@@ -23,10 +23,10 @@ func (r *aiRepository) GetSettings(ctx context.Context, projectID int64) (*model
 	s := &models.AISettings{}
 	err := r.db.QueryRowContext(ctx,
 		`SELECT project_id, base_url, model, api_key_enc, api_key_hint, price_input::float8, price_output::float8,
-		        monthly_budget::float8, updated_by, updated_at
+		        monthly_budget::float8, extra_context, updated_by, updated_at
 		 FROM project_ai_settings WHERE project_id = $1`, projectID,
 	).Scan(&s.ProjectID, &s.BaseURL, &s.Model, &s.APIKeyEnc, &s.APIKeyHint, &s.PriceInput, &s.PriceOutput,
-		&s.MonthlyBudget, &s.UpdatedBy, &s.UpdatedAt)
+		&s.MonthlyBudget, &s.ExtraContext, &s.UpdatedBy, &s.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -36,14 +36,16 @@ func (r *aiRepository) GetSettings(ctx context.Context, projectID int64) (*model
 func (r *aiRepository) SaveSettings(ctx context.Context, s *models.AISettings) error {
 	return r.db.QueryRowContext(ctx,
 		`INSERT INTO project_ai_settings (project_id, base_url, model, api_key_enc, api_key_hint, price_input,
-		        price_output, monthly_budget, updated_by)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+		        price_output, monthly_budget, updated_by, extra_context)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 		 ON CONFLICT (project_id) DO UPDATE SET base_url = EXCLUDED.base_url, model = EXCLUDED.model,
 		        api_key_enc = EXCLUDED.api_key_enc, api_key_hint = EXCLUDED.api_key_hint,
 		        price_input = EXCLUDED.price_input, price_output = EXCLUDED.price_output,
-		        monthly_budget = EXCLUDED.monthly_budget, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+		        monthly_budget = EXCLUDED.monthly_budget, extra_context = EXCLUDED.extra_context,
+		        updated_by = EXCLUDED.updated_by, updated_at = NOW()
 		 RETURNING updated_at`,
 		s.ProjectID, s.BaseURL, s.Model, s.APIKeyEnc, s.APIKeyHint, s.PriceInput, s.PriceOutput, s.MonthlyBudget, s.UpdatedBy,
+		s.ExtraContext,
 	).Scan(&s.UpdatedAt)
 }
 

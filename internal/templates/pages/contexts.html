@@ -1,0 +1,26 @@
+{{define "content"}}{{$p := .Data.Project}}
+{{template "project_header" .}}
+<section class="card">
+    <div class="card-head">
+        <h2>📌 {{t .Lang "title.contexts"}} <span class="muted small">({{len .Data.Items}})</span></h2>
+    </div>
+    <p class="muted small">{{t .Lang "context.intro"}}</p>
+    <form method="get" action="{{$p.Path}}/contexts" class="context-search">
+        <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "context.search"}}" aria-label="{{t .Lang "context.search"}}">
+    </form>
+    {{if .Data.Items}}
+    <ul class="context-list">
+        {{range .Data.Items}}
+        <li>
+            <div class="context-file"><a href="{{.FileURL $p.Path}}"><strong>{{.Filename}}</strong></a>
+                <span class="muted small">@{{.OwnerUsername}}{{if .Language}} · {{langName .Language}}{{end}}</span></div>
+            <div class="context-note">{{linkify .Note}}</div>
+            <div class="muted small">{{t $.Lang "context.by" .UpdaterName (timeAgo $.Lang .UpdatedAt)}}</div>
+        </li>
+        {{end}}
+    </ul>
+    {{else}}
+    <p class="muted">{{if .Data.Query}}{{t .Lang "context.no_results"}}{{else}}{{t .Lang "context.empty"}}{{end}}</p>
+    {{end}}
+</section>
+{{end}}

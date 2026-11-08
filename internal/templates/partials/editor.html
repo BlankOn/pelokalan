@@ -19,7 +19,7 @@
         <div class="ed-label">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} {{t $.Lang "editor.glossary"}}</div>
         <ul class="gl-terms">
             {{range .Terms}}
-            <li class="gl-term">
+            <li class="gl-term{{if .Overridden}} gl-overridden{{end}}"{{if .Overridden}} title="{{t $.Lang "editor.glossary_overridden"}}"{{end}}>
                 <button type="button" class="gl-insert" data-insert="{{.Translation}}" {{if $.ReadOnly}}disabled{{end}} title="{{t $.Lang "editor.glossary_insert"}}"><span class="gl-src">{{.Term}}</span> <span class="arrow">→</span> <strong class="gl-tr">{{.Translation}}</strong></button>
                 <span class="muted small" title="{{t $.Lang "editor.glossary_share"}}">{{.Share}}%</span>
                 <a class="gl-open small" href="{{$.Project.Path}}/glossary/{{.Hash}}" target="_blank" rel="noopener" title="{{t $.Lang "editor.glossary_open"}}">↗</a>

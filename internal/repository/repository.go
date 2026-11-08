@@ -259,6 +259,8 @@ type WikiRepository interface {
 	// Reorder makes ids the children of parentID (nil = top level) in that order; it does not
 	// change updated_at, so moving a page never conflicts with someone editing it
 	Reorder(ctx context.Context, projectID int64, parentID *int64, ids []int64) error
+	// Edits lists who saved a page and when, newest first
+	Edits(ctx context.Context, pageID int64, limit int) ([]models.WikiEdit, error)
 	CreateFile(ctx context.Context, f *models.WikiFile) error
 	GetFile(ctx context.Context, projectID, id int64) (*models.WikiFile, error)
 }
@@ -267,4 +269,13 @@ type WikiRepository interface {
 type ModuleCount struct {
 	Name  string
 	Terms int64
+}
+
+// ContextRepository stores Konteks notes of PO files
+type ContextRepository interface {
+	Get(ctx context.Context, catalogID int64) (*models.CatalogContext, error)
+	// Set stores a note; an empty note removes it
+	Set(ctx context.Context, c *models.CatalogContext) error
+	// ListForProject lists the notes of a project's PO files, optionally matching q
+	ListForProject(ctx context.Context, projectID int64, q string) ([]*models.CatalogContext, error)
 }

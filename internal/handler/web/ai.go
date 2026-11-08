@@ -57,6 +57,7 @@ func (h *Handler) SaveAISettings(w http.ResponseWriter, r *http.Request) {
 		PriceInput:    r.FormValue("price_input"),
 		PriceOutput:   r.FormValue("price_output"),
 		MonthlyBudget: r.FormValue("monthly_budget"),
+		ExtraContext:  r.FormValue("extra_context"),
 	})
 	if err != nil {
 		h.renderSettings(w, r, p, h.errorMessage(r, err), "")

@@ -32,9 +32,11 @@ func NewCatalogService(catalogs repository.CatalogRepository, commits repository
 
 // EntryFilter narrows an entry listing
 type EntryFilter struct {
-	Status string // "", "todo", "untranslated", "fuzzy", "translated", "issues"
-	Query  string
-	Order  string // "", "file", "source", "translation", "todo_first"
+	// Statuses: an entry is listed when it matches any of them ("todo", "untranslated",
+	// "fuzzy", "translated", "issues", "ai", "glossary", "memory"); none = all entries
+	Statuses []string
+	Query    string
+	Order    string // "", "file", "source", "translation", "todo_first"
 }
 
 // EntryListing is the result of listing entries
@@ -508,13 +510,25 @@ func (s *CatalogService) Entries(ctx context.Context, c *models.Catalog, f Entry
 		case models.OriginMemory:
 			l.Memory++
 		}
-		if !matchStatus(e, f.Status) || (q != "" && !matchQuery(e, q)) {
+		if !matchAnyStatus(e, f.Statuses) || (q != "" && !matchQuery(e, q)) {
 			continue
 		}
 		l.Entries = append(l.Entries, e)
 	}
 	sortEntries(l.Entries, f.Order)
 	return l, nil
+}
+
+func matchAnyStatus(e *models.Entry, statuses []string) bool {
+	if len(statuses) == 0 {
+		return true
+	}
+	for _, s := range statuses {
+		if matchStatus(e, s) {
+			return true
+		}
+	}
+	return false
 }
 
 func matchStatus(e *models.Entry, status string) bool {

@@ -171,6 +171,14 @@ func (s *WikiService) Redirect(ctx context.Context, p *models.Project, slug stri
 	return cur, err
 }
 
+// wikiHistoryLimit is how many saves the page shows
+const wikiHistoryLimit = 50
+
+// Edits lists who saved the page and when, newest first
+func (s *WikiService) Edits(ctx context.Context, pg *models.WikiPage) ([]models.WikiEdit, error) {
+	return s.repo.Edits(ctx, pg.ID, wikiHistoryLimit)
+}
+
 // Page loads one page with its body
 func (s *WikiService) Page(ctx context.Context, p *models.Project, slug string) (*models.WikiPage, error) {
 	pg, err := s.repo.GetPage(ctx, p.ID, strings.ToLower(slug))

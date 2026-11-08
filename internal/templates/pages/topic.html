@@ -1,0 +1,9 @@
+{{define "content"}}{{$p := .Data.Project}}{{$t := .Data.Thread.Thread}}
+{{template "project_header" .}}
+<div class="topic-head">
+    <div class="crumbs"><a href="{{$p.Path}}/discussions">{{t .Lang "title.discussions"}}</a> /</div>
+    <h1>{{$t.Subject.Title}}</h1>
+    {{with .Data.Starter}}<p class="muted small">{{t $.Lang "topic.started_by" .AuthorName (timeAgo $.Lang .CreatedAt)}}</p>{{end}}
+</div>
+{{template "discussion_thread" .Data.Thread}}
+{{end}}

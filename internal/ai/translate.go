@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"sort"
 	"strings"
 	"unicode"
@@ -17,6 +18,54 @@ import (
 type TermHint struct {
 	Term        string `json:"term"`
 	Translation string `json:"translation"`
+	// Optional: the file's Konteks note talks about a word of this term, so the note
+	// decides and the glossary translation is only a suggestion
+	Optional bool `json:"optional,omitempty"`
+}
+
+// quotedRe finds the parts of a note written in backticks or (straight or curly) double
+// quotes: `key`, "flat review", “key”. Only those name terms the note decides on.
+var quotedRe = regexp.MustCompile("`([^`\\n]{1,80})`|\"([^\"\\n]{1,80})\"|“([^”\\n]{1,80})”")
+
+// ContextWords returns the words (lowercase) a Konteks note explicitly talks about: the words
+// inside backticks or double quotes. Glossary terms containing one of them are decided by the
+// note. Words merely used in sentences or examples do not count.
+func ContextWords(note string) map[string]bool {
+	var quoted []string
+	for _, m := range quotedRe.FindAllStringSubmatch(note, -1) {
+		quoted = append(quoted, m[1]+m[2]+m[3])
+	}
+	words := map[string]bool{}
+	for _, w := range splitWords(strings.ToLower(strings.Join(quoted, " "))) {
+		w = strings.Trim(w, "-'")
+		if utf8.RuneCountInString(w) >= 3 {
+			words[w] = true
+		}
+	}
+	return words
+}
+
+// Mentioned reports whether the note's words include a word of text (3+ letters)
+func Mentioned(text string, words map[string]bool) bool {
+	if len(words) == 0 {
+		return false
+	}
+	for _, w := range splitWords(glossary.Normalize(glossary.Clean(text))) {
+		if utf8.RuneCountInString(w) >= 3 && words[strings.Trim(w, "-'")] {
+			return true
+		}
+	}
+	return false
+}
+
+// MarkOptional makes glossary hints the note talks about optional
+func MarkOptional(hints []TermHint, words map[string]bool) []TermHint {
+	for i := range hints {
+		if Mentioned(hints[i].Term, words) {
+			hints[i].Optional = true
+		}
+	}
+	return hints
 }
 
 // Item is one string to translate
@@ -149,11 +198,20 @@ func splitWords(s string) []string {
 	})
 }
 
-// SystemPrompt returns the instructions for the model
-func SystemPrompt(sourceLang, targetLang string) string {
-	return fmt.Sprintf(`You are a professional software localizer translating user interface strings from %s to %s.
+// MaxFileContext caps how much of the file's Konteks note goes into the prompt;
+// MaxProjectContext is the longest project-wide guidance accepted in the AI settings
+const (
+	MaxFileContext    = 4000
+	MaxProjectContext = 4000
+)
+
+// SystemPrompt returns the instructions for the model. fileContext is the translators'
+// Konteks note about the PO file (may be empty); it is background only and never
+// overrides the rules.
+func SystemPrompt(sourceLang, targetLang, projectContext, fileContext string) string {
+	p := fmt.Sprintf(`You are a professional software localizer translating user interface strings from %s to %s.
 Rules:
-1. Each item may contain "glossary": a list of required term translations. When a glossary term appears in the source you MUST use its given translation (you may adjust letter case or add affixes required by grammar). The glossary overrides your own preferences.
+1. Each item may contain "glossary": a list of term translations. When a glossary term appears in the source you MUST use its given translation (you may adjust letter case or add affixes required by grammar); it overrides your own preferences. Exception: a term marked "optional": true is discussed in the project or file context below; there that context decides, and the glossary translation is only a suggestion.
 2. Keep every format placeholder exactly as in the source (e.g. %%s, %%d, %%1$s, {name}, $VAR), and keep markup tags and entities unchanged.
 3. Keep leading and trailing whitespace and newlines (\n) as in the source.
 4. If the source has a keyboard accelerator marker (_ or & before a letter), put exactly one marker before a suitable letter of the translation.
@@ -161,6 +219,26 @@ Rules:
 6. When "forms" is given, return that many plural forms (form 0 first) following the target language's plural rules.
 7. Use concise, natural, consistent UI language. Do not add explanations.
 Reply with JSON only: {"translations":[{"id":<id>,"forms":["..."]}]} with one entry per input item.`, sourceLang, targetLang)
+	if projectContext = strings.TrimSpace(projectContext); projectContext != "" {
+		if r := []rune(projectContext); len(r) > MaxProjectContext {
+			projectContext = string(r[:MaxProjectContext]) + "…"
+		}
+		p += "\n\nGuidance for the whole project from its translators (style, audience, terminology). " +
+			"Follow it for every item. When it says how a word should be translated, follow it " +
+			"(it overrides glossary terms marked optional). Placeholders, markup and the other rules above still apply.\n" +
+			"<project_context>\n" + projectContext + "\n</project_context>"
+	}
+	if fileContext = strings.TrimSpace(fileContext); fileContext != "" {
+		if r := []rune(fileContext); len(r) > MaxFileContext {
+			fileContext = string(r[:MaxFileContext]) + "…"
+		}
+		p += "\n\nContext about this file from its translators (what it is, where its strings appear, agreed terms and style). " +
+			"Use it to choose meaning, terminology and tone; it is more specific than the project guidance and wins if they disagree. " +
+			"When it says how a word should be translated in this file, follow it " +
+			"(it overrides glossary terms marked optional). Placeholders, markup and the other rules above still apply.\n" +
+			"<file_context>\n" + fileContext + "\n</file_context>"
+	}
+	return p
 }
 
 // UserPrompt serializes a batch of items
@@ -224,6 +302,9 @@ func Verify(it Item, forms []string, nplurals int) []string {
 	joined := strings.ToLower(glossary.Clean(strings.Join(forms, "\n")))
 	joined = strings.NewReplacer("_", "", "&", "").Replace(joined)
 	for _, h := range it.Glossary {
+		if h.Optional {
+			continue // the file context may ask for another translation
+		}
 		if !strings.Contains(joined, strings.ToLower(h.Translation)) {
 			problems = append(problems, ProblemGlossary)
 			break

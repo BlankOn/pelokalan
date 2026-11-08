@@ -1,0 +1,23 @@
+{{define "content"}}{{$p := .Data.Project}}
+{{template "project_header" .}}
+<section class="card topic-new">
+    <h1>{{t .Lang "topic.new_title"}}</h1>
+    <p class="muted small">{{t .Lang "topic.new_help"}}</p>
+    <form method="post" action="{{$p.Path}}/topics/new" enctype="multipart/form-data" class="form comment-form">
+        <label for="topic-title">{{t .Lang "topic.field_title"}}</label>
+        <input id="topic-title" name="title" required maxlength="140" value="{{.Data.TopicTitle}}" autofocus>
+        <label for="topic-body">{{t .Lang "topic.field_body"}}</label>
+        <textarea id="topic-body" name="body" rows="10" maxlength="5000" placeholder="{{t .Lang "discuss.placeholder"}}">{{.Data.Body}}</textarea>
+        <div class="att-picker small">
+            <label class="att-add">📎 {{t .Lang "discuss.attach"}}<input type="file" name="files" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" data-max="5" data-max-bytes="10485760" data-err-type="{{t .Lang "err.attachment_type"}}" data-err-size="{{t .Lang "err.attachment_size" 10}}" data-err-count="{{t .Lang "err.attachments_count" 5}}"></label>
+            <span class="muted">{{t .Lang "discuss.attach_help"}}</span>
+            <ul class="att-pending"></ul>
+            <div class="att-error c-err" role="alert" hidden></div>
+        </div>
+        <div class="row-actions">
+            <a class="btn" href="{{$p.Path}}/discussions">{{t .Lang "action.cancel"}}</a>
+            <button type="submit" class="btn btn-primary">{{t .Lang "topic.start"}}</button>
+        </div>
+    </form>
+</section>
+{{end}}

@@ -6,7 +6,13 @@
         {{range $t.Comments}}
         <li id="comment-{{.ID}}" class="comment{{if .IsDeleted}} comment-deleted{{end}}">
             {{if .IsDeleted}}
-            <span class="muted small">{{t $.Lang "discuss.deleted"}}</span>
+            <div class="comment-head">
+                <span class="avatar avatar-sm">{{initial .AuthorName}}</span>
+                <strong>{{or .AuthorName "—"}}</strong>
+                {{if .AuthorUsername}}<span class="muted small">@{{.AuthorUsername}}</span>{{end}}
+                <a class="muted small" href="#comment-{{.ID}}">{{timeAgo $.Lang .CreatedAt}}</a>
+            </div>
+            <p class="comment-body comment-removed">{{if .DeletedByOther}}{{t $.Lang "discuss.deleted_by" .DeleterName (timeAgo $.Lang (derefTime .DeletedAt))}}{{else}}{{t $.Lang "discuss.deleted_at" (timeAgo $.Lang (derefTime .DeletedAt))}}{{end}}</p>
             {{else}}
             <div class="comment-head">
                 <span class="avatar avatar-sm">{{initial .AuthorName}}</span>

@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"html"
@@ -100,8 +102,49 @@ func (s *DiscussionService) ResolveSubject(ctx context.Context, p *models.Projec
 			return &Subject{Type: subjectType, Key: key, Title: d.Title, URL: url}, nil
 		}
 		return nil, ErrNotFound
+	case models.SubjectTopic:
+		// a topic exists only once it has been started (CreateTopic)
+		if !topicKeyRe.MatchString(key) {
+			return nil, ErrNotFound
+		}
+		d, err := s.repo.Get(ctx, p.ID, subjectType, key)
+		if errors.Is(err, repository.ErrNotFound) {
+			return nil, ErrNotFound
+		} else if err != nil {
+			return nil, err
+		}
+		return &Subject{Type: subjectType, Key: key, Title: d.Title, URL: TopicURL(p, key)}, nil
 	}
 	return nil, ErrNotFound
+}
+
+var topicKeyRe = regexp.MustCompile(`^[0-9a-f]{12}$`)
+
+// TopicURL is the page of a free discussion
+func TopicURL(p *models.Project, key string) string { return p.Path() + "/topics/" + key }
+
+const maxTopicTitle = 140
+
+// CreateTopic starts a free discussion (project members) with a title and a first post.
+// Nothing is stored when the post is invalid.
+func (s *DiscussionService) CreateTopic(ctx context.Context, user *models.User, p *models.Project, title, body, lang string, uploads []Upload) (*Subject, error) {
+	if !p.Role.IsMember() {
+		return nil, ErrForbidden
+	}
+	title = strings.Join(strings.Fields(title), " ")
+	if title == "" || len([]rune(title)) > maxTopicTitle {
+		return nil, userErr("err.topic_title", maxTopicTitle)
+	}
+	b := make([]byte, 6)
+	if _, err := rand.Read(b); err != nil {
+		return nil, err
+	}
+	key := hex.EncodeToString(b)
+	subj := &Subject{Type: models.SubjectTopic, Key: key, Title: title, URL: TopicURL(p, key)}
+	if _, err := s.post(ctx, user, p, subj, body, lang, uploads); err != nil {
+		return nil, err
+	}
+	return subj, nil
 }
 
 // entryCatalog parses a PO entry subject key and loads its file
@@ -132,6 +175,8 @@ func (s *DiscussionService) SubjectURL(ctx context.Context, p *models.Project, d
 	switch d.SubjectType {
 	case models.SubjectGlossaryTerm:
 		return GlossaryTermURL(p, d.SubjectKey)
+	case models.SubjectTopic:
+		return TopicURL(p, d.SubjectKey)
 	case models.SubjectPOEntry:
 		if c, hash, err := s.entryCatalog(ctx, p, d.SubjectKey); err == nil {
 			return c.URL() + "?entry=" + hash
@@ -264,33 +309,43 @@ func (s *DiscussionService) Comment(ctx context.Context, user *models.User, p *m
 	if len([]rune(body)) > maxCommentLen || (body == "" && len(uploads) == 0) {
 		return nil, nil, userErr("err.comment_length", maxCommentLen)
 	}
-	attachments, err := s.storeUploads(ctx, uploads)
-	if err != nil {
-		return nil, nil, err
-	}
-	if body == "" && len(attachments) == 0 {
-		return nil, nil, userErr("err.comment_length", maxCommentLen)
-	}
 	subj, err := s.ResolveSubject(ctx, p, subjectType, key)
 	if err != nil {
 		return nil, nil, err
 	}
-	d := &models.Discussion{ProjectID: p.ID, SubjectType: subjectType, SubjectKey: key, Title: subj.Title, CreatedBy: &user.ID}
+	c, err := s.post(ctx, user, p, subj, body, lang, uploads)
+	return c, subj, err
+}
+
+// post stores a comment on a resolved subject, creating its discussion on first use
+func (s *DiscussionService) post(ctx context.Context, user *models.User, p *models.Project, subj *Subject, body, lang string, uploads []Upload) (*models.Comment, error) {
+	body = strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n"))
+	if len([]rune(body)) > maxCommentLen || (body == "" && len(uploads) == 0) {
+		return nil, userErr("err.comment_length", maxCommentLen)
+	}
+	attachments, err := s.storeUploads(ctx, uploads)
+	if err != nil {
+		return nil, err
+	}
+	if body == "" && len(attachments) == 0 {
+		return nil, userErr("err.comment_length", maxCommentLen)
+	}
+	d := &models.Discussion{ProjectID: p.ID, SubjectType: subj.Type, SubjectKey: subj.Key, Title: subj.Title, CreatedBy: &user.ID}
 	if err := s.repo.GetOrCreate(ctx, d); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	members, err := s.Members(ctx, p)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	mentioned := s.resolveMentions(body, members)
 	c := &models.Comment{DiscussionID: d.ID, AuthorID: &user.ID, Body: body}
 	if err := s.repo.AddComment(ctx, c, ids(mentioned), attachments); err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 	// emails go out in the background so posting stays fast
 	go s.notify(context.Background(), user, p, subj, c, mentioned, members)
-	return c, subj, nil
+	return c, nil
 }
 
 func (s *DiscussionService) resolveMentions(body string, members map[string]*models.User) []*models.User {

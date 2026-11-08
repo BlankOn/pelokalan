@@ -171,12 +171,13 @@ func (r *discussionRepository) AddComment(ctx context.Context, c *models.Comment
 }
 
 const commentColumns = `c.id, c.discussion_id, c.author_id, COALESCE(NULLIF(u.name, ''), u.username, ''), COALESCE(u.username, ''),
-	c.body, c.created_at, c.edited_at, c.deleted_at`
+	c.body, c.created_at, c.edited_at, c.deleted_at, c.deleted_by,
+	COALESCE((SELECT COALESCE(NULLIF(x.name, ''), x.username) FROM users x WHERE x.id = c.deleted_by), '')`
 
 func scanComment(row interface{ Scan(...any) error }) (*models.Comment, error) {
 	c := &models.Comment{}
 	err := row.Scan(&c.ID, &c.DiscussionID, &c.AuthorID, &c.AuthorName, &c.AuthorUsername, &c.Body, &c.CreatedAt,
-		&c.EditedAt, &c.DeletedAt)
+		&c.EditedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}

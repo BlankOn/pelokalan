@@ -8,6 +8,7 @@ import "time"
 const (
 	SubjectGlossaryTerm = "glossary_term" // key: glossary term hash
 	SubjectPOEntry      = "po_entry"      // key: "<catalog id>-<entry key hash>"
+	SubjectTopic        = "topic"         // free discussion started by a member; key: random id
 )
 
 // Discussion is a comment thread attached to a subject
@@ -38,8 +39,15 @@ type Comment struct {
 	CreatedAt      time.Time
 	EditedAt       *time.Time
 	DeletedAt      *time.Time
+	DeletedBy      *int64
+	DeleterName    string // who deleted it
 
 	Attachments []*Attachment
+}
+
+// DeletedByOther reports whether someone other than the author (a moderator) deleted it
+func (c *Comment) DeletedByOther() bool {
+	return c.DeletedBy != nil && (c.AuthorID == nil || *c.DeletedBy != *c.AuthorID)
 }
 
 // IsDeleted reports whether the comment was removed

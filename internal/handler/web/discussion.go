@@ -476,3 +476,72 @@ func linkify(s string) template.HTML {
 	b.WriteString(html.EscapeString(s[last:]))
 	return template.HTML(b.String())
 }
+
+// TopicPage shows a free discussion (public, like the other discussions)
+func (h *Handler) TopicPage(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	thread, err := h.discuss.Thread(r.Context(), p, models.SubjectTopic, strings.ToLower(chi.URLParam(r, "key")))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	data := h.page(r, "")
+	data.Title = thread.Subject.Title + " · " + i18n.T(data.Lang, "title.discussions") + " · " + p.Name
+	data.Data["Project"] = p
+	data.Data["Tab"] = "discussions"
+	data.Data["Thread"] = h.threadView(r, p, thread)
+	if len(thread.Comments) > 0 {
+		data.Data["Starter"] = thread.Comments[0]
+	}
+	h.render(w, "topic", data)
+}
+
+// TopicNew shows the form to start a free discussion (members)
+func (h *Handler) TopicNew(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	h.renderTopicNew(w, r, p, "", "", "")
+}
+
+func (h *Handler) renderTopicNew(w http.ResponseWriter, r *http.Request, p *models.Project, title, body, errMsg string) {
+	data := h.page(r, "")
+	data.Title = i18n.T(data.Lang, "topic.new_title") + " · " + p.Name
+	data.Error = errMsg
+	data.Data["Project"] = p
+	data.Data["Tab"] = "discussions"
+	data.Data["TopicTitle"] = title
+	data.Data["Body"] = body
+	if errMsg != "" {
+		w.WriteHeader(http.StatusBadRequest)
+	}
+	h.render(w, "topic_new", data)
+}
+
+// TopicCreate starts a free discussion with its first post (text and/or images)
+func (h *Handler) TopicCreate(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	uploads, err := readAttachments(w, r)
+	if err != nil {
+		h.renderTopicNew(w, r, p, r.FormValue("title"), r.FormValue("body"), h.errorMessage(r, err))
+		return
+	}
+	subj, err := h.discuss.CreateTopic(r.Context(), middleware.GetUser(r.Context()), p,
+		r.FormValue("title"), r.FormValue("body"), middleware.GetLang(r.Context()), uploads)
+	if err != nil {
+		if _, ok := service.AsUserError(err); ok {
+			h.renderTopicNew(w, r, p, r.FormValue("title"), r.FormValue("body"), h.errorMessage(r, err))
+			return
+		}
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, subj.URL, http.StatusSeeOther)
+}

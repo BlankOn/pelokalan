@@ -50,7 +50,7 @@ func TestGlossaryExact(t *testing.T) {
 }
 
 func TestVerify(t *testing.T) {
-	it := Item{Source: "Open %s", Flags: []string{"c-format"}, Glossary: []TermHint{{"Open", "Buka"}}}
+	it := Item{Source: "Open %s", Flags: []string{"c-format"}, Glossary: []TermHint{{Term: "Open", Translation: "Buka"}}}
 	if p := Verify(it, []string{"Buka %s"}, 1); len(p) != 0 {
 		t.Errorf("good translation flagged: %v", p)
 	}
@@ -77,7 +77,7 @@ func TestParseAndBatch(t *testing.T) {
 	if b := Batch(items, 25, 100000); len(b) != 3 || len(b[2]) != 5 {
 		t.Fatalf("batches = %d", len(b))
 	}
-	est := EstimateBatches(Batch(items, 25, 100000), SystemPrompt("English", "Indonesian"))
+	est := EstimateBatches(Batch(items, 25, 100000), SystemPrompt("English", "Indonesian", "", ""))
 	if est.PromptTokens <= 0 || est.CompletionTokens <= 0 || est.Batches != 3 {
 		t.Fatalf("estimate = %+v", est)
 	}
@@ -132,5 +132,66 @@ func TestClient(t *testing.T) {
 	}
 	if _, _, err := NewClient(srv.URL, "good", "m", false).Chat(context.Background(), "s", "u"); err == nil {
 		t.Fatal("private address must be blocked")
+	}
+}
+
+func TestSystemPromptFileContext(t *testing.T) {
+	plain := SystemPrompt("English", "Indonesian", "", "  ")
+	if strings.Contains(plain, "<file_context>") {
+		t.Fatal("empty context must not add a section")
+	}
+	with := SystemPrompt("English", "Indonesian", "", "Orca screen reader UI. \"flat review\" = \"tinjau rata\".")
+	if !strings.HasPrefix(with, plain) || !strings.Contains(with, "<file_context>\nOrca screen reader UI.") {
+		t.Fatalf("context section missing or rules not first:\n%s", with)
+	}
+	long := SystemPrompt("English", "Indonesian", "", strings.Repeat("x", MaxFileContext+500))
+	if !strings.Contains(long, "\n"+strings.Repeat("x", MaxFileContext)+"…\n</file_context>") {
+		t.Fatal("long context is not capped")
+	}
+}
+
+func TestContextMakesGlossaryOptional(t *testing.T) {
+	note := "Tecla adalah aplikasi untuk menampilkan layout papan tik. Bahasa inggris `key` di sini kemungkinan besar adalah `tombol`, bukan `kunci`."
+	words := ContextWords(note)
+	if !Mentioned("Key Description", words) || !Mentioned("_Keys…", words) && Mentioned("Show _Description", words) {
+		t.Fatal("terms with a word from the note must be detected")
+	}
+	if Mentioned("Show Description", words) || Mentioned("Open", ContextWords("")) {
+		t.Fatal("unrelated terms must stay required")
+	}
+	// words only used in a sentence or example do not override the glossary; quoted ones do
+	example := ContextWords("Contoh, key description adalah pola MD; diterjemahkan menjadi Deskripsi tombol.")
+	if Mentioned("Description", example) || Mentioned("Key", example) {
+		t.Fatal("unquoted words must not override the glossary")
+	}
+	quoted := ContextWords(`Istilah: "flat review" = “tinjau rata”, dan ` + "`Keys`.")
+	if !Mentioned("Flat Review", quoted) || !Mentioned("_Keys…", quoted) || Mentioned("Review Changes", ContextWords("review")) {
+		t.Fatal("quoted words must override the glossary")
+	}
+	hints := MarkOptional([]TermHint{{Term: "Key", Translation: "Kunci"}, {Term: "Description", Translation: "Deskripsi"}}, words)
+	if !hints[0].Optional || hints[1].Optional {
+		t.Fatalf("got %+v", hints)
+	}
+	// an optional term missing from the result is not a glossary problem; a required one is
+	it := Item{Source: "Key Description", Glossary: hints}
+	if p := Verify(it, []string{"Deskripsi Tombol"}, 2); len(p) != 0 {
+		t.Fatalf("Deskripsi Tombol should pass, got %v", p)
+	}
+	if p := Verify(it, []string{"Keterangan Tombol"}, 2); len(p) == 0 {
+		t.Fatal("missing required term must be flagged")
+	}
+	if !strings.Contains(SystemPrompt("English", "Indonesian", "", note), `"optional": true`) {
+		t.Fatal("prompt must explain optional terms")
+	}
+}
+
+func TestSystemPromptProjectContext(t *testing.T) {
+	p := SystemPrompt("English", "Indonesian", "Gunakan bahasa santai.", "Berkas Tecla.")
+	pi, fi := strings.Index(p, "<project_context>\nGunakan bahasa santai."), strings.Index(p, "<file_context>\nBerkas Tecla.")
+	if pi < 0 || fi < 0 || pi > fi {
+		t.Fatalf("project context must come before the file context:\n%s", p)
+	}
+	if strings.Contains(SystemPrompt("English", "Indonesian", " ", ""), "<project_context>") {
+		t.Fatal("empty project context must not add a section")
 	}
 }

@@ -9,14 +9,22 @@
             <h1>{{$pg.Title}}</h1>
             {{if $.Data.CanEdit}}
             <div class="row-actions">
-                <a class="btn btn-small btn-primary" href="{{$p.Path}}/wiki/{{$pg.Slug}}/edit">{{t $.Lang "wiki.edit"}}</a>
-                {{if lt $.Data.Depth $.Data.MaxDepth}}<a class="btn btn-small" href="{{$p.Path}}/wiki/new?parent={{$pg.ID}}">{{t $.Lang "wiki.new_subpage"}}</a>{{end}}
                 {{if $.Data.CanDelete}}<form method="post" action="{{$p.Path}}/wiki/{{$pg.Slug}}/delete" data-confirm="{{t $.Lang "wiki.confirm_delete"}}"><button class="btn btn-small btn-danger">{{t $.Lang "wiki.delete"}}</button></form>{{end}}
+                {{if lt $.Data.Depth $.Data.MaxDepth}}<a class="btn btn-small" href="{{$p.Path}}/wiki/new?parent={{$pg.ID}}">{{t $.Lang "wiki.new_subpage"}}</a>{{end}}
+                <a class="btn btn-small btn-primary" href="{{$p.Path}}/wiki/{{$pg.Slug}}/edit">{{t $.Lang "wiki.edit"}}</a>
             </div>
             {{end}}
         </div>
         <p class="muted small wiki-meta">{{t $.Lang "wiki.updated" (timeAgo $.Lang $pg.UpdatedAt) (or $pg.UpdaterName "—")}}</p>
         <div class="wiki-body">{{if $pg.Body}}{{wikiHTML $pg.Body}}{{else}}<p class="muted">{{t $.Lang "wiki.preview_empty"}}</p>{{end}}</div>
+        {{if $.Data.Edits}}
+        <details class="wiki-history" open>
+            <summary>{{t $.Lang "wiki.history" (len $.Data.Edits)}}</summary>
+            <ol>
+                {{range $.Data.Edits}}<li>{{if .Username}}<strong>@{{.Username}}</strong>{{else}}<span class="muted">—</span>{{end}} <span class="muted">· <time data-local datetime="{{.At.Format "2006-01-02T15:04:05Z07:00"}}" title="{{timeAgo $.Lang .At}}">{{.At.Format "02-01-2006 15:04"}}</time></span></li>{{end}}
+            </ol>
+        </details>
+        {{end}}
         {{if $.Data.Subpages}}
         <nav class="wiki-subpages">
             <h3>{{t $.Lang "wiki.subpages"}}</h3>

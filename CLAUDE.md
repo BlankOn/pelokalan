@@ -122,14 +122,18 @@ make test
   `comments` + `comment_mentions`. Subject types are resolved in
   `DiscussionService.ResolveSubject` / `SubjectURL`: `glossary_term` (key = term hash) and
   `po_entry` (key = "<catalog id>-<Entry.KeyHash()>", stable across restores/merges; page =
-  file URL + `?entry=<hash>`). Add a case there to attach discussions to something new.
+  file URL + `?entry=<hash>`) and `topic` (free discussion: key = random 12 hex chars, title
+  stored on the discussion, page `/projects/{id}/topics/{key}`, started from the Diskusi tab via
+  `CreateTopic`, which stores nothing if the first post is invalid). Add a case there to attach
+  discussions to something new.
 - The glossary can be filtered by module (PO file, `GlossaryQuery.Module`); the term still shows
   all its translations. The module list (`GlossaryRepository.Modules`) feeds a searchable dropdown
   (`[data-combo]` in app.js).
 - The sync status above the glossary always describes the newest version with data.
 - Every new comment emails all other project members in the background (mentioned members
   get the mention wording).
-- Comments: project members only; readable publicly. `@username` mentions of members are
+- Comments: project members only; readable publicly. Deletion is soft (`deleted_at`, `deleted_by`): the
+  author, username and time stay visible with a note saying who deleted it and when. `@username` mentions of members are
   stored and emailed. Authors edit/delete their own; owners/managers can delete any. Bodies are
   Markdown rendered by `commentHTML` (goldmark GFM + hard wraps, safe mode: raw HTML and
   javascript: links dropped; bare URLs auto-linked; mentions outside a/code/pre).
@@ -152,6 +156,20 @@ make test
 - Thread component `discussion_thread` is used on the term page and lazily in the glossary
   list (`.gl-thread[data-thread-url]`); "Diskusi" tab lists all threads (`?mentions=1`).
 
+## Konteks
+
+- One free note per PO file (`catalog_contexts`, migration 022), kept in Pelokalan only (never
+  exported). Readable by anyone who can read the file; only the file owner edits it.
+- Editor: "Konteks" toolbar button right of Praterjemah opens `#context-dialog`; saved with
+  `POST /catalogs/{cid}/context` (JSON). A dot on the button shows that the file has a note.
+- Project tab "Konteks" (`/projects/{id}/contexts`) lists all files with a note, searchable.
+- AI pre-translation puts the file's note into the system prompt (`ai.SystemPrompt(..., fileContext)`,
+  capped at `ai.MaxFileContext`); it counts in the cost estimate. The note outranks the glossary for
+  the words it talks about: glossary terms containing a word the note writes in quotes or backticks (3+ letters,
+  `ai.ContextWords`/`ai.Mentioned`; plain sentences and examples do not count) are sent as `optional` hints (not enforced by `ai.Verify`), and
+  whole-string glossary matches containing such a word go to the model instead of being applied.
+- Project tabs carry monochrome line icons (`tab_icon` in project_header.html).
+
 ## Wiki
 
 - `wiki_pages` (migration 019): Markdown pages per project, nested at most `models.WikiMaxDepth`
@@ -163,6 +181,9 @@ make test
   between, the save is refused (409) and the editor keeps the user's text with steps to resolve:
   copy it, reload the latest version, edit again. It never overwrites. Tree moves are
   last-write-wins.
+- Every create/save is recorded in `wiki_edits` (migration 021, backfilled from created/updated);
+  the article lists the latest 50 as "@username · time", converted to the reader's time zone
+  (`time[data-local]` in app.js). Moves are not edits.
 - The tree is reorganized only by drag and drop in the sidebar (`WikiService.Move`, modes
   before/after/inside, depth checked for the whole subtree; `Reorder` does not touch updated_at).
 - Rendering: `wikiHTML` (goldmark GFM, safe mode, heading ids). Images are only shown when
@@ -201,7 +222,10 @@ make test
 ## AI pre-translation
 
 - Settings per project in `project_ai_settings` (owner/manager): base URL, model, API key
-  encrypted with `ai.Box` (AES-GCM, key from `AI_SECRET_KEY`), prices per 1M tokens, monthly budget.
+  encrypted with `ai.Box` (AES-GCM, key from `AI_SECRET_KEY`), prices per 1M tokens, monthly budget,
+  and `extra_context` (migration 023): project-wide guidance sent as `<project_context>` before the
+  file's `<file_context>` (the file note is more specific and wins). Words in either can make
+  glossary hints optional.
 - `AIService.plan` (service/ai.go): untranslated (optionally fuzzy) entries of the user's own
   catalog. Order of precedence: (1) `ai.Glossary.Exact` — whole string equals a glossary term
   whose top translation has >= 60% share: applied directly, no model call; (2) the model, with
@@ -217,7 +241,9 @@ make test
 
 Above the source text the editor lists glossary terms found in the entry (`GlossaryService.ForEntry`,
 all versions, preferred translation + share). Chips insert the translation at the cursor; ↗ opens
-the term page. Orange text when nothing matches or the language has no glossary. Term matchers are
+the term page. Orange text when nothing matches or the language has no glossary. Chips the project AI
+context or the file's Konteks talks about (`ai.Mentioned`, same rule as pre-translation) are orange
+(`EntryTerm.Overridden`). Term matchers are
 cached per project+language and rebuilt only when `GlossaryRepository.Stamp` (imports) changes.
 
 ## Entry origin
@@ -279,6 +305,8 @@ deploys never run stale JS/CSS.
 - Client behaviour (selection, shortcuts, dirty tracking, splitter) is in `static/js/app.js`.
 - Plain Up/Down move between entries, also from the translation box (Left/Right stay there);
   in multi-line text they only leave the entry from the first/last line (`arrowNavigates`).
+- The status filter is a dropdown of checkboxes (`#filter-status`, `EntryFilter.Statuses`): an entry
+  shows when it matches any ticked status; none = all. Shortcuts (status bar, Validasi) tick one.
 - Entry load/save deliberately use `fetch` (not htmx): a new load aborts the previous one,
   requests time out after 20 s, navigation during a save waits for it, and a failed save asks
   before moving on. htmx's per-element request queue could otherwise freeze the editor after

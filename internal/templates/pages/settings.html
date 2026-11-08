@@ -67,6 +67,9 @@
             </div>
         </div>
         <p class="muted small">{{t .Lang "ai.price_help"}}</p>
+        <label for="ai-context">{{t .Lang "ai.extra_context"}}</label>
+        <textarea id="ai-context" name="extra_context" rows="6" maxlength="4000" placeholder="{{t .Lang "ai.extra_context_placeholder"}}">{{if $s}}{{$s.ExtraContext}}{{end}}</textarea>
+        <p class="muted small field-help">{{t .Lang "ai.extra_context_help"}}</p>
         <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
     </form>
 </section>

@@ -94,8 +94,10 @@ func main() {
 	glossaryService := service.NewGlossaryService(repos.Glossary, fetcher)
 	discussionService := service.NewDiscussionService(repos.Discuss, repos.Project, repos.Glossary, repos.Catalog, blobs, mailer, cfg.Site)
 	wikiService := service.NewWikiService(postgres.NewWikiRepository(db), blobs)
+	contextService := service.NewContextService(postgres.NewContextRepository(db))
 	aiService := service.NewAIService(repos.AI, repos.Catalog, repos.Glossary, ai.NewBox(cfg.AI.SecretKey), cfg.AI.AllowPrivateHosts)
 	aiService.SetHistory(catalogService)
+	aiService.SetContexts(contextService)
 	if err := aiService.RecoverJobs(context.Background()); err != nil {
 		log.Printf("AI: recover jobs: %v", err)
 	}
@@ -112,6 +114,7 @@ func main() {
 		aiService,
 		discussionService,
 		wikiService,
+		contextService,
 	)
 	if err != nil {
 		log.Fatalf("Failed to initialize web handler: %v", err)
@@ -156,6 +159,8 @@ func main() {
 		r.Get("/projects/{id}/members", webHandler.MembersPage)
 		r.Get("/join/{token}", webHandler.JoinPage)
 		r.Get("/projects/{id}/wiki", webHandler.WikiIndex)
+		r.Get("/projects/{id}/contexts", webHandler.ContextsPage)
+		r.Get("/projects/{id}/topics/{key}", webHandler.TopicPage)
 		r.Get("/projects/{id}/wiki/files/{fid}/{filename}", webHandler.WikiFile)
 		r.Get("/projects/{id}/wiki/{slug}", webHandler.WikiPage)
 		r.Get("/projects/{id}/glossary/{hash}", webHandler.GlossaryTermPage)
@@ -197,6 +202,7 @@ func main() {
 
 		// Changes to PO files (the owner only; checked per file)
 		r.Post("/catalogs/{cid}/entries/{eid}", webHandler.SaveEntry)
+		r.Post("/catalogs/{cid}/context", webHandler.SaveCatalogContext)
 		r.Post("/catalogs/{cid}/update", webHandler.UpdateFromTemplate)
 		r.Post("/catalogs/{cid}/pretranslate", webHandler.PreTranslate)
 		r.Post("/catalogs/{cid}/replace", webHandler.ReplaceCatalog)
@@ -234,6 +240,8 @@ func main() {
 		r.Post("/projects/{id}/invite-links/{lid}/delete", webHandler.DeleteInviteLink)
 		r.Post("/join/{token}", webHandler.Join)
 		r.Get("/projects/{id}/wiki/new", webHandler.WikiNew)
+		r.Get("/projects/{id}/topics/new", webHandler.TopicNew)
+		r.Post("/projects/{id}/topics/new", webHandler.TopicCreate)
 		r.Post("/projects/{id}/wiki/new", webHandler.WikiCreate)
 		r.Post("/projects/{id}/wiki/preview", webHandler.WikiPreview)
 		r.Post("/projects/{id}/wiki/files", webHandler.WikiUpload)

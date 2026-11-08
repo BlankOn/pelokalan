@@ -51,3 +51,9 @@ type WikiFile struct {
 
 // IsImage reports whether the file can be shown inline
 func (f *WikiFile) IsImage() bool { return IsInlineType(f.ContentType) }
+
+// WikiEdit is one save of a wiki page (its edit history)
+type WikiEdit struct {
+	Username string // empty when the account was removed
+	At       time.Time
+}

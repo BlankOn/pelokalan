@@ -9,6 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
+	"pelokalan/internal/ai"
 	"strconv"
 	"strings"
 
@@ -79,7 +80,18 @@ func (h *Handler) attachComments(r *http.Request, p *models.Project, c *models.C
 
 func filterFromRequest(r *http.Request) service.EntryFilter {
 	q := r.URL.Query()
-	return service.EntryFilter{Status: q.Get("status"), Query: q.Get("q"), Order: q.Get("order")}
+	// status may repeat (checkboxes) or be comma separated (?status=fuzzy,ai)
+	var statuses []string
+	seen := map[string]bool{}
+	for _, v := range q["status"] {
+		for _, s := range strings.Split(v, ",") {
+			if s = strings.TrimSpace(s); s != "" && !seen[s] {
+				seen[s] = true
+				statuses = append(statuses, s)
+			}
+		}
+	}
+	return service.EntryFilter{Statuses: statuses, Query: q.Get("q"), Order: q.Get("order")}
 }
 
 // editorView is the data of the editor partials
@@ -150,6 +162,9 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 	data.Data["Status"] = map[string]any{"Lang": data.Lang, "Listing": listing, "Catalog": c}
 	data.Data["ReadOnly"] = c.IsTemplate || !c.Owned
 	data.Data["Owned"] = c.Owned
+	if n, err := h.contexts.ForCatalog(r.Context(), c); err == nil {
+		data.Data["FileContext"] = n
+	}
 	data.Data["FullPage"] = true
 	data.Data["Props"] = h.catalogService.Properties(c)
 	h.catalogService.EnsureBaseline(r.Context(), c)
@@ -216,6 +231,12 @@ func (h *Handler) editorData(r *http.Request, c *models.Catalog, p *models.Proje
 	}
 	if !c.IsTemplate && c.Language != "" {
 		if g, err := h.glossary.ForEntry(r.Context(), p.ID, c.Language, e.MsgID, e.MsgIDPlural); err == nil {
+			if len(g.Terms) > 0 {
+				words := h.contextWords(r, p, c)
+				for i := range g.Terms {
+					g.Terms[i].Overridden = ai.Mentioned(g.Terms[i].Term, words)
+				}
+			}
 			v.Glossary = g
 		} else {
 			log.Printf("glossary terms for entry %d: %v", e.ID, err)
@@ -481,4 +502,17 @@ func (h *Handler) UpdateProperties(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, c.URL()+"?flash=properties_saved", http.StatusSeeOther)
+}
+
+// contextWords are the words of the project's AI context and the file's Konteks; glossary
+// terms containing one of them are decided by the context (same rule as AI pre-translation)
+func (h *Handler) contextWords(r *http.Request, p *models.Project, c *models.Catalog) map[string]bool {
+	text := ""
+	if st, err := h.ai.Settings(r.Context(), p); err == nil && st != nil {
+		text = st.ExtraContext
+	}
+	if n, err := h.contexts.ForCatalog(r.Context(), c); err == nil && n != nil {
+		text += "\n" + n.Note
+	}
+	return ai.ContextWords(text)
 }

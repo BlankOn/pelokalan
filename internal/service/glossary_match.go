@@ -17,6 +17,9 @@ type EntryTerm struct {
 	Translation string
 	Share       int    // percent of uses with this translation
 	Hash        string // glossary string page id
+	// Overridden: the project's AI context or the file's Konteks talks about a word of this
+	// term, so AI pre-translation treats the glossary translation as a suggestion only
+	Overridden bool
 }
 
 // EntryGlossary is what the editor shows above the source text

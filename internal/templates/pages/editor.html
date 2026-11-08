@@ -9,15 +9,24 @@
             <span>{{t .Lang "editor.project"}}</span>
         </a>
         <div class="tb-sep"></div>
-        <button type="button" class="tb-btn" id="btn-validate" title="{{t .Lang "editor.validate_help"}}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
-            <span>{{t .Lang "editor.validate"}}</span>
+        {{if not $c.IsTemplate}}
+        <button type="button" class="tb-btn tb-context" data-open-dialog="context-dialog" title="{{t .Lang "context.button_help"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 3h6l-1 6 3 3H7l3-3z"/><path d="M12 12v9"/></svg>
+            <span>{{t .Lang "context.title"}}</span>
+            <span id="context-dot" class="tb-dot"{{if not .Data.FileContext}} hidden{{end}}></span>
         </button>
+        {{end}}
         {{if not .Data.ReadOnly}}
         <button type="button" class="tb-btn tb-ai{{if .Data.AIConfigured}} tb-ai-on{{end}}" data-open-dialog="ai-dialog" title="{{t .Lang "editor.pretranslate_help"}}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path class="s1" d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path class="s2" d="M19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg>
             <span>{{t .Lang "editor.pretranslate"}}</span>
         </button>
+        {{end}}
+        <button type="button" class="tb-btn" id="btn-validate" title="{{t .Lang "editor.validate_help"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
+            <span>{{t .Lang "editor.validate"}}</span>
+        </button>
+        {{if not .Data.ReadOnly}}
         {{if .Data.Template}}
         <form method="post" action="/catalogs/{{$c.ID}}/update" data-confirm="{{t .Lang "confirm.update_from_template"}}">
             <button type="submit" class="tb-btn" title="{{t .Lang "action.update_from_template"}}">
@@ -69,18 +78,24 @@
                 <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
                 <input type="search" name="q" id="filter-q" value="{{$f.Query}}" placeholder="{{t .Lang "editor.search"}}" aria-label="{{t .Lang "editor.search"}}">
             </div>
-            <label class="tb-filter-icon" for="filter-status" title="{{t .Lang "editor.filter"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8z"/></svg></label>
-            <select name="status" id="filter-status" aria-label="{{t .Lang "editor.filter"}}">
-                <option value="" {{if eq $f.Status ""}}selected{{end}}>{{t .Lang "filter.all"}}</option>
-                <option value="todo" {{if eq $f.Status "todo"}}selected{{end}}>{{t .Lang "filter.todo"}}</option>
-                <option value="untranslated" {{if eq $f.Status "untranslated"}}selected{{end}}>{{t .Lang "filter.untranslated"}}</option>
-                <option value="fuzzy" {{if eq $f.Status "fuzzy"}}selected{{end}}>{{t .Lang "filter.fuzzy"}}</option>
-                <option value="translated" {{if eq $f.Status "translated"}}selected{{end}}>{{t .Lang "filter.translated"}}</option>
-                <option value="issues" {{if eq $f.Status "issues"}}selected{{end}}>{{t .Lang "filter.issues"}}</option>
-                <option value="ai" {{if eq $f.Status "ai"}}selected{{end}}>🤖 {{t .Lang "filter.ai"}}</option>
-                <option value="glossary" {{if eq $f.Status "glossary"}}selected{{end}}>📖 {{t .Lang "filter.glossary"}}</option>
-                <option value="memory" {{if eq $f.Status "memory"}}selected{{end}}>🗂 {{t .Lang "filter.memory"}}</option>
-            </select>
+            <details class="multi-filter" id="filter-status">
+                <summary class="mf-btn" title="{{t .Lang "editor.filter"}}">
+                    <svg class="mf-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8z"/></svg>
+                    <span class="mf-label" data-all="{{t .Lang "filter.all"}}" data-many="{{t .Lang "filter.n_selected"}}">{{if not $f.Statuses}}{{t .Lang "filter.all"}}{{else if eq (len $f.Statuses) 1}}{{t .Lang (printf "filter.%s" (index $f.Statuses 0))}}{{else}}{{t .Lang "filter.n_selected" (len $f.Statuses)}}{{end}}</span>
+                    <span class="combo-caret">▾</span>
+                </summary>
+                <div class="mf-pop">
+                    <label class="mf-opt"><input type="checkbox" name="status" value="todo" {{if has $f.Statuses "todo"}}checked{{end}}> {{t .Lang "filter.todo"}}</label>
+                    <label class="mf-opt"><input type="checkbox" name="status" value="untranslated" {{if has $f.Statuses "untranslated"}}checked{{end}}> {{t .Lang "filter.untranslated"}}</label>
+                    <label class="mf-opt"><input type="checkbox" name="status" value="fuzzy" {{if has $f.Statuses "fuzzy"}}checked{{end}}> {{t .Lang "filter.fuzzy"}}</label>
+                    <label class="mf-opt"><input type="checkbox" name="status" value="translated" {{if has $f.Statuses "translated"}}checked{{end}}> {{t .Lang "filter.translated"}}</label>
+                    <label class="mf-opt"><input type="checkbox" name="status" value="issues" {{if has $f.Statuses "issues"}}checked{{end}}> {{t .Lang "filter.issues"}}</label>
+                    <label class="mf-opt"><input type="checkbox" name="status" value="ai" {{if has $f.Statuses "ai"}}checked{{end}}> 🤖 {{t .Lang "filter.ai"}}</label>
+                    <label class="mf-opt"><input type="checkbox" name="status" value="glossary" {{if has $f.Statuses "glossary"}}checked{{end}}> 📖 {{t .Lang "filter.glossary"}}</label>
+                    <label class="mf-opt"><input type="checkbox" name="status" value="memory" {{if has $f.Statuses "memory"}}checked{{end}}> 🗂 {{t .Lang "filter.memory"}}</label>
+                    <button type="button" class="linklike small mf-clear">{{t .Lang "filter.clear"}}</button>
+                </div>
+            </details>
             <select name="order" aria-label="{{t .Lang "editor.order"}}">
                 <option value="file" {{if eq $f.Order "file"}}selected{{end}}>{{t .Lang "order.file"}}</option>
                 <option value="todo_first" {{if eq $f.Order "todo_first"}}selected{{end}}>{{t .Lang "order.todo_first"}}</option>
@@ -111,6 +126,27 @@
     </div>
     {{template "statusbar" .Data.Status}}
 </div>
+
+{{if not $c.IsTemplate}}
+<dialog id="context-dialog" class="dialog context-dialog">
+    <form class="form" id="context-form" data-url="/catalogs/{{$c.ID}}/context">
+        <h2>📌 {{t .Lang "context.dialog_title" $c.Filename}}</h2>
+        <p class="muted small">{{t .Lang "context.help"}}</p>
+        {{if .Data.Owned}}
+        <textarea name="note" rows="12" maxlength="10000" placeholder="{{t .Lang "context.placeholder"}}">{{with .Data.FileContext}}{{.Note}}{{end}}</textarea>
+        <p class="muted small context-status" role="status">{{with .Data.FileContext}}{{t $.Lang "context.by" .UpdaterName (timeAgo $.Lang .UpdatedAt)}}{{end}}</p>
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
+        </div>
+        {{else}}
+        {{with .Data.FileContext}}<div class="context-note context-read">{{linkify .Note}}</div><p class="muted small">{{t $.Lang "context.by" .UpdaterName (timeAgo $.Lang .UpdatedAt)}}</p>
+        {{else}}<p class="muted">{{t .Lang "context.none"}}</p>{{end}}
+        <div class="dialog-actions"><button type="button" class="btn" data-close-dialog>{{t .Lang "action.close"}}</button></div>
+        {{end}}
+    </form>
+</dialog>
+{{end}}
 
 {{if .Data.Owned}}
 <dialog id="commit-dialog" class="dialog">

@@ -121,6 +121,8 @@ code, kbd, pre { font-family: var(--mono); font-size: 12px; }
 .tabs-nav a { padding: 8px 14px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs-nav a.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 .tabs-nav a:hover { text-decoration: none; color: var(--text); }
+.tabs-nav a { display: inline-flex; align-items: center; gap: 6px; }
+.tab-icon { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
 
 /* ---------- Alerts / toasts ---------- */
 .alert { padding: 10px 14px; border-radius: var(--radius); margin-bottom: 16px; }
@@ -284,10 +286,12 @@ h1 .ai-badge { font-size: 12px; }
 .tb-sep { width: 1px; height: 34px; background: var(--border); margin: 0 6px; }
 .tb-mode { margin: 0 12px; font-size: 13px; white-space: nowrap; }
 /* search box takes the space between the toolbar buttons and the filters */
-.tb-filter { display: flex; gap: 6px; align-items: center; flex: 1; min-width: 0; margin-left: 4px; }
+/* basis 440px: on narrower windows the search and filters move to their own row instead of overflowing */
+.tb-filter { display: flex; gap: 6px; align-items: center; flex: 1 1 440px; min-width: 0; margin-left: 4px; }
 .tb-filter select, .tb-filter input { padding: 4px 8px; font-size: 13px; }
 .tb-filter select { flex: none; width: auto; max-width: 190px; }
-.tb-search { position: relative; flex: 1; min-width: 140px; max-width: 520px; margin-right: auto; }
+/* filter and sort follow the search box directly; spare space stays at the end of the row */
+.tb-search { position: relative; flex: 1; min-width: 140px; max-width: 520px; }
 .tb-search svg { position: absolute; left: 8px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linecap: round; pointer-events: none; }
 .tb-search input[type=search] { width: 100%; padding-left: 28px; }
 .tb-filter-icon { display: inline-flex; align-items: center; color: var(--muted); cursor: pointer; margin-left: 6px; }
@@ -676,15 +680,17 @@ h1 .ai-badge { font-size: 12px; }
 .comment-target { background: #fffbe6; border-radius: 6px; padding-left: 8px; padding-right: 8px; }
 .comment-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .comment-head .linklike { margin-left: 4px; }
-/* Edit/delete appear on hover or keyboard focus; always shown on touch screens. */
+/* Edit/delete appear on hover or keyboard focus (not after a mouse click, e.g. on an image); always shown on touch screens. */
 @media (hover: hover) {
     .comment-head > button.linklike { opacity: 0; transition: opacity .12s; }
     .comment:hover .comment-head > button.linklike,
-    .comment:focus-within .comment-head > button.linklike { opacity: 1; }
+    .comment:has(:focus-visible) .comment-head > button.linklike { opacity: 1; }
 }
 .comment-body { margin: 6px 0 0 28px; word-break: break-word; line-height: 1.5; }
 .comment-edit { margin: 6px 0 0 28px; display: flex; flex-direction: column; gap: 6px; }
-.comment-deleted { font-style: italic; }
+/* deleted comments keep who wrote them and when; only the text is gone */
+.comment-deleted .comment-head { opacity: .7; }
+.comment-removed { font-style: italic; color: var(--muted); font-size: 13px; margin: 2px 0 0; }
 .mention { background: var(--accent-soft); color: var(--accent-dark); border-radius: 4px; padding: 0 3px; font-weight: 600; }
 .comment-form { display: flex; flex-direction: column; gap: 8px; }
 .comment-form textarea, .comment-edit textarea { width: 100%; }
@@ -768,7 +774,8 @@ h1 .ai-badge { font-size: 12px; }
 .lb-bar { grid-column: 1 / -1; display: flex; align-items: center; gap: 14px; padding: 10px 16px; color: #fff; }
 .lb-caption { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .lb-hint { color: rgba(255,255,255,.65) !important; margin-right: auto; }
-.lb-open { color: #9ec1ff; white-space: nowrap; }
+.lb-open { white-space: nowrap; color: var(--text); background: var(--surface); }
+.lb-open:hover { text-decoration: none; }
 .lb-close { background: none; border: 0; color: #fff; font-size: 28px; line-height: 1; cursor: pointer; padding: 0 4px; }
 .lb-stage { overflow: auto; display: flex; min-height: 0; min-width: 0; }
 .lb-stage img { margin: auto; max-width: 100%; max-height: calc(100vh - 60px); object-fit: contain; cursor: zoom-in; background: repeating-conic-gradient(#ddd 0 25%, #fff 0 50%) 50% / 16px 16px; }
@@ -815,6 +822,11 @@ h1 .ai-badge { font-size: 12px; }
 .gl-insert .arrow { color: var(--muted); }
 .gl-tr { color: #145c41; }
 .gl-open { color: #1a7f5a; text-decoration: none; padding: 0 2px; }
+/* glossary term the Konteks overrides: orange, like other "decided elsewhere" hints */
+.gl-term.gl-overridden { background: #fff1e0; border-color: #f3c48f; }
+.gl-overridden .gl-tr, .gl-overridden .gl-open { color: #a64f06; }
+.gl-overridden .gl-insert:hover:not(:disabled) { background: #fde3c4; }
+.gl-overridden .gl-src::before { content: "📌 "; font-size: 11px; }
 .ed-gl-none { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; color: #c2620a; }
 .ed-gl-none a { color: #c2620a; text-decoration: underline; }
 
@@ -833,6 +845,9 @@ h1 .ai-badge { font-size: 12px; }
 .wiki-head h1 { margin: 0; }
 .wiki-head form { margin: 0; }
 .wiki-meta { margin: 4px 0 16px; }
+.wiki-history { margin-top: 24px; border-top: 1px solid var(--border-soft); padding-top: 10px; font-size: 13px; }
+.wiki-history summary { cursor: pointer; color: var(--muted); font-weight: 600; }
+.wiki-history ol { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .wiki-subpages { margin-top: 24px; border-top: 1px solid var(--border-soft); padding-top: 12px; }
 .wiki-subpages h3 { font-size: 13px; margin: 0 0 6px; }
 /* rendered Markdown */
@@ -949,6 +964,10 @@ h1 .ai-badge { font-size: 12px; }
     .tb-search { flex: 1 1 100%; min-width: 0; max-width: none; margin-right: 0; }
     .tb-search input[type=search] { font-size: 16px; padding-top: 5px; padding-bottom: 5px; }
     .tb-filter select { flex: 1 1 0; min-width: 0; max-width: none; padding: 4px; }
+    .multi-filter { flex: 1 1 0; min-width: 0; }
+    .mf-btn { width: 100%; max-width: none; font-size: 16px; }
+    .mf-pop { left: 0; right: auto; }
+    .mf-opt { font-size: 16px; padding: 8px; }
     .tb-filter-icon { margin-left: 0; }
     .tb-mode { display: none; }
 
@@ -973,6 +992,9 @@ h1 .ai-badge { font-size: 12px; }
     }
     .splitter.dragging::after { border-color: var(--accent); }
 
+    /* Diskusi header: title on its own line, actions below */
+    .card-head { flex-wrap: wrap; }
+
     /* status bar: one line that can be swiped */
     .statusbar { flex-wrap: nowrap; overflow-x: auto; white-space: nowrap; scrollbar-width: none; }
     .statusbar::-webkit-scrollbar { display: none; }
@@ -981,3 +1003,30 @@ h1 .ai-badge { font-size: 12px; }
     /* wiki */
     .slug-input span { max-width: 45%; }
 }
+
+/* Konteks */
+.tb-dot { position: absolute; top: 4px; right: 12px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.context-dialog { width: min(640px, calc(100vw - 24px)); }
+.context-dialog textarea { width: 100%; resize: vertical; }
+.context-status { margin: 0; }
+.context-read { max-height: 60vh; overflow: auto; }
+.context-note { white-space: pre-line; overflow-wrap: anywhere; }
+.context-search { margin: 8px 0 14px; }
+.context-search input { width: 100%; }
+.context-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border-soft); }
+.context-list li { padding: 12px 0; border-bottom: 1px solid var(--border-soft); display: flex; flex-direction: column; gap: 4px; }
+.context-file { overflow-wrap: anywhere; }
+
+/* editor status filter: dropdown of checkboxes */
+.multi-filter { position: relative; flex: none; }
+.multi-filter summary { list-style: none; }
+.multi-filter summary::-webkit-details-marker { display: none; }
+.mf-btn { display: inline-flex; align-items: center; gap: 6px; padding: 4px 8px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); font-size: 13px; cursor: pointer; white-space: nowrap; max-width: 220px; }
+.mf-btn .mf-label { overflow: hidden; text-overflow: ellipsis; }
+.mf-icon { width: 15px; height: 15px; fill: none; stroke: var(--muted); stroke-width: 2; stroke-linejoin: round; flex-shrink: 0; }
+.multi-filter.mf-active .mf-btn { border-color: var(--accent); background: var(--accent-soft); }
+.multi-filter.mf-active .mf-icon { stroke: var(--accent); }
+.mf-pop { position: absolute; z-index: 40; top: calc(100% + 4px); right: 0; min-width: 230px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,.12); padding: 6px; display: flex; flex-direction: column; }
+.mf-opt { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 5px; font-size: 13px; cursor: pointer; white-space: nowrap; }
+.mf-opt:hover { background: var(--surface-2); }
+.mf-clear { align-self: flex-start; margin: 4px 8px 2px; }

@@ -3,12 +3,15 @@
 <section class="card">
     <div class="card-head">
         <h2>{{t .Lang "title.discussions"}} <span class="muted small">({{.Data.Total}})</span></h2>
-        {{if .User}}
-        <nav class="seg">
-            <a href="{{$p.Path}}/discussions" class="{{if not .Data.Mine}}active{{end}}">{{t .Lang "discuss.all"}}</a>
-            <a href="{{$p.Path}}/discussions?mentions=1" class="{{if .Data.Mine}}active{{end}}">{{t .Lang "discuss.mentions_me"}}</a>
-        </nav>
-        {{end}}
+        <div class="row-actions">
+            {{if .User}}
+            <nav class="seg">
+                <a href="{{$p.Path}}/discussions" class="{{if not .Data.Mine}}active{{end}}">{{t .Lang "discuss.all"}}</a>
+                <a href="{{$p.Path}}/discussions?mentions=1" class="{{if .Data.Mine}}active{{end}}">{{t .Lang "discuss.mentions_me"}}</a>
+            </nav>
+            {{end}}
+            {{if $p.Role.IsMember}}<a class="btn btn-small btn-primary" href="{{$p.Path}}/topics/new">{{t .Lang "topic.new"}}</a>{{end}}
+        </div>
     </div>
     {{if .Data.Rows}}
     <ul class="discussion-list">

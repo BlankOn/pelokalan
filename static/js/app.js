@@ -135,6 +135,7 @@
         });
     }
 
+    window.toast = function (m, e) { toast(m, e); };
     function toast(message, isError) {
         var area = document.getElementById("toast");
         if (!area) return;
@@ -367,11 +368,49 @@
         }
     });
 
-    function setFilter(status) {
-        var sel = document.getElementById("filter-status");
-        sel.value = status;
-        sel.dispatchEvent(new Event("change", { bubbles: true }));
+    // status filter: a dropdown of checkboxes (an entry shows when it matches any ticked one)
+    function filterBoxes() {
+        var box = document.getElementById("filter-status");
+        return box ? Array.prototype.slice.call(box.querySelectorAll("input[name=status]")) : [];
     }
+    function updateFilterLabel() {
+        var box = document.getElementById("filter-status");
+        if (!box) return;
+        var label = box.querySelector(".mf-label");
+        var on = filterBoxes().filter(function (cb) { return cb.checked; });
+        if (!on.length) label.textContent = label.dataset.all;
+        else if (on.length === 1) label.textContent = on[0].parentNode.textContent.trim();
+        else label.textContent = label.dataset.many.replace("%d", on.length);
+        box.classList.toggle("mf-active", on.length > 0);
+    }
+    // shortcuts (status bar counts, Validasi) show exactly one filter
+    function setFilter(status) {
+        var boxes = filterBoxes(), target = null;
+        boxes.forEach(function (cb) { cb.checked = cb.value === status; if (cb.checked) target = cb; });
+        updateFilterLabel();
+        (target || boxes[0]).dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    document.addEventListener("change", function (ev) {
+        if (ev.target.matches && ev.target.matches("#filter-status input[name=status]")) updateFilterLabel();
+    });
+    document.addEventListener("click", function (ev) {
+        var box = document.getElementById("filter-status");
+        if (!box) return;
+        if (ev.target.closest(".mf-clear")) {
+            var boxes = filterBoxes();
+            boxes.forEach(function (cb) { cb.checked = false; });
+            updateFilterLabel();
+            box.open = false;
+            if (boxes[0]) boxes[0].dispatchEvent(new Event("change", { bubbles: true }));
+        } else if (box.open && !box.contains(ev.target)) {
+            box.open = false;
+        }
+    });
+    document.addEventListener("keydown", function (ev) {
+        var box = document.getElementById("filter-status");
+        if (ev.key === "Escape" && box && box.open) { box.open = false; box.querySelector("summary").focus(); }
+    });
+    updateFilterLabel();
 
     var validate = document.getElementById("btn-validate");
     if (validate) validate.addEventListener("click", function () { setFilter("issues"); });
@@ -952,7 +991,7 @@ document.addEventListener("click", function (ev) {
         dlg = document.createElement("dialog");
         dlg.className = "lightbox";
         dlg.innerHTML = '<div class="lb-bar"><span class="lb-caption"></span><span class="lb-hint muted small"></span>' +
-            '<a class="lb-open" target="_blank" rel="noopener"></a><button type="button" class="lb-close" aria-label="">×</button></div>' +
+            '<a class="lb-open btn btn-small" download></a><button type="button" class="lb-close" aria-label="">×</button></div>' +
             '<button type="button" class="lb-nav lb-prev" aria-label="‹">‹</button>' +
             '<div class="lb-stage"><img alt=""></div>' +
             '<button type="button" class="lb-nav lb-next" aria-label="›">›</button>';
@@ -991,6 +1030,8 @@ document.addEventListener("click", function (ev) {
         img.src = src;
         img.alt = thumb ? thumb.alt : "";
         link.href = src;
+        // save under the uploaded file name (same-origin, so the browser honours it)
+        link.setAttribute("download", decodeURIComponent(src.split("?")[0].split("/").pop()) || "");
         caption.textContent = a.title || img.alt || decodeURIComponent(src.split("/").pop());
         dlg.classList.toggle("lb-single", items.length < 2);
     }
@@ -1336,4 +1377,43 @@ document.addEventListener("click", function (ev) {
     if (nav && active && nav.scrollWidth > nav.clientWidth) {
         nav.scrollLeft = active.offsetLeft - (nav.clientWidth - active.offsetWidth) / 2;
     }
+})();
+
+// Show <time data-local> timestamps in the reader's time zone (the server may run on UTC)
+(function () {
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    document.querySelectorAll("time[data-local][datetime]").forEach(function (el) {
+        var d = new Date(el.getAttribute("datetime"));
+        if (isNaN(d)) return;
+        el.textContent = pad(d.getDate()) + "-" + pad(d.getMonth() + 1) + "-" + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+    });
+})();
+
+// Konteks popup in the editor: save the PO file's context without leaving the page
+(function () {
+    var form = document.getElementById("context-form");
+    if (!form) return;
+    form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var ta = form.querySelector("textarea[name=note]");
+        if (!ta) return;
+        var status = form.querySelector(".context-status");
+        var btn = form.querySelector("button[type=submit]");
+        var body = new URLSearchParams();
+        body.set("note", ta.value);
+        btn.disabled = true;
+        fetch(form.dataset.url, { method: "POST", body: body, credentials: "same-origin" })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res.error) { status.textContent = res.error; status.classList.add("c-err"); return; }
+                status.classList.remove("c-err");
+                status.textContent = res.status;
+                var dot = document.getElementById("context-dot");
+                if (dot) dot.hidden = !res.has;
+                form.closest("dialog").close();
+                if (window.toast) window.toast(res.status);
+            })
+            .catch(function () { status.classList.add("c-err"); })
+            .finally(function () { btn.disabled = false; });
+    });
 })();

@@ -89,6 +89,9 @@ func (h *Handler) WikiPage(w http.ResponseWriter, r *http.Request) {
 		data.Data["Subpages"] = node.Children
 	}
 	data.Data["MaxDepth"] = models.WikiMaxDepth
+	if edits, err := h.wiki.Edits(r.Context(), pg); err == nil {
+		data.Data["Edits"] = edits
+	}
 	data.Data["CanDelete"] = service.CanDeleteWikiPage(middleware.GetUser(r.Context()), p, pg)
 	h.render(w, "wiki", data)
 }

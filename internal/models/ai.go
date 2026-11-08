@@ -12,6 +12,7 @@ type AISettings struct {
 	PriceInput    float64 // USD per 1M input tokens
 	PriceOutput   float64 // USD per 1M output tokens
 	MonthlyBudget float64 // USD, 0 = unlimited
+	ExtraContext  string  // project-wide guidance for every AI request
 	UpdatedBy     *int64
 	UpdatedAt     time.Time
 }

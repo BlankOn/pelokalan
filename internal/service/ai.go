@@ -39,6 +39,8 @@ type AIService struct {
 	allowPrivate bool
 	// history records versions before and after a job (optional)
 	history historyRecorder
+	// contexts supplies the PO file's Konteks note for the prompt (optional)
+	contexts fileContexts
 	// newClient is replaceable in tests
 	newClient func(s *models.AISettings, key string) chatClient
 }
@@ -46,6 +48,13 @@ type AIService struct {
 type historyRecorder interface {
 	AutoCommitByID(ctx context.Context, authorID, catalogID int64, message string)
 }
+
+type fileContexts interface {
+	ForCatalog(ctx context.Context, c *models.Catalog) (*models.CatalogContext, error)
+}
+
+// SetContexts makes prompts include the PO file's Konteks note
+func (s *AIService) SetContexts(c fileContexts) { s.contexts = c }
 
 // SetHistory makes jobs record catalog versions before and after running
 func (s *AIService) SetHistory(h historyRecorder) { s.history = h }
@@ -85,6 +94,7 @@ type AISettingsInput struct {
 	PriceInput    string
 	PriceOutput   string
 	MonthlyBudget string
+	ExtraContext  string // project-wide guidance for the model
 }
 
 func parseMoney(v string) (float64, bool) {
@@ -123,6 +133,10 @@ func (s *AIService) SaveSettings(ctx context.Context, user *models.User, p *mode
 	st.MonthlyBudget, ok3 = parseMoney(in.MonthlyBudget)
 	if !ok1 || !ok2 || !ok3 {
 		return userErr("err.ai_price")
+	}
+	st.ExtraContext = strings.TrimSpace(strings.ReplaceAll(in.ExtraContext, "\r\n", "\n"))
+	if len([]rune(st.ExtraContext)) > ai.MaxProjectContext {
+		return userErr("err.ai_context_length", ai.MaxProjectContext)
 	}
 	key := strings.TrimSpace(in.APIKey)
 	switch {
@@ -263,6 +277,20 @@ func (s *AIService) plan(ctx context.Context, p *models.Project, c *models.Catal
 		}
 	}
 
+	// the file's Konteks note: sent with the prompt, and it outranks glossary terms it talks about
+	fileContext := ""
+	if s.contexts != nil {
+		if n, err := s.contexts.ForCatalog(ctx, c); err == nil && n != nil {
+			fileContext = n.Note
+		}
+	}
+	// project-wide guidance from the AI settings
+	projectContext := ""
+	if st, err := s.Settings(ctx, p); err == nil && st != nil {
+		projectContext = st.ExtraContext
+	}
+	contextWords := ai.ContextWords(projectContext + "\n" + fileContext)
+
 	pl := &aiPlan{memory: map[int64]string{}, direct: map[int64]string{}, versions: map[int64]int{}, terms: g.Len()}
 	for _, e := range entries {
 		switch e.Status() {
@@ -278,7 +306,9 @@ func (s *AIService) plan(ctx context.Context, p *models.Project, c *models.Catal
 			pl.memory[e.ID] = tr
 			continue
 		}
-		if !e.IsPlural() {
+		// a whole-string glossary match is applied without the model, unless the note
+		// talks about one of its words (then the model decides with the note)
+		if !e.IsPlural() && !ai.Mentioned(e.MsgID, contextWords) {
 			if tr, ok := g.Exact(e.MsgID); ok {
 				pl.direct[e.ID] = tr
 				continue
@@ -293,11 +323,11 @@ func (s *AIService) plan(ctx context.Context, p *models.Project, c *models.Catal
 		if e.IsPlural() {
 			it.Forms = c.NPlurals
 		}
-		it.Glossary = g.Matches(e.MsgID + " " + e.MsgIDPlural)
+		it.Glossary = ai.MarkOptional(g.Matches(e.MsgID+" "+e.MsgIDPlural), contextWords)
 		pl.items = append(pl.items, it)
 	}
 	pl.batches = ai.Batch(pl.items, aiBatchItems, aiBatchChars)
-	pl.system = ai.SystemPrompt(languageLabel(p.SourceLanguage), languageLabel(c.Language))
+	pl.system = ai.SystemPrompt(languageLabel(p.SourceLanguage), languageLabel(c.Language), projectContext, fileContext)
 	return pl, nil
 }
 

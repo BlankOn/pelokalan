@@ -69,11 +69,42 @@ func (r *wikiRepository) SlugExists(ctx context.Context, projectID int64, slug s
 }
 
 func (r *wikiRepository) CreatePage(ctx context.Context, p *models.WikiPage) error {
-	return r.db.QueryRowContext(ctx,
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if err := tx.QueryRowContext(ctx,
 		`INSERT INTO wiki_pages (project_id, parent_id, slug, title, body, position, created_by, updated_by)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $7) RETURNING id, created_at, updated_at`,
 		p.ProjectID, p.ParentID, p.Slug, p.Title, p.Body, p.Position, p.CreatedBy,
-	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
+	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO wiki_edits (page_id, user_id, created_at) VALUES ($1, $2, $3)`,
+		p.ID, p.CreatedBy, p.CreatedAt); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func (r *wikiRepository) Edits(ctx context.Context, pageID int64, limit int) ([]models.WikiEdit, error) {
+	rows, err := r.db.QueryContext(ctx,
+		`SELECT COALESCE(u.username, ''), e.created_at FROM wiki_edits e LEFT JOIN users u ON u.id = e.user_id
+		 WHERE e.page_id = $1 ORDER BY e.created_at DESC, e.id DESC LIMIT $2`, pageID, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.WikiEdit
+	for rows.Next() {
+		var e models.WikiEdit
+		if err := rows.Scan(&e.Username, &e.At); err != nil {
+			return nil, err
+		}
+		out = append(out, e)
+	}
+	return out, rows.Err()
 }
 
 func (r *wikiRepository) UpdatePage(ctx context.Context, p *models.WikiPage, version int64) error {
@@ -102,6 +133,10 @@ func (r *wikiRepository) UpdatePage(ctx context.Context, p *models.WikiPage, ver
 		`UPDATE wiki_pages SET slug = $2, title = $3, body = $4, updated_by = $5, updated_at = NOW()
 		 WHERE id = $1 RETURNING updated_at`,
 		p.ID, p.Slug, p.Title, p.Body, p.UpdatedBy).Scan(&p.UpdatedAt); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `INSERT INTO wiki_edits (page_id, user_id, created_at) VALUES ($1, $2, $3)`,
+		p.ID, p.UpdatedBy, p.UpdatedAt); err != nil {
 		return err
 	}
 	if oldSlug != p.Slug {

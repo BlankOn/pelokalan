@@ -41,6 +41,7 @@ type Handler struct {
 	ai             *service.AIService
 	discuss        *service.DiscussionService
 	wiki           *service.WikiService
+	contexts       *service.ContextService
 	assetVersion   string
 }
 
@@ -56,6 +57,7 @@ func NewHandler(
 	aiService *service.AIService,
 	discussionService *service.DiscussionService,
 	wikiService *service.WikiService,
+	contextService *service.ContextService,
 ) (*Handler, error) {
 	h := &Handler{
 		templatesDir:   templatesDir,
@@ -68,6 +70,7 @@ func NewHandler(
 		ai:             aiService,
 		discuss:        discussionService,
 		wiki:           wikiService,
+		contexts:       contextService,
 	}
 	h.assetVersion = assetVersion("static")
 	if err := h.loadTemplates(); err != nil {
@@ -174,6 +177,20 @@ func funcMap() template.FuncMap {
 				return strings.ToUpper(string(r))
 			}
 			return "?"
+		},
+		"has": func(list []string, v string) bool {
+			for _, x := range list {
+				if x == v {
+					return true
+				}
+			}
+			return false
+		},
+		"derefTime": func(t *time.Time) time.Time {
+			if t == nil {
+				return time.Time{}
+			}
+			return *t
 		},
 		"deref": func(p *int64) int64 {
 			if p == nil {
