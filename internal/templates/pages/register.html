@@ -1,0 +1,23 @@
+{{define "content"}}
+<div class="auth-card">
+    <h1>{{t .Lang "auth.register_title"}}</h1>
+    <p class="muted">{{if .Data.WhitelistOn}}{{t .Lang "auth.register_intro"}}{{else}}{{t .Lang "auth.register_intro_open"}}{{end}}</p>
+    <form method="post" action="/register" class="form">
+        <input type="hidden" name="next" value="{{.Data.Next}}">
+        <label for="name">{{t .Lang "field.name"}}</label>
+        <input id="name" type="text" name="name" value="{{.Data.Name}}" required maxlength="100" autocomplete="name" autofocus>
+                <label for="username">{{t .Lang "field.username"}}</label>
+        <div class="username-input"><span>@</span><input id="username" type="text" name="username" value="{{.Data.Username}}" required
+               minlength="3" maxlength="30" pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{1,28}[a-zA-Z0-9]" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="nama.anda"></div>
+        <p class="muted small field-help">{{t .Lang "field.username_help"}}</p>
+        <label for="email">{{t .Lang "field.email"}}</label>
+        <input id="email" type="email" name="email" value="{{.Data.Email}}" required autocomplete="email" placeholder="nama@contoh.id">
+        <button type="submit" class="btn btn-primary btn-block">{{t .Lang "auth.send_code"}}</button>
+    </form>
+    {{if .Data.HasAccount}}
+    <p class="auth-alt"><a class="btn btn-block" href="/login?email={{.Data.Email}}&amp;next={{.Data.Next}}">{{t .Lang "auth.go_login"}}</a></p>
+    {{end}}
+    <p class="auth-alt">{{t .Lang "auth.have_account"}} <a href="/login?next={{.Data.Next}}">{{t .Lang "auth.login_link"}}</a></p>
+    {{if .Data.WhitelistOn}}<p class="muted small">{{t .Lang "auth.whitelist_note"}}</p>{{end}}
+</div>
+{{end}}

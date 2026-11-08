@@ -1,0 +1,24 @@
+{{/* Wiki sidebar: page tree (up to three levels) */}}
+{{define "wiki_nav"}}{{$p := .Data.Project}}
+<aside class="wiki-nav" aria-label="{{t .Lang "wiki.pages"}}">
+    <div class="wiki-nav-head">
+        <span class="wiki-nav-title">{{t .Lang "wiki.pages"}}</span>
+        {{if .Data.CanEdit}}<a class="btn btn-small" href="{{$p.Path}}/wiki/new">{{t .Lang "wiki.new_page"}}</a>{{end}}
+    </div>
+    {{if .Data.Tree.Roots}}
+    {{template "wiki_tree" (dict "Pages" .Data.Tree.Roots "Current" .Data.Current "Path" $p.Path "Drag" .Data.CanEdit)}}
+    {{if .Data.CanEdit}}<p class="muted small wiki-drag-help">{{t .Lang "wiki.drag_help"}}</p>{{end}}
+    {{else}}<p class="muted small">{{t .Lang "wiki.empty_visitor"}}</p>{{end}}
+</aside>
+{{end}}
+
+{{define "wiki_tree"}}
+<ul class="wiki-tree"{{if and .Drag (not .Nested)}} id="wiki-tree" data-move-url="{{.Path}}/wiki/" data-max-depth="3"{{end}}>
+    {{range .Pages}}
+    <li data-id="{{.ID}}" data-slug="{{.Slug}}" data-depth="{{.Depth}}">
+        <a href="{{$.Path}}/wiki/{{.Slug}}" class="{{if and $.Current (eq .ID $.Current.ID)}}active{{end}}"{{if $.Drag}} draggable="true"{{end}}>{{.Title}}</a>
+        {{if .Children}}{{template "wiki_tree" (dict "Pages" .Children "Current" $.Current "Path" $.Path "Drag" $.Drag "Nested" true)}}{{end}}
+    </li>
+    {{end}}
+</ul>
+{{end}}

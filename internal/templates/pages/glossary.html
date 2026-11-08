@@ -1,0 +1,75 @@
+{{define "content"}}{{$p := .Data.Project}}{{$r := .Data.Results}}
+{{template "project_header" .}}
+
+<section class="card glossary-main">
+    <div class="glossary-toolbar">
+        <span class="sync-status small muted">{{with .Data.Sync}}
+            {{if .LastFetched}}<span class="sync-dot{{if .Failed}} sync-failed{{end}}"></span>{{t $.Lang "glossary.synced" (timeAgo $.Lang .LastFetched) .Label}}{{if .Failed}} · <span class="c-err">{{t $.Lang "feed.status_error"}}</span>{{end}}
+            {{else if .HasFeed}}<span class="sync-dot sync-pending"></span>{{t $.Lang "glossary.sync_pending" .Label}}
+            {{else if .LastImport}}<span class="sync-dot sync-manual"></span>{{t $.Lang "glossary.no_upstream" .Label (timeAgo $.Lang .LastImport)}}{{end}}
+        {{end}}</span>
+        {{if $p.Role.CanManage}}<button type="button" class="btn" data-open-dialog="manage-glossary" data-tab-open="list">⚙ {{t .Lang "glossary.manage"}}</button>{{end}}
+    </div>
+    {{if .Data.Languages}}
+    <form id="glossary-form" class="glossary-search" hx-get="{{$p.Path}}/glossary/search" hx-target="#glossary-results"
+          hx-trigger="input changed delay:300ms from:#gl-q, change, submit">
+        <input type="hidden" name="f" value="1">
+        <input type="search" id="gl-q" name="q" value="{{$r.Search.Query}}" autofocus
+               placeholder="{{t .Lang "glossary.search_placeholder"}}" aria-label="{{t .Lang "glossary.search_placeholder"}}">
+        <div class="glossary-filters">
+            {{if gt (len .Data.Languages) 1}}
+            <select name="lang" aria-label="{{t .Lang "field.language"}}">
+                {{range .Data.Languages}}<option value="{{.}}" {{if eq . $r.Search.Language}}selected{{end}}>{{langName .}} ({{.}})</option>{{end}}
+            </select>
+            {{else}}
+            <input type="hidden" name="lang" value="{{$r.Search.Language}}">
+            <span class="muted small">{{langName $r.Search.Language}}</span>
+            {{end}}
+            <select name="version" aria-label="{{t .Lang "glossary.version"}}">
+                {{range $r.Versions}}{{if .ImportCount}}<option value="{{.ID}}" {{if eq (printf "%d" .ID) $r.Version}}selected{{end}}>{{.Label}}</option>{{end}}{{end}}
+                <option value="all" {{if eq $r.Version "all"}}selected{{end}}>{{t .Lang "glossary.all_versions"}}</option>
+            </select>
+            {{if $r.Modules}}
+            <div class="combo" data-combo>
+                <input type="hidden" name="module" value="{{$r.Search.Module}}">
+                <button type="button" class="combo-btn{{if $r.Search.Module}} combo-set{{end}}" aria-haspopup="listbox" aria-expanded="false" title="{{t .Lang "glossary.module_filter"}}">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5"/></svg>
+                    <span class="combo-label">{{if $r.Search.Module}}{{$r.Search.Module}}{{else}}{{t .Lang "glossary.all_modules"}}{{end}}</span>
+                    <span class="combo-caret">▾</span>
+                </button>
+                <div class="combo-pop" hidden>
+                    <input type="search" class="combo-q" placeholder="{{t .Lang "glossary.module_search"}}" aria-label="{{t .Lang "glossary.module_search"}}" autocomplete="off">
+                    <ul class="combo-list" role="listbox">
+                        <li><button type="button" role="option" data-value="" data-label="{{t .Lang "glossary.all_modules"}}" class="{{if not $r.Search.Module}}selected{{end}}">{{t .Lang "glossary.all_modules"}}</button></li>
+                        {{range $r.Modules}}<li><button type="button" role="option" data-value="{{.Name}}" data-label="{{.Name}}" class="{{if eq .Name $r.Search.Module}}selected{{end}}"><span>{{.Name}}</span><span class="muted small">{{num .Terms}}</span></button></li>{{end}}
+                    </ul>
+                    <p class="combo-none muted small" hidden>{{t .Lang "glossary.module_none"}}</p>
+                </div>
+            </div>
+            {{end}}
+            <select name="order" aria-label="{{t .Lang "editor.order"}}">
+                <option value="frequency" {{if eq $r.Search.Order "frequency"}}selected{{end}}>{{t .Lang "glossary.order_frequency"}}</option>
+                <option value="alpha" {{if eq $r.Search.Order "alpha"}}selected{{end}}>{{t .Lang "glossary.order_alpha"}}</option>
+                <option value="variants" {{if or (eq $r.Search.Order "") (eq $r.Search.Order "variants")}}selected{{end}}>{{t .Lang "glossary.order_variants"}}</option>
+            </select>
+            <select name="dir" aria-label="{{t .Lang "glossary.direction"}}">
+                <option value="" {{if eq $r.Search.Dir ""}}selected{{end}}>{{t .Lang "glossary.dir_auto"}}</option>
+                <option value="asc" {{if eq $r.Search.Dir "asc"}}selected{{end}}>↑ {{t .Lang "glossary.dir_asc"}}</option>
+                <option value="desc" {{if eq $r.Search.Dir "desc"}}selected{{end}}>↓ {{t .Lang "glossary.dir_desc"}}</option>
+            </select>
+            <label class="check"><input type="checkbox" name="terms" value="1" {{if $r.Search.TermsOnly}}checked{{end}}> {{t .Lang "glossary.terms_only"}}</label>
+            <label class="check"><input type="checkbox" name="inconsistent" value="1" {{if $r.Search.Inconsistent}}checked{{end}}> {{t .Lang "glossary.inconsistent_only"}}</label>
+        </div>
+    </form>
+    {{template "glossary_results" $r}}
+    {{else}}
+    <div class="empty-state">
+        <h2>{{t .Lang "glossary.empty_title"}}</h2>
+        <p class="muted">{{t .Lang "glossary.empty_text"}}</p>
+        {{if $p.Role.CanManage}}<button type="button" class="btn btn-primary" data-open-dialog="manage-glossary" data-tab-open="add">+ {{t .Lang "glossary.add_source"}}</button>{{end}}
+    </div>
+    {{end}}
+</section>
+
+{{if $p.Role.CanManage}}{{template "glossary_manage" .}}{{end}}
+{{end}}

@@ -1,0 +1,7 @@
+DROP TABLE IF EXISTS entries;
+DROP TABLE IF EXISTS catalogs;
+DROP TABLE IF EXISTS project_invitations;
+DROP TABLE IF EXISTS project_members;
+DROP TABLE IF EXISTS projects;
+DROP TABLE IF EXISTS otp_codes;
+DROP TABLE IF EXISTS users;

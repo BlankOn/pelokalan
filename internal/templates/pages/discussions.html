@@ -1,0 +1,33 @@
+{{define "content"}}{{$p := .Data.Project}}
+{{template "project_header" .}}
+<section class="card">
+    <div class="card-head">
+        <h2>{{t .Lang "title.discussions"}} <span class="muted small">({{.Data.Total}})</span></h2>
+        {{if .User}}
+        <nav class="seg">
+            <a href="{{$p.Path}}/discussions" class="{{if not .Data.Mine}}active{{end}}">{{t .Lang "discuss.all"}}</a>
+            <a href="{{$p.Path}}/discussions?mentions=1" class="{{if .Data.Mine}}active{{end}}">{{t .Lang "discuss.mentions_me"}}</a>
+        </nav>
+        {{end}}
+    </div>
+    {{if .Data.Rows}}
+    <ul class="discussion-list">
+        {{range .Data.Rows}}{{$d := .D}}
+        <li>
+            <a class="discussion-row" href="{{.URL}}">
+                <span class="discussion-type">{{t $.Lang (printf "discuss.type_%s" $d.SubjectType)}}</span>
+                <strong class="discussion-title">{{$d.Title}}</strong>
+                <span class="muted small">💬 {{$d.CommentCount}} · {{t $.Lang "discuss.participants" $d.Participants}}{{if $d.LastAuthor}} · {{t $.Lang "discuss.last_by" $d.LastAuthor}}{{end}} · {{timeAgo $.Lang $d.LastActivityAt}}</span>
+            </a>
+        </li>
+        {{end}}
+    </ul>
+    <div class="row-actions pager">
+        {{with .Data.PrevOffset}}<a class="btn btn-small" href="?offset={{.}}{{if $.Data.Mine}}&amp;mentions=1{{end}}">← {{t $.Lang "discuss.newer"}}</a>{{end}}
+        {{with .Data.NextOffset}}<a class="btn btn-small" href="?offset={{.}}{{if $.Data.Mine}}&amp;mentions=1{{end}}">{{t $.Lang "discuss.older"}} →</a>{{end}}
+    </div>
+    {{else}}
+    <p class="muted">{{if .Data.Mine}}{{t .Lang "discuss.no_mentions"}}{{else}}{{t .Lang "discuss.none"}}{{end}}</p>
+    {{end}}
+</section>
+{{end}}

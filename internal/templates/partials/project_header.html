@@ -1,0 +1,19 @@
+{{define "project_header"}}{{$p := .Data.Project}}
+<div class="page-head">
+    <div>
+        <div class="crumbs"><a href="/projects">{{t .Lang "nav.projects"}}</a> /</div>
+        <h1>{{$p.Name}}{{if $p.AIEnabled}} {{template "ai_badge" .Lang}}{{end}}</h1>
+        {{if $p.Description}}<p class="muted project-desc">{{linkify $p.Description}}</p>{{end}}
+    </div>
+    {{if $p.Role.IsMember}}<span class="role-badge role-{{$p.Role}}">{{roleName .Lang $p.Role}}</span>
+    {{else if not .User}}<a class="btn btn-small" href="/login?next={{$p.Path}}">{{t .Lang "project.login_to_contribute"}}</a>{{end}}
+</div>
+<nav class="tabs-nav">
+    <a href="{{$p.Path}}" class="{{if eq .Data.Tab "glossary"}}active{{end}}">{{t .Lang "project.tab_glossary"}}</a>
+    <a href="{{$p.Path}}/files" class="{{if eq .Data.Tab "files"}}active{{end}}">{{t .Lang "project.tab_files"}}</a>
+    <a href="{{$p.Path}}/discussions" class="{{if eq .Data.Tab "discussions"}}active{{end}}">{{t .Lang "project.tab_discussions"}}</a>
+    <a href="{{$p.Path}}/wiki" class="{{if eq .Data.Tab "wiki"}}active{{end}}">{{t .Lang "project.tab_wiki"}}</a>
+    <a href="{{$p.Path}}/members" class="{{if eq .Data.Tab "members"}}active{{end}}">{{t .Lang "project.tab_members"}}</a>
+    {{if $p.Role.CanManage}}<a href="{{$p.Path}}/settings" class="{{if eq .Data.Tab "settings"}}active{{end}}">{{t .Lang "project.tab_settings"}}</a>{{end}}
+</nav>
+{{end}}

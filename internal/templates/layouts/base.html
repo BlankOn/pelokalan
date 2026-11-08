@@ -1,0 +1,29 @@
+{{define "base"}}<!DOCTYPE html>
+<html lang="{{.Lang}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="htmx-config" content='{"defaultSwapStyle":"outerHTML","scrollIntoViewOnBoost":false}'>
+    <title>{{.Title}}</title>
+    <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml">
+    <link rel="stylesheet" href="/static/css/style.css?v={{.Asset}}">
+    <script src="/static/js/htmx.min.js"></script>
+    <script src="/static/js/app.js?v={{.Asset}}" defer></script>
+</head>
+<body class="{{if .Data.FullPage}}full{{end}}" data-lang="{{.Lang}}">
+    {{template "nav" .}}
+    <div id="toast" class="toast-area" aria-live="polite"></div>
+    {{if .Data.FullPage}}
+        {{template "content" .}}
+    {{else}}
+    <main class="container">
+        {{if .Flash}}<div class="alert alert-ok">{{.Flash}}</div>{{end}}
+        {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+        {{template "content" .}}
+    </main>
+    <footer class="site-footer">
+        {{.SiteName}} · {{t .Lang "footer.tagline"}}
+    </footer>
+    {{end}}
+</body>
+</html>{{end}}

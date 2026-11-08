@@ -1,0 +1,47 @@
+{{define "glossary_results"}}
+<div id="glossary-results">
+    {{if .Page.Groups}}
+    <p class="muted small gl-summary">{{t .Lang "glossary.results" .Page.Total}}</p>
+    <div class="gl-list">{{template "glossary_page" .}}</div>
+    {{else}}
+    <p class="muted gl-none">{{t .Lang "glossary.no_results"}}</p>
+    {{end}}
+</div>
+{{end}}
+
+{{define "glossary_page"}}
+{{range .Page.Groups}}{{$g := .}}
+<details class="gl-item{{if .IsInconsistent}} gl-inconsistent{{end}}">
+    <summary>
+        <span class="gl-source">{{.Source}}</span>
+        <span class="gl-translations">
+            {{range $i, $tr := .Translations}}<span class="gl-chip{{if eq $i 0}} gl-main{{end}}" title="{{$tr.Count}}×">{{$tr.Text}}{{if $g.IsInconsistent}} <small>{{$tr.Share $g.Total}}%</small>{{end}}</span>{{end}}
+        </span>
+                <span class="gl-count muted small">{{if .Comments}}<span class="comment-count" title="{{t $.Lang "discuss.title"}}">💬 {{.Comments}}</span> {{end}}{{.Total}}×</span>
+    </summary>
+        <div class="gl-detail">
+        <p class="small"><a href="{{$.ProjectPath}}/glossary/{{.Hash}}">{{t $.Lang "term.open_page"}} →</a></p>
+        {{if .IsInconsistent}}<p class="gl-warn small">{{t $.Lang "glossary.variants" (len .Translations)}}</p>{{end}}
+        <table class="table gl-table">
+            <thead><tr><th>{{t $.Lang "editor.translation"}}</th><th class="num">{{t $.Lang "glossary.uses"}}</th>{{if eq $.Version "all"}}<th>{{t $.Lang "glossary.versions"}}</th>{{end}}<th>{{t $.Lang "glossary.modules"}}</th></tr></thead>
+            <tbody>
+            {{range .Translations}}
+            <tr>
+                <td><strong>{{.Text}}</strong>{{if .Contexts}}<div class="muted small">{{t $.Lang "editor.context"}}: {{join .Contexts ", "}}</div>{{end}}</td>
+                <td class="num">{{.Count}}</td>
+                {{if eq $.Version "all"}}<td>{{range .Versions}}<span class="version-badge">{{.}}</span> {{end}}</td>{{end}}
+                <td class="small gl-modules">{{range .Modules}}<code>{{.}}</code> {{end}}</td>
+            </tr>
+            {{end}}
+            </tbody>
+                </table>
+        <div class="gl-thread" data-thread-url="{{$.ProjectPath}}/discussions/glossary_term/{{.Hash}}"></div>
+    </div>
+</details>
+{{end}}
+{{if .Page.HasMore}}
+<button type="button" class="btn btn-block gl-more" hx-get="{{.ProjectPath}}/glossary/search?{{.MoreQuery}}" hx-target="this" hx-swap="outerHTML">
+    {{t .Lang "glossary.load_more" .Page.NextOffset .Page.Total}}
+</button>
+{{end}}
+{{end}}

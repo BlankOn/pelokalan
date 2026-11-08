@@ -1,0 +1,36 @@
+{{define "content"}}{{$p := .Data.Project}}
+{{template "project_header" .}}
+<div class="wiki-layout">
+    {{template "wiki_nav" .}}
+    <article class="card wiki-main" data-lb-open="{{t .Lang "discuss.image_open"}}" data-lb-zoom="{{t .Lang "discuss.image_zoom"}}" data-lb-close="{{t .Lang "action.close"}}">
+        {{with .Data.Page}}{{$pg := .}}
+        {{if $.Data.Crumbs}}<div class="crumbs">{{range $.Data.Crumbs}}<a href="{{$p.Path}}/wiki/{{.Slug}}">{{.Title}}</a> / {{end}}</div>{{end}}
+        <div class="wiki-head">
+            <h1>{{$pg.Title}}</h1>
+            {{if $.Data.CanEdit}}
+            <div class="row-actions">
+                <a class="btn btn-small btn-primary" href="{{$p.Path}}/wiki/{{$pg.Slug}}/edit">{{t $.Lang "wiki.edit"}}</a>
+                {{if lt $.Data.Depth $.Data.MaxDepth}}<a class="btn btn-small" href="{{$p.Path}}/wiki/new?parent={{$pg.ID}}">{{t $.Lang "wiki.new_subpage"}}</a>{{end}}
+                {{if $.Data.CanDelete}}<form method="post" action="{{$p.Path}}/wiki/{{$pg.Slug}}/delete" data-confirm="{{t $.Lang "wiki.confirm_delete"}}"><button class="btn btn-small btn-danger">{{t $.Lang "wiki.delete"}}</button></form>{{end}}
+            </div>
+            {{end}}
+        </div>
+        <p class="muted small wiki-meta">{{t $.Lang "wiki.updated" (timeAgo $.Lang $pg.UpdatedAt) (or $pg.UpdaterName "—")}}</p>
+        <div class="wiki-body">{{if $pg.Body}}{{wikiHTML $pg.Body}}{{else}}<p class="muted">{{t $.Lang "wiki.preview_empty"}}</p>{{end}}</div>
+        {{if $.Data.Subpages}}
+        <nav class="wiki-subpages">
+            <h3>{{t $.Lang "wiki.subpages"}}</h3>
+            <ul>{{range $.Data.Subpages}}<li><a href="{{$p.Path}}/wiki/{{.Slug}}">{{.Title}}</a></li>{{end}}</ul>
+        </nav>
+        {{end}}
+        {{else}}
+        <div class="empty-state">
+            <h2>{{t .Lang "wiki.empty_title"}}</h2>
+            <p class="muted">{{if .Data.CanEdit}}{{t .Lang "wiki.empty_help"}}{{else}}{{t .Lang "wiki.empty_visitor"}}{{end}}</p>
+            {{if .Data.CanEdit}}<a class="btn btn-primary" href="{{$p.Path}}/wiki/new">{{t .Lang "wiki.new_page"}}</a>
+            {{else if not .User}}<p><a href="/login?next={{$p.Path}}/wiki">{{t .Lang "nav.login"}}</a> · {{t .Lang "wiki.login_to_edit"}}</p>{{end}}
+        </div>
+        {{end}}
+    </article>
+</div>
+{{end}}

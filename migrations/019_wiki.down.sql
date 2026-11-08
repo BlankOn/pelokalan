@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS wiki_files;
+DROP TABLE IF EXISTS wiki_pages;

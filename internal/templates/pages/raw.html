@@ -1,0 +1,29 @@
+{{define "content"}}{{$c := .Data.Catalog}}
+<form method="post" action="/catalogs/{{$c.ID}}/raw" class="raw-app" id="raw-form" data-msg-unsaved="{{t .Lang "editor.unsaved_changes"}}">
+    <div class="toolbar">
+        <a class="tb-btn" href="{{$c.URL}}" title="{{t .Lang "raw.back"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+            <span>{{t .Lang "raw.back_short"}}</span>
+        </a>
+        <div class="tb-sep"></div>
+        {{if not .Data.ReadOnly}}
+        <button type="submit" class="tb-btn" title="Ctrl+S">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4M8 20v-6h8v6"/></svg>
+            <span>{{t .Lang "action.save"}}</span>
+        </button>
+        {{end}}
+        <a class="tb-btn" href="/catalogs/{{$c.ID}}/download" title="{{t .Lang "action.download_po"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+            <span>{{if $c.IsTemplate}}POT{{else}}PO{{end}}</span>
+        </a>
+        <strong class="tb-mode">{{t .Lang "raw.title"}}</strong>
+        <div class="spacer"></div>
+        <span class="muted small raw-pos" id="raw-pos"></span>
+    </div>
+    {{if .Error}}<div class="raw-error">{{.Error}}</div>{{end}}
+    <p class="raw-hint muted small">{{if .Data.ReadOnly}}{{t .Lang "editor.others_readonly" .Data.Catalog.OwnerUsername}}{{else}}{{t .Lang "raw.hint"}}{{end}}</p>
+    <input type="hidden" name="updated_at" value="{{.Data.UpdatedAt}}">
+    <textarea name="content" id="raw-text" class="raw-text" spellcheck="false" wrap="off" {{if .Data.ReadOnly}}readonly{{end}} aria-label="{{t .Lang "raw.title"}}">
+{{.Data.Text}}</textarea>
+</form>
+{{end}}

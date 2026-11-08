@@ -1,0 +1,54 @@
+{{define "content"}}{{$p := .Data.Project}}{{$in := .Data.Input}}{{$pg := .Data.Page}}
+{{template "project_header" .}}
+<div class="wiki-layout">
+    {{template "wiki_nav" .}}
+    <article class="card wiki-main">
+        <h1>{{if $pg}}{{t .Lang "wiki.edit_title" $pg.Title}}{{else}}{{t .Lang "wiki.new_title"}}{{end}}</h1>
+        {{if .Data.Conflict}}
+        <div class="alert alert-error wiki-conflict" role="alert">
+            <strong>{{t .Lang "wiki.conflict_title"}}</strong>
+            <p>{{t .Lang "wiki.conflict_help" (or $pg.UpdaterName "—") (timeAgo .Lang $pg.UpdatedAt)}}</p>
+            <ol>
+                <li>{{t .Lang "wiki.conflict_step_copy"}}</li>
+                <li>{{t .Lang "wiki.conflict_step_reload"}}</li>
+                <li>{{t .Lang "wiki.conflict_step_edit"}}</li>
+            </ol>
+            <div class="row-actions">
+                <button type="button" class="btn btn-small" data-copy-from="#wiki-body" data-copied="{{t .Lang "links.copied"}}">{{t .Lang "wiki.copy_my_text"}}</button>
+                <a class="btn btn-small btn-primary" href="{{$p.Path}}/wiki/{{$pg.Slug}}/edit" data-reload-wiki>{{t .Lang "wiki.reload"}}</a>
+            </div>
+        </div>
+        {{end}}
+        <form method="post" action="{{$p.Path}}/wiki/{{if $pg}}{{$pg.Slug}}/edit{{else}}new{{end}}" class="form wiki-form" id="wiki-form"
+              data-preview-url="{{$p.Path}}/wiki/preview" data-upload-url="{{$p.Path}}/wiki/files">
+            <input type="hidden" name="version" value="{{$in.Version}}">
+            {{if not $pg}}<input type="hidden" name="parent_id" value="{{$in.ParentID}}">{{end}}
+            <label for="wiki-title">{{t .Lang "wiki.field_title"}}</label>
+            <input id="wiki-title" name="title" required maxlength="120" value="{{$in.Title}}" {{if not $pg}}autofocus{{end}}>
+            <label for="wiki-slug">{{if $pg}}{{t .Lang "wiki.field_address"}}{{else}}{{t .Lang "wiki.field_slug"}}{{end}}</label>
+            <div class="slug-input"><span>{{$p.Path}}/wiki/</span><input id="wiki-slug" name="slug" maxlength="50" value="{{$in.Slug}}" {{if $pg}}required{{end}} pattern="[a-z0-9][a-z0-9\-]{1,48}[a-z0-9]" placeholder="panduan-gaya" autocapitalize="none" spellcheck="false"></div>
+            <p class="muted small field-help">{{if $pg}}{{t .Lang "wiki.address_help"}}{{else}}{{t .Lang "wiki.slug_help"}}{{end}}</p>
+
+            <div class="wiki-tabs" role="tablist">
+                <button type="button" role="tab" class="wtab active" data-wtab="write" aria-selected="true">{{t .Lang "wiki.write"}}</button>
+                <button type="button" role="tab" class="wtab" data-wtab="preview" aria-selected="false">{{t .Lang "wiki.preview"}}</button>
+                <span class="spacer"></span>
+                <label class="att-add small">📎 {{t .Lang "wiki.attach"}}<input type="file" id="wiki-files" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp"></label>
+            </div>
+            <div class="wiki-write" data-wpanel="write">
+                <textarea id="wiki-body" name="body" rows="22" placeholder="{{t .Lang "wiki.body_placeholder"}}" data-uploading="{{t .Lang "wiki.uploading"}}"
+                          data-err-type="{{t .Lang "err.attachment_type"}}" data-err-size="{{t .Lang "err.attachment_size" 10}}">{{$in.Body}}</textarea>
+                <p class="muted small">{{t .Lang "wiki.markdown_help"}} · {{t .Lang "discuss.attach_help"}}</p>
+                <div class="att-error c-err small" role="alert" hidden></div>
+            </div>
+            <div class="wiki-preview wiki-body" data-wpanel="preview" hidden
+                 data-lb-open="{{t .Lang "discuss.image_open"}}" data-lb-zoom="{{t .Lang "discuss.image_zoom"}}" data-lb-close="{{t .Lang "action.close"}}"></div>
+
+            <div class="row-actions">
+                <a class="btn" href="{{if $pg}}{{$p.Path}}/wiki/{{$pg.Slug}}{{else}}{{$p.Path}}/wiki{{end}}">{{t .Lang "wiki.cancel"}}</a>
+                <button type="submit" class="btn btn-primary">{{t .Lang "wiki.save"}}</button>
+            </div>
+        </form>
+    </article>
+</div>
+{{end}}

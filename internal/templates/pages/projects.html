@@ -1,0 +1,56 @@
+{{define "content"}}
+{{if .Data.Invitations}}
+<section class="card invite-banner">
+    <h2>{{t .Lang "invitations.pending_title"}}</h2>
+    {{range .Data.Invitations}}{{template "invitation_item" (dict "I" . "Lang" $.Lang)}}{{end}}
+</section>
+{{end}}
+
+<div class="page-head">
+    <h1>{{t .Lang "title.projects"}}</h1>
+    {{if .User}}<button type="button" class="btn btn-primary" data-open-dialog="new-project">+ {{t .Lang "project.new"}}</button>{{end}}
+</div>
+
+{{if .Data.Mine}}
+<h2 class="section-title">{{t .Lang "project.mine"}}</h2>
+<div class="project-grid">{{range .Data.Mine}}{{template "project_card" (dict "P" . "Lang" $.Lang)}}{{end}}</div>
+{{end}}
+
+{{if .Data.Others}}
+{{if .Data.Mine}}<h2 class="section-title">{{t .Lang "project.others"}}</h2>{{end}}
+<div class="project-grid">{{range .Data.Others}}{{template "project_card" (dict "P" . "Lang" $.Lang)}}{{end}}</div>
+{{end}}
+
+{{if not (or .Data.Mine .Data.Others)}}
+<div class="empty-state">
+    <img src="/static/img/logo.svg" alt="" width="56" height="56">
+    <h2>{{t .Lang "project.empty_title"}}</h2>
+    <p class="muted">{{t .Lang "project.empty_text"}}</p>
+    {{if .User}}<button type="button" class="btn btn-primary" data-open-dialog="new-project">+ {{t .Lang "project.new"}}</button>{{end}}
+</div>
+{{end}}
+
+{{if .User}}
+<dialog id="new-project" class="dialog" {{if .Data.ShowNew}}data-open-on-load{{end}}>
+    <form method="post" action="/projects" class="form">
+        <h2>{{t .Lang "project.new"}}</h2>
+        <label for="p-name">{{t .Lang "field.project_name"}}</label>
+        <input id="p-name" name="name" required maxlength="120" value="{{with .Data.Form}}{{.Name}}{{end}}">
+                <label for="p-slug">{{t .Lang "field.slug"}}</label>
+        <div class="username-input slug-input"><span>/projects/</span><input id="p-slug" name="slug"  maxlength="50" value="{{with .Data.Form}}{{.Slug}}{{end}}"
+               pattern="[a-zA-Z0-9][a-zA-Z0-9\-]{1,48}[a-zA-Z0-9]" autocapitalize="none" spellcheck="false" placeholder="gnome-id" data-slug-for="p-name"></div>
+        <p class="muted small field-help">{{t .Lang "field.slug_help"}}</p>
+        <label for="p-desc">{{t .Lang "field.description"}}</label>
+        <textarea id="p-desc" name="description" rows="3">{{with .Data.Form}}{{.Description}}{{end}}</textarea>
+        <label for="p-src">{{t .Lang "field.source_language"}}</label>
+        <select id="p-src" name="source_language">
+            {{range languages}}<option value="{{.Code}}" {{if eq .Code "en"}}selected{{end}}>{{.Name}} ({{.Code}})</option>{{end}}
+        </select>
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "action.create"}}</button>
+        </div>
+    </form>
+</dialog>
+{{end}}
+{{end}}

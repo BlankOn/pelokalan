@@ -1,0 +1,517 @@
+package web
+
+import (
+	"errors"
+	"fmt"
+	"github.com/go-chi/chi/v5"
+	"io"
+	"net/http"
+	"sort"
+	"strconv"
+	"strings"
+
+	"pelokalan/internal/handler/middleware"
+	"pelokalan/internal/i18n"
+	"pelokalan/internal/models"
+	"pelokalan/internal/service"
+)
+
+// Projects lists all projects (public) and the user's pending invitations
+func (h *Handler) Projects(w http.ResponseWriter, r *http.Request) {
+	h.renderProjects(w, r, "", nil)
+}
+
+func (h *Handler) renderProjects(w http.ResponseWriter, r *http.Request, errMsg string, form *service.ProjectInput) {
+	user := middleware.GetUser(r.Context())
+	projects, err := h.projectService.ListAll(r.Context(), user)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	var mine, others []*models.Project
+	for _, p := range projects {
+		if p.Role.IsMember() {
+			mine = append(mine, p)
+		} else {
+			others = append(others, p)
+		}
+	}
+	data := h.page(r, "title.projects")
+	data.Error = errMsg
+	data.Data["Mine"] = mine
+	data.Data["Others"] = others
+	if user != nil {
+		invitations, err := h.projectService.InvitationsForUser(r.Context(), user)
+		if err != nil {
+			h.fail(w, r, err)
+			return
+		}
+		data.Data["Invitations"] = invitations
+	}
+	data.Data["ShowNew"] = user != nil && (r.URL.Query().Get("new") == "1" || form != nil)
+	if form != nil {
+		data.Data["Form"] = *form
+	}
+	h.render(w, "projects", data)
+}
+
+// CreateProject creates a project
+func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUser(r.Context())
+	in := service.ProjectInput{
+		Name:           r.FormValue("name"),
+		Slug:           r.FormValue("slug"),
+		Description:    r.FormValue("description"),
+		SourceLanguage: r.FormValue("source_language"),
+	}
+	p, err := h.projectService.Create(r.Context(), user, in)
+	if err != nil {
+		h.renderProjects(w, r, h.errorMessage(r, err), &in)
+		return
+	}
+	http.Redirect(w, r, p.Path()+"?flash=project_created", http.StatusSeeOther)
+}
+
+// loadProject loads a project for the request. Projects are public, so the
+// viewer may be a visitor (empty Role); services check roles for changes.
+//
+// The {id} URL segment is the project slug ("gnome-id"); numeric ids still
+// work and page views are redirected to the slug address.
+func (h *Handler) loadProject(w http.ResponseWriter, r *http.Request) (*models.Project, bool) {
+	user := middleware.GetUser(r.Context())
+	param := chi.URLParam(r, "id")
+	if id, err := strconv.ParseInt(param, 10, 64); err == nil {
+		p, err := h.projectService.GetPublic(r.Context(), user, id)
+		if err != nil {
+			h.fail(w, r, err)
+			return nil, false
+		}
+		if r.Method == http.MethodGet && !isHTMX(r) {
+			target := strings.Replace(r.URL.EscapedPath(), "/projects/"+param, p.Path(), 1)
+			if r.URL.RawQuery != "" {
+				target += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, target, http.StatusMovedPermanently)
+			return nil, false
+		}
+		return p, true
+	}
+	p, err := h.projectService.GetPublicBySlug(r.Context(), user, param)
+	if err != nil {
+		h.fail(w, r, err)
+		return nil, false
+	}
+	return p, true
+}
+
+// loadMemberProject loads a project the signed-in user belongs to
+func (h *Handler) loadMemberProject(w http.ResponseWriter, r *http.Request) (*models.Project, bool) {
+	p, ok := h.loadProject(w, r)
+	if ok && !p.Role.IsMember() {
+		h.fail(w, r, service.ErrForbidden)
+		return nil, false
+	}
+	return p, ok
+}
+
+// ownerFiles groups another member's files on the PO files page
+type ownerFiles struct {
+	Username string
+	Files    []*models.Catalog
+}
+
+// ProjectPage shows the project's PO files: the user's own first, then the
+// other members' files (read-only)
+func (h *Handler) ProjectPage(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	h.renderProject(w, r, p, "")
+}
+
+func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *models.Project, errMsg string) {
+	catalogs, err := h.catalogService.ListAll(r.Context(), middleware.GetUser(r.Context()), p)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	var template *models.Catalog
+	var translations []*models.Catalog
+	others := map[string]*ownerFiles{}
+	var otherOrder []string
+	for _, c := range catalogs {
+		switch {
+		case c.Owned && c.IsTemplate:
+			template = c
+		case c.Owned:
+			translations = append(translations, c)
+		default:
+			g, ok := others[c.OwnerUsername]
+			if !ok {
+				g = &ownerFiles{Username: c.OwnerUsername}
+				others[c.OwnerUsername] = g
+				otherOrder = append(otherOrder, c.OwnerUsername)
+			}
+			g.Files = append(g.Files, c)
+		}
+	}
+	sort.Strings(otherOrder)
+	var otherGroups []*ownerFiles
+	for _, u := range otherOrder {
+		otherGroups = append(otherGroups, others[u])
+	}
+	data := h.page(r, "")
+	data.Title = i18n.T(data.Lang, "project.tab_files") + " · " + p.Name
+	data.Error = errMsg
+	data.Data["Project"] = p
+	data.Data["Template"] = template
+	data.Data["Catalogs"] = translations
+	data.Data["Others"] = otherGroups
+	data.Data["Tab"] = "files"
+	if msg := r.URL.Query().Get("merged"); msg != "" {
+		data.Flash = i18n.T(data.Lang, "flash.merged", r.URL.Query().Get("added"), r.URL.Query().Get("obsolete"))
+	}
+	h.render(w, "project", data)
+}
+
+// UploadCatalog imports a PO/POT file into the project
+func (h *Handler) UploadCatalog(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	user := middleware.GetUser(r.Context())
+	name, body, err := h.readUpload(w, r)
+	if err != nil {
+		h.renderProject(w, r, p, h.errorMessage(r, err))
+		return
+	}
+	c, res, err := h.catalogService.Upload(r.Context(), user, p, name, body, r.FormValue("language"))
+	if err != nil {
+		h.renderProject(w, r, p, h.errorMessage(r, err))
+		return
+	}
+	if res != nil {
+		http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d", res.Added, res.Obsolete), http.StatusSeeOther)
+		return
+	}
+	if c.IsTemplate {
+		http.Redirect(w, r, p.Path()+"/files?flash=template_uploaded", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, c.URL(), http.StatusSeeOther)
+}
+
+func (h *Handler) readUpload(w http.ResponseWriter, r *http.Request) (string, []byte, error) {
+	limit := h.serverConfig.MaxUploadMB << 20
+	r.Body = http.MaxBytesReader(w, r.Body, limit+1<<20)
+	if err := r.ParseMultipartForm(limit); err != nil {
+		return "", nil, &service.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
+	}
+	f, hdr, err := r.FormFile("file")
+	if err != nil {
+		return "", nil, &service.UserError{Key: "err.no_file"}
+	}
+	defer f.Close()
+	body, err := io.ReadAll(io.LimitReader(f, limit+1))
+	if err != nil {
+		return "", nil, err
+	}
+	if int64(len(body)) > limit {
+		return "", nil, &service.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
+	}
+	return hdr.Filename, body, nil
+}
+
+// CreateTranslation starts a new language from the template
+func (h *Handler) CreateTranslation(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	lang := r.FormValue("language")
+	if lang == "other" {
+		lang = r.FormValue("language_other")
+	}
+	c, err := h.catalogService.CreateFromTemplate(r.Context(), middleware.GetUser(r.Context()), p, lang)
+	if err != nil {
+		h.renderProject(w, r, p, h.errorMessage(r, err))
+		return
+	}
+	http.Redirect(w, r, c.URL(), http.StatusSeeOther)
+}
+
+// UpdateAllFromTemplate refreshes every translation from the template
+func (h *Handler) UpdateAllFromTemplate(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	res, err := h.catalogService.UpdateAllFromTemplate(r.Context(), middleware.GetUser(r.Context()), p)
+	if err != nil {
+		h.renderProject(w, r, p, h.errorMessage(r, err))
+		return
+	}
+	http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d", res.Added, res.Obsolete), http.StatusSeeOther)
+}
+
+// MembersPage shows members and invitations
+func (h *Handler) MembersPage(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	h.renderMembers(w, r, p, "", "")
+}
+
+func (h *Handler) renderMembers(w http.ResponseWriter, r *http.Request, p *models.Project, errMsg, email string) {
+	members, err := h.projectService.Members(r.Context(), p)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	// pending invitations reveal email addresses: managers only
+	var invitations []*models.Invitation
+	if p.Role.CanManage() {
+		if invitations, err = h.projectService.PendingInvitations(r.Context(), p); err != nil {
+			h.fail(w, r, err)
+			return
+		}
+	}
+	data := h.page(r, "")
+	data.Title = i18n.T(data.Lang, "title.members") + " · " + p.Name
+	data.Error = errMsg
+	data.Data["Project"] = p
+	data.Data["Members"] = members
+	data.Data["Invitations"] = invitations
+	data.Data["InviteEmail"] = email
+	if p.Role.CanManage() {
+		links, err := h.projectService.InviteLinks(r.Context(), p)
+		if err != nil {
+			h.fail(w, r, err)
+			return
+		}
+		data.Data["InviteLinks"] = links
+		data.Data["LinkDays"] = service.InviteLinkDays
+		data.Data["LinkUses"] = service.InviteLinkUses
+		data.Data["SiteURL"] = strings.TrimRight(h.siteConfig.BaseURL, "/")
+		data.Data["NewLink"] = r.URL.Query().Get("link")
+	}
+	data.Data["Tab"] = "members"
+	h.render(w, "members", data)
+}
+
+// Invite sends an invitation
+func (h *Handler) Invite(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	user := middleware.GetUser(r.Context())
+	_, err := h.projectService.Invite(r.Context(), user, p, r.FormValue("email"),
+		models.ProjectRole(r.FormValue("role")), middleware.GetLang(r.Context()))
+	if err != nil {
+		h.renderMembers(w, r, p, h.errorMessage(r, err), r.FormValue("email"))
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/members?flash=invited", http.StatusSeeOther)
+}
+
+// CancelInvitation withdraws an invitation
+func (h *Handler) CancelInvitation(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	if err := h.projectService.CancelInvitation(r.Context(), p, idParam(r, "iid")); err != nil {
+		h.renderMembers(w, r, p, h.errorMessage(r, err), "")
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/members?flash=invitation_cancelled", http.StatusSeeOther)
+}
+
+// ChangeMemberRole updates a member's role
+func (h *Handler) ChangeMemberRole(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	err := h.projectService.ChangeRole(r.Context(), p, idParam(r, "uid"), models.ProjectRole(r.FormValue("role")))
+	if err != nil {
+		h.renderMembers(w, r, p, h.errorMessage(r, err), "")
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/members?flash=role_changed", http.StatusSeeOther)
+}
+
+// RemoveMember removes a member or lets a member leave
+func (h *Handler) RemoveMember(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	user := middleware.GetUser(r.Context())
+	uid := idParam(r, "uid")
+	if err := h.projectService.RemoveMember(r.Context(), user, p, uid); err != nil {
+		h.renderMembers(w, r, p, h.errorMessage(r, err), "")
+		return
+	}
+	if uid == user.ID {
+		http.Redirect(w, r, "/projects?flash=left_project", http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/members?flash=member_removed", http.StatusSeeOther)
+}
+
+// SettingsPage shows project settings
+func (h *Handler) SettingsPage(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	// settings are for owners and managers only
+	if !p.Role.CanManage() {
+		h.fail(w, r, service.ErrForbidden)
+		return
+	}
+	h.renderSettings(w, r, p, "", "")
+}
+
+// UpdateSettings saves project settings
+func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	in := service.ProjectInput{
+		Name:           r.FormValue("name"),
+		Slug:           r.FormValue("slug"),
+		Description:    r.FormValue("description"),
+		SourceLanguage: r.FormValue("source_language"),
+	}
+	if err := h.projectService.Update(r.Context(), p, in); err != nil {
+		h.renderSettings(w, r, p, h.errorMessage(r, err), "")
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/settings?flash=settings_saved", http.StatusSeeOther)
+}
+
+// DeleteProject removes a project
+func (h *Handler) DeleteProject(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	if r.FormValue("confirm_name") != p.Name {
+		h.renderSettings(w, r, p, i18n.T(middleware.GetLang(r.Context()), "err.confirm_name"), "")
+		return
+	}
+	if err := h.projectService.Delete(r.Context(), p); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, "/projects?flash=project_deleted", http.StatusSeeOther)
+}
+
+// InvitationsPage lists invitations addressed to the user
+func (h *Handler) InvitationsPage(w http.ResponseWriter, r *http.Request) {
+	invitations, err := h.projectService.InvitationsForUser(r.Context(), middleware.GetUser(r.Context()))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	data := h.page(r, "title.invitations")
+	data.Data["Invitations"] = invitations
+	h.render(w, "invitations", data)
+}
+
+// AcceptInvitation joins a project
+func (h *Handler) AcceptInvitation(w http.ResponseWriter, r *http.Request) {
+	inv, err := h.projectService.AcceptInvitation(r.Context(), middleware.GetUser(r.Context()), idParam(r, "iid"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, "/projects/"+strconv.FormatInt(inv.ProjectID, 10)+"?flash=joined", http.StatusSeeOther)
+}
+
+// DeclineInvitation rejects an invitation
+func (h *Handler) DeclineInvitation(w http.ResponseWriter, r *http.Request) {
+	if err := h.projectService.DeclineInvitation(r.Context(), middleware.GetUser(r.Context()), idParam(r, "iid")); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, "/invitations?flash=declined", http.StatusSeeOther)
+}
+
+// CreateInviteLink makes a shareable join link (owners and managers)
+func (h *Handler) CreateInviteLink(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	days, _ := strconv.Atoi(r.FormValue("days"))
+	uses, _ := strconv.Atoi(r.FormValue("max_uses"))
+	l, err := h.projectService.CreateInviteLink(r.Context(), middleware.GetUser(r.Context()), p,
+		models.ProjectRole(r.FormValue("role")), days, uses)
+	if err != nil {
+		h.renderMembers(w, r, p, h.errorMessage(r, err), "")
+		return
+	}
+	http.Redirect(w, r, fmt.Sprintf("%s/members?flash=link_created&link=%d#invite-links", p.Path(), l.ID), http.StatusSeeOther)
+}
+
+// DeleteInviteLink revokes a join link
+func (h *Handler) DeleteInviteLink(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	if err := h.projectService.DeleteInviteLink(r.Context(), p, idParam(r, "lid")); err != nil {
+		h.renderMembers(w, r, p, h.errorMessage(r, err), "")
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/members?flash=link_deleted#invite-links", http.StatusSeeOther)
+}
+
+// JoinPage shows what a join link offers; visitors are asked to sign in or register first
+func (h *Handler) JoinPage(w http.ResponseWriter, r *http.Request) {
+	h.renderJoin(w, r, "")
+}
+
+func (h *Handler) renderJoin(w http.ResponseWriter, r *http.Request, errMsg string) {
+	token := chi.URLParam(r, "token")
+	l, p, err := h.projectService.InviteLink(r.Context(), middleware.GetUser(r.Context()), token)
+	data := h.page(r, "title.join")
+	data.Error = errMsg
+	if err != nil {
+		if !errors.Is(err, service.ErrInviteLinkInvalid) {
+			h.fail(w, r, err)
+			return
+		}
+		w.WriteHeader(http.StatusNotFound)
+		data.Data["Invalid"] = true
+		h.render(w, "join", data)
+		return
+	}
+	data.Title = i18n.T(data.Lang, "title.join") + " · " + p.Name
+	data.Data["Link"] = l
+	data.Data["Project"] = p
+	data.Data["Next"] = l.Path()
+	h.render(w, "join", data)
+}
+
+// Join adds the signed-in user to the project of a join link
+func (h *Handler) Join(w http.ResponseWriter, r *http.Request) {
+	p, err := h.projectService.JoinByInviteLink(r.Context(), middleware.GetUser(r.Context()), chi.URLParam(r, "token"))
+	if err != nil {
+		if _, ok := service.AsUserError(err); ok {
+			h.renderJoin(w, r, h.errorMessage(r, err))
+			return
+		}
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, p.Path()+"?flash=joined", http.StatusSeeOther)
+}

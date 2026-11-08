@@ -1,0 +1,10 @@
+{{define "resend_form"}}
+<form id="resend-form" class="auth-alt" hx-post="/verify/resend" hx-target="#resend-form" hx-swap="outerHTML">
+    <input type="hidden" name="email" value="{{.Email}}">
+    <input type="hidden" name="purpose" value="{{.Purpose}}">
+    {{if .Message}}<div class="resend-msg small{{if .Error}} c-err{{end}}" role="status">{{.Message}}</div>{{end}}
+    {{t .Lang "auth.no_code"}}
+    <button type="submit" class="linklike" data-countdown="{{.Wait}}"
+            data-label="{{t .Lang "auth.resend"}}" data-wait-label="{{t .Lang "auth.resend_in"}}">{{if .Wait}}{{t .Lang "auth.resend_in" .Wait}}{{else}}{{t .Lang "auth.resend"}}{{end}}</button>
+</form>
+{{end}}

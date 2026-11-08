@@ -1,0 +1,199 @@
+{{define "content"}}{{$c := .Data.Catalog}}{{$p := .Data.Project}}{{$f := .Data.Filter}}
+<div class="editor-app" id="editor-app" data-catalog="{{$c.ID}}" data-readonly="{{.Data.ReadOnly}}" data-initial-entry="{{.Data.InitialEntry}}"
+     data-msg-unsaved="{{t .Lang "editor.unsaved_changes"}}"
+     data-msg-error="{{t .Lang "editor.request_failed"}}"
+     data-msg-save-failed="{{t .Lang "editor.save_failed_move"}}">
+    <div class="toolbar">
+        <a class="tb-btn" href="{{$p.Path}}/files" title="{{t .Lang "editor.back_to_project"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+            <span>{{t .Lang "editor.project"}}</span>
+        </a>
+        <div class="tb-sep"></div>
+        <button type="button" class="tb-btn" id="btn-validate" title="{{t .Lang "editor.validate_help"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
+            <span>{{t .Lang "editor.validate"}}</span>
+        </button>
+        {{if not .Data.ReadOnly}}
+        <button type="button" class="tb-btn tb-ai{{if .Data.AIConfigured}} tb-ai-on{{end}}" data-open-dialog="ai-dialog" title="{{t .Lang "editor.pretranslate_help"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path class="s1" d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path class="s2" d="M19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg>
+            <span>{{t .Lang "editor.pretranslate"}}</span>
+        </button>
+        {{if .Data.Template}}
+        <form method="post" action="/catalogs/{{$c.ID}}/update" data-confirm="{{t .Lang "confirm.update_from_template"}}">
+            <button type="submit" class="tb-btn" title="{{t .Lang "action.update_from_template"}}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5l2 2M20 12a8 8 0 0 1-14 5l-2-2"/><path d="M20 4v5h-5M4 20v-5h5"/></svg>
+                <span>{{t .Lang "editor.update"}}</span>
+            </button>
+        </form>
+        {{end}}
+        {{end}}
+        <div class="tb-sep"></div>
+        <a class="tb-btn" href="{{$c.URL}}/history" title="{{t .Lang "history.title"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
+            <span>{{t .Lang "history.button"}}</span>
+        </a>
+        {{if .Data.Owned}}
+        <button type="button" class="tb-btn tb-commit" data-open-dialog="commit-dialog" title="{{t .Lang "history.commit_help"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M3 12h5.5M15.5 12H21"/></svg>
+            <span>{{t .Lang "history.commit"}}</span>
+            {{template "commit_badge" (dict "N" .Data.Uncommitted "OOB" false)}}
+        </button>
+        {{end}}
+        <div class="tb-sep"></div>
+        <a class="tb-btn" href="{{$c.URL}}/raw" title="{{t .Lang "raw.open"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>
+            <span>{{t .Lang "raw.button"}}</span>
+        </a>
+        {{if .Data.Owned}}
+        <button type="button" class="tb-btn" data-open-dialog="properties-dialog" title="{{t .Lang "props.title"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21c1-4 4-6 8-6s7 2 8 6"/></svg>
+            <span>{{t .Lang "props.button"}}</span>
+        </button>
+        {{end}}
+        <div class="tb-sep"></div>
+        <a class="tb-btn" href="/catalogs/{{$c.ID}}/download" title="{{t .Lang "action.download_po"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+            <span>{{if $c.IsTemplate}}POT{{else}}PO{{end}}</span>
+        </a>
+        {{if not $c.IsTemplate}}
+        <a class="tb-btn" href="/catalogs/{{$c.ID}}/download.mo" title="{{t .Lang "action.download_mo"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
+            <span>MO</span>
+        </a>
+        {{end}}
+
+        <div class="tb-sep"></div>
+        <form id="filter-form" class="tb-filter" hx-get="/catalogs/{{$c.ID}}/list" hx-target="#entry-list"
+              hx-trigger="input changed delay:300ms from:#filter-q, change, submit" hx-include="#filter-selected">
+            <div class="tb-search">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg>
+                <input type="search" name="q" id="filter-q" value="{{$f.Query}}" placeholder="{{t .Lang "editor.search"}}" aria-label="{{t .Lang "editor.search"}}">
+            </div>
+            <label class="tb-filter-icon" for="filter-status" title="{{t .Lang "editor.filter"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8z"/></svg></label>
+            <select name="status" id="filter-status" aria-label="{{t .Lang "editor.filter"}}">
+                <option value="" {{if eq $f.Status ""}}selected{{end}}>{{t .Lang "filter.all"}}</option>
+                <option value="todo" {{if eq $f.Status "todo"}}selected{{end}}>{{t .Lang "filter.todo"}}</option>
+                <option value="untranslated" {{if eq $f.Status "untranslated"}}selected{{end}}>{{t .Lang "filter.untranslated"}}</option>
+                <option value="fuzzy" {{if eq $f.Status "fuzzy"}}selected{{end}}>{{t .Lang "filter.fuzzy"}}</option>
+                <option value="translated" {{if eq $f.Status "translated"}}selected{{end}}>{{t .Lang "filter.translated"}}</option>
+                <option value="issues" {{if eq $f.Status "issues"}}selected{{end}}>{{t .Lang "filter.issues"}}</option>
+                <option value="ai" {{if eq $f.Status "ai"}}selected{{end}}>🤖 {{t .Lang "filter.ai"}}</option>
+                <option value="glossary" {{if eq $f.Status "glossary"}}selected{{end}}>📖 {{t .Lang "filter.glossary"}}</option>
+                <option value="memory" {{if eq $f.Status "memory"}}selected{{end}}>🗂 {{t .Lang "filter.memory"}}</option>
+            </select>
+            <select name="order" aria-label="{{t .Lang "editor.order"}}">
+                <option value="file" {{if eq $f.Order "file"}}selected{{end}}>{{t .Lang "order.file"}}</option>
+                <option value="todo_first" {{if eq $f.Order "todo_first"}}selected{{end}}>{{t .Lang "order.todo_first"}}</option>
+                <option value="source" {{if eq $f.Order "source"}}selected{{end}}>{{t .Lang "order.source"}}</option>
+                <option value="translation" {{if eq $f.Order "translation"}}selected{{end}}>{{t .Lang "order.translation"}}</option>
+            </select>
+            <input type="hidden" name="selected" id="filter-selected" value="">
+        </form>
+    </div>
+
+    {{if .Flash}}<div class="editor-flash">{{.Flash}}</div>{{end}}
+    {{with .Data.AIJob}}{{template "ai_job" .}}{{end}}
+
+    <div class="workspace">
+        <div class="main-col" id="main-col">
+            <div class="list-header" role="row">
+                <div class="cell-icon"></div>
+                <div class="cell-src">{{t .Lang "editor.source_text"}} — {{langName $p.SourceLanguage}}</div>
+                <div class="cell-tr">{{if $c.IsTemplate}}{{t .Lang "editor.translation"}}{{else}}{{t .Lang "editor.translation"}} — {{$c.LanguageName}}{{end}}</div>
+            </div>
+            {{template "entry_list" .Data.List}}
+            <div class="splitter" id="splitter" role="separator" aria-orientation="horizontal" tabindex="0"></div>
+            <div id="editor" class="editor-pane">
+                <div class="editor-empty muted">{{t .Lang "editor.select_entry"}}</div>
+            </div>
+        </div>
+        <aside id="sidebar" class="sidebar"></aside>
+    </div>
+    {{template "statusbar" .Data.Status}}
+</div>
+
+{{if .Data.Owned}}
+<dialog id="commit-dialog" class="dialog">
+    <form class="form" hx-post="/catalogs/{{$c.ID}}/commit" hx-swap="none">
+        <h2>{{t .Lang "history.commit_title"}}</h2>
+        {{template "commit_status" (dict "N" .Data.Uncommitted "Lang" .Lang "OOB" false)}}
+        <label for="commit-msg">{{t .Lang "history.message"}}</label>
+        <input id="commit-msg" name="message" required maxlength="500" placeholder="{{t .Lang "history.message_placeholder"}}">
+        <p class="muted small"><a href="{{$c.URL}}/history">{{t .Lang "history.view"}}</a></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "history.commit"}}</button>
+        </div>
+    </form>
+</dialog>
+{{end}}
+
+{{if .Data.Owned}}
+<dialog id="properties-dialog" class="dialog dialog-medium">
+    <form method="post" action="/catalogs/{{$c.ID}}/properties" class="form">
+        <h2>{{t .Lang "props.title"}}</h2>
+        {{with .Data.Props}}
+        <label for="pp-version">Project-Id-Version</label>
+        <input id="pp-version" name="project_version" value="{{.ProjectVersion}}" maxlength="200">
+        <label for="pp-bugs">Report-Msgid-Bugs-To</label>
+        <input id="pp-bugs" name="report_bugs_to" value="{{.ReportBugsTo}}" maxlength="200">
+        {{if not $c.IsTemplate}}
+        <label for="pp-team">Language-Team</label>
+        <input id="pp-team" name="language_team" value="{{.LanguageTeam}}" maxlength="200" placeholder="Indonesian &lt;tim@example.id&gt;">
+        {{end}}
+        <label for="pp-contrib">{{t $.Lang "props.contributors"}}</label>
+        <textarea id="pp-contrib" name="contributors" rows="7" class="mono" spellcheck="false">{{.Contributors}}</textarea>
+        <p class="muted small">{{t $.Lang "props.contributors_help"}}</p>
+        {{end}}
+        {{if not $c.IsTemplate}}
+        <div class="identity-note small">
+            {{t .Lang "props.identity_note" .User.TranslatorIdentity}}
+            <a href="/profile#identity">{{t .Lang "props.identity_change"}}</a>
+        </div>
+        {{end}}
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
+        </div>
+    </form>
+</dialog>
+{{end}}
+
+{{if not .Data.ReadOnly}}
+<dialog id="ai-dialog" class="dialog dialog-medium">
+    <form id="ai-form" class="form" hx-post="/catalogs/{{$c.ID}}/ai" hx-swap="none" hx-disabled-elt="find button[type=submit]">
+        <h2>{{t .Lang "editor.pretranslate"}}</h2>
+        <p class="muted small">{{t .Lang "pre.intro"}}</p>
+        <ol class="pre-sources">
+            <li>
+                <label class="check"><input type="checkbox" name="use_memory" value="1" checked> {{template "icon_memory" (dict "Title" "" "Fuzzy" false)}} <strong>{{t .Lang "pre.memory"}}</strong></label>
+                <span class="muted small">{{t .Lang "pre.memory_help"}}</span>
+            </li>
+            <li>
+                <label for="ai-gl">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} <strong>{{t .Lang "pre.glossary"}}</strong></label>
+                <select id="ai-gl" name="glossary_version">
+                    {{range .Data.GlossaryVersions}}<option value="{{.ID}}">{{.Label}}</option>{{end}}
+                    {{if .Data.GlossaryVersions}}<option value="all">{{t .Lang "glossary.all_versions"}}</option>{{end}}
+                    <option value="none">{{t .Lang "ai.no_glossary"}}</option>
+                </select>
+                <span class="muted small">{{t .Lang "pre.glossary_help"}}</span>
+            </li>
+            <li>
+                <label class="check"><input type="checkbox" name="use_ai" value="1" {{if .Data.AIConfigured}}checked{{else}}disabled{{end}}> {{template "icon_bot" (dict "Title" "" "Fuzzy" false)}} <strong>{{t .Lang "pre.ai"}}</strong></label>
+                <span class="muted small">{{if .Data.AIConfigured}}{{t .Lang "pre.ai_help"}}{{else}}{{t .Lang "ai.not_configured"}}{{end}}</span>
+            </li>
+        </ol>
+        <label class="check"><input type="checkbox" name="include_fuzzy" value="1"> {{t .Lang "ai.include_fuzzy"}}</label>
+        <label class="check"><input type="checkbox" name="mark_fuzzy" value="1" checked> {{t .Lang "ai.mark_fuzzy"}}</label>
+        <div id="ai-estimate-box" data-url="/catalogs/{{$c.ID}}/ai/estimate">
+            <p class="muted small">{{t .Lang "ai.estimating"}}</p>
+        </div>
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "ai.start"}}</button>
+        </div>
+    </form>
+</dialog>
+
+{{end}}
+{{end}}

@@ -1,0 +1,84 @@
+{{define "content"}}{{$c := .Data.Catalog}}{{$p := .Data.Project}}{{$w := .Data.Working}}
+<div class="page-head">
+    <div>
+        <div class="crumbs"><a href="{{$p.Path}}">{{$p.Name}}</a> / <a href="{{$p.Path}}/files">{{t .Lang "project.tab_files"}}</a> / <a href="{{$c.URL}}">{{if $c.IsTemplate}}{{$c.Filename}}{{else}}{{$c.LanguageName}}{{end}}</a></div>
+        <h1>{{t .Lang "history.title"}}</h1>
+        <p class="muted small">{{t .Lang "history.intro"}}</p>
+    </div>
+    <div class="row-actions">
+        {{with .Data.Original}}{{if and $.Data.Owned (gt (len $.Data.Commits) 1)}}
+        <form hx-post="/catalogs/{{$c.ID}}/history/{{.ID}}/restore" hx-swap="none" hx-confirm="{{t $.Lang "confirm.restore_original"}}">
+            <button type="submit" class="btn">⏮ {{t $.Lang "history.restore_original"}}</button>
+        </form>
+        {{end}}{{end}}
+        <a class="btn" href="{{$c.URL}}">← {{t .Lang "raw.back_short"}}</a>
+    </div>
+</div>
+
+{{if .Data.Dirty}}
+<section class="card commit-bar">
+    <form class="form form-inline" hx-post="/catalogs/{{$c.ID}}/commit" hx-swap="none">
+        <input type="hidden" name="back" value="history">
+        <span class="commit-dirty">{{t .Lang "history.uncommitted" $w.Total}}</span>
+        <input name="message" required maxlength="500" placeholder="{{t .Lang "history.message_placeholder"}}" aria-label="{{t .Lang "history.message"}}">
+        <button type="submit" class="btn btn-primary">{{t .Lang "history.commit"}}</button>
+    </form>
+    {{if .Data.Commits}}
+    <form class="discard-form" hx-post="/catalogs/{{$c.ID}}/history/discard" hx-swap="none" hx-confirm="{{t .Lang "confirm.discard"}}">
+        <button type="submit" class="linklike danger small">↺ {{t .Lang "history.discard"}}</button>
+    </form>
+    {{end}}
+</section>
+{{end}}
+
+{{with .Data.Chart}}{{if .Points}}
+<section class="card">
+    <h2 class="small-title">{{t $.Lang "history.chart"}}</h2>
+    <svg class="history-chart" viewBox="0 0 {{.W}} {{.H}}" preserveAspectRatio="none" role="img" aria-label="{{t $.Lang "history.chart"}}">
+        <line x1="0" x2="{{.W}}" y1="6" y2="6" class="grid"/><line x1="0" x2="{{.W}}" y1="45" y2="45" class="grid"/><line x1="0" x2="{{.W}}" y1="84" y2="84" class="grid"/>
+        <polyline points="{{.FuzzyLine}}" class="line-fuzzy"/>
+        <polyline points="{{.Line}}" class="line-done"/>
+        {{range .Points}}<circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .Y}}" r="4" class="pt pt-{{.Commit.Kind}}{{if hasPrefix .Commit.Message "commit.after_ai"}} pt-ai{{end}}"><title>{{.Commit.ShortID}} · {{.Commit.Percent}}% · {{commitMsg $.Lang .Commit.Message}}</title></circle>{{end}}
+    </svg>
+    <div class="chart-legend small muted"><span class="lg lg-done"></span> {{t $.Lang "stats.translated"}} <span class="lg lg-fuzzy"></span> + {{t $.Lang "stats.fuzzy"}} · 0–100%</div>
+</section>
+{{end}}{{end}}
+
+<div class="history-layout">
+    <section class="card">
+        <ol class="timeline">
+            {{if .Data.Dirty}}
+            <li class="tl-item tl-working" hx-get="/catalogs/{{$c.ID}}/history/working" hx-target="#history-diff" hx-swap="innerHTML" data-select>
+                <span class="tl-node"></span>
+                <div class="tl-body">
+                    <strong>{{t .Lang "history.working"}}</strong>
+                    <div class="tl-stats small"><span class="d-add">+{{$w.Added}}</span> <span class="d-chg">~{{$w.Changed}}</span> <span class="d-del">−{{$w.Removed}}</span>{{if $w.Reviewed}} <span class="d-rev">✓{{$w.Reviewed}}</span>{{end}}</div>
+                </div>
+            </li>
+            {{end}}
+            {{range .Data.Commits}}
+            <li class="tl-item tl-{{.Kind}}{{if hasPrefix .Message "commit.after_ai"}} tl-ai{{end}}" hx-get="/catalogs/{{$c.ID}}/history/{{.ID}}" hx-target="#history-diff" hx-swap="innerHTML" data-select>
+                <span class="tl-node">{{if hasPrefix .Message "commit.after_ai"}}{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}}{{end}}</span>
+                <div class="tl-body">
+                    <div class="tl-head">
+                        <strong class="tl-msg">{{commitMsg $.Lang .Message}}</strong>
+                        <span class="tl-kind">{{if and $.Data.Original (eq .ID $.Data.Original.ID)}}<span class="original-badge">{{t $.Lang "history.original"}}</span> {{end}}{{t $.Lang (printf "history.kind_%s" .Kind)}}</span>
+                    </div>
+                    <div class="tl-meta small muted">{{.ShortID}} · {{if .AuthorName}}{{.AuthorName}} · {{end}}{{timeAgo $.Lang .CreatedAt}}</div>
+                    <div class="tl-stats small">
+                        <span class="d-add">+{{.Added}}</span> <span class="d-chg">~{{.Changed}}</span> <span class="d-del">−{{.Removed}}</span>
+                        {{if .Reviewed}}<span class="d-rev" title="{{t $.Lang "history.reviewed"}}">✓{{.Reviewed}}</span>{{end}}
+                        <span class="tl-progress"><span class="progress"><span class="p-done" style="width: {{.Percent}}%"></span><span class="p-fuzzy" style="width: {{.FuzzyPercent}}%"></span></span> {{.Percent}}%</span>
+                    </div>
+                </div>
+            </li>
+            {{else}}
+            {{if not $.Data.Dirty}}<li class="muted">{{t $.Lang "history.empty"}}</li>{{end}}
+            {{end}}
+        </ol>
+    </section>
+    <section class="card history-diff-card">
+        <div id="history-diff"><p class="muted">{{t .Lang "history.select"}}</p></div>
+    </section>
+</div>
+{{end}}

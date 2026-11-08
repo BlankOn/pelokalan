@@ -1,0 +1,41 @@
+{{define "nav"}}
+<header class="topbar">
+    <a class="brand" href="/projects" title="{{t .Lang "nav.projects"}}">
+        <img src="/static/img/logo.svg" alt="" width="22" height="22">
+        <span>{{.SiteName}}</span>
+    </a>
+    {{with .Data.Catalog}}{{$c := .}}
+    <div class="top-title">
+        <strong>{{with $.Data.Project}}<a href="{{.Path}}/files">{{.Name}}</a> · {{end}}<a href="{{$c.URL}}">{{$c.Filename}}</a></strong>
+        <span class="small">{{if $c.IsTemplate}}{{t $.Lang "project.template"}}{{else}}{{$c.LanguageName}}{{end}}</span>
+    </div>
+    {{else}}{{with .Data.Project}}
+    <div class="top-title">
+        <a class="top-title-project" href="{{.Path}}">{{.Name}}</a>
+    </div>
+    {{end}}{{end}}
+    <div class="spacer"></div>
+    <div class="langswitch" role="group" aria-label="{{t .Lang "nav.language"}}">
+        {{range uiLanguages}}
+        <a href="/lang?l={{.Code}}&amp;next={{$.Path}}" class="{{if eq .Code $.Lang}}active{{end}}" title="{{.Name}}" hreflang="{{.Code}}">{{.Code}}</a>
+        {{end}}
+    </div>
+    {{if .User}}
+    <details class="usermenu">
+        <summary><span class="avatar" aria-hidden="true">{{.User.Initial}}</span><span class="sr-only">{{t .Lang "nav.account"}}</span></summary>
+        <div class="menu">
+            <div class="menu-head">
+                                <strong>{{.User.DisplayName}}</strong>
+                <span class="small">@{{.User.Username}}</span>
+                <span class="muted small">{{.User.Email}}</span>
+            </div>
+            <a href="/profile">{{t .Lang "nav.profile"}}</a>
+            <a href="/invitations">{{t .Lang "nav.invitations"}}</a>
+            <form method="post" action="/logout"><button type="submit" class="linklike">{{t .Lang "nav.logout"}}</button></form>
+        </div>
+    </details>
+    {{else}}
+    <a class="btn btn-small" href="/login">{{t .Lang "nav.login"}}</a>
+    {{end}}
+</header>
+{{end}}

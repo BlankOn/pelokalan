@@ -1,0 +1,7 @@
+{{define "content"}}
+<div class="page-head"><h1>{{t .Lang "title.invitations"}}</h1></div>
+<div class="card">
+    {{range .Data.Invitations}}{{template "invitation_item" (dict "I" . "Lang" $.Lang)}}
+    {{else}}<p class="muted">{{t .Lang "invitations.none"}}</p>{{end}}
+</div>
+{{end}}

@@ -1,0 +1,12 @@
+{{define "invitation_item"}}{{$i := .I}}
+<div class="invitation">
+    <div>
+        <strong>{{$i.ProjectName}}</strong>
+        <div class="muted small">{{t .Lang "invitations.from" $i.InviterName}} · {{roleName .Lang $i.Role}} · {{timeAgo .Lang $i.CreatedAt}}</div>
+    </div>
+    <div class="row-actions">
+        <form method="post" action="/invitations/{{$i.ID}}/decline"><button class="btn btn-small">{{t .Lang "action.decline"}}</button></form>
+        <form method="post" action="/invitations/{{$i.ID}}/accept"><button class="btn btn-small btn-primary">{{t .Lang "action.accept"}}</button></form>
+    </div>
+</div>
+{{end}}

@@ -1,0 +1,126 @@
+{{define "content"}}{{$p := .Data.Project}}{{$canManage := $p.Role.CanManage}}
+{{template "project_header" .}}
+
+{{if $canManage}}
+<section class="card">
+    <h2>{{t .Lang "members.invite_title"}}</h2>
+    <p class="muted small">{{t .Lang "members.invite_help"}}{{if .Data.WhitelistOn}} {{t .Lang "members.invite_whitelist"}}{{end}}</p>
+    <form method="post" action="{{$p.Path}}/members/invite" class="form form-inline">
+        <input type="email" name="email" required placeholder="{{t .Lang "field.email"}}" value="{{.Data.InviteEmail}}" aria-label="{{t .Lang "field.email"}}">
+        <select name="role" aria-label="{{t .Lang "field.role"}}">
+            <option value="translator">{{roleName .Lang "translator"}}</option>
+            <option value="manager">{{roleName .Lang "manager"}}</option>
+        </select>
+        <button type="submit" class="btn btn-primary">{{t .Lang "action.invite"}}</button>
+    </form>
+</section>
+
+<section class="card" id="invite-links">
+    <h2>{{t .Lang "links.title"}}</h2>
+    <p class="muted small">{{t .Lang "links.help"}}</p>
+    <form method="post" action="{{$p.Path}}/invite-links" class="form form-inline">
+        <label class="small">{{t .Lang "field.role"}}
+            <select name="role">
+                <option value="translator">{{roleName .Lang "translator"}}</option>
+                <option value="manager">{{roleName .Lang "manager"}}</option>
+            </select>
+        </label>
+        <label class="small">{{t .Lang "links.expires"}}
+            <select name="days">
+                {{range .Data.LinkDays}}<option value="{{.}}" {{if eq . 7}}selected{{end}}>{{if eq . 0}}{{t $.Lang "links.never"}}{{else}}{{t $.Lang "links.days" .}}{{end}}</option>{{end}}
+            </select>
+        </label>
+        <label class="small">{{t .Lang "links.max_uses"}}
+            <select name="max_uses">
+                {{range .Data.LinkUses}}<option value="{{.}}">{{if eq . 0}}{{t $.Lang "links.unlimited"}}{{else}}{{t $.Lang "links.n_uses" .}}{{end}}</option>{{end}}
+            </select>
+        </label>
+        <button type="submit" class="btn btn-primary">{{t .Lang "links.create"}}</button>
+    </form>
+    {{if .Data.InviteLinks}}
+    <table class="table invite-links">
+        <tbody>
+        {{range .Data.InviteLinks}}{{$url := printf "%s%s" $.Data.SiteURL .Path}}
+        <tr class="{{if not .IsActive}}link-inactive{{end}}{{if eq (printf "%d" .ID) $.Data.NewLink}} link-new{{end}}">
+            <td class="link-cell">
+                <div class="copy-field">
+                    <input type="text" readonly value="{{$url}}" aria-label="{{t $.Lang "links.title"}}" onfocus="this.select()">
+                    {{if .IsActive}}<button type="button" class="btn btn-small" data-copy="{{$url}}" data-copied="{{t $.Lang "links.copied"}}">{{t $.Lang "links.copy"}}</button>{{end}}
+                </div>
+                <div class="muted small">
+                    <span class="role-badge role-{{.Role}}">{{roleName $.Lang .Role}}</span>
+                    {{if .IsExpired}}<span class="c-err">{{t $.Lang "links.expired"}}</span>
+                    {{else if .IsUsedUp}}<span class="c-err">{{t $.Lang "links.used_up"}}</span>
+                    {{else if .ExpiresAt}}{{t $.Lang "links.expires_on" (.ExpiresAt.Format "02-01-2006 15:04")}}
+                    {{else}}{{t $.Lang "links.no_expiry"}}{{end}}
+                    · {{if .MaxUses}}{{t $.Lang "links.used_of" .Uses .Limit}}{{else}}{{t $.Lang "links.used" .Uses}}{{end}}
+                    · {{t $.Lang "invitations.from" .CreatorName}}
+                </div>
+            </td>
+            <td class="actions">
+                <form method="post" action="{{$p.Path}}/invite-links/{{.ID}}/delete" data-confirm="{{t $.Lang "links.confirm_delete"}}"><button class="btn btn-small btn-danger">{{t $.Lang "links.delete"}}</button></form>
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{end}}
+</section>
+{{end}}
+
+<section class="card">
+    <h2>{{t .Lang "project.tab_members"}}</h2>
+    <table class="table">
+        <thead><tr><th>{{t .Lang "field.name"}}</th><th>{{t .Lang "field.role"}}</th><th>{{t .Lang "members.joined"}}</th><th></th></tr></thead>
+        <tbody>
+        {{range .Data.Members}}
+        <tr>
+            <td><span class="avatar avatar-sm">{{.User.Initial}}</span> <strong>{{.User.DisplayName}}</strong> <span class="muted small">@{{.User.Username}}</span>{{if $p.Role.IsMember}} <span class="muted small">{{.User.Email}}</span>{{end}}{{if and $.User (eq .User.ID $.User.ID)}} <span class="muted small">({{t $.Lang "members.you"}})</span>{{end}}</td>
+            <td>
+                {{if and $canManage (ne .Role "owner")}}
+                <form method="post" action="{{$p.Path}}/members/{{.User.ID}}/role">
+                    <select name="role" data-autosubmit aria-label="{{t $.Lang "field.role"}}">
+                        <option value="translator" {{if eq .Role "translator"}}selected{{end}}>{{roleName $.Lang "translator"}}</option>
+                        <option value="manager" {{if eq .Role "manager"}}selected{{end}}>{{roleName $.Lang "manager"}}</option>
+                    </select>
+                </form>
+                {{else}}<span class="role-badge role-{{.Role}}">{{roleName $.Lang .Role}}</span>{{end}}
+            </td>
+            <td class="small muted">{{timeAgo $.Lang .CreatedAt}}</td>
+            <td class="actions">
+                {{if ne .Role "owner"}}
+                {{if and $.User (eq .User.ID $.User.ID)}}
+                <form method="post" action="{{$p.Path}}/members/{{.User.ID}}/remove" data-confirm="{{t $.Lang "confirm.leave"}}"><button class="btn btn-small">{{t $.Lang "action.leave"}}</button></form>
+                {{else if $canManage}}
+                <form method="post" action="{{$p.Path}}/members/{{.User.ID}}/remove" data-confirm="{{t $.Lang "confirm.remove_member"}}"><button class="btn btn-small btn-danger">{{t $.Lang "action.remove"}}</button></form>
+                {{end}}
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+</section>
+
+{{if .Data.Invitations}}
+<section class="card">
+    <h2>{{t .Lang "members.pending"}}</h2>
+    <table class="table">
+        <tbody>
+        {{range .Data.Invitations}}
+        <tr>
+            <td><strong>{{.Email}}</strong></td>
+            <td>{{roleName $.Lang .Role}}</td>
+            <td class="small muted">{{t $.Lang "invitations.from" .InviterName}} · {{if .IsExpired}}{{t $.Lang "members.expired"}}{{else}}{{timeAgo $.Lang .CreatedAt}}{{end}}</td>
+            <td class="actions">
+                {{if $canManage}}
+                <form method="post" action="{{$p.Path}}/invitations/{{.ID}}/cancel"><button class="btn btn-small">{{t $.Lang "action.cancel_invitation"}}</button></form>
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+</section>
+{{end}}
+{{end}}

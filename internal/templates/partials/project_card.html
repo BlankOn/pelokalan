@@ -1,0 +1,20 @@
+{{define "project_card"}}{{$p := .P}}
+<div class="project-card">
+    <div class="project-card-head">
+        <h2><a class="project-card-link" href="{{$p.Path}}">{{$p.Name}}</a>{{if $p.AIEnabled}} {{template "ai_badge" .Lang}}{{end}}</h2>
+        <div class="project-badges">
+            {{if $p.Role.IsMember}}<span class="role-badge role-{{$p.Role}}">{{roleName .Lang $p.Role}}</span>{{end}}
+        </div>
+    </div>
+    {{if $p.Description}}<p class="muted project-desc">{{linkify $p.Description}}</p>{{end}}
+    <div class="project-meta muted small">
+        <span>{{t .Lang "project.n_versions" $p.VersionCount}}</span>
+        {{if $p.TermCount}}<span>{{t .Lang "project.n_terms" $p.TermCount}}</span>{{end}}
+        <span>{{t .Lang "project.n_po_files" $p.CatalogCount}}</span>
+        <span>{{t .Lang "project.n_members" $p.MemberCount}}</span>
+    </div>
+</div>
+{{end}}
+
+{{/* Shimmering "AI" badge for projects with an LLM key; . is the language */}}
+{{define "ai_badge"}}<span class="ai-badge" title="{{t . "project.ai_enabled"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="s1" d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path class="s2" d="M19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg>AI</span>{{end}}

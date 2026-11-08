@@ -1,0 +1,69 @@
+{{define "discussion_thread"}}{{$t := .Thread}}{{$s := $t.Subject}}
+<section id="{{.ID}}" class="thread" data-lb-open="{{t .Lang "discuss.image_open"}}" data-lb-zoom="{{t .Lang "discuss.image_zoom"}}" data-lb-close="{{t .Lang "action.close"}}">
+    <h3 class="thread-title">💬 {{t .Lang "discuss.title"}}{{with $t.Discussion}} <span class="muted">({{.CommentCount}})</span>{{end}}</h3>
+    {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
+    <ol class="comments">
+        {{range $t.Comments}}
+        <li id="comment-{{.ID}}" class="comment{{if .IsDeleted}} comment-deleted{{end}}">
+            {{if .IsDeleted}}
+            <span class="muted small">{{t $.Lang "discuss.deleted"}}</span>
+            {{else}}
+            <div class="comment-head">
+                <span class="avatar avatar-sm">{{initial .AuthorName}}</span>
+                <strong>{{.AuthorName}}</strong>
+                {{if .AuthorUsername}}<span class="muted small">@{{.AuthorUsername}}</span>{{end}}
+                <a class="muted small" href="#comment-{{.ID}}">{{timeAgo $.Lang .CreatedAt}}</a>
+                {{if .EditedAt}}<span class="muted small">· {{t $.Lang "discuss.edited"}}</span>{{end}}
+                <div class="spacer"></div>
+                {{$own := and $.User .AuthorID (eq (deref .AuthorID) $.User.ID)}}
+                {{if and $own $.CanComment}}<button type="button" class="linklike small" data-edit-comment="{{.ID}}">{{t $.Lang "action.edit"}}</button>{{end}}
+                {{if or $own $.CanManage}}{{if $.User}}
+                <button type="button" class="linklike small danger" hx-post="{{$.Project.Path}}/comments/{{.ID}}/delete" hx-target="#{{$.ID}}" hx-swap="outerHTML" hx-confirm="{{t $.Lang "confirm.delete_comment"}}">{{t $.Lang "action.delete"}}</button>
+                {{end}}{{end}}
+            </div>
+                        {{if .Body}}<div class="comment-body">{{commentHTML .Body $.Known}}</div>{{end}}
+            {{if .Attachments}}
+            <div class="comment-files">
+                {{range .Attachments}}{{$url := printf "%s/attachments/%d/%s" $.Project.Path .ID (pathEscape .Filename)}}
+                {{if .IsImage}}
+                <a class="att-image" href="{{$url}}" target="_blank" rel="noopener" data-lightbox title="{{.Filename}} · {{fileSize .Size}}"><img src="{{$url}}" alt="{{.Filename}}" loading="lazy"></a>
+                {{else}}
+                <a class="att-file" href="{{$url}}" download="{{.Filename}}">📎 <span class="att-name">{{.Filename}}</span> <span class="muted small">{{fileSize .Size}}</span></a>
+                {{end}}
+                {{end}}
+            </div>
+            {{end}}
+            {{if and $own $.CanComment}}
+            <form class="comment-edit" hidden hx-post="{{$.Project.Path}}/comments/{{.ID}}/edit" hx-target="#{{$.ID}}" hx-swap="outerHTML">
+                <textarea name="body" rows="3" required maxlength="5000">{{.Body}}</textarea>
+                <div class="row-actions"><button type="button" class="btn btn-small" data-cancel-edit>{{t $.Lang "action.cancel"}}</button><button type="submit" class="btn btn-small btn-primary">{{t $.Lang "action.save"}}</button></div>
+            </form>
+            {{end}}
+            {{end}}
+        </li>
+        {{else}}
+        <li class="muted small comments-empty">{{t .Lang "discuss.empty"}}</li>
+        {{end}}
+    </ol>
+    {{if .CanComment}}
+        <form class="comment-form" data-drop-label="{{t .Lang "discuss.drop_here"}}" hx-post="{{.Project.Path}}/discussions/{{$s.Type}}/{{$s.Key}}/comments" hx-target="#{{.ID}}" hx-swap="outerHTML"
+          hx-encoding="multipart/form-data" hx-disabled-elt="find button[type=submit]">
+        <textarea name="body" rows="3" maxlength="5000" placeholder="{{t .Lang "discuss.placeholder"}}" aria-label="{{t .Lang "discuss.placeholder"}}"></textarea>
+        <div class="att-picker small">
+            <label class="att-add">📎 {{t .Lang "discuss.attach"}}<input type="file" name="files" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" data-max="5" data-max-bytes="10485760" data-err-type="{{t .Lang "err.attachment_type"}}" data-err-size="{{t .Lang "err.attachment_size" 10}}" data-err-count="{{t .Lang "err.attachments_count" 5}}"></label>
+            <span class="muted">{{t .Lang "discuss.attach_help"}}</span>
+            <ul class="att-pending"></ul>
+            <div class="att-error c-err" role="alert" hidden></div>
+        </div>
+        <div class="comment-form-foot">
+            {{if .Members}}<div class="mention-chips small"><span class="muted">{{t .Lang "discuss.mention"}}</span>{{range .Members}}{{if ne . $.User.Username}}<button type="button" class="chip" data-mention="{{.}}">@{{.}}</button>{{end}}{{end}}</div>{{end}}
+            <button type="submit" class="btn btn-small btn-primary">{{t .Lang "discuss.send"}}</button>
+        </div>
+    </form>
+    {{else if .User}}
+    <p class="muted small">{{t .Lang "discuss.members_only"}}</p>
+    {{else}}
+    <p class="muted small"><a href="/login?next={{$s.URL}}">{{t .Lang "nav.login"}}</a> {{t .Lang "discuss.login_to_comment"}}</p>
+    {{end}}
+</section>
+{{end}}

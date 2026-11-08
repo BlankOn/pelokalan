@@ -1,0 +1,46 @@
+{{define "ai_estimate"}}{{$e := .E}}
+<div id="ai-estimate" class="ai-estimate">
+    {{if eq $e.Entries 0}}
+    <p class="muted">{{if $e.Unmatched}}{{t .Lang "pre.no_matches" $e.Unmatched}}{{else}}{{t .Lang "ai.nothing"}}{{end}}</p>
+    {{else}}
+    <table class="table est-table">
+        <tr><td>{{t .Lang "ai.est_entries"}}</td><td class="num"><strong>{{$e.Entries}}</strong></td></tr>
+        <tr><td>1. {{t .Lang "pre.memory"}} <span class="muted small">({{t .Lang "ai.free"}})</span></td><td class="num">{{$e.FromMemory}}</td></tr>
+        <tr><td>2. {{t .Lang "ai.est_glossary"}} <span class="muted small">({{t .Lang "ai.free"}}, {{t .Lang "pre.terms" $e.GlossaryTerms}})</span></td><td class="num">{{$e.FromGlossary}}</td></tr>
+        {{if $e.UseAI}}
+        <tr><td>3. {{t .Lang "ai.est_model" $e.Model}}</td><td class="num">{{$e.ToModel}}</td></tr>
+        <tr><td>{{t .Lang "ai.est_tokens"}}</td><td class="num">{{num $e.PromptTokens}} + {{num $e.CompletionTokens}}</td></tr>
+        <tr class="est-cost"><td>{{t .Lang "ai.est_cost"}}</td><td class="num"><strong>≈ {{usd $e.Cost}}</strong></td></tr>
+        {{if gt $e.Budget 0.0}}<tr><td>{{t .Lang "ai.budget_left"}}</td><td class="num">{{usd $e.BudgetLeft}} / {{usd $e.Budget}}</td></tr>{{end}}
+        {{else}}
+        <tr><td>{{t .Lang "pre.left_empty"}}</td><td class="num">{{$e.Unmatched}}</td></tr>
+        <tr class="est-cost"><td>{{t .Lang "ai.est_cost"}}</td><td class="num"><strong>$0</strong></td></tr>
+        {{end}}
+    </table>
+    {{if $e.UseAI}}<p class="muted small">{{t .Lang "ai.est_note"}}</p>{{end}}
+    {{if $e.OverBudget}}<div class="alert alert-error">{{t .Lang "ai.over_budget"}}</div>{{end}}
+    {{end}}
+</div>
+{{end}}
+
+{{define "ai_job"}}{{$j := .J}}
+<div id="ai-job" class="ai-job ai-{{$j.Status}}" {{if $j.IsRunning}}hx-get="/catalogs/{{.Catalog.ID}}/ai/jobs/{{$j.ID}}" hx-trigger="every 2s" hx-swap="outerHTML"{{end}}>
+    <div class="ai-job-main">
+                {{if $j.IsRunning}}<span class="ai-working-bot">{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}}</span>{{end}}
+        <strong>{{t .Lang (printf "ai.status_%s" $j.Status)}}</strong>
+        <div class="progress ai-progress"><span class="p-done" style="width: {{$j.Percent}}%"></span></div>
+        <span class="small">{{$j.Processed}} / {{$j.Total}}</span>
+        <span class="small muted">{{t .Lang "ai.job_counts" $j.FromMemory $j.FromGlossary $j.Translated $j.Flagged $j.Skipped}}</span>
+        {{if $j.Model}}<span class="small">{{usd $j.Cost}} <span class="muted">({{t .Lang "ai.estimated"}} {{usd $j.EstimatedCost}})</span></span>{{end}}
+        <div class="spacer"></div>
+        {{if $j.IsRunning}}
+        {{if not $j.CancelRequested}}<button type="button" class="btn btn-small" hx-post="/catalogs/{{.Catalog.ID}}/ai/jobs/{{$j.ID}}/cancel" hx-target="#ai-job" hx-swap="outerHTML">{{t .Lang "action.cancel"}}</button>
+        {{else}}<span class="small muted">{{t .Lang "ai.cancelling"}}</span>{{end}}
+        {{else}}
+        <a class="btn btn-small btn-primary" href="{{.Catalog.URL}}?status={{if $j.Translated}}ai{{else}}fuzzy{{end}}">{{t .Lang "ai.review"}}</a>
+        <a class="btn btn-small" href="{{.Catalog.URL}}">{{t .Lang "ai.close"}}</a>
+        {{end}}
+    </div>
+    {{if $j.Error}}<div class="small c-err">{{jobError .Lang $j.Error}}</div>{{end}}
+</div>
+{{end}}

@@ -1,0 +1,63 @@
+{{define "sidebar"}}{{$e := .Entry}}
+<aside id="sidebar" class="sidebar" {{if .OOB}}hx-swap-oob="true"{{end}}>
+    {{if not .ReadOnly}}
+    <section class="sb-section">
+        <h3>{{t .Lang "sidebar.suggestions"}}</h3>
+        {{range $i, $s := .Suggestions}}
+        <button type="button" class="suggestion" data-text="{{$s.Text}}" data-index="{{add $i 1}}">
+            <span class="sugg-text">{{$s.Text}}</span>
+            <span class="sugg-meta">{{$s.ProjectName}}{{if gt $s.Count 1}} · {{$s.Count}}×{{end}}<kbd>Ctrl+{{add $i 1}}</kbd></span>
+        </button>
+        {{else}}
+        <p class="muted small">{{t .Lang "sidebar.no_suggestions"}}</p>
+        {{end}}
+    </section>
+    {{end}}
+
+    {{with $e.PreviousID}}
+    <section class="sb-section">
+        <h3>{{t $.Lang "sidebar.previous_source"}}</h3>
+        <div class="sb-text">{{.}}</div>
+    </section>
+    {{end}}
+
+    {{if $e.ExtractedComments}}
+    <section class="sb-section">
+        <h3>{{t .Lang "sidebar.notes"}}</h3>
+        <div class="sb-text">{{$e.ExtractedComments}}</div>
+    </section>
+    {{end}}
+
+    <section class="sb-section">
+        <h3>{{t .Lang "sidebar.comment"}}</h3>
+        {{if .ReadOnly}}
+        {{if $e.TranslatorComments}}<div class="sb-text">{{$e.TranslatorComments}}</div>{{else}}<p class="muted small">—</p>{{end}}
+        {{else}}
+        <textarea form="entry-form" name="comment" class="comment-input" rows="3" placeholder="{{t .Lang "sidebar.comment_placeholder"}}">
+{{$e.TranslatorComments}}</textarea>
+        {{end}}
+    </section>
+
+    {{with $e.ReferenceList}}
+    <section class="sb-section">
+        <h3>{{t $.Lang "sidebar.references"}}</h3>
+        <ul class="refs">{{range .}}<li><code>{{.}}</code></li>{{end}}</ul>
+    </section>
+    {{end}}
+
+    {{with $e.FlagList}}
+    <section class="sb-section">
+        <h3>{{t $.Lang "sidebar.flags"}}</h3>
+        <div>{{range .}}<span class="flag">{{.}}</span> {{end}}</div>
+    </section>
+    {{end}}
+
+    {{if .Thread}}<section class="sb-section sb-thread"><div class="gl-thread" data-thread-url="{{.Thread}}"></div></section>{{end}}
+
+    {{if $e.UpdatedBy}}
+    <section class="sb-section sb-meta muted small">
+        {{t .Lang "sidebar.last_edited" $e.UpdatedByName (timeAgo .Lang $e.UpdatedAt)}}
+    </section>
+    {{end}}
+</aside>
+{{end}}

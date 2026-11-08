@@ -1,0 +1,85 @@
+{{define "content"}}{{$p := .Data.Project}}
+{{template "project_header" .}}
+
+<section class="card">
+    <h2>{{t .Lang "settings.general"}}</h2>
+    <form method="post" action="{{$p.Path}}/settings" class="form">
+        <fieldset {{if not $p.Role.CanManage}}disabled{{end}}>
+            <label for="s-name">{{t .Lang "field.project_name"}}</label>
+            <input id="s-name" name="name" required maxlength="120" value="{{$p.Name}}">
+                        <label for="s-slug">{{t .Lang "field.slug"}}</label>
+        <div class="username-input slug-input"><span>/projects/</span><input id="s-slug" name="slug" required maxlength="50" value="{{$p.Slug}}"
+               pattern="[a-zA-Z0-9][a-zA-Z0-9\-]{1,48}[a-zA-Z0-9]" autocapitalize="none" spellcheck="false" placeholder="gnome-id" data-slug-for=""></div>
+        <p class="muted small field-help">{{t .Lang "field.slug_help"}}</p>
+            <label for="s-desc">{{t .Lang "field.description"}}</label>
+            <textarea id="s-desc" name="description" rows="3">{{$p.Description}}</textarea>
+            <label for="s-src">{{t .Lang "field.source_language"}}</label>
+            <select id="s-src" name="source_language">
+                {{range languages}}<option value="{{.Code}}" {{if eq .Code $p.SourceLanguage}}selected{{end}}>{{.Name}} ({{.Code}})</option>{{end}}
+            </select>
+            <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
+        </fieldset>
+    </form>
+</section>
+
+{{if $p.Role.CanManage}}
+<section class="card" id="ai">
+    <h2>{{t .Lang "ai.settings_title"}}</h2>
+    <p class="muted small">{{t .Lang "ai.settings_help"}}</p>
+    {{$s := .Data.AI}}{{$d := .Data.AIDefaults}}
+    {{if $s}}
+    <div class="ai-summary">
+        <div><span class="muted">{{t .Lang "ai.key"}}:</span> <code>{{$s.APIKeyHint}}</code></div>
+        <div><span class="muted">{{t .Lang "ai.model"}}:</span> <code>{{$s.Model}}</code></div>
+        <div><span class="muted">{{t .Lang "ai.spent_month"}}:</span> <strong>{{usd .Data.AISpent}}</strong>{{if gt $s.MonthlyBudget 0.0}} / {{usd $s.MonthlyBudget}}{{end}}</div>
+    </div>
+    <div class="row-actions ai-actions">
+        <form method="post" action="{{$p.Path}}/ai/test" data-busy="{{t .Lang "ai.testing"}}"><button class="btn btn-small" type="submit">{{t .Lang "ai.test"}}</button></form>
+        <form method="post" action="{{$p.Path}}/ai/delete" data-confirm="{{t .Lang "confirm.ai_remove"}}"><button class="btn btn-small btn-danger" type="submit">{{t .Lang "ai.remove"}}</button></form>
+    </div>
+    {{end}}
+    <form method="post" action="{{$p.Path}}/ai" class="form" autocomplete="off">
+        <label for="ai-key">{{t .Lang "ai.api_key"}}</label>
+        <input id="ai-key" type="password" name="api_key" autocomplete="new-password" spellcheck="false"
+               placeholder="{{if $s}}{{t .Lang "ai.key_keep"}}{{else}}sk-…{{end}}" {{if not $s}}required{{end}}>
+        <div class="grid-2">
+            <div>
+                <label for="ai-model">{{t .Lang "ai.model"}}</label>
+                <input id="ai-model" name="model" required maxlength="100" value="{{if $s}}{{$s.Model}}{{else}}{{index $d "Model"}}{{end}}">
+            </div>
+            <div>
+                <label for="ai-base">{{t .Lang "ai.base_url"}}</label>
+                <input id="ai-base" name="base_url" type="url" value="{{if $s}}{{$s.BaseURL}}{{else}}https://api.openai.com/v1{{end}}">
+            </div>
+        </div>
+        <div class="grid-3">
+            <div>
+                <label for="ai-pin">{{t .Lang "ai.price_input"}}</label>
+                <input id="ai-pin" name="price_input" inputmode="decimal" value="{{if $s}}{{$s.PriceInput}}{{else}}{{index $d "PriceInput"}}{{end}}">
+            </div>
+            <div>
+                <label for="ai-pout">{{t .Lang "ai.price_output"}}</label>
+                <input id="ai-pout" name="price_output" inputmode="decimal" value="{{if $s}}{{$s.PriceOutput}}{{else}}{{index $d "PriceOutput"}}{{end}}">
+            </div>
+            <div>
+                <label for="ai-budget">{{t .Lang "ai.budget"}}</label>
+                <input id="ai-budget" name="monthly_budget" inputmode="decimal" value="{{if $s}}{{$s.MonthlyBudget}}{{else}}0{{end}}">
+            </div>
+        </div>
+        <p class="muted small">{{t .Lang "ai.price_help"}}</p>
+        <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
+    </form>
+</section>
+{{end}}
+
+{{if $p.Role.IsOwner}}
+<section class="card danger-zone">
+    <h2>{{t .Lang "settings.danger"}}</h2>
+    <p class="muted">{{t .Lang "settings.delete_help"}}</p>
+    <form method="post" action="{{$p.Path}}/delete" class="form form-inline">
+        <input name="confirm_name" required placeholder="{{$p.Name}}" aria-label="{{t .Lang "settings.type_name"}}">
+        <button type="submit" class="btn btn-danger">{{t .Lang "settings.delete_project"}}</button>
+    </form>
+</section>
+{{end}}
+{{end}}

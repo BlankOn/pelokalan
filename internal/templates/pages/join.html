@@ -1,0 +1,31 @@
+{{define "content"}}
+<div class="auth-card join-card">
+    {{if .Data.Invalid}}
+    <h1>{{t .Lang "join.invalid_title"}}</h1>
+    <p class="muted">{{t .Lang "join.invalid_help"}}</p>
+    <p class="auth-alt"><a class="btn btn-block" href="/projects">{{t .Lang "nav.projects"}}</a></p>
+    {{else}}{{$p := .Data.Project}}{{$l := .Data.Link}}
+    <p class="muted small">{{t .Lang "join.invited_by" $l.CreatorName}}</p>
+    <h1>{{$p.Name}}</h1>
+    {{if $p.Description}}<p class="muted project-desc">{{linkify $p.Description}}</p>{{end}}
+    <p>{{t .Lang "join.role"}} <span class="role-badge role-{{$l.Role}}">{{roleName .Lang $l.Role}}</span></p>
+    {{if $p.Role.IsMember}}
+    <div class="alert alert-ok">{{t .Lang "join.already_member" (roleName .Lang $p.Role)}}</div>
+    <p class="auth-alt"><a class="btn btn-primary btn-block" href="{{$p.Path}}">{{t .Lang "join.open_project"}}</a></p>
+    {{else if not $l.IsActive}}
+    <div class="alert alert-error">{{if $l.IsExpired}}{{t .Lang "join.expired"}}{{else}}{{t .Lang "join.used_up"}}{{end}}</div>
+    <p class="auth-alt"><a class="btn btn-block" href="{{$p.Path}}">{{t .Lang "join.view_project"}}</a></p>
+    {{else if .User}}
+    <form method="post" action="{{$l.Path}}" class="form">
+        <p class="muted small">{{t .Lang "join.signed_in_as" .User.Email}}</p>
+        <button type="submit" class="btn btn-primary btn-block">{{t .Lang "join.join"}}</button>
+    </form>
+    <p class="auth-alt small"><a href="{{$p.Path}}">{{t .Lang "join.view_project"}}</a></p>
+    {{else}}
+    <p class="muted">{{t .Lang "join.sign_in_first"}}</p>
+    <p><a class="btn btn-primary btn-block" href="/login?next={{.Data.Next}}">{{t .Lang "join.login"}}</a></p>
+    <p class="auth-alt">{{t .Lang "auth.no_account"}} <a href="/register?next={{.Data.Next}}">{{t .Lang "auth.register_link"}}</a></p>
+    {{end}}
+    {{end}}
+</div>
+{{end}}

@@ -1,0 +1,175 @@
+{{define "content"}}{{$p := .Data.Project}}{{$canManage := $p.Role.IsMember}}
+{{template "project_header" .}}
+
+{{if $canManage}}
+<h2 class="section-title">{{t .Lang "files.mine"}}</h2>
+<section class="card">
+    <div class="card-head">
+        <div>
+            <h2>{{t .Lang "project.translations"}}</h2>
+            <p class="muted small">{{t .Lang "files.mine_help"}}</p>
+        </div>
+        {{if $canManage}}
+        <div class="row-actions">
+            {{if .Data.Template}}<button type="button" class="btn btn-primary" data-open-dialog="new-translation">+ {{t .Lang "project.new_translation"}}</button>{{end}}
+            <button type="button" class="btn" data-open-dialog="upload">{{t .Lang "project.upload"}}</button>
+        </div>
+        {{end}}
+    </div>
+
+    {{if .Data.Catalogs}}
+    <table class="table files-table">
+        <thead><tr>
+            <th>{{t .Lang "project.col_file"}}</th>
+            <th class="w-progress">{{t .Lang "project.col_progress"}}</th>
+            <th class="num">{{t .Lang "stats.translated"}}</th>
+            <th class="num">{{t .Lang "stats.fuzzy"}}</th>
+            <th class="num">{{t .Lang "stats.untranslated"}}</th>
+            <th>{{t .Lang "project.col_updated"}}</th>
+            <th></th>
+        </tr></thead>
+        <tbody>
+        {{range .Data.Catalogs}}
+        <tr>
+            <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a><div class="muted small">{{.LanguageName}} · {{.Language}}</div></td>
+            <td>{{template "progress" (dict "Stats" .Stats "Lang" $.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span></td>
+            <td class="num">{{.Stats.Translated}}</td>
+            <td class="num">{{.Stats.Fuzzy}}</td>
+            <td class="num">{{.Stats.Untranslated}}</td>
+            <td class="small muted">{{timeAgo $.Lang .UpdatedAt}}</td>
+            <td class="actions">
+                <a class="btn btn-small btn-primary" href="{{.URL}}">{{t $.Lang "action.translate"}}</a>
+                <details class="dropdown">
+                    <summary class="btn btn-small" aria-label="{{t $.Lang "action.more"}}">⋯</summary>
+                    <div class="menu">
+                        <a href="/catalogs/{{.ID}}/download">{{t $.Lang "action.download_po"}}</a>
+                        <a href="/catalogs/{{.ID}}/download.mo">{{t $.Lang "action.download_mo"}}</a>
+                        {{if $canManage}}
+                        {{if $.Data.Template}}
+                        <form method="post" action="/catalogs/{{.ID}}/update"><button class="linklike">{{t $.Lang "action.update_from_template"}}</button></form>
+                        {{end}}
+                        <form method="post" action="/catalogs/{{.ID}}/replace" enctype="multipart/form-data" class="inline-upload">
+                            <label class="linklike">{{t $.Lang "action.upload_new_version"}}<input type="file" name="file" accept=".po" data-autosubmit hidden></label>
+                        </form>
+                        <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $.Lang "confirm.delete_file"}}"><button class="linklike danger">{{t $.Lang "action.delete"}}</button></form>
+                        {{end}}
+                    </div>
+                </details>
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    {{else}}
+    <div class="empty-inline">
+        <p class="muted">{{if .Data.Template}}{{t .Lang "project.no_translations_with_template"}}{{else}}{{t .Lang "project.no_files"}}{{end}}</p>
+    </div>
+    {{end}}
+</section>
+
+<section class="card">
+    <div class="card-head">
+        <h2>{{t .Lang "project.template"}}</h2>
+        {{if and $canManage .Data.Template .Data.Catalogs}}
+        <form method="post" action="{{$p.Path}}/update-all" data-confirm="{{t .Lang "confirm.update_all"}}">
+            <button class="btn">{{t .Lang "action.update_all"}}</button>
+        </form>
+        {{end}}
+    </div>
+    {{with .Data.Template}}
+    <div class="template-row">
+        <div>
+            <strong>{{.Filename}}</strong>
+            <div class="muted small">{{t $.Lang "project.template_strings" .Stats.Total}} · {{timeAgo $.Lang .UpdatedAt}}</div>
+        </div>
+        <div class="row-actions">
+            <a class="btn btn-small" href="{{.URL}}">{{t $.Lang "action.view"}}</a>
+            <a class="btn btn-small" href="/catalogs/{{.ID}}/download">{{t $.Lang "action.download"}}</a>
+            {{if $canManage}}
+            <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $.Lang "confirm.delete_file"}}"><button class="btn btn-small btn-danger">{{t $.Lang "action.delete"}}</button></form>
+            {{end}}
+        </div>
+    </div>
+    {{else}}
+    <p class="muted">{{t .Lang "project.no_template"}}</p>
+    {{end}}
+</section>
+
+{{end}}
+
+<h2 class="section-title">{{t .Lang "files.others"}}</h2>
+{{range .Data.Others}}
+<section class="card">
+    <div class="card-head">
+        <h2><span class="avatar avatar-sm">{{initial .Username}}</span> @{{.Username}}</h2>
+        <span class="role-badge">{{t $.Lang "files.read_only"}}</span>
+    </div>
+    <table class="table files-table">
+        <thead><tr>
+            <th>{{t $.Lang "project.col_file"}}</th>
+            <th class="w-progress">{{t $.Lang "project.col_progress"}}</th>
+            <th class="num">{{t $.Lang "stats.translated"}}</th>
+            <th class="num">{{t $.Lang "stats.fuzzy"}}</th>
+            <th class="num">{{t $.Lang "stats.untranslated"}}</th>
+            <th>{{t $.Lang "project.col_updated"}}</th>
+            <th></th>
+        </tr></thead>
+        <tbody>
+        {{range .Files}}
+        <tr>
+            <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a><div class="muted small">{{if .IsTemplate}}{{t $.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}</div></td>
+            <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>{{end}}</td>
+            <td class="num">{{if not .IsTemplate}}{{.Stats.Translated}}{{end}}</td>
+            <td class="num">{{if not .IsTemplate}}{{.Stats.Fuzzy}}{{end}}</td>
+            <td class="num">{{if not .IsTemplate}}{{.Stats.Untranslated}}{{else}}{{t $.Lang "project.template_strings" .Stats.Total}}{{end}}</td>
+            <td class="small muted">{{timeAgo $.Lang .UpdatedAt}}</td>
+            <td class="actions">
+                <a class="btn btn-small" href="{{.URL}}">{{t $.Lang "action.view"}}</a>
+                <a class="btn btn-small" href="/catalogs/{{.ID}}/download">{{t $.Lang "action.download"}}</a>
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+</section>
+{{else}}
+<p class="muted">{{t .Lang "files.others_none"}}</p>
+{{end}}
+
+{{if $canManage}}
+<dialog id="upload" class="dialog">
+    <form method="post" action="{{$p.Path}}/upload" enctype="multipart/form-data" class="form">
+        <h2>{{t .Lang "project.upload"}}</h2>
+        <p class="muted small">{{t .Lang "project.upload_help"}}</p>
+        <label for="u-file">{{t .Lang "field.file"}}</label>
+        <input id="u-file" type="file" name="file" accept=".po,.pot" required>
+        <label for="u-lang">{{t .Lang "field.language_optional"}}</label>
+        <input id="u-lang" name="language" list="lang-codes" placeholder="id, en, pt_BR…" maxlength="12">
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "action.upload"}}</button>
+        </div>
+    </form>
+</dialog>
+<datalist id="lang-codes">{{range languages}}<option value="{{.Code}}">{{.Name}}</option>{{end}}</datalist>
+
+{{if .Data.Template}}
+<dialog id="new-translation" class="dialog">
+    <form method="post" action="{{$p.Path}}/translations" class="form">
+        <h2>{{t .Lang "project.new_translation"}}</h2>
+        <p class="muted small">{{t .Lang "project.new_translation_help"}}</p>
+        <label for="t-lang">{{t .Lang "field.language"}}</label>
+        <select id="t-lang" name="language" data-other-toggle="t-lang-other">
+            {{range languages}}<option value="{{.Code}}">{{.Name}} ({{.Code}})</option>{{end}}
+            <option value="other">{{t .Lang "field.other_language"}}</option>
+        </select>
+        <input id="t-lang-other" name="language_other" placeholder="xx_YY" maxlength="12" hidden>
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "action.create"}}</button>
+        </div>
+    </form>
+</dialog>
+{{end}}
+{{end}}
+{{end}}

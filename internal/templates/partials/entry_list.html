@@ -1,0 +1,47 @@
+{{define "entry_list"}}
+<div id="entry-list" class="entry-list" role="grid" aria-label="{{t .Lang "editor.entries"}}">
+    {{range .Listing.Entries}}{{template "entry_row" (dict "E" . "Lang" $.Lang "Selected" (eq .ID $.Selected) "OOB" false)}}
+    {{else}}<div class="list-empty muted">{{t .Lang "editor.no_entries"}}</div>{{end}}
+</div>
+{{end}}
+
+{{define "entry_row"}}{{$e := .E}}
+<div id="row-{{$e.ID}}" class="entry-row st-{{$e.Status}}{{if $e.HasIssues}} has-issues{{end}}{{if .Selected}} selected{{end}}" data-id="{{$e.ID}}" role="row" {{if .OOB}}hx-swap-oob="true"{{end}}>
+    <div class="cell-icon">{{if $e.HasIssues}}<span class="mark-err" title="{{range $e.Issues}}{{issueName $.Lang .}}. {{end}}">!</span>{{else if $e.Origin}}{{template "icon_origin" (dict "O" $e.Origin "Lang" .Lang "Fuzzy" (eq $e.Status "fuzzy") "Title" true)}}{{else if eq $e.Status "fuzzy"}}<span class="mark-fuzzy" title="{{t .Lang "filter.fuzzy"}}"></span>{{end}}</div>
+    <div class="cell-src">{{if $e.Context}}<span class="ctx-tag">{{$e.ContextValue}}</span>{{end}}<span class="txt">{{$e.MsgID}}</span>{{if $e.IsPlural}}<span class="plural-tag" title="{{t .Lang "editor.plural"}}">⁺</span>{{end}}</div>
+    <div class="cell-tr"><span class="txt">{{$e.FirstTranslation}}</span>{{if $e.Comments}}<span class="row-comments" title="{{t .Lang "discuss.title"}}">💬 {{$e.Comments}}</span>{{end}}</div>
+</div>
+{{end}}
+
+{{define "statusbar"}}
+<footer id="statusbar" class="statusbar" {{if .OOB}}hx-swap-oob="true"{{end}}>
+    {{with .Listing}}
+    <span>{{t $.Lang "status.translated" .Stats.Translated .Stats.Total .Stats.Percent}}</span>
+    <span class="sb-sep">·</span><span class="c-fuzzy">{{t $.Lang "status.fuzzy" .Stats.Fuzzy}}</span>
+    <span class="sb-sep">·</span><span>{{t $.Lang "status.untranslated" .Stats.Untranslated}}</span>
+    {{if .Issues}}<span class="sb-sep">·</span><a href="#" class="c-err" data-filter-status="issues">{{t $.Lang "status.issues" .Issues}}</a>{{end}}
+    {{if .AI}}<span class="sb-sep">·</span><a href="#" class="c-ai" data-filter-status="ai">{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}} {{t $.Lang "status.ai" .AI}}</a>{{end}}
+    {{if .Glossary}}<span class="sb-sep">·</span><a href="#" class="c-glossary" data-filter-status="glossary">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} {{t $.Lang "status.glossary" .Glossary}}</a>{{end}}
+    {{if .Memory}}<span class="sb-sep">·</span><a href="#" class="c-memory" data-filter-status="memory">{{template "icon_memory" (dict "Title" "" "Fuzzy" false)}} {{t $.Lang "status.memory" .Memory}}</a>{{end}}
+    <div class="spacer"></div>
+    {{template "progress" (dict "Stats" .Stats "Lang" $.Lang)}}
+    <span class="sb-shortcuts muted">{{t $.Lang "status.shortcuts"}}</span>
+    {{end}}
+</footer>
+{{end}}
+
+{{define "icon_bot"}}<svg class="mark-ai{{if .Fuzzy}} is-fuzzy{{end}}" viewBox="0 0 24 24" aria-hidden="{{if .Title}}false{{else}}true{{end}}" role="img"{{if .Title}} aria-label="{{.Title}}"{{end}}>{{if .Title}}<title>{{.Title}}</title>{{end}}<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4"/><circle cx="12" cy="3.5" r="1.3"/><circle cx="9" cy="13.5" r="1.4" class="eye"/><circle cx="15" cy="13.5" r="1.4" class="eye"/><path d="M9.5 17h5"/></svg>{{end}}
+
+{{/* Book: pre-translated from the glossary */}}
+{{define "icon_book"}}<svg class="mark-origin mark-glossary{{if .Fuzzy}} is-fuzzy{{end}}" viewBox="0 0 24 24" aria-hidden="{{if .Title}}false{{else}}true{{end}}" role="img"{{if .Title}} aria-label="{{.Title}}"{{end}}>{{if .Title}}<title>{{.Title}}</title>{{end}}<path class="fill" d="M5 4.5A1.5 1.5 0 0 1 6.5 3H19v15H6.5A1.5 1.5 0 0 0 5 19.5z"/><path d="M5 19.5A1.5 1.5 0 0 0 6.5 21H19v-3"/><path d="M9 7.5h6M9 11h4"/></svg>{{end}}
+
+{{/* Stacked cards: pre-translated from translation memory */}}
+{{define "icon_memory"}}<svg class="mark-origin mark-memory{{if .Fuzzy}} is-fuzzy{{end}}" viewBox="0 0 24 24" aria-hidden="{{if .Title}}false{{else}}true{{end}}" role="img"{{if .Title}} aria-label="{{.Title}}"{{end}}>{{if .Title}}<title>{{.Title}}</title>{{end}}<rect class="fill" x="7" y="7" width="13" height="13" rx="2"/><path d="M4 16V6a2 2 0 0 1 2-2h10"/><path d="M10.5 11.5h6M10.5 15h4"/></svg>{{end}}
+
+{{/* The marker for an origin (ai, glossary, memory); Title true adds a tooltip */}}
+{{define "icon_origin"}}{{$title := ""}}{{if .Title}}{{$title = t .Lang (printf "filter.%s" .O)}}{{end}}{{if eq .O "ai"}}{{template "icon_bot" (dict "Title" $title "Fuzzy" .Fuzzy)}}{{else if eq .O "glossary"}}{{template "icon_book" (dict "Title" $title "Fuzzy" .Fuzzy)}}{{else if eq .O "memory"}}{{template "icon_memory" (dict "Title" $title "Fuzzy" .Fuzzy)}}{{end}}{{end}}
+
+{{/* Uncommitted changes (text, needs-work flag, machine origin) on the Commit button and dialog;
+     refreshed out-of-band after every save */}}
+{{define "commit_badge"}}<span id="commit-badge" class="tb-badge" {{if .OOB}}hx-swap-oob="true"{{end}}>{{if .N}}{{.N}}{{end}}</span>{{end}}
+{{define "commit_status"}}<p id="commit-status" class="muted small" {{if .OOB}}hx-swap-oob="true"{{end}}>{{if .N}}{{t .Lang "history.uncommitted" .N}}{{else}}{{t .Lang "history.nothing"}}{{end}}</p>{{end}}

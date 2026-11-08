@@ -1,0 +1,5 @@
+{{define "progress"}}
+<div class="progress" title="{{t .Lang "stats.summary" .Stats.Translated .Stats.Fuzzy .Stats.Untranslated}}">
+    <span class="p-done" style="width: {{.Stats.Percent}}%"></span><span class="p-fuzzy" style="width: {{.Stats.FuzzyPercent}}%"></span>
+</div>
+{{end}}
