@@ -12,7 +12,32 @@ const (
 	IssueNewlineStart = "newline_start"
 	IssueNewlineEnd   = "newline_end"
 	IssuePluralCount  = "plural_count"
+	IssueControlChars = "control_chars" // invisible control characters (e.g. mangled markup)
+	IssueMarkup       = "markup"        // XML-like tags (<gui>, <key>…) differ from the source
 )
+
+// markupTagRe matches XML-like tags such as <gui>, </key>, <link href="…"> or <br/>
+var markupTagRe = regexp.MustCompile(`<(/?)([A-Za-z][\w:.-]*)(?:\s[^<>]*)?(/?)>`)
+
+// markupTags returns the tags of s (name with "/" marking closing tags), sorted
+func markupTags(s string) []string {
+	var out []string
+	for _, m := range markupTagRe.FindAllStringSubmatch(s, -1) {
+		out = append(out, m[1]+m[2]+m[3])
+	}
+	sort.Strings(out)
+	return out
+}
+
+// hasControlChars reports C0 control characters other than tab and newlines
+func hasControlChars(s string) bool {
+	for _, r := range s {
+		if (r < 0x20 && r != '\t' && r != '\n' && r != '\r') || r == 0x7f {
+			return true
+		}
+	}
+	return false
+}
 
 var (
 	cFormatRe      = regexp.MustCompile(`%(?:\d+\$)?[-+ 0#']*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|h|ll|l|L|q|j|z|t|I64|I32)?[diouxXeEfFgGaAcspn%]`)
@@ -50,6 +75,12 @@ func Validate(e *Entry, nplurals int) []string {
 		}
 		if strings.HasSuffix(src, "\n") != strings.HasSuffix(tr, "\n") {
 			add(IssueNewlineEnd)
+		}
+		if hasControlChars(tr) && !hasControlChars(src) {
+			add(IssueControlChars)
+		}
+		if want := markupTags(src); len(want) > 0 && !equal(want, markupTags(tr)) {
+			add(IssueMarkup)
 		}
 		if re != nil {
 			want := placeholders(re, src)

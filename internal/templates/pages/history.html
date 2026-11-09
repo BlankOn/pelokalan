@@ -1,4 +1,21 @@
 {{define "content"}}{{$c := .Data.Catalog}}{{$p := .Data.Project}}{{$w := .Data.Working}}
+<div class="history-app">
+    <div class="toolbar">
+        <a class="tb-btn" href="{{$c.URL}}" title="{{t .Lang "raw.back"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+            <span>{{t .Lang "raw.back_short"}}</span>
+        </a>
+        <div class="tb-sep"></div>
+        <a class="tb-btn" href="/catalogs/{{$c.ID}}/download" title="{{t .Lang "action.download_po"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+            <span>{{if $c.IsTemplate}}POT{{else}}PO{{end}}</span>
+        </a>
+        <strong class="tb-mode">{{t .Lang "history.title"}}</strong>
+    </div>
+    <div class="history-scroll">
+    <main class="container">
+        {{if .Flash}}<div class="alert alert-ok">{{.Flash}}</div>{{end}}
+        {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
 <div class="page-head">
     <div>
         <div class="crumbs"><a href="{{$p.Path}}">{{$p.Name}}</a> / <a href="{{$p.Path}}/files">{{t .Lang "project.tab_files"}}</a> / <a href="{{$c.URL}}">{{if $c.IsTemplate}}{{$c.Filename}}{{else}}{{$c.LanguageName}}{{end}}</a></div>
@@ -11,7 +28,6 @@
             <button type="submit" class="btn">⏮ {{t $.Lang "history.restore_original"}}</button>
         </form>
         {{end}}{{end}}
-        <a class="btn" href="{{$c.URL}}">← {{t .Lang "raw.back_short"}}</a>
     </div>
 </div>
 
@@ -80,5 +96,8 @@
     <section class="card history-diff-card">
         <div id="history-diff"><p class="muted">{{t .Lang "history.select"}}</p></div>
     </section>
+</div>
+    </main>
+    </div>
 </div>
 {{end}}

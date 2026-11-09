@@ -18,3 +18,26 @@
 
 {{/* Shimmering "AI" badge for projects with an LLM key; . is the language */}}
 {{define "ai_badge"}}<span class="ai-badge" title="{{t . "project.ai_enabled"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="s1" d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path class="s2" d="M19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg>AI</span>{{end}}
+
+{{/* rows of project (source) PO files, followed by a "load more" row when there are more */}}
+{{define "project_file_rows"}}{{$v := .}}
+{{range .Files}}
+<tr>
+    <td><strong class="pf-name">{{.Filename}}</strong><div class="muted small">{{langName .Language}} · {{.Language}}</div>
+        {{with .Mine}}<div class="small pf-mine">{{t $v.Lang "files.mine_copy"}} <a href="{{.URL}}">{{.Filename}}</a></div>{{end}}</td>
+    <td>{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · <span class="c-fuzzy">{{t $v.Lang "files.fuzzy_count" .Fuzzy}}</span>{{end}}</span></td>
+    <td class="small"><span class="version-badge">{{.VersionLabel}}</span></td>
+    <td class="actions">
+        {{if $v.CanTake}}{{if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .VersionLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
+            <input type="hidden" name="into" value="{{.Mine.ID}}">
+            <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
+        {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"><button class="btn btn-small btn-primary" title="{{t $v.Lang "files.take_help"}}">{{t $v.Lang "files.take"}}</button></form>{{end}}{{end}}
+        <a class="btn btn-small btn-icon" href="{{$v.Project.Path}}/project-files/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
+    </td>
+</tr>
+{{end}}
+{{if and .Searched (not .Files) (eq .Next 0)}}<tr class="pf-more"><td colspan="4" class="muted">{{t .Lang "files.project_none"}}</td></tr>{{end}}
+{{if lt .Next .Total}}
+<tr class="pf-more"><td colspan="4"><button type="button" class="btn btn-block gl-more" hx-get="{{.Project.Path}}/project-files?offset={{.Next}}" hx-include="#pf-filter" hx-target="closest tr" hx-swap="outerHTML">{{t .Lang "files.load_more" .Next .Total}}</button></td></tr>
+{{end}}
+{{end}}

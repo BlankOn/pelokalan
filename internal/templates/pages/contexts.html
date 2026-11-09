@@ -1,10 +1,6 @@
 {{define "content"}}{{$p := .Data.Project}}
 {{template "project_header" .}}
 <section class="card">
-    <div class="card-head">
-        <h2>📌 {{t .Lang "title.contexts"}} <span class="muted small">({{len .Data.Items}})</span></h2>
-    </div>
-    <p class="muted small">{{t .Lang "context.intro"}}</p>
     <form method="get" action="{{$p.Path}}/contexts" class="context-search">
         <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "context.search"}}" aria-label="{{t .Lang "context.search"}}">
     </form>
@@ -12,10 +8,11 @@
     <ul class="context-list">
         {{range .Data.Items}}
         <li>
-            <div class="context-file"><a href="{{.FileURL $p.Path}}"><strong>{{.Filename}}</strong></a>
-                <span class="muted small">@{{.OwnerUsername}}{{if .Language}} · {{langName .Language}}{{end}}</span></div>
+            <div class="context-file"><strong>{{.Module}}</strong>
+                {{if .Files}}<span class="muted small">{{range $i, $f := .Files}}{{if $i}} · {{end}}<a href="{{$f.URL}}">{{$f.Filename}}</a> <span>@{{$f.OwnerUsername}}</span>{{end}}</span>
+                {{else}}<span class="muted small">{{t $.Lang "context.no_files"}}</span>{{end}}</div>
             <div class="context-note">{{linkify .Note}}</div>
-            <div class="muted small">{{t $.Lang "context.by" .UpdaterName (timeAgo $.Lang .UpdatedAt)}}</div>
+            <div class="muted small">{{t $.Lang "context.by" (or .UpdaterName "—") (timeAgo $.Lang .UpdatedAt)}}</div>
         </li>
         {{end}}
     </ul>

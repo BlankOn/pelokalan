@@ -1,0 +1,23 @@
+{{define "content"}}
+<div class="page-head"><div><h1>{{t .Lang "title.licenses"}}</h1><p class="muted">{{t .Lang "licenses.intro"}}</p></div></div>
+<section class="card">
+    <h2>{{t .Lang "licenses.software"}}</h2>
+    <table class="table licenses-table">
+        <thead><tr><th>{{t .Lang "licenses.name"}}</th><th>{{t .Lang "licenses.used_for"}}</th><th>{{t .Lang "licenses.license"}}</th></tr></thead>
+        <tbody>
+        {{range .Data.Credits}}
+        <tr><td><a href="{{.URL}}" rel="noopener" target="_blank">{{.Name}}</a></td><td class="muted">{{t $.Lang .Note}}</td><td><span class="license-badge">{{.License}}</span></td></tr>
+        {{end}}
+        </tbody>
+    </table>
+</section>
+<section class="card">
+    <h2>{{t .Lang "licenses.data"}}</h2>
+    {{with .Data.Thesaurus}}
+    <p><strong>{{t $.Lang "licenses.thesaurus_title"}}</strong> — {{t $.Lang .Note}}</p>
+    <p class="small">{{t $.Lang "licenses.thesaurus_source"}} <a href="{{.URL}}" rel="noopener" target="_blank">{{.URL}}</a></p>
+    <p class="muted small">{{t $.Lang "licenses.thesaurus_origin"}}</p>
+    {{end}}
+    <p class="muted small">{{t .Lang "licenses.glossary_data"}}</p>
+</section>
+{{end}}

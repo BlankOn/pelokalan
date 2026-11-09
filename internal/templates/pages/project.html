@@ -1,14 +1,49 @@
 {{define "content"}}{{$p := .Data.Project}}{{$canManage := $p.Role.IsMember}}
 {{template "project_header" .}}
 
+{{if not .User}}
+<div class="alert alert-warn">{{t .Lang "files.guest_prefix"}} <a href="/login?next={{$p.Path}}/files">{{t .Lang "files.guest_login"}}</a> {{t .Lang "files.guest_or"}} <a href="/register?next={{$p.Path}}/files">{{t .Lang "files.guest_register"}}</a> {{t .Lang "files.guest_suffix"}}</div>
+{{end}}
+{{with .Data.ProjectFiles}}{{if .Files}}
+<h2 class="section-title">{{t $.Lang "files.project"}} <span class="muted small">({{.Total}})</span></h2>
+{{if .HasFeed}}<p class="pf-synced small muted">{{t $.Lang "files.synced_label"}}
+    {{with .LastSync}}<time data-local datetime="{{.Format "2006-01-02T15:04:05Z07:00"}}">{{.Format "02-01-2006 15:04"}}</time> (<span class="pf-synced-ago">{{timeAgo $.Lang .}}</span>){{else}}<time data-local></time> (<span class="pf-synced-ago">{{t $.Lang "files.never_synced"}}</span>){{end}}
+    · {{t $.Lang "files.sync_every" .SyncHours}}</p>{{end}}
+<section class="card">
+    <div class="context-search pf-toolbar">
+        <form id="pf-filter" class="pf-filter" hx-get="{{.Project.Path}}/project-files" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change, submit" hx-target="#project-file-rows" hx-swap="innerHTML">
+        <input type="search" name="q" placeholder="{{t $.Lang "files.project_search"}}" aria-label="{{t $.Lang "files.project_search"}}" autocomplete="off">
+        {{if gt (len .Versions) 1}}
+        <details class="multi-filter" data-multi-filter>
+            <summary class="mf-btn" title="{{t $.Lang "files.version_filter"}}">
+                <svg class="mf-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8z"/></svg>
+                <span class="mf-label" data-all="{{t $.Lang "files.all_versions"}}" data-many="{{t $.Lang "files.n_versions"}}">{{t $.Lang "files.all_versions"}}</span>
+                <span class="combo-caret">▾</span>
+            </summary>
+            <div class="mf-pop">
+                {{range .Versions}}<label class="mf-opt"><input type="checkbox" name="v" value="{{.ID}}"> <span class="mf-text">{{.Label}}</span> <span class="muted small">{{.Files}}</span></label>{{end}}
+                <button type="button" class="linklike small mf-clear mf-none">{{t $.Lang "filter.clear"}}</button>
+            </div>
+        </details>
+        {{end}}
+        </form>
+        {{if .CanManage}}<form method="post" action="{{.Project.Path}}/project-files/sync" data-sync data-syncing="{{t $.Lang "files.syncing"}}">
+            <button class="btn" title="{{t $.Lang "files.sync_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync"}}</span></button>
+        </form>{{end}}
+    </div>
+    <p class="pf-sync-msg small" role="status" hidden></p>
+    <table class="table files-table project-files">
+        <thead><tr><th>{{t $.Lang "project.col_file"}}</th><th class="w-progress">{{t $.Lang "project.col_progress"}}</th><th>{{t $.Lang "glossary.version"}}</th><th></th></tr></thead>
+        <tbody id="project-file-rows">{{template "project_file_rows" .}}</tbody>
+    </table>
+</section>
+{{end}}{{end}}
+
 {{if $canManage}}
 <h2 class="section-title">{{t .Lang "files.mine"}}</h2>
 <section class="card">
     <div class="card-head">
-        <div>
-            <h2>{{t .Lang "project.translations"}}</h2>
-            <p class="muted small">{{t .Lang "files.mine_help"}}</p>
-        </div>
+        <h2>{{t .Lang "project.translations"}}</h2>
         {{if $canManage}}
         <div class="row-actions">
             {{if .Data.Template}}<button type="button" class="btn btn-primary" data-open-dialog="new-translation">+ {{t .Lang "project.new_translation"}}</button>{{end}}
@@ -84,7 +119,7 @@
         </div>
         <div class="row-actions">
             <a class="btn btn-small" href="{{.URL}}">{{t $.Lang "action.view"}}</a>
-            <a class="btn btn-small" href="/catalogs/{{.ID}}/download">{{t $.Lang "action.download"}}</a>
+            <a class="btn btn-small btn-icon" href="/catalogs/{{.ID}}/download" title="{{t $.Lang "action.download"}} {{.Filename}}" aria-label="{{t $.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
             {{if $canManage}}
             <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $.Lang "confirm.delete_file"}}"><button class="btn btn-small btn-danger">{{t $.Lang "action.delete"}}</button></form>
             {{end}}
@@ -102,7 +137,6 @@
 <section class="card">
     <div class="card-head">
         <h2><span class="avatar avatar-sm">{{initial .Username}}</span> @{{.Username}}</h2>
-        <span class="role-badge">{{t $.Lang "files.read_only"}}</span>
     </div>
     <table class="table files-table">
         <thead><tr>
@@ -125,7 +159,7 @@
             <td class="small muted">{{timeAgo $.Lang .UpdatedAt}}</td>
             <td class="actions">
                 <a class="btn btn-small" href="{{.URL}}">{{t $.Lang "action.view"}}</a>
-                <a class="btn btn-small" href="/catalogs/{{.ID}}/download">{{t $.Lang "action.download"}}</a>
+                <a class="btn btn-small btn-icon" href="/catalogs/{{.ID}}/download" title="{{t $.Lang "action.download"}} {{.Filename}}" aria-label="{{t $.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
             </td>
         </tr>
         {{end}}
@@ -138,16 +172,20 @@
 
 {{if $canManage}}
 <dialog id="upload" class="dialog">
-    <form method="post" action="{{$p.Path}}/upload" enctype="multipart/form-data" class="form">
+    <form method="post" action="{{$p.Path}}/upload" enctype="multipart/form-data" class="form" data-busy="{{t .Lang "upload.busy"}}">
         <h2>{{t .Lang "project.upload"}}</h2>
         <p class="muted small">{{t .Lang "project.upload_help"}}</p>
         <label for="u-file">{{t .Lang "field.file"}}</label>
-        <input id="u-file" type="file" name="file" accept=".po,.pot" required>
+        <input id="u-file" type="file" name="file" accept=".po,.pot">
+        <div class="or-sep small muted"><span>{{t .Lang "upload.or"}}</span></div>
+        <label for="u-url">{{t .Lang "upload.url"}}</label>
+        <input id="u-url" type="url" name="url" placeholder="https://l10n.gnome.org/POT/tecla.master/tecla.master.id.po" inputmode="url" spellcheck="false">
+        <p class="muted small field-help">{{t .Lang "upload.url_help"}}</p>
         <label for="u-lang">{{t .Lang "field.language_optional"}}</label>
         <input id="u-lang" name="language" list="lang-codes" placeholder="id, en, pt_BR…" maxlength="12">
         <div class="dialog-actions">
             <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
-            <button type="submit" class="btn btn-primary">{{t .Lang "action.upload"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "project.upload_submit"}}</button>
         </div>
     </form>
 </dialog>

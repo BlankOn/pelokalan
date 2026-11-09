@@ -93,7 +93,10 @@ func (r *glossaryRepository) SetFeed(ctx context.Context, versionID int64, url, 
 
 func (r *glossaryRepository) DueFeeds(ctx context.Context, before time.Time) ([]*models.ProjectVersion, error) {
 	return r.listVersions(ctx, `SELECT `+versionColumns+` FROM project_versions v
-		WHERE v.glossary_url <> '' AND (v.last_fetched_at IS NULL OR v.last_fetched_at < $1)
+		WHERE v.glossary_url <> '' AND (v.last_fetched_at IS NULL OR v.last_fetched_at < $1
+		   -- imported before project files were kept: fetch again to fill them in
+		   OR (EXISTS (SELECT 1 FROM glossary_imports i WHERE i.version_id = v.id)
+		       AND NOT EXISTS (SELECT 1 FROM project_files f WHERE f.version_id = v.id)))
 		ORDER BY v.last_fetched_at NULLS FIRST LIMIT 50`, before)
 }
 
@@ -468,6 +471,128 @@ func (r *glossaryRepository) Modules(ctx context.Context, projectID int64, langu
 			return nil, err
 		}
 		out = append(out, m)
+	}
+	return out, rows.Err()
+}
+
+func (r *glossaryRepository) AddProjectFiles(ctx context.Context, files []*models.ProjectFile) error {
+	if len(files) == 0 {
+		return nil
+	}
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	stmt, err := tx.PrepareContext(ctx, `INSERT INTO project_files
+		(import_id, project_id, version_id, filename, language, total, translated, fuzzy, size, data)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+	for _, f := range files {
+		if _, err := stmt.ExecContext(ctx, f.ImportID, f.ProjectID, f.VersionID, f.Filename, f.Language,
+			f.Total, f.Translated, f.Fuzzy, f.Size, f.Data); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+const projectFileColumns = `f.id, f.import_id, f.project_id, f.version_id, v.name || '-' || v.version, f.filename, f.language,
+	f.total, f.translated, f.fuzzy, f.size, f.created_at`
+
+func (r *glossaryRepository) ListProjectFiles(ctx context.Context, projectID int64, query string, versionIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error) {
+	// every word must appear in the file name, language or version label
+	where := `f.project_id = $1`
+	args := []any{projectID}
+	if len(versionIDs) > 0 {
+		args = append(args, versionIDs)
+		where += fmt.Sprintf(` AND f.version_id = ANY($%d)`, len(args))
+	}
+	for _, w := range strings.Fields(query) {
+		args = append(args, "%"+escapeLike(w)+"%")
+		where += fmt.Sprintf(` AND (f.filename || ' ' || f.language || ' ' || v.name || '-' || v.version) ILIKE $%d`, len(args))
+	}
+	from := ` FROM project_files f JOIN project_versions v ON v.id = f.version_id WHERE ` + where
+	var total int
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*)`+from, args...).Scan(&total); err != nil {
+		return nil, 0, err
+	}
+	args = append(args, limit, offset)
+	rows, err := r.db.QueryContext(ctx, `SELECT `+projectFileColumns+from+`
+		ORDER BY f.translated::float8 / GREATEST(f.total, 1), f.total - f.translated DESC, f.filename, f.id DESC
+		LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer rows.Close()
+	var out []*models.ProjectFile
+	for rows.Next() {
+		f := &models.ProjectFile{}
+		if err := rows.Scan(&f.ID, &f.ImportID, &f.ProjectID, &f.VersionID, &f.VersionLabel, &f.Filename, &f.Language,
+			&f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt); err != nil {
+			return nil, 0, err
+		}
+		out = append(out, f)
+	}
+	return out, total, rows.Err()
+}
+
+func (r *glossaryRepository) GetProjectFile(ctx context.Context, projectID, id int64) (*models.ProjectFile, error) {
+	f := &models.ProjectFile{}
+	err := r.db.QueryRowContext(ctx, `SELECT `+projectFileColumns+`, f.data
+		FROM project_files f JOIN project_versions v ON v.id = f.version_id
+		WHERE f.project_id = $1 AND f.id = $2`, projectID, id).Scan(&f.ID, &f.ImportID, &f.ProjectID, &f.VersionID,
+		&f.VersionLabel, &f.Filename, &f.Language, &f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt, &f.Data)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, repository.ErrNotFound
+	}
+	return f, err
+}
+
+func (r *glossaryRepository) CountVersionFiles(ctx context.Context, versionID int64) (int, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM project_files WHERE version_id = $1`, versionID).Scan(&n)
+	return n, err
+}
+
+func (r *glossaryRepository) ProjectFilesForLanguage(ctx context.Context, projectID int64, language string) ([]*models.ProjectFile, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+projectFileColumns+`
+		FROM project_files f JOIN project_versions v ON v.id = f.version_id
+		WHERE f.project_id = $1 AND f.language = $2 ORDER BY f.created_at DESC, f.id DESC`, projectID, language)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*models.ProjectFile
+	for rows.Next() {
+		f := &models.ProjectFile{}
+		if err := rows.Scan(&f.ID, &f.ImportID, &f.ProjectID, &f.VersionID, &f.VersionLabel, &f.Filename, &f.Language,
+			&f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
+}
+
+func (r *glossaryRepository) ProjectFileVersions(ctx context.Context, projectID int64) ([]*models.ProjectFileVersion, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT v.id, v.name, v.version, COUNT(*)
+		FROM project_files f JOIN project_versions v ON v.id = f.version_id
+		WHERE f.project_id = $1 GROUP BY v.id, v.name, v.version`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*models.ProjectFileVersion
+	for rows.Next() {
+		v := &models.ProjectFileVersion{}
+		if err := rows.Scan(&v.ID, &v.Name, &v.Version, &v.Files); err != nil {
+			return nil, err
+		}
+		out = append(out, v)
 	}
 	return out, rows.Err()
 }

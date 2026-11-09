@@ -27,6 +27,17 @@ type Subject struct {
 	Key   string
 	Title string
 	URL   string // page showing the subject and its discussion
+	// ReadOnly: the subject is gone (e.g. the PO file was deleted). Its discussion
+	// stays readable on its own page, but nobody can comment, edit or delete there.
+	ReadOnly bool
+}
+
+// ErrDiscussionClosed: the discussion's subject is gone, so it is read-only
+var ErrDiscussionClosed = userErr("err.discussion_closed")
+
+// ThreadURL is the standalone page of a discussion whose subject is gone
+func ThreadURL(p *models.Project, subjectType, key string) string {
+	return p.Path() + "/threads/" + subjectType + "/" + key
 }
 
 // Thread is a subject with its discussion (nil when nobody commented yet)
@@ -85,6 +96,10 @@ func (s *DiscussionService) ResolveSubject(ctx context.Context, p *models.Projec
 	case models.SubjectPOEntry:
 		c, hash, err := s.entryCatalog(ctx, p, key)
 		if err != nil {
+			// the PO file was deleted: keep the discussion readable on its own page
+			if d, derr := s.repo.Get(ctx, p.ID, subjectType, key); derr == nil {
+				return &Subject{Type: subjectType, Key: key, Title: d.Title, URL: ThreadURL(p, subjectType, key), ReadOnly: true}, nil
+			}
 			return nil, err
 		}
 		url := c.URL() + "?entry=" + hash
@@ -92,14 +107,15 @@ func (s *DiscussionService) ResolveSubject(ctx context.Context, p *models.Projec
 		if err != nil {
 			return nil, err
 		}
+		// a deleted file stays readable in the editor; its discussions are read-only
 		for _, e := range entries {
 			if e.KeyHash() == hash {
-				return &Subject{Type: subjectType, Key: key, Title: entryTitle(e.MsgID, c), URL: url}, nil
+				return &Subject{Type: subjectType, Key: key, Title: entryTitle(e.MsgID, c), URL: url, ReadOnly: c.IsDeleted()}, nil
 			}
 		}
 		// the entry may have been removed; keep its discussion reachable
 		if d, derr := s.repo.Get(ctx, p.ID, subjectType, key); derr == nil {
-			return &Subject{Type: subjectType, Key: key, Title: d.Title, URL: url}, nil
+			return &Subject{Type: subjectType, Key: key, Title: d.Title, URL: url, ReadOnly: c.IsDeleted()}, nil
 		}
 		return nil, ErrNotFound
 	case models.SubjectTopic:
@@ -181,6 +197,7 @@ func (s *DiscussionService) SubjectURL(ctx context.Context, p *models.Project, d
 		if c, hash, err := s.entryCatalog(ctx, p, d.SubjectKey); err == nil {
 			return c.URL() + "?entry=" + hash
 		}
+		return ThreadURL(p, d.SubjectType, d.SubjectKey)
 	}
 	return p.Path() + "/discussions"
 }
@@ -319,6 +336,9 @@ func (s *DiscussionService) Comment(ctx context.Context, user *models.User, p *m
 
 // post stores a comment on a resolved subject, creating its discussion on first use
 func (s *DiscussionService) post(ctx context.Context, user *models.User, p *models.Project, subj *Subject, body, lang string, uploads []Upload) (*models.Comment, error) {
+	if subj.ReadOnly {
+		return nil, ErrDiscussionClosed
+	}
 	body = strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n"))
 	if len([]rune(body)) > maxCommentLen || (body == "" && len(uploads) == 0) {
 		return nil, userErr("err.comment_length", maxCommentLen)
@@ -418,6 +438,10 @@ func (s *DiscussionService) projectComment(ctx context.Context, p *models.Projec
 	if err != nil || d.ProjectID != p.ID {
 		return nil, nil, ErrNotFound
 	}
+	// comments of a read-only discussion (its subject is gone) are not changed any more
+	if subj, err := s.ResolveSubject(ctx, p, d.SubjectType, d.SubjectKey); err == nil && subj.ReadOnly {
+		return nil, nil, ErrDiscussionClosed
+	}
 	return c, d, nil
 }
 
@@ -480,4 +504,31 @@ func (s *DiscussionService) Counts(ctx context.Context, p *models.Project, subje
 // EntrySubjectKey is the discussion key of a PO entry: "<catalog id>-<entry key hash>"
 func EntrySubjectKey(c *models.Catalog, e *models.Entry) string {
 	return strconv.FormatInt(c.ID, 10) + "-" + e.KeyHash()
+}
+
+// CanDeleteDiscussion reports whether a user may delete a whole discussion: whoever
+// started it, or a project owner/manager; never a read-only one (its subject is gone)
+func CanDeleteDiscussion(user *models.User, p *models.Project, t *Thread) bool {
+	if user == nil || t == nil || t.Discussion == nil || t.Subject.ReadOnly || !p.Role.IsMember() {
+		return false
+	}
+	return p.Role.CanManage() || (t.Discussion.CreatedBy != nil && *t.Discussion.CreatedBy == user.ID)
+}
+
+// DeleteDiscussion removes a whole discussion (its starter, or an owner/manager)
+func (s *DiscussionService) DeleteDiscussion(ctx context.Context, user *models.User, p *models.Project, subjectType, key string) (*Subject, error) {
+	t, err := s.Thread(ctx, p, subjectType, key)
+	if err != nil {
+		return nil, err
+	}
+	if t.Discussion == nil {
+		return nil, ErrNotFound
+	}
+	if t.Subject.ReadOnly {
+		return nil, ErrDiscussionClosed
+	}
+	if !CanDeleteDiscussion(user, p, t) {
+		return nil, ErrForbidden
+	}
+	return t.Subject, s.repo.DeleteDiscussion(ctx, t.Discussion.ID)
 }

@@ -24,6 +24,7 @@ const (
 	CommitMsgBeforeRaw         = "commit.before_raw"
 	CommitMsgBeforeReplace     = "commit.before_replace"
 	CommitMsgUploaded          = "commit.uploaded"
+	CommitMsgFromUpstream      = "commit.from_upstream"
 	CommitMsgBeforeMerge       = "commit.before_merge"
 	CommitMsgBeforeMemory      = "commit.before_memory"
 	CommitMsgBeforeRestore     = "commit.before_restore"
@@ -108,7 +109,7 @@ func (s *CatalogService) commit(ctx context.Context, authorID *int64, c *models.
 
 // Commit saves the current state of the user's catalog with a message
 func (s *CatalogService) Commit(ctx context.Context, user *models.User, c *models.Catalog, message string) (*models.Commit, error) {
-	if c.OwnerID != user.ID {
+	if !c.WritableBy(user.ID) {
 		return nil, ErrForbidden
 	}
 	message = strings.TrimSpace(message)
@@ -275,7 +276,7 @@ func splitOriginFlag(flags []string) ([]string, string) {
 // Restore brings the catalog back to an earlier version. The current state is
 // committed first and the restore is itself recorded, so it can be undone.
 func (s *CatalogService) Restore(ctx context.Context, user *models.User, c *models.Catalog, id int64) (*models.Commit, error) {
-	if c.OwnerID != user.ID {
+	if !c.WritableBy(user.ID) {
 		return nil, ErrForbidden
 	}
 	target, data, err := s.commitSnapshot(ctx, c, id)

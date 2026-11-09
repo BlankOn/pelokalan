@@ -18,8 +18,13 @@ type Catalog struct {
 	OwnerID       int64
 	OwnerUsername string
 	ProjectSlug   string
-	// Owned is true when the viewing user owns the file (set by the service, not stored)
-	Owned          bool
+	// Owned is true when the viewing user owns the file and may change it (set by the
+	// service, not stored; false for a deleted file)
+	Owned bool
+	// DeletedAt is set when the file was deleted: it stays readable, but nobody changes it
+	DeletedAt      *time.Time
+	DeletedBy      *int64
+	DeleterName    string
 	IsTemplate     bool
 	Language       string
 	Filename       string
@@ -34,9 +39,27 @@ type Catalog struct {
 	Stats CatalogStats
 }
 
+// IsDeleted reports whether the file was deleted (kept read-only)
+func (c *Catalog) IsDeleted() bool { return c.DeletedAt != nil }
+
+// DeletedTime is when the file was deleted (zero when it was not)
+func (c *Catalog) DeletedTime() time.Time {
+	if c.DeletedAt == nil {
+		return time.Time{}
+	}
+	return *c.DeletedAt
+}
+
+// WritableBy reports whether a user may change the file: its owner, while it is not deleted
+func (c *Catalog) WritableBy(userID int64) bool { return c.OwnerID == userID && c.DeletedAt == nil }
+
 // URL is the address of the file in the owner's workspace,
 // e.g. /projects/1/ani/po/orca.id.po
 func (c *Catalog) URL() string {
+	if c.DeletedAt != nil {
+		// a newer file may use the same name; the id always finds this one
+		return "/catalogs/" + strconv.FormatInt(c.ID, 10)
+	}
 	project := c.ProjectSlug
 	if project == "" {
 		project = strconv.FormatInt(c.ProjectID, 10)
@@ -95,6 +118,8 @@ type Entry struct {
 	Comments int
 	// Origin of a machine translation not yet saved by a person: "ai", "glossary", "memory"
 	Origin string
+	// ReplacedMsgStr is the translation a machine replaced, kept until a person saves (nil = none)
+	ReplacedMsgStr []string
 
 	// Computed by the service
 	Issues []string

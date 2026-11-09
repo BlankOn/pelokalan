@@ -1,5 +1,6 @@
 {{define "content"}}{{$c := .Data.Catalog}}{{$p := .Data.Project}}{{$f := .Data.Filter}}
 <div class="editor-app" id="editor-app" data-catalog="{{$c.ID}}" data-readonly="{{.Data.ReadOnly}}" data-initial-entry="{{.Data.InitialEntry}}"
+     {{if .Data.Owned}}data-thesaurus="{{$p.Path}}/thesaurus?v={{.Asset}}" data-th-title="{{t .Lang "thesaurus.synonyms"}}" data-th-antonyms="{{t .Lang "thesaurus.antonyms"}}" data-th-none="{{t .Lang "thesaurus.none"}}" data-th-source="{{t .Lang "thesaurus.source"}}" data-th-tags="{{t .Lang "thesaurus.tags"}}" data-th-as-form="{{t .Lang "thesaurus.as_form"}}" data-ai-working="{{t .Lang "ai.entry_working"}}" data-locked-msg="{{t .Lang "ai.editor_locked"}}"{{end}}
      data-msg-unsaved="{{t .Lang "editor.unsaved_changes"}}"
      data-msg-error="{{t .Lang "editor.request_failed"}}"
      data-msg-save-failed="{{t .Lang "editor.save_failed_move"}}">
@@ -37,12 +38,21 @@
         {{end}}
         {{end}}
         <div class="tb-sep"></div>
+        {{with .Data.Upstream}}
+        <form method="post" action="{{$p.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $.Lang "files.update_confirm" $c.Filename .VersionLabel}}" data-confirm-ok="{{t $.Lang "files.update"}}">
+            <input type="hidden" name="into" value="{{$c.ID}}">
+            <button type="submit" class="tb-btn" title="{{t $.Lang "editor.pull_upstream_help" .Filename .VersionLabel}}">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17H6.5a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 17.6 8a4 4 0 0 1-.1 9H17"/><path d="M12 11v9"/><path d="M9 17l3 3 3-3"/></svg>
+                <span>{{t $.Lang "editor.pull_upstream"}}</span>
+            </button>
+        </form>
+        {{end}}
         <a class="tb-btn" href="{{$c.URL}}/history" title="{{t .Lang "history.title"}}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
             <span>{{t .Lang "history.button"}}</span>
         </a>
         {{if .Data.Owned}}
-        <button type="button" class="tb-btn tb-commit" data-open-dialog="commit-dialog" title="{{t .Lang "history.commit_help"}}">
+        <button type="button" class="tb-btn tb-commit" data-open-dialog="commit-dialog" title="{{t .Lang "history.commit_help"}}" data-title-none="{{t .Lang "history.nothing"}}"{{if not .Data.Uncommitted}} disabled{{end}}>
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3.5"/><path d="M3 12h5.5M15.5 12H21"/></svg>
             <span>{{t .Lang "history.commit"}}</span>
             {{template "commit_badge" (dict "N" .Data.Uncommitted "OOB" false)}}
@@ -71,6 +81,10 @@
         </a>
         {{end}}
 
+        <button type="button" class="tb-btn" data-open-dialog="help-dialog" title="{{t .Lang "help.title"}} (?)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.6"/><circle cx="12" cy="16.9" r=".6"/></svg>
+            <span>{{t .Lang "help.button"}}</span>
+        </button>
         <div class="tb-sep"></div>
         <form id="filter-form" class="tb-filter" hx-get="/catalogs/{{$c.ID}}/list" hx-target="#entry-list"
               hx-trigger="input changed delay:300ms from:#filter-q, change, submit" hx-include="#filter-selected">
@@ -107,6 +121,7 @@
     </div>
 
     {{if .Flash}}<div class="editor-flash">{{.Flash}}</div>{{end}}
+    {{if $c.IsDeleted}}<div class="editor-flash editor-deleted" role="status">{{t .Lang "editor.deleted_notice" (or $c.DeleterName "—") (timeAgo .Lang $c.DeletedTime)}}</div>{{end}}
     {{with .Data.AIJob}}{{template "ai_job" .}}{{end}}
 
     <div class="workspace">
@@ -127,14 +142,56 @@
     {{template "statusbar" .Data.Status}}
 </div>
 
+<dialog id="help-dialog" class="dialog help-dialog">
+    <h2>⌨ {{t .Lang "help.title"}}</h2>
+    <h3>{{t .Lang "help.saving"}}</h3>
+    <dl class="kbd-list">
+        <dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd></dt><dd>{{t .Lang "help.ctrl_enter"}}</dd>
+        <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Enter</kbd></dt><dd>{{t .Lang "help.ctrl_shift_enter"}}</dd>
+        <dt><kbd>Ctrl</kbd>+<kbd>U</kbd></dt><dd>{{t .Lang "help.ctrl_u"}}</dd>
+        <dt><kbd>Ctrl</kbd>+<kbd>B</kbd></dt><dd>{{t .Lang "help.ctrl_b"}}</dd>
+        <dt><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd></dt><dd>{{t .Lang "help.ctrl_shift_a"}}</dd>
+    </dl>
+    <h3>{{t .Lang "help.moving"}}</h3>
+    <dl class="kbd-list">
+        <dt><kbd>↑</kbd> / <kbd>↓</kbd></dt><dd>{{t .Lang "help.arrows"}}</dd>
+        <dt><kbd>Ctrl</kbd>+<kbd>↑</kbd> / <kbd>↓</kbd></dt><dd>{{t .Lang "help.ctrl_arrows"}}</dd>
+        <dt><kbd>Ctrl</kbd>+<kbd>F</kbd></dt><dd>{{t .Lang "help.ctrl_f"}}</dd>
+        <dt><kbd>Esc</kbd></dt><dd>{{t .Lang "help.esc"}}</dd>
+        <dt><kbd>?</kbd></dt><dd>{{t .Lang "help.question"}}</dd>
+    </dl>
+    <h3>{{t .Lang "help.editing"}}</h3>
+    <dl class="kbd-list">
+        <dt>{{t .Lang "help.select_word"}}</dt><dd>{{t .Lang "help.thesaurus"}}</dd>
+        <dt>{{t .Lang "help.glossary_chip"}}</dt><dd>{{t .Lang "help.glossary_insert"}}</dd>
+        <dt><kbd>Ctrl</kbd>+<kbd>Enter</kbd> {{t .Lang "help.in_comment"}}</dt><dd>{{t .Lang "help.send_comment"}}</dd>
+    </dl>
+    <div class="dialog-actions"><button type="button" class="btn" data-close-dialog>{{t .Lang "action.close"}}</button></div>
+</dialog>
+
 {{if not $c.IsTemplate}}
 <dialog id="context-dialog" class="dialog context-dialog">
     <form class="form" id="context-form" data-url="/catalogs/{{$c.ID}}/context">
-        <h2>📌 {{t .Lang "context.dialog_title" $c.Filename}}</h2>
-        <p class="muted small">{{t .Lang "context.help"}}</p>
-        {{if .Data.Owned}}
+        <h2>📌 {{t .Lang "context.dialog_title" .Data.ContextModule}}</h2>
+        <p class="muted small">{{t .Lang "context.help" .Data.ContextModule}}</p>
+        {{if .Data.CanEditContext}}
+        <input type="hidden" name="version" value="{{or .Data.ContextVersion 0}}">
+        <div class="alert alert-error context-conflict" role="alert" hidden>
+            <strong>{{t .Lang "context.conflict_title"}}</strong>
+            <p class="context-conflict-help"></p>
+            <ol class="small">
+                <li>{{t .Lang "wiki.conflict_step_copy"}}</li>
+                <li>{{t .Lang "context.conflict_step_load"}}</li>
+                <li>{{t .Lang "wiki.conflict_step_edit"}}</li>
+            </ol>
+            <div class="row-actions">
+                <button type="button" class="btn btn-small" data-context-copy data-copied="{{t .Lang "context.copied"}}">{{t .Lang "context.copy_mine"}}</button>
+                <button type="button" class="btn btn-small" data-context-load data-confirm-msg="{{t .Lang "context.load_confirm"}}">{{t .Lang "context.load_latest"}}</button>
+            </div>
+        </div>
         <textarea name="note" rows="12" maxlength="10000" placeholder="{{t .Lang "context.placeholder"}}">{{with .Data.FileContext}}{{.Note}}{{end}}</textarea>
         <p class="muted small context-status" role="status">{{with .Data.FileContext}}{{t $.Lang "context.by" .UpdaterName (timeAgo $.Lang .UpdatedAt)}}{{end}}</p>
+        {{template "context_history" .}}
         <div class="dialog-actions">
             <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
             <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
@@ -142,6 +199,7 @@
         {{else}}
         {{with .Data.FileContext}}<div class="context-note context-read">{{linkify .Note}}</div><p class="muted small">{{t $.Lang "context.by" .UpdaterName (timeAgo $.Lang .UpdatedAt)}}</p>
         {{else}}<p class="muted">{{t .Lang "context.none"}}</p>{{end}}
+        {{template "context_history" .}}
         <div class="dialog-actions"><button type="button" class="btn" data-close-dialog>{{t .Lang "action.close"}}</button></div>
         {{end}}
     </form>

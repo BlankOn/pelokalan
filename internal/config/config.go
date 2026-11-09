@@ -47,6 +47,9 @@ type GlossaryConfig struct {
 	MaxDownloadMB int64
 	// AllowPrivateHosts permits URLs on local or private networks (off by default)
 	AllowPrivateHosts bool
+	// ThesaurusURL is where the Indonesian thesaurus JSON is downloaded from when the
+	// database has none yet; empty disables the thesaurus
+	ThesaurusURL string
 }
 
 // ServerConfig holds HTTP server configuration
@@ -159,9 +162,11 @@ func Load() *Config {
 			AllowPrivateHosts: getEnv("AI_ALLOW_PRIVATE_HOSTS", "false") == "true",
 		},
 		Glossary: GlossaryConfig{
-			FetchInterval:     time.Duration(getEnvInt("GLOSSARY_FETCH_INTERVAL_HOURS", 24)) * time.Hour,
+			FetchInterval:     time.Duration(getEnvInt("GLOSSARY_FETCH_INTERVAL_HOURS", 3)) * time.Hour,
 			MaxDownloadMB:     int64(getEnvInt("GLOSSARY_MAX_DOWNLOAD_MB", 100)),
 			AllowPrivateHosts: getEnv("GLOSSARY_ALLOW_PRIVATE_HOSTS", "false") == "true",
+			ThesaurusURL: getEnv("THESAURUS_URL",
+				"https://raw.githubusercontent.com/victoriasovereigne/tesaurus/refs/heads/master/dict.json"),
 		},
 	}
 }

@@ -50,7 +50,7 @@ type historyRecorder interface {
 }
 
 type fileContexts interface {
-	ForCatalog(ctx context.Context, c *models.Catalog) (*models.CatalogContext, error)
+	ForCatalog(ctx context.Context, c *models.Catalog) (*models.ModuleContext, error)
 }
 
 // SetContexts makes prompts include the PO file's Konteks note
@@ -307,28 +307,49 @@ func (s *AIService) plan(ctx context.Context, p *models.Project, c *models.Catal
 			continue
 		}
 		// a whole-string glossary match is applied without the model, unless the note
-		// talks about one of its words (then the model decides with the note)
-		if !e.IsPlural() && !ai.Mentioned(e.MsgID, contextWords) {
+		// talks about one of its words (then the model decides with the note) or the entry
+		// already has a draft translation to review
+		draft := e.Fuzzy && hasText(e.MsgStr)
+		if !e.IsPlural() && !draft && !ai.Mentioned(e.MsgID, contextWords) {
 			if tr, ok := g.Exact(e.MsgID); ok {
 				pl.direct[e.ID] = tr
 				continue
 			}
 		}
-		it := ai.Item{ID: e.ID, Source: e.MsgID, Plural: e.MsgIDPlural, Context: e.ContextValue(), Flags: e.FlagList()}
-		notes := strings.TrimSpace(e.ExtractedComments)
-		if len(notes) > 500 {
-			notes = notes[:500]
+		// an entry that needs review keeps its translation as a draft for the model to improve
+		var current []string
+		if draft {
+			current = e.MsgStr
 		}
-		it.Notes = notes
-		if e.IsPlural() {
-			it.Forms = c.NPlurals
-		}
-		it.Glossary = ai.MarkOptional(g.Matches(e.MsgID+" "+e.MsgIDPlural), contextWords)
-		pl.items = append(pl.items, it)
+		pl.items = append(pl.items, buildItem(e, c, g, contextWords, current))
 	}
 	pl.batches = ai.Batch(pl.items, aiBatchItems, aiBatchChars)
 	pl.system = ai.SystemPrompt(languageLabel(p.SourceLanguage), languageLabel(c.Language), projectContext, fileContext)
 	return pl, nil
+}
+
+// buildItem prepares one entry for the model: source, plural forms, context, notes and
+// glossary hints (optional where the Konteks talks about them). A non-empty current is an
+// existing translation to improve; its own word choices then outrank all glossary hints.
+func buildItem(e *models.Entry, c *models.Catalog, g *ai.Glossary, contextWords map[string]bool, current []string) ai.Item {
+	it := ai.Item{ID: e.ID, Source: e.MsgID, Plural: e.MsgIDPlural, Context: e.ContextValue(), Flags: e.FlagList()}
+	notes := strings.TrimSpace(e.ExtractedComments)
+	if len(notes) > 500 {
+		notes = notes[:500]
+	}
+	it.Notes = notes
+	if e.IsPlural() {
+		it.Forms = c.NPlurals
+	}
+	it.Glossary = ai.MatchCase(ai.MarkOptional(g.Matches(e.MsgID+" "+e.MsgIDPlural), contextWords), e.MsgID+" "+e.MsgIDPlural)
+	// a draft damaged by an earlier run (control characters) is not worth improving
+	if hasText(current) && !ai.HasControlChars(current) {
+		it.Current = current
+		for i := range it.Glossary {
+			it.Glossary[i].Optional = true
+		}
+	}
+	return it
 }
 
 func languageLabel(code string) string {
@@ -394,7 +415,8 @@ func (s *AIService) Job(ctx context.Context, c *models.Catalog, id int64) (*mode
 	return j, nil
 }
 
-// Cancel asks a running job to stop after the current batch
+// Cancel asks a running job to stop; the job aborts its current model request within a
+// couple of seconds (see watchCancel)
 func (s *AIService) Cancel(ctx context.Context, c *models.Catalog, id int64) error {
 	j, err := s.Job(ctx, c, id)
 	if err != nil {
@@ -405,7 +427,7 @@ func (s *AIService) Cancel(ctx context.Context, c *models.Catalog, id int64) err
 
 // Start begins pre-translating a catalog in the background
 func (s *AIService) Start(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, opts AIOptions) (*models.AIJob, error) {
-	if c.IsTemplate || c.OwnerID != user.ID {
+	if c.IsTemplate || !c.WritableBy(user.ID) {
 		return nil, ErrForbidden
 	}
 	st, err := s.Settings(ctx, p)
@@ -512,8 +534,12 @@ func (s *AIService) run(job *models.AIJob, st *models.AISettings, cl chatClient,
 		spent, _ := s.repo.Spend(ctx, job.ProjectID, time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC))
 		budgetLeft = st.MonthlyBudget - spent
 	}
+	// model requests can take a minute or more; a cancel request aborts the one in flight
+	reqCtx, abort := context.WithCancel(ctx)
+	defer abort()
+	go s.watchCancel(reqCtx, job.ID, abort)
 	for _, batch := range pl.batches {
-		if cancelled, _ := s.repo.IsCancelRequested(ctx, job.ID); cancelled {
+		if cancelled, _ := s.repo.IsCancelRequested(ctx, job.ID); cancelled || reqCtx.Err() != nil {
 			job.Status = models.AIJobCancelled
 			s.finish(job)
 			return
@@ -523,10 +549,16 @@ func (s *AIService) run(job *models.AIJob, st *models.AISettings, cl chatClient,
 			s.finish(job)
 			return
 		}
-		content, usage, err := cl.Chat(ctx, pl.system, ai.UserPrompt(batch))
+		content, usage, err := cl.Chat(reqCtx, pl.system, ai.UserPrompt(batch))
 		job.PromptTokens += usage.PromptTokens
 		job.CompletionTokens += usage.CompletionTokens
 		job.Cost = st.Cost(job.PromptTokens, job.CompletionTokens)
+		if reqCtx.Err() != nil && ctx.Err() == nil {
+			// cancelled while the model was answering: keep earlier batches, write nothing more
+			job.Status = models.AIJobCancelled
+			s.finish(job)
+			return
+		}
 		if err != nil {
 			job.Status = models.AIJobFailed
 			if ue, ok := AsUserError(translateAIError(err)); ok {
@@ -548,7 +580,7 @@ func (s *AIService) run(job *models.AIJob, st *models.AISettings, cl chatClient,
 			}
 			forms = ai.FitForms(forms, it.Plural != "", c.NPlurals)
 			problems := ai.Verify(it, forms, c.NPlurals)
-			if len(problems) > 0 && problems[0] == ai.ProblemEmpty {
+			if len(problems) > 0 && (problems[0] == ai.ProblemEmpty || problems[0] == ai.ProblemCorrupt) {
 				job.Skipped++
 				job.Processed++
 				continue
@@ -568,6 +600,26 @@ func (s *AIService) run(job *models.AIJob, st *models.AISettings, cl chatClient,
 	}
 	job.Status = models.AIJobDone
 	s.finish(job)
+}
+
+// cancelPollInterval is how often a running job checks for a cancel request
+var cancelPollInterval = 1500 * time.Millisecond
+
+// watchCancel calls abort as soon as a cancel is requested for the job
+func (s *AIService) watchCancel(ctx context.Context, jobID int64, abort context.CancelFunc) {
+	t := time.NewTicker(cancelPollInterval)
+	defer t.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-t.C:
+			if cancelled, err := s.repo.IsCancelRequested(ctx, jobID); err == nil && cancelled {
+				abort()
+				return
+			}
+		}
+	}
 }
 
 func joinArgs(args []any) string {
@@ -613,7 +665,13 @@ func (s *AIService) apply(ctx context.Context, c *models.Catalog, id int64, vers
 	if e.Version != version {
 		return applySkipped // someone edited it meanwhile
 	}
-	e.MsgStr = fitForms(forms, e.IsPlural(), c.NPlurals)
+	// keep the replaced translation for comparison: the last text a person wrote (an earlier
+	// machine result does not replace it)
+	newForms := fitForms(forms, e.IsPlural(), c.NPlurals)
+	if hasText(e.MsgStr) && !sameForms(e.MsgStr, newForms) && (e.Origin == "" || e.ReplacedMsgStr == nil) {
+		e.ReplacedMsgStr = e.MsgStr
+	}
+	e.MsgStr = newForms
 	e.Fuzzy = fuzzy
 	e.Origin = origin
 	if err := s.catalogs.UpdateEntry(ctx, e, userID); err != nil {
@@ -624,4 +682,108 @@ func (s *AIService) apply(ctx context.Context, c *models.Catalog, id int64, vers
 		return applyFailed
 	}
 	return applyOK
+}
+
+func sameForms(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func hasText(forms []string) bool {
+	for _, f := range forms {
+		if strings.TrimSpace(f) != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// EntryAIResult is the model's translation of one entry, not yet saved
+type EntryAIResult struct {
+	Forms    []string `json:"forms"`
+	Flagged  bool     `json:"flagged"` // failed a check (glossary, placeholders): mark for review
+	Problems []string `json:"problems,omitempty"`
+}
+
+// TranslateEntry asks the model to translate one entry for its owner, with the same glossary,
+// Konteks and draft rules as pre-translation. current is the text in the editor (a draft to
+// improve when not empty). Nothing is saved; the cost is recorded toward the monthly budget.
+func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, e *models.Entry, current []string) (*EntryAIResult, error) {
+	if c.IsTemplate || !c.WritableBy(user.ID) {
+		return nil, ErrForbidden
+	}
+	st, err := s.Settings(ctx, p)
+	if err != nil {
+		return nil, err
+	}
+	if st == nil {
+		return nil, userErr("err.ai_not_configured")
+	}
+	cl, err := s.client(st)
+	if err != nil {
+		return nil, err
+	}
+	pref, err := s.glossary.PreferredTerms(ctx, p.ID, c.Language, 0)
+	if err != nil {
+		return nil, err
+	}
+	terms := make([]ai.Term, len(pref))
+	for i, t := range pref {
+		terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words}
+	}
+	fileContext := ""
+	if s.contexts != nil {
+		if n, err := s.contexts.ForCatalog(ctx, c); err == nil && n != nil {
+			fileContext = n.Note
+		}
+	}
+	contextWords := ai.ContextWords(st.ExtraContext + "\n" + fileContext)
+	it := buildItem(e, c, ai.NewGlossary(terms), contextWords, current)
+	system := ai.SystemPrompt(languageLabel(p.SourceLanguage), languageLabel(c.Language), st.ExtraContext, fileContext)
+	batch := []ai.Item{it}
+
+	if st.MonthlyBudget > 0 {
+		u := ai.EstimateBatches([][]ai.Item{batch}, system)
+		spent, err := s.MonthSpend(ctx, p)
+		if err != nil {
+			return nil, err
+		}
+		if spent+st.Cost(u.PromptTokens, u.CompletionTokens) > st.MonthlyBudget {
+			return nil, userErr("err.ai_budget", st.MonthlyBudget-spent)
+		}
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, 2*time.Minute)
+	defer cancel()
+	content, usage, err := cl.Chat(callCtx, system, ai.UserPrompt(batch))
+	// record the cost even when the answer is unusable
+	now := time.Now()
+	job := &models.AIJob{ProjectID: p.ID, CatalogID: c.ID, UserID: &user.ID, Status: models.AIJobDone, Model: st.Model,
+		Total: 1, Processed: 1, Single: true, PromptTokens: usage.PromptTokens, CompletionTokens: usage.CompletionTokens,
+		Cost: st.Cost(usage.PromptTokens, usage.CompletionTokens), FinishedAt: &now}
+	if usage.PromptTokens+usage.CompletionTokens > 0 {
+		if err := s.repo.CreateJob(context.Background(), job); err == nil {
+			_ = s.repo.UpdateJob(context.Background(), job)
+		}
+	}
+	if err != nil {
+		return nil, translateAIError(err)
+	}
+	results, err := ai.ParseResponse(content)
+	if err != nil || len(results[e.ID]) == 0 {
+		return nil, userErr("err.ai_entry_empty")
+	}
+	forms := ai.FitForms(results[e.ID], e.IsPlural(), c.NPlurals)
+	problems := ai.Verify(it, forms, c.NPlurals)
+	if len(problems) > 0 && (problems[0] == ai.ProblemEmpty || problems[0] == ai.ProblemCorrupt) {
+		return nil, userErr("err.ai_entry_empty")
+	}
+	return &EntryAIResult{Forms: forms, Flagged: len(problems) > 0, Problems: problems}, nil
 }

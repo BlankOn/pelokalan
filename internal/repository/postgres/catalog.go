@@ -23,12 +23,13 @@ func NewCatalogRepository(db *sql.DB) repository.CatalogRepository {
 
 const catalogColumns = `id, project_id, owner_id, (SELECT username FROM users WHERE users.id = catalogs.owner_id),
 	(SELECT slug FROM projects WHERE projects.id = catalogs.project_id), is_template, language, filename, header, header_comments,
-	plural_forms, nplurals, created_by, created_at, updated_at`
+	plural_forms, nplurals, created_by, created_at, updated_at, deleted_at, deleted_by,
+	COALESCE((SELECT COALESCE(NULLIF(u.name, ''), u.username) FROM users u WHERE u.id = catalogs.deleted_by), '')`
 
 func scanCatalog(row interface{ Scan(...any) error }) (*models.Catalog, error) {
 	c := &models.Catalog{}
 	err := row.Scan(&c.ID, &c.ProjectID, &c.OwnerID, &c.OwnerUsername, &c.ProjectSlug, &c.IsTemplate, &c.Language, &c.Filename, &c.Header, &c.HeaderComments,
-		&c.PluralForms, &c.NPlurals, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt)
+		&c.PluralForms, &c.NPlurals, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -99,26 +100,27 @@ func (r *catalogRepository) GetByID(ctx context.Context, id int64) (*models.Cata
 func (r *catalogRepository) GetByPath(ctx context.Context, projectID int64, ownerUsername, filename string) (*models.Catalog, error) {
 	return scanCatalog(r.db.QueryRowContext(ctx,
 		`SELECT `+catalogColumns+` FROM catalogs
-		 WHERE project_id = $1 AND filename = $3 AND owner_id = (SELECT id FROM users WHERE username = $2)`,
+		 WHERE project_id = $1 AND filename = $3 AND owner_id = (SELECT id FROM users WHERE username = $2)
+		 ORDER BY deleted_at DESC NULLS FIRST, id DESC LIMIT 1`, // the current file, else the latest deleted one
 		projectID, ownerUsername, filename))
 }
 
 func (r *catalogRepository) FilenameTaken(ctx context.Context, projectID, ownerID int64, filename string, excludeID int64) (bool, error) {
 	var n int
 	err := r.db.QueryRowContext(ctx,
-		`SELECT COUNT(*) FROM catalogs WHERE project_id = $1 AND owner_id = $2 AND filename = $3 AND id <> $4`,
+		`SELECT COUNT(*) FROM catalogs WHERE project_id = $1 AND owner_id = $2 AND filename = $3 AND id <> $4 AND deleted_at IS NULL`,
 		projectID, ownerID, filename, excludeID).Scan(&n)
 	return n > 0, err
 }
 
 func (r *catalogRepository) GetTemplate(ctx context.Context, projectID, ownerID int64) (*models.Catalog, error) {
 	return scanCatalog(r.db.QueryRowContext(ctx,
-		`SELECT `+catalogColumns+` FROM catalogs WHERE project_id = $1 AND owner_id = $2 AND is_template`, projectID, ownerID))
+		`SELECT `+catalogColumns+` FROM catalogs WHERE project_id = $1 AND owner_id = $2 AND is_template AND deleted_at IS NULL`, projectID, ownerID))
 }
 
 func (r *catalogRepository) ListByProject(ctx context.Context, projectID, ownerID int64) ([]*models.Catalog, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT `+catalogColumns+` FROM catalogs WHERE project_id = $1 AND owner_id = $2 ORDER BY is_template DESC, language`,
+		`SELECT `+catalogColumns+` FROM catalogs WHERE project_id = $1 AND owner_id = $2 AND deleted_at IS NULL ORDER BY is_template DESC, language`,
 		projectID, ownerID)
 	if err != nil {
 		return nil, err
@@ -145,7 +147,7 @@ func (r *catalogRepository) ListByProject(ctx context.Context, projectID, ownerI
 
 func (r *catalogRepository) ListAllByProject(ctx context.Context, projectID int64) ([]*models.Catalog, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT `+catalogColumns+` FROM catalogs WHERE project_id = $1 ORDER BY owner_id, is_template DESC, language`, projectID)
+		`SELECT `+catalogColumns+` FROM catalogs WHERE project_id = $1 AND deleted_at IS NULL ORDER BY owner_id, is_template DESC, language`, projectID)
 	if err != nil {
 		return nil, err
 	}
@@ -176,8 +178,9 @@ func (r *catalogRepository) UpdateHeader(ctx context.Context, c *models.Catalog)
 	return err
 }
 
-func (r *catalogRepository) Delete(ctx context.Context, id int64) error {
-	_, err := r.db.ExecContext(ctx, `DELETE FROM catalogs WHERE id = $1`, id)
+// Delete marks a file deleted; its entries and history are kept (read-only)
+func (r *catalogRepository) Delete(ctx context.Context, id, byUserID int64) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE catalogs SET deleted_at = NOW(), deleted_by = $2 WHERE id = $1 AND deleted_at IS NULL`, id, byUserID)
 	return err
 }
 
@@ -204,19 +207,22 @@ func (r *catalogRepository) ReplaceEntries(ctx context.Context, c *models.Catalo
 
 const entryColumns = `e.id, e.catalog_id, e.position, e.msgctxt, e.msgid, e.msgid_plural, e.msgstr, e.fuzzy, e.flags,
 	e.translator_comments, e.extracted_comments, e.refs, e.previous, e.obsolete, e.version, e.updated_by,
-	COALESCE(NULLIF(u.name, ''), u.email, ''), e.updated_at, e.origin`
+	COALESCE(NULLIF(u.name, ''), u.email, ''), e.updated_at, e.origin, e.replaced_msgstr`
 
 func scanEntry(row interface{ Scan(...any) error }) (*models.Entry, error) {
 	e := &models.Entry{}
-	var msgstr []byte
+	var msgstr, replaced []byte
 	err := row.Scan(&e.ID, &e.CatalogID, &e.Position, &e.Context, &e.MsgID, &e.MsgIDPlural, &msgstr, &e.Fuzzy, &e.Flags,
 		&e.TranslatorComments, &e.ExtractedComments, &e.References, &e.Previous, &e.Obsolete, &e.Version, &e.UpdatedBy,
-		&e.UpdatedByName, &e.UpdatedAt, &e.Origin)
+		&e.UpdatedByName, &e.UpdatedAt, &e.Origin, &replaced)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
 	if err != nil {
 		return nil, err
+	}
+	if len(replaced) > 0 {
+		_ = json.Unmarshal(replaced, &e.ReplacedMsgStr)
 	}
 	if err := json.Unmarshal(msgstr, &e.MsgStr); err != nil {
 		return nil, err
@@ -265,13 +271,21 @@ func (r *catalogRepository) UpdateEntry(ctx context.Context, e *models.Entry, us
 	}
 	defer tx.Rollback()
 
+	var replaced any // NULL unless a machine replaced a translation
+	if e.ReplacedMsgStr != nil {
+		b, err := json.Marshal(e.ReplacedMsgStr)
+		if err != nil {
+			return err
+		}
+		replaced = string(b)
+	}
 	err = tx.QueryRowContext(ctx,
 		`UPDATE entries SET msgstr = $3, fuzzy = $4, translator_comments = $5,
 		        previous = CASE WHEN $4 THEN previous ELSE '' END,
-		        version = version + 1, updated_by = $6, updated_at = NOW(), origin = $7
+		        version = version + 1, updated_by = $6, updated_at = NOW(), origin = $7, replaced_msgstr = $8
 		 WHERE id = $1 AND version = $2
 		 RETURNING version, updated_at`,
-		e.ID, e.Version, string(msgstr), e.Fuzzy, e.TranslatorComments, userID, e.Origin,
+		e.ID, e.Version, string(msgstr), e.Fuzzy, e.TranslatorComments, userID, e.Origin, replaced,
 	).Scan(&e.Version, &e.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return repository.ErrConflict
@@ -303,7 +317,7 @@ func (r *catalogRepository) Suggestions(ctx context.Context, userID int64, langu
 		 FROM entries e
 		 JOIN catalogs c ON c.id = e.catalog_id
 		 JOIN projects p ON p.id = c.project_id
-		 WHERE c.owner_id = $1 AND c.language = $2 AND md5(e.msgid) = md5($3) AND e.msgid = $3 AND e.id <> $4
+		 WHERE c.owner_id = $1 AND c.language = $2 AND c.deleted_at IS NULL AND md5(e.msgid) = md5($3) AND e.msgid = $3 AND e.id <> $4
 		   AND NOT e.fuzzy AND NOT e.obsolete AND e.msgid_plural = '' AND COALESCE(e.msgstr->>0, '') <> ''
 		 GROUP BY t ORDER BY COUNT(*) DESC, t LIMIT $5`,
 		userID, language, msgid, excludeEntryID, limit)
@@ -330,7 +344,7 @@ func (r *catalogRepository) MemoryMatches(ctx context.Context, catalogID, userID
 		     SELECT DISTINCT ON (e.msgid) e.msgid, e.msgstr->>0 AS txt
 		     FROM entries e
 		     JOIN catalogs c ON c.id = e.catalog_id
-		     WHERE c.owner_id = $2 AND c.language = $3 AND e.catalog_id <> $1 AND NOT e.fuzzy AND NOT e.obsolete
+		     WHERE c.owner_id = $2 AND c.language = $3 AND c.deleted_at IS NULL AND e.catalog_id <> $1 AND NOT e.fuzzy AND NOT e.obsolete
 		       AND e.msgid_plural = '' AND COALESCE(e.msgstr->>0, '') <> ''
 		     ORDER BY e.msgid, e.updated_at DESC
 		 ) src ON src.msgid = t.msgid
@@ -361,7 +375,7 @@ func (r *catalogRepository) PreTranslate(ctx context.Context, catalogID, userID 
 		     SELECT DISTINCT ON (e.msgid) e.msgid, e.msgstr->>0 AS txt
 		     FROM entries e
 		     JOIN catalogs c ON c.id = e.catalog_id
-		     WHERE c.owner_id = $2 AND c.language = $3 AND e.catalog_id <> $1 AND NOT e.fuzzy AND NOT e.obsolete
+		     WHERE c.owner_id = $2 AND c.language = $3 AND c.deleted_at IS NULL AND e.catalog_id <> $1 AND NOT e.fuzzy AND NOT e.obsolete
 		       AND e.msgid_plural = '' AND COALESCE(e.msgstr->>0, '') <> ''
 		     ORDER BY e.msgid, e.updated_at DESC
 		 ) src

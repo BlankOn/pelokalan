@@ -50,6 +50,7 @@ type AIJob struct {
 	Cost             float64
 	EstimatedCost    float64
 	CancelRequested  bool
+	Single           bool // one entry translated from the editor
 	Error            string
 	CreatedAt        time.Time
 	FinishedAt       *time.Time

@@ -57,8 +57,10 @@
                 <option value="asc" {{if eq $r.Search.Dir "asc"}}selected{{end}}>↑ {{t .Lang "glossary.dir_asc"}}</option>
                 <option value="desc" {{if eq $r.Search.Dir "desc"}}selected{{end}}>↓ {{t .Lang "glossary.dir_desc"}}</option>
             </select>
-            <label class="check"><input type="checkbox" name="terms" value="1" {{if $r.Search.TermsOnly}}checked{{end}}> {{t .Lang "glossary.terms_only"}}</label>
-            <label class="check"><input type="checkbox" name="inconsistent" value="1" {{if $r.Search.Inconsistent}}checked{{end}}> {{t .Lang "glossary.inconsistent_only"}}</label>
+            <div class="glossary-checks">
+                <label class="check"><input type="checkbox" name="terms" value="1" {{if $r.Search.TermsOnly}}checked{{end}}> {{t .Lang "glossary.terms_only"}}</label>
+                <label class="check"><input type="checkbox" name="inconsistent" value="1" {{if $r.Search.Inconsistent}}checked{{end}}> {{t .Lang "glossary.inconsistent_only"}}</label>
+            </div>
         </div>
     </form>
     {{template "glossary_results" $r}}

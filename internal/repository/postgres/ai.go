@@ -71,9 +71,9 @@ func scanJob(row interface{ Scan(...any) error }) (*models.AIJob, error) {
 
 func (r *aiRepository) CreateJob(ctx context.Context, j *models.AIJob) error {
 	return r.db.QueryRowContext(ctx,
-		`INSERT INTO ai_jobs (project_id, catalog_id, user_id, status, model, total, estimated_cost)
-		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,
-		j.ProjectID, j.CatalogID, j.UserID, j.Status, j.Model, j.Total, j.EstimatedCost,
+		`INSERT INTO ai_jobs (project_id, catalog_id, user_id, status, model, total, estimated_cost, single)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id, created_at`,
+		j.ProjectID, j.CatalogID, j.UserID, j.Status, j.Model, j.Total, j.EstimatedCost, j.Single,
 	).Scan(&j.ID, &j.CreatedAt)
 }
 
@@ -94,7 +94,7 @@ func (r *aiRepository) GetJob(ctx context.Context, id int64) (*models.AIJob, err
 
 func (r *aiRepository) LatestJob(ctx context.Context, catalogID int64) (*models.AIJob, error) {
 	return scanJob(r.db.QueryRowContext(ctx,
-		`SELECT `+jobColumns+` FROM ai_jobs WHERE catalog_id = $1 ORDER BY created_at DESC, id DESC LIMIT 1`, catalogID))
+		`SELECT `+jobColumns+` FROM ai_jobs WHERE catalog_id = $1 AND NOT single ORDER BY created_at DESC, id DESC LIMIT 1`, catalogID))
 }
 
 func (r *aiRepository) RequestCancel(ctx context.Context, id int64) error {

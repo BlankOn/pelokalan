@@ -69,6 +69,7 @@ func (h *Handler) History(w http.ResponseWriter, r *http.Request) {
 	data.Data["Working"] = working
 	data.Data["Dirty"] = c.Owned && (!working.Empty() || len(commits) == 0)
 	data.Data["Owned"] = c.Owned
+	data.Data["FullPage"] = true // editor-style toolbar (back to the editor) above the page
 	if len(commits) > 0 {
 		data.Data["Original"] = commits[len(commits)-1]
 	}

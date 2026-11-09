@@ -1,13 +1,16 @@
 {{define "content"}}{{$p := .Data.Project}}
 {{template "project_header" .}}
 <section class="card">
-    <div class="card-head">
-        <h2>{{t .Lang "title.discussions"}} <span class="muted small">({{.Data.Total}})</span></h2>
+    <div class="card-head discussions-head">
+        <form method="get" action="{{$p.Path}}/discussions" class="context-search discussion-search">
+            {{if .Data.Mine}}<input type="hidden" name="mentions" value="1">{{end}}
+            <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "discuss.search"}}" aria-label="{{t .Lang "discuss.search"}}">
+        </form>
         <div class="row-actions">
             {{if .User}}
             <nav class="seg">
-                <a href="{{$p.Path}}/discussions" class="{{if not .Data.Mine}}active{{end}}">{{t .Lang "discuss.all"}}</a>
-                <a href="{{$p.Path}}/discussions?mentions=1" class="{{if .Data.Mine}}active{{end}}">{{t .Lang "discuss.mentions_me"}}</a>
+                <a href="{{$p.Path}}/discussions{{with .Data.Query}}?q={{.}}{{end}}" class="{{if not .Data.Mine}}active{{end}}">{{t .Lang "discuss.all"}}</a>
+                <a href="{{$p.Path}}/discussions?mentions=1{{with .Data.Query}}&amp;q={{.}}{{end}}" class="{{if .Data.Mine}}active{{end}}">{{t .Lang "discuss.mentions_me"}}</a>
             </nav>
             {{end}}
             {{if $p.Role.IsMember}}<a class="btn btn-small btn-primary" href="{{$p.Path}}/topics/new">{{t .Lang "topic.new"}}</a>{{end}}
@@ -20,17 +23,18 @@
             <a class="discussion-row" href="{{.URL}}">
                 <span class="discussion-type">{{t $.Lang (printf "discuss.type_%s" $d.SubjectType)}}</span>
                 <strong class="discussion-title">{{$d.Title}}</strong>
+                {{if .Snippet}}<span class="discussion-snippet small">“{{.Snippet}}”</span>{{end}}
                 <span class="muted small">💬 {{$d.CommentCount}} · {{t $.Lang "discuss.participants" $d.Participants}}{{if $d.LastAuthor}} · {{t $.Lang "discuss.last_by" $d.LastAuthor}}{{end}} · {{timeAgo $.Lang $d.LastActivityAt}}</span>
             </a>
         </li>
         {{end}}
     </ul>
     <div class="row-actions pager">
-        {{with .Data.PrevOffset}}<a class="btn btn-small" href="?offset={{.}}{{if $.Data.Mine}}&amp;mentions=1{{end}}">← {{t $.Lang "discuss.newer"}}</a>{{end}}
-        {{with .Data.NextOffset}}<a class="btn btn-small" href="?offset={{.}}{{if $.Data.Mine}}&amp;mentions=1{{end}}">{{t $.Lang "discuss.older"}} →</a>{{end}}
+        {{with .Data.PrevOffset}}<a class="btn btn-small" href="?offset={{.}}{{if $.Data.Mine}}&amp;mentions=1{{end}}{{with $.Data.Query}}&amp;q={{.}}{{end}}">← {{t $.Lang "discuss.newer"}}</a>{{end}}
+        {{with .Data.NextOffset}}<a class="btn btn-small" href="?offset={{.}}{{if $.Data.Mine}}&amp;mentions=1{{end}}{{with $.Data.Query}}&amp;q={{.}}{{end}}">{{t $.Lang "discuss.older"}} →</a>{{end}}
     </div>
     {{else}}
-    <p class="muted">{{if .Data.Mine}}{{t .Lang "discuss.no_mentions"}}{{else}}{{t .Lang "discuss.none"}}{{end}}</p>
+    <p class="muted">{{if .Data.Query}}{{t .Lang "discuss.no_results"}}{{else if .Data.Mine}}{{t .Lang "discuss.no_mentions"}}{{else}}{{t .Lang "discuss.none"}}{{end}}</p>
     {{end}}
 </section>
 {{end}}

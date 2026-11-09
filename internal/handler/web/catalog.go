@@ -125,6 +125,18 @@ func (h *Handler) CatalogRedirect(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// a deleted file lives at its id address (read-only): show it here
+	if c.IsDeleted() {
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/history"):
+			h.History(w, r)
+		case strings.HasSuffix(r.URL.Path, "/raw"):
+			h.RawEditor(w, r)
+		default:
+			h.Editor(w, r)
+		}
+		return
+	}
 	target := c.URL()
 	if strings.HasSuffix(r.URL.Path, "/history") {
 		target += "/history"
@@ -165,6 +177,18 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 	if n, err := h.contexts.ForCatalog(r.Context(), c); err == nil {
 		data.Data["FileContext"] = n
 	}
+	if !c.IsTemplate {
+		// the module's Konteks, shared by every member's file of this module
+		data.Data["ContextModule"] = service.ModuleOf(c)
+		data.Data["CanEditContext"] = p.Role.IsMember()
+		data.Data["ContextEdits"] = []models.ContextEdit{} // the history partial needs a list, also when empty
+		if n, err := h.contexts.ForModule(r.Context(), p.ID, service.ModuleOf(c)); err == nil && n != nil {
+			data.Data["ContextVersion"] = n.Version
+			if edits, err := h.contexts.Edits(r.Context(), n); err == nil && edits != nil {
+				data.Data["ContextEdits"] = edits
+			}
+		}
+	}
 	data.Data["FullPage"] = true
 	data.Data["Props"] = h.catalogService.Properties(c)
 	h.catalogService.EnsureBaseline(r.Context(), c)
@@ -187,6 +211,9 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 		h.editorAIData(r, p, c, data)
 		if tmpl, err := h.catalogService.Template(r.Context(), p, c.OwnerID); err == nil && tmpl != nil {
 			data.Data["Template"] = true
+		}
+		if up, err := h.glossary.UpstreamFor(r.Context(), p, c); err == nil && up != nil {
+			data.Data["Upstream"] = up
 		}
 	}
 	if n := r.URL.Query().Get("pretranslated"); n != "" {

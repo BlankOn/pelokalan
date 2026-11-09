@@ -32,6 +32,7 @@ type threadView struct {
 	User       *models.User
 	CanComment bool
 	CanManage  bool
+	CanDelete  bool            // may delete the whole discussion
 	Members    []string        // usernames that can be mentioned
 	Known      map[string]bool // usernames rendered as mentions
 	ID         string          // DOM id of the component
@@ -44,10 +45,11 @@ func (h *Handler) threadView(r *http.Request, p *models.Project, t *service.Thre
 		Project:    p,
 		Thread:     t,
 		User:       middleware.GetUser(r.Context()),
-		CanComment: p.Role.IsMember(),
-		CanManage:  p.Role.CanManage(),
+		CanComment: p.Role.IsMember() && !t.Subject.ReadOnly,
+		CanManage:  p.Role.CanManage() && !t.Subject.ReadOnly,
 		Known:      map[string]bool{},
 		ID:         "thread-" + t.Subject.Type + "-" + t.Subject.Key[:min(12, len(t.Subject.Key))],
+		CanDelete:  service.CanDeleteDiscussion(middleware.GetUser(r.Context()), p, t),
 	}
 	if members, err := h.discuss.Members(r.Context(), p); err == nil {
 		for name := range members {
@@ -414,8 +416,9 @@ func (h *Handler) DeleteComment(w http.ResponseWriter, r *http.Request) {
 
 // discussionRow is one line of the discussions tab
 type discussionRow struct {
-	D   *models.Discussion
-	URL string
+	D       *models.Discussion
+	URL     string
+	Snippet string // part of a comment matching the search
 }
 
 // DiscussionsPage lists all discussions of a project
@@ -430,6 +433,7 @@ func (h *Handler) DiscussionsPage(w http.ResponseWriter, r *http.Request) {
 	if mine {
 		f.MentionedUserID = user.ID
 	}
+	f.Query = strings.TrimSpace(r.URL.Query().Get("q"))
 	f.Offset, _ = strconv.Atoi(r.URL.Query().Get("offset"))
 	if f.Offset < 0 {
 		f.Offset = 0
@@ -441,7 +445,7 @@ func (h *Handler) DiscussionsPage(w http.ResponseWriter, r *http.Request) {
 	}
 	rows := make([]discussionRow, len(list))
 	for i, d := range list {
-		rows[i] = discussionRow{D: d, URL: h.discuss.SubjectURL(r.Context(), p, d)}
+		rows[i] = discussionRow{D: d, URL: h.discuss.SubjectURL(r.Context(), p, d), Snippet: shortText(d.Snippet, 180)}
 	}
 	data := h.page(r, "")
 	data.Title = i18n.T(data.Lang, "title.discussions") + " · " + p.Name
@@ -450,6 +454,7 @@ func (h *Handler) DiscussionsPage(w http.ResponseWriter, r *http.Request) {
 	data.Data["Rows"] = rows
 	data.Data["Total"] = total
 	data.Data["Mine"] = mine
+	data.Data["Query"] = f.Query
 	if f.Offset+len(list) < total {
 		data.Data["NextOffset"] = f.Offset + len(list)
 	}
@@ -544,4 +549,75 @@ func (h *Handler) TopicCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, subj.URL, http.StatusSeeOther)
+}
+
+// shortText flattens whitespace and cuts text to n characters
+func shortText(s string, n int) string {
+	s = strings.Join(strings.Fields(s), " ")
+	if r := []rune(s); len(r) > n {
+		return string(r[:n]) + "…"
+	}
+	return s
+}
+
+// ThreadPage shows a discussion on its own page, used when its subject is gone (e.g. the
+// PO file was deleted): readable by everyone, but read-only.
+func (h *Handler) ThreadPage(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	thread, err := h.discuss.Thread(r.Context(), p, chi.URLParam(r, "type"), chi.URLParam(r, "key"))
+	if err == nil && thread.Discussion == nil {
+		err = service.ErrNotFound
+	}
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	// the subject still exists: its own page shows the discussion
+	if !thread.Subject.ReadOnly && thread.Subject.URL != r.URL.Path {
+		http.Redirect(w, r, thread.Subject.URL, http.StatusSeeOther)
+		return
+	}
+	data := h.page(r, "")
+	data.Title = thread.Subject.Title + " · " + i18n.T(data.Lang, "title.discussions") + " · " + p.Name
+	data.Data["Project"] = p
+	data.Data["Tab"] = "discussions"
+	data.Data["Thread"] = h.threadView(r, p, thread)
+	data.Data["ReadOnly"] = thread.Subject.ReadOnly
+	if len(thread.Comments) > 0 {
+		data.Data["Starter"] = thread.Comments[0]
+	}
+	h.render(w, "topic", data)
+}
+
+// DeleteDiscussion removes a whole discussion (its starter, or an owner/manager). A free
+// discussion (topic) no longer exists afterwards, so the Diskusi list opens; other subjects
+// keep their (now empty) thread in place.
+func (h *Handler) DeleteDiscussion(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	subjectType, key := chi.URLParam(r, "type"), chi.URLParam(r, "key")
+	if _, err := h.discuss.DeleteDiscussion(r.Context(), middleware.GetUser(r.Context()), p, subjectType, key); err != nil {
+		if isHTMX(r) {
+			h.renderThread(w, r, p, subjectType, key, h.errorMessage(r, err))
+			return
+		}
+		h.fail(w, r, err)
+		return
+	}
+	if subjectType == models.SubjectTopic {
+		target := p.Path() + "/discussions?flash=discussion_deleted"
+		if isHTMX(r) {
+			w.Header().Set("HX-Redirect", target)
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+		http.Redirect(w, r, target, http.StatusSeeOther)
+		return
+	}
+	h.renderThread(w, r, p, subjectType, key, "")
 }

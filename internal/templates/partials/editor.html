@@ -8,9 +8,6 @@
         {{if .Draft}}<details><summary>{{t .Lang "editor.your_text"}}</summary>{{range .Draft}}<pre class="draft">{{.}}</pre>{{end}}</details>{{end}}
     </div>
     {{end}}
-    {{if $e.IsAI}}<div class="ed-alert ed-alert-ai">{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "editor.ai_notice"}}</div>
-    {{else if eq $e.Origin "glossary"}}<div class="ed-alert ed-alert-glossary">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "editor.glossary_notice"}}</div>
-    {{else if eq $e.Origin "memory"}}<div class="ed-alert ed-alert-memory">{{template "icon_memory" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "editor.memory_notice"}}</div>{{end}}
     {{if $e.HasIssues}}<div class="ed-alert ed-alert-warn">{{range $e.Issues}}<div>⚠ {{issueName $.Lang .}}</div>{{end}}</div>{{end}}
 
     {{with .Glossary}}
@@ -53,8 +50,15 @@
     <section class="ed-section ed-translation">
         <div class="ed-label">
             {{t .Lang "editor.translation"}}
-            {{if $e.IsAI}}<span class="origin-tag origin-ai">{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}} AI</span>{{else if eq $e.Origin "memory"}}<span class="origin-tag origin-memory">{{template "icon_memory" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "origin.memory"}}</span>{{else if eq $e.Origin "glossary"}}<span class="origin-tag origin-glossary">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "origin.glossary"}}</span>{{end}}
+            {{if $e.IsAI}}<span class="origin-tag origin-ai" title="{{t .Lang "editor.ai_notice"}}">{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}} AI</span>{{else if eq $e.Origin "memory"}}<span class="origin-tag origin-memory" title="{{t .Lang "editor.memory_notice"}}">{{template "icon_memory" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "origin.memory"}}</span>{{else if eq $e.Origin "glossary"}}<span class="origin-tag origin-glossary" title="{{t .Lang "editor.glossary_notice"}}">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "origin.glossary"}}</span>{{end}}
+            <button type="button" class="cmp-btn" id="btn-compare" title="{{t .Lang "compare.help"}}"{{if not $e.ReplacedMsgStr}} hidden{{end}}{{with $e.ReplacedMsgStr}} data-replaced="{{toJSON .}}"{{end}}>⇄ {{t .Lang "compare.button"}}</button>
+            {{if .Project.AIEnabled}}<button type="button" class="ai-entry-btn" id="btn-ai-entry" data-url="/catalogs/{{$c.ID}}/entries/{{$e.ID}}/ai" title="{{t .Lang "ai.entry_help"}} (Ctrl+Shift+A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="s1" d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path class="s2" d="M19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg><span>{{t .Lang "ai.entry_button"}}</span></button>{{end}}
             <label class="fuzzy-toggle" title="Ctrl+U"><input type="checkbox" name="fuzzy" value="1" {{if $e.Fuzzy}}checked{{end}}> {{t .Lang "editor.needs_work"}}</label>
+        </div>
+        <div class="cmp-panel" id="cmp-panel" hidden data-before="{{t .Lang "compare.before"}}" data-after="{{t .Lang "compare.after"}}">
+            <div class="cmp-cols"><div class="cmp-col"><div class="cmp-head">{{t .Lang "compare.before"}}</div><div class="cmp-text cmp-before"></div></div>
+            <div class="cmp-col"><div class="cmp-head">{{t .Lang "compare.after"}}</div><div class="cmp-text cmp-after"></div></div></div>
+            <div class="cmp-actions"><button type="button" class="btn btn-small" id="cmp-use-before">{{t .Lang "compare.use_before"}}</button><button type="button" class="btn btn-small" id="cmp-close">{{t .Lang "action.close"}}</button></div>
         </div>
         {{if $e.IsPlural}}
         <div class="plural-tabs" role="tablist">
@@ -71,10 +75,11 @@
     </section>
     <div class="ed-actions">
         <button type="button" class="btn btn-small" id="btn-copy-source" title="Ctrl+B">{{t .Lang "editor.copy_source"}}</button>
+        <button type="button" class="btn btn-small" id="btn-undo" disabled title="{{t .Lang "editor.undo_help"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>{{t .Lang "editor.undo"}}</button>
         <span class="ed-notice muted small" role="status">{{.Notice}}</span>
         <div class="spacer"></div>
-        <button type="button" class="btn btn-small btn-orange" id="btn-unfuzzy-save" title="Ctrl+Shift+Enter" {{if not $e.Fuzzy}}hidden{{end}}>{{t .Lang "editor.unfuzzy_save_next"}}</button>
-        <button type="submit" class="btn btn-small btn-primary" id="btn-save" title="Ctrl+Enter">{{t .Lang "editor.save_next"}}</button>
+        <button type="submit" class="btn btn-small btn-primary" id="btn-save" title="{{if $e.Fuzzy}}Ctrl+Shift+Enter{{else}}Ctrl+Enter{{end}}"><svg class="ok-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{t .Lang "editor.save_next"}}</button>
+        <button type="button" class="btn btn-small btn-approve" id="btn-unfuzzy-save" title="Ctrl+Enter" {{if not $e.Fuzzy}}hidden{{end}}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{t .Lang "editor.unfuzzy_save_next"}}</button>
     </div>
     {{else}}
     {{if not $c.IsTemplate}}
@@ -89,7 +94,7 @@
         <div class="src-text tr-readonly">{{if $s}}{{$s}}{{else}}<span class="muted">—</span>{{end}}</div>
         {{end}}
     </section>
-    <p class="muted small ed-readonly">{{t .Lang "editor.others_readonly" $c.OwnerUsername}}</p>
+    <p class="muted small ed-readonly">{{if $c.IsDeleted}}{{t .Lang "editor.deleted_readonly"}}{{else}}{{t .Lang "editor.others_readonly" $c.OwnerUsername}}{{end}}</p>
     {{else}}
     <p class="muted small ed-readonly">{{t .Lang "editor.template_readonly"}}</p>
     {{end}}

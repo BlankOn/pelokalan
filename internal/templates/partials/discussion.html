@@ -1,6 +1,7 @@
 {{define "discussion_thread"}}{{$t := .Thread}}{{$s := $t.Subject}}
 <section id="{{.ID}}" class="thread" data-lb-open="{{t .Lang "discuss.image_open"}}" data-lb-zoom="{{t .Lang "discuss.image_zoom"}}" data-lb-close="{{t .Lang "action.close"}}">
-    <h3 class="thread-title">💬 {{t .Lang "discuss.title"}}{{with $t.Discussion}} <span class="muted">({{.CommentCount}})</span>{{end}}</h3>
+    <h3 class="thread-title">💬 {{t .Lang "discuss.title"}}{{with $t.Discussion}} <span class="muted">({{.CommentCount}})</span>{{end}}
+        {{if .CanDelete}}<button type="button" class="linklike small danger thread-delete" hx-post="{{.Project.Path}}/discussions/{{$s.Type}}/{{$s.Key}}/delete" hx-target="#{{.ID}}" hx-swap="outerHTML" hx-confirm="{{t .Lang "discuss.delete_confirm"}}" data-confirm-ok="{{t .Lang "action.delete"}}">{{t .Lang "discuss.delete"}}</button>{{end}}</h3>
     {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
     <ol class="comments">
         {{range $t.Comments}}
@@ -23,7 +24,7 @@
                 <div class="spacer"></div>
                 {{$own := and $.User .AuthorID (eq (deref .AuthorID) $.User.ID)}}
                 {{if and $own $.CanComment}}<button type="button" class="linklike small" data-edit-comment="{{.ID}}">{{t $.Lang "action.edit"}}</button>{{end}}
-                {{if or $own $.CanManage}}{{if $.User}}
+                {{if and (or $own $.CanManage) (not $.Thread.Subject.ReadOnly)}}{{if $.User}}
                 <button type="button" class="linklike small danger" hx-post="{{$.Project.Path}}/comments/{{.ID}}/delete" hx-target="#{{$.ID}}" hx-swap="outerHTML" hx-confirm="{{t $.Lang "confirm.delete_comment"}}">{{t $.Lang "action.delete"}}</button>
                 {{end}}{{end}}
             </div>
@@ -66,6 +67,8 @@
             <button type="submit" class="btn btn-small btn-primary">{{t .Lang "discuss.send"}}</button>
         </div>
     </form>
+    {{else if .Thread.Subject.ReadOnly}}
+    <p class="muted small">{{t .Lang "discuss.read_only"}}</p>
     {{else if .User}}
     <p class="muted small">{{t .Lang "discuss.members_only"}}</p>
     {{else}}

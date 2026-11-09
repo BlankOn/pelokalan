@@ -1,0 +1,9 @@
+{{/* saves of a module's Konteks, collapsed (like the wiki article history) */}}
+{{define "context_history"}}
+<details class="wiki-history context-history"{{if not .Data.ContextEdits}} hidden{{end}}>
+    <summary>{{t .Lang "context.history"}} (<span class="context-history-n">{{if .Data.ContextEdits}}{{len .Data.ContextEdits}}{{else}}0{{end}}</span>)</summary>
+    <ul class="context-history-list">
+        {{range .Data.ContextEdits}}<li>{{if .Username}}<strong>@{{.Username}}</strong>{{else}}<span class="muted">—</span>{{end}} <span class="muted">· <time data-local datetime="{{.At.Format "2006-01-02T15:04:05Z07:00"}}" title="{{timeAgo $.Lang .At}}">{{.At.Format "02-01-2006 15:04"}}</time></span></li>{{end}}
+    </ul>
+</details>
+{{end}}

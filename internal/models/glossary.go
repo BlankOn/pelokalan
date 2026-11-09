@@ -102,3 +102,46 @@ type GlossaryTerm struct {
 	Words  int
 	Rows   []GlossaryTermRow
 }
+
+// ProjectFile is a PO file contained in a glossary source (e.g. a release tarball)
+type ProjectFile struct {
+	ID           int64
+	ImportID     int64
+	ProjectID    int64
+	VersionID    int64
+	VersionLabel string
+	Filename     string
+	Language     string
+	Total        int
+	Translated   int
+	Fuzzy        int
+	Size         int64
+	Data         []byte   // gzip-compressed; only filled when one file is loaded
+	Mine         *Catalog // the viewer's own file of the same module, if any (not stored)
+	CreatedAt    time.Time
+}
+
+// Percent is the share of translated entries
+// ProjectFileVersion is a glossary version that has project files (filter option)
+type ProjectFileVersion struct {
+	ID      int64
+	Name    string
+	Version string
+	Files   int
+}
+
+// Label is "name-version", e.g. "gnome-51"
+func (v *ProjectFileVersion) Label() string { return VersionLabel(v.Name, v.Version) }
+
+// Stats returns the file's progress in the shape the progress bar expects
+func (f *ProjectFile) Stats() CatalogStats {
+	return CatalogStats{Total: f.Total, Translated: f.Translated, Fuzzy: f.Fuzzy,
+		Untranslated: f.Total - f.Translated - f.Fuzzy}
+}
+
+func (f *ProjectFile) Percent() int {
+	if f.Total == 0 {
+		return 0
+	}
+	return f.Translated * 100 / f.Total
+}

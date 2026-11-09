@@ -1,15 +1,20 @@
 package web
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/go-chi/chi/v5"
 	"io"
+	"log"
+	"mime"
 	"net/http"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
+	"pelokalan/internal/glossary"
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
@@ -169,8 +174,20 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Data["Catalogs"] = translations
 	data.Data["Others"] = otherGroups
 	data.Data["Tab"] = "files"
+	if pf, total, err := h.glossary.ProjectFiles(r.Context(), p, "", nil, 0); err == nil {
+		_ = h.catalogService.MatchOwnFiles(r.Context(), middleware.GetUser(r.Context()), p, pf)
+		view := projectFilesView{Lang: data.Lang, Project: p, Files: pf, Total: total,
+			Next: len(pf), CanTake: p.Role.IsMember(), CanManage: p.Role.CanManage(),
+			SyncHours: int(h.syncEvery / time.Hour)}
+		view.HasFeed, view.LastSync = h.lastSync(r, p)
+		view.Versions, _ = h.glossary.ProjectFileVersions(r.Context(), p)
+		data.Data["ProjectFiles"] = view
+	}
 	if msg := r.URL.Query().Get("merged"); msg != "" {
 		data.Flash = i18n.T(data.Lang, "flash.merged", r.URL.Query().Get("added"), r.URL.Query().Get("obsolete"))
+		if n := r.URL.Query().Get("skipped"); n != "" && n != "0" {
+			data.Flash += " " + i18n.T(data.Lang, "flash.merged_skipped", n)
+		}
 	}
 	h.render(w, "project", data)
 }
@@ -193,7 +210,7 @@ func (h *Handler) UploadCatalog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if res != nil {
-		http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d", res.Added, res.Obsolete), http.StatusSeeOther)
+		http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d&skipped=%d", res.Added, res.Obsolete, res.Skipped), http.StatusSeeOther)
 		return
 	}
 	if c.IsTemplate {
@@ -211,6 +228,10 @@ func (h *Handler) readUpload(w http.ResponseWriter, r *http.Request) (string, []
 	}
 	f, hdr, err := r.FormFile("file")
 	if err != nil {
+		// no file chosen: download it from the given URL instead
+		if u := strings.TrimSpace(r.FormValue("url")); u != "" {
+			return h.downloadPO(r, u)
+		}
 		return "", nil, &service.UserError{Key: "err.no_file"}
 	}
 	defer f.Close()
@@ -253,7 +274,7 @@ func (h *Handler) UpdateAllFromTemplate(w http.ResponseWriter, r *http.Request) 
 		h.renderProject(w, r, p, h.errorMessage(r, err))
 		return
 	}
-	http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d", res.Added, res.Obsolete), http.StatusSeeOther)
+	http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d&skipped=%d", res.Added, res.Obsolete, res.Skipped), http.StatusSeeOther)
 }
 
 // MembersPage shows members and invitations
@@ -514,4 +535,207 @@ func (h *Handler) Join(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, p.Path()+"?flash=joined", http.StatusSeeOther)
+}
+
+// downloadPO fetches a PO/POT file from a public URL (private and local addresses are
+// refused) with the same size limit as uploads
+func (h *Handler) downloadPO(r *http.Request, rawURL string) (string, []byte, error) {
+	if h.poFetcher == nil {
+		return "", nil, &service.UserError{Key: "err.no_file"}
+	}
+	if _, err := glossary.ValidateURL(rawURL); err != nil {
+		return "", nil, &service.UserError{Key: "err.po_url"}
+	}
+	res, err := h.poFetcher.Fetch(r.Context(), rawURL, "", "")
+	if errors.Is(err, glossary.ErrTooLarge) {
+		return "", nil, &service.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
+	}
+	if err != nil {
+		log.Printf("PO download %s: %v", rawURL, err)
+		switch msg := err.Error(); {
+		case strings.Contains(msg, "address not allowed"):
+			return "", nil, &service.UserError{Key: "err.po_private"}
+		case strings.HasPrefix(msg, "HTTP "):
+			return "", nil, &service.UserError{Key: "err.po_download", Args: []any{msg}}
+		default:
+			return "", nil, &service.UserError{Key: "err.po_unreachable"}
+		}
+	}
+	return res.Filename, res.Data, nil
+}
+
+// projectFilesView is a page of the project's source PO files
+type projectFilesView struct {
+	Lang      string
+	Project   *models.Project
+	Files     []*models.ProjectFile
+	Total     int
+	Next      int // offset of the next page
+	CanTake   bool
+	Query     string                       // search words (kept by "Muat lagi")
+	Searched  bool                         // a search result: say so when nothing matches
+	CanManage bool                         // may start a sync
+	HasFeed   bool                         // some version has a sync link
+	LastSync  *time.Time                   // newest download check of those versions
+	SyncHours int                          // automatic sync interval
+	Versions  []*models.ProjectFileVersion // filter options
+}
+
+// ProjectFilesMore returns the next page of project files (htmx "Muat lagi")
+func (h *Handler) ProjectFilesMore(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	q := r.URL.Query().Get("q")
+	var versionIDs []int64
+	for _, v := range r.URL.Query()["v"] {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+			versionIDs = append(versionIDs, id)
+		}
+	}
+	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, versionIDs, offset)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	_ = h.catalogService.MatchOwnFiles(r.Context(), middleware.GetUser(r.Context()), p, pf)
+	h.renderPartials(w, partial{"project_file_rows", projectFilesView{Lang: middleware.GetLang(r.Context()), Project: p,
+		Files: pf, Total: total, Next: offset + len(pf), CanTake: p.Role.IsMember(), Query: q, Searched: true, CanManage: p.Role.CanManage()}})
+}
+
+// ProjectFileDownload sends a source PO file as it came from the glossary source
+func (h *Handler) ProjectFileDownload(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	f, data, err := h.glossary.ProjectFile(r.Context(), p, idParam(r, "fid"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	w.Header().Set("Content-Type", "text/x-gettext-translation; charset=utf-8")
+	w.Header().Set("Content-Disposition", mime.FormatMediaType("attachment", map[string]string{"filename": f.Filename}))
+	_, _ = w.Write(data)
+}
+
+// ProjectFileTake copies a source PO file into the member's own files and opens it
+func (h *Handler) ProjectFileTake(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	f, data, err := h.glossary.ProjectFile(r.Context(), p, idParam(r, "fid"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	user := middleware.GetUser(r.Context())
+	// "Perbarui": replace the member's own file of this module (confirmed in the browser)
+	if into, _ := strconv.ParseInt(r.FormValue("into"), 10, 64); into > 0 {
+		c, cp, err := h.catalogService.Get(r.Context(), user, into)
+		if err == nil && cp.ID != p.ID {
+			err = service.ErrNotFound
+		}
+		if err == nil {
+			err = h.catalogService.UpdateFromUpstream(r.Context(), user, c, f.VersionLabel, data)
+		}
+		if err != nil {
+			h.renderProject(w, r, p, h.errorMessage(r, err))
+			return
+		}
+		http.Redirect(w, r, c.URL()+"?flash=upstream_updated", http.StatusSeeOther)
+		return
+	}
+	c, res, err := h.catalogService.Upload(r.Context(), user, p, f.Filename, data, f.Language)
+	if err != nil {
+		h.renderProject(w, r, p, h.errorMessage(r, err))
+		return
+	}
+	if res != nil { // merged into the member's existing file of that language
+		http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d&skipped=%d", res.Added, res.Obsolete, res.Skipped), http.StatusSeeOther)
+		return
+	}
+	http.Redirect(w, r, c.URL(), http.StatusSeeOther)
+}
+
+// ProjectFilesSync downloads the glossary sources again (in the background), refreshing project files
+func (h *Handler) ProjectFilesSync(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	err := h.glossary.SyncAll(r.Context(), p)
+	if r.Header.Get("X-Sync") != "" { // app.js waits for the result (button spins)
+		w.Header().Set("Content-Type", "application/json")
+		if err != nil {
+			w.WriteHeader(http.StatusConflict)
+			_ = json.NewEncoder(w).Encode(map[string]string{"error": h.errorMessage(r, err)})
+			return
+		}
+		_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+		return
+	}
+	if err != nil {
+		h.renderProject(w, r, p, h.errorMessage(r, err))
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/files?flash=sync_started", http.StatusSeeOther)
+}
+
+// ProjectFilesSyncStatus reports the running Sync (JSON, polled by app.js) with a message when done
+func (h *Handler) ProjectFilesSyncStatus(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	lang := middleware.GetLang(r.Context())
+	st := h.glossary.SyncState(p)
+	resp := map[string]any{"running": false}
+	if _, last := h.lastSync(r, p); last != nil {
+		resp["last"] = last.Format(time.RFC3339)
+		resp["last_ago"] = timeAgo(lang, *last)
+	}
+	if st != nil {
+		resp["running"] = st.Running
+		resp["changed"] = len(st.Changed)
+		switch {
+		case st.Running:
+			resp["message"] = i18n.T(lang, "files.sync_progress", st.Done, st.Versions)
+		case len(st.Failed) > 0:
+			resp["error"] = i18n.T(lang, "files.sync_failed", strings.Join(st.Failed, "; "))
+			if len(st.Changed) > 0 {
+				resp["message"] = i18n.T(lang, "files.sync_updated", strings.Join(st.Changed, ", "))
+			}
+		case len(st.Changed) > 0:
+			resp["message"] = i18n.T(lang, "files.sync_updated", strings.Join(st.Changed, ", "))
+		default:
+			resp["message"] = i18n.T(lang, "files.sync_unchanged")
+		}
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	_ = json.NewEncoder(w).Encode(resp)
+}
+
+// lastSync reports whether any glossary version has a sync link and when one was last checked
+func (h *Handler) lastSync(r *http.Request, p *models.Project) (bool, *time.Time) {
+	versions, err := h.glossary.Versions(r.Context(), p)
+	if err != nil {
+		return false, nil
+	}
+	has := false
+	var last *time.Time
+	for _, v := range versions {
+		if !v.HasFeed() {
+			continue
+		}
+		has = true
+		if v.LastFetchedAt != nil && (last == nil || v.LastFetchedAt.After(*last)) {
+			last = v.LastFetchedAt
+		}
+	}
+	return has, last
 }

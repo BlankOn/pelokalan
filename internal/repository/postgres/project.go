@@ -69,7 +69,7 @@ func (r *projectRepository) ListForUser(ctx context.Context, userID int64) ([]*m
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT p.id, p.name, p.slug, p.description, p.source_language, p.owner_id, p.created_at, p.updated_at, m.role,
 		        (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = p.id),
-		        (SELECT COUNT(*) FROM catalogs c WHERE c.project_id = p.id AND NOT c.is_template)
+		        (SELECT COUNT(*) FROM catalogs c WHERE c.project_id = p.id AND NOT c.is_template AND c.deleted_at IS NULL)
 		 FROM projects p
 		 JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
 		 ORDER BY p.updated_at DESC`, userID)
@@ -98,7 +98,7 @@ func (r *projectRepository) ListAll(ctx context.Context, userID int64) ([]*model
 		        (SELECT COUNT(DISTINCT i.version_id) FROM glossary_imports i WHERE i.project_id = p.id),
 		        (SELECT COALESCE(MAX(i.term_count), 0) FROM glossary_imports i WHERE i.project_id = p.id),
 		        EXISTS (SELECT 1 FROM project_ai_settings s WHERE s.project_id = p.id AND s.api_key_enc <> ''),
-		        (SELECT COUNT(*) FROM catalogs c WHERE c.project_id = p.id AND NOT c.is_template)
+		        (SELECT COUNT(*) FROM catalogs c WHERE c.project_id = p.id AND NOT c.is_template AND c.deleted_at IS NULL)
 		 FROM projects p
 		 LEFT JOIN project_members m ON m.project_id = p.id AND m.user_id = $1
 		 ORDER BY (m.role IS NULL), p.updated_at DESC`, userID)

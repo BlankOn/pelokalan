@@ -21,7 +21,7 @@
         <span class="muted small raw-pos" id="raw-pos"></span>
     </div>
     {{if .Error}}<div class="raw-error">{{.Error}}</div>{{end}}
-    <p class="raw-hint muted small">{{if .Data.ReadOnly}}{{t .Lang "editor.others_readonly" .Data.Catalog.OwnerUsername}}{{else}}{{t .Lang "raw.hint"}}{{end}}</p>
+    <p class="raw-hint muted small">{{if .Data.Catalog.IsDeleted}}{{t .Lang "editor.deleted_readonly"}}{{else if .Data.ReadOnly}}{{t .Lang "editor.others_readonly" .Data.Catalog.OwnerUsername}}{{else}}{{t .Lang "raw.hint"}}{{end}}</p>
     <input type="hidden" name="updated_at" value="{{.Data.UpdatedAt}}">
     <textarea name="content" id="raw-text" class="raw-text" spellcheck="false" wrap="off" {{if .Data.ReadOnly}}readonly{{end}} aria-label="{{t .Lang "raw.title"}}">
 {{.Data.Text}}</textarea>

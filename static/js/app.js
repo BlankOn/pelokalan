@@ -25,12 +25,90 @@
         });
     });
 
+    // The app's own popup for questions and messages; the browser's built-in
+    // confirm/alert boxes are never used (they are blocked in some embedded browsers).
+    // opts.ok: label of the confirm button; opts.danger: red button; opts.notice: OK only.
+    function confirmDialog() {
+        var d = document.getElementById("confirm-dialog");
+        if (d) return d;
+        var en = document.body.dataset.lang === "en";
+        d = document.createElement("dialog");
+        d.id = "confirm-dialog";
+        d.className = "dialog confirm-dialog";
+        d.dataset.deleteLabel = en ? "Delete" : "Hapus";
+        d.innerHTML = '<p class="confirm-msg"></p><div class="dialog-actions">' +
+            '<button type="button" class="btn" data-confirm-cancel></button>' +
+            '<button type="button" class="btn btn-primary" data-confirm-ok></button></div>';
+        d.querySelector("[data-confirm-cancel]").textContent = en ? "Cancel" : "Batal";
+        d.querySelector("[data-confirm-ok]").textContent = en ? "Continue" : "Lanjutkan";
+        document.body.appendChild(d);
+        return d;
+    }
+    window.askConfirm = function (msg, opts) {
+        opts = opts || {};
+        var d = confirmDialog();
+        var ok = d.querySelector("[data-confirm-ok]");
+        var cancel = d.querySelector("[data-confirm-cancel]");
+        if (!ok.dataset.label) ok.dataset.label = ok.textContent;
+        cancel.hidden = !!opts.notice;
+        d.querySelector(".confirm-msg").textContent = msg;
+        ok.textContent = opts.ok || (opts.danger ? d.dataset.deleteLabel : opts.notice ? "OK" : ok.dataset.label);
+        ok.classList.toggle("btn-danger", !!opts.danger);
+        ok.classList.toggle("btn-primary", !opts.danger);
+        return new Promise(function (resolve) {
+            var done = function (val) {
+                ok.removeEventListener("click", onOk);
+                cancel.removeEventListener("click", onCancel);
+                d.removeEventListener("close", onClose);
+                if (d.open) d.close();
+                resolve(val);
+            };
+            var onOk = function () { done(true); };
+            var onCancel = function () { done(false); };
+            var onClose = function () { done(false); };
+            ok.addEventListener("click", onOk);
+            cancel.addEventListener("click", onCancel);
+            d.addEventListener("close", onClose);
+            d.showModal();
+            (opts.danger ? cancel : ok).focus();
+        });
+    };
+    // showMessage: a notice with only an OK button
+    window.showMessage = function (msg) { return window.askConfirm(msg, { notice: true }); };
+
+    // hx-confirm: ask with the app's popup instead of the browser's
+    document.addEventListener("htmx:confirm", function (ev) {
+        var q = ev.detail.question;
+        if (!q) return;
+        ev.preventDefault();
+        var elt = ev.detail.elt;
+        var url = (elt.getAttribute("hx-post") || elt.getAttribute("hx-delete") || "");
+        window.askConfirm(q, {
+            ok: elt.getAttribute("data-confirm-ok"),
+            danger: /\/(delete|revoke|remove)[^/]*$/.test(url) || elt.hasAttribute("hx-delete")
+        }).then(function (yes) {
+            if (yes) ev.detail.issueRequest(true);
+        });
+    });
+
     document.addEventListener("submit", function (ev) {
-        var msg = ev.target.getAttribute && ev.target.getAttribute("data-confirm");
-        if (msg && !window.confirm(msg)) {
-            ev.preventDefault();
-            ev.stopImmediatePropagation();
-        }
+        var form = ev.target;
+        var msg = form.getAttribute && form.getAttribute("data-confirm");
+        if (!msg) return;
+        if (form._confirmed) { form._confirmed = false; return; }
+        ev.preventDefault();
+        ev.stopImmediatePropagation();
+        var submitter = ev.submitter;
+        var action = form.getAttribute("action") || "";
+        window.askConfirm(msg, {
+            ok: form.getAttribute("data-confirm-ok"),
+            danger: /\/(delete|revoke|remove)[^/]*$/.test(action) || form.hasAttribute("data-confirm-danger")
+        }).then(function (yes) {
+            if (!yes) return;
+            form._confirmed = true;
+            if (form.requestSubmit) form.requestSubmit(submitter && submitter.form === form ? submitter : undefined);
+            else form.submit();
+        });
     }, true);
 
     document.addEventListener("change", function (ev) {
@@ -62,6 +140,68 @@
             });
         }).observe(toastArea, { childList: true });
     }
+
+    // Sinkronkan (project files): start the sync, spin until it is done, then report and refresh the list
+    document.addEventListener("submit", function (ev) {
+        var form = ev.target;
+        if (!form.hasAttribute || !form.hasAttribute("data-sync")) return;
+        ev.preventDefault();
+        if (form.classList.contains("is-syncing")) return;
+        var btn = form.querySelector("button");
+        var label = form.querySelector(".sync-label");
+        var msg = document.querySelector(".pf-sync-msg");
+        var oldLabel = label.textContent;
+        var show = function (text, isError) {
+            if (!msg) return;
+            msg.hidden = !text;
+            msg.textContent = text || "";
+            msg.classList.toggle("c-err", !!isError);
+        };
+        var finish = function () {
+            form.classList.remove("is-syncing");
+            btn.disabled = false;
+            label.textContent = oldLabel;
+        };
+        form.classList.add("is-syncing");
+        btn.disabled = true;
+        label.textContent = form.getAttribute("data-syncing") || oldLabel;
+        show("");
+        fetch(form.action, { method: "POST", headers: { "X-Sync": "1" }, credentials: "same-origin" })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (res.error) { show(res.error, true); finish(); return; }
+                var poll = function () {
+                    fetch(form.action, { headers: { "Accept": "application/json" }, credentials: "same-origin", cache: "no-store" })
+                        .then(function (r) { return r.json(); })
+                        .then(function (st) {
+                            if (st.running) {
+                                if (st.message) label.textContent = st.message;
+                                setTimeout(poll, 2000);
+                                return;
+                            }
+                            finish();
+                            var tm = document.querySelector(".pf-synced time");
+                            if (tm && st.last) {
+                                tm.setAttribute("datetime", st.last);
+                                if (window.formatLocalTime) window.formatLocalTime(tm);
+                                var ago = document.querySelector(".pf-synced-ago");
+                                if (ago && st.last_ago) ago.textContent = st.last_ago;
+                            }
+                            var text = [st.message, st.error].filter(Boolean).join(" ");
+                            show(text, !!st.error);
+                            var rows = document.getElementById("project-file-rows");
+                            if (st.changed && rows && window.htmx) {
+                                var q = document.querySelector(".pf-toolbar input[name=q]");
+                                htmx.ajax("GET", form.action.replace(/\/sync$/, "") + "?q=" + encodeURIComponent(q ? q.value : ""),
+                                    { target: rows, swap: "innerHTML" });
+                            }
+                        })
+                        .catch(function () { setTimeout(poll, 4000); });
+                };
+                setTimeout(poll, 1500);
+            })
+            .catch(function () { show(oldLabel + ": error", true); finish(); });
+    });
 
     // ---------- Editor ----------
 
@@ -159,6 +299,9 @@
         });
         var ed = document.getElementById("editor");
         if (window.htmx && ed) htmx.process(ed);
+        undoStack = [];
+        lastTyping = 0;
+        applyLock();
         currentId = (ed && ed.dataset.entryId) || null;
         setDirty(false);
         markSelected();
@@ -197,6 +340,8 @@
     function save(nextId) {
         var f = form();
         if (!f || readOnly) return;
+        // while a pre-translation job runs the editor is read-only: just move on
+        if (editorLocked()) { if (nextId) load(nextId); return; }
         if (saving) { // the running save will move on afterwards
             afterSave = nextId;
             return;
@@ -222,10 +367,12 @@
     // After a failed save the text stays in the editor. Moving on is the
     // translator's choice, so the editor never gets stuck on one entry.
     function saveFailed(nextId) {
-        if (nextId && nextId !== currentId && window.confirm(app.dataset.msgSaveFailed)) {
+        if (!nextId || nextId === currentId) return;
+        window.askConfirm(app.dataset.msgSaveFailed).then(function (yes) {
+            if (!yes) return;
             setDirty(false);
             load(nextId);
-        }
+        });
     }
 
     // Load an entry; saves the current one first when it has unsaved changes.
@@ -282,7 +429,113 @@
         var f = form();
         var btn = f && f.querySelector("#btn-unfuzzy-save");
         var cb = f && f.querySelector("input[name=fuzzy]");
-        if (btn && cb) btn.hidden = !cb.checked;
+        if (btn && cb) {
+            btn.hidden = !cb.checked;
+            var save = f.querySelector("#btn-save");
+            if (save) save.title = cb.checked ? "Ctrl+Shift+Enter" : "Ctrl+Enter";
+        }
+    }
+
+    // Pre-translation job running (its banner has class ai-running): the editor is read-only
+    // until it finishes, then the list and the current entry are reloaded to show the results.
+    var wasLocked = false;
+    function editorLocked() { return !!document.querySelector("#ai-job.ai-running"); }
+    function applyLock() {
+        var locked = editorLocked(), f = form();
+        app.classList.toggle("editor-locked", locked);
+        if (f) {
+            f.querySelectorAll(".tr-input").forEach(function (ta) { ta.readOnly = locked || ta.classList.contains("ai-filling"); });
+            f.querySelectorAll("button, input[type=checkbox]").forEach(function (b) {
+                if (locked) {
+                    if (!b.disabled) { b.dataset.lockDisabled = "1"; b.disabled = true; }
+                } else if (b.dataset.lockDisabled) {
+                    b.disabled = false;
+                    delete b.dataset.lockDisabled;
+                }
+            });
+            var note = f.querySelector(".ed-locked-note");
+            if (locked && !note) {
+                note = document.createElement("div");
+                note.className = "ed-alert ed-locked-note";
+                note.textContent = app.dataset.lockedMsg || "";
+                f.insertBefore(note, f.firstChild);
+            } else if (!locked && note) {
+                note.remove();
+            }
+        }
+        if (wasLocked && !locked) {
+            // the job finished: show what it changed
+            var ff = document.getElementById("filter-form");
+            if (ff && window.htmx) htmx.trigger(ff, "submit");
+            if (currentId) load(currentId);
+        }
+        wasLocked = locked;
+    }
+    // the job banner replaces itself (outerHTML), so listen for new content (htmx:load bubbles
+    // from the inserted element) and also check once a second in case an event is missed
+    document.body.addEventListener("htmx:load", function () { setTimeout(applyLock, 0); });
+    setInterval(function () { if (editorLocked() !== wasLocked) applyLock(); }, 1000);
+
+    // AI translation of the current entry: the result goes into the translation box (unsaved)
+    var aiBusy = false;
+    function aiTranslateEntry() {
+        var f = form(), btn = f && f.querySelector("#btn-ai-entry");
+        if (!btn || readOnly || aiBusy || editorLocked()) return;
+        var body = new URLSearchParams();
+        var boxes = Array.prototype.slice.call(f.querySelectorAll(".tr-input"));
+        boxes.forEach(function (ta) { body.set("msgstr" + ta.dataset.panel, ta.value); });
+        var label = btn.querySelector("span"), old = label.textContent;
+        aiBusy = true;
+        btn.classList.add("working");
+        btn.disabled = true;
+        // the translation box is locked (and shimmers) until the answer arrives
+        boxes.forEach(function (ta) { ta.readOnly = true; ta.classList.add("ai-filling"); });
+        label.textContent = app.dataset.aiWorking || "…";
+        var entryId = currentId;
+        fetch(btn.dataset.url, { method: "POST", body: body, credentials: "same-origin" })
+            .then(function (r) { return r.json(); })
+            .then(function (res) {
+                if (currentId !== entryId) return; // the user moved on meanwhile
+                if (res.error) { toast(res.error, true); return; }
+                pushUndo();
+                var beforeForms = boxes.map(function (ta) { return ta.value; });
+                boxes.forEach(function (ta) {
+                    var i = parseInt(ta.dataset.panel, 10);
+                    if (res.forms && res.forms[i] !== undefined) ta.value = res.forms[i];
+                });
+                setDirty(true);
+                var cb = f.querySelector("input[name=fuzzy]");
+                if (cb) {
+                    if (res.flagged) cb.checked = true;
+                    else clearFuzzyOnEdit();
+                    cb.dataset.touched = res.flagged ? "1" : cb.dataset.touched || "";
+                }
+                syncUnfuzzyButton();
+                var notice = f.querySelector(".ed-notice");
+                if (notice) notice.textContent = res.notice || "";
+                var changed = boxes.some(function (ta, i) { return ta.value !== beforeForms[i]; });
+                if (changed && beforeForms.some(function (v) { return v.trim() !== ""; })) {
+                    setReplaced(beforeForms);
+                    showCompare();
+                }
+                focusTranslation();
+            })
+            .catch(function () { toast(app.dataset.msgError || "Error", true); })
+            .finally(function () {
+                aiBusy = false;
+                btn.classList.remove("working");
+                btn.disabled = false;
+                label.textContent = old;
+                boxes.forEach(function (ta) { ta.classList.remove("ai-filling"); ta.readOnly = editorLocked(); });
+            });
+    }
+    document.addEventListener("click", function (ev) {
+        if (ev.target.closest && ev.target.closest("#btn-ai-entry")) { ev.preventDefault(); aiTranslateEntry(); }
+    });
+
+    function unfuzzyShown() {
+        var btn = form() && form().querySelector("#btn-unfuzzy-save");
+        return !!(btn && !btn.hidden);
     }
 
     function unfuzzySaveAndNext() {
@@ -302,12 +555,143 @@
         }
     });
 
+    // Undo for the translation box: snapshots of every plural form and the needs-work flag.
+    // Typing is grouped into bursts; tools (copy source, AI, glossary, thesaurus, suggestions)
+    // record a snapshot before they change the text. The history resets per entry.
+    var undoStack = [], lastTyping = 0;
+    function trSnapshot() {
+        var f = form();
+        if (!f) return null;
+        var cb = f.querySelector("input[name=fuzzy]");
+        return {
+            values: Array.prototype.map.call(f.querySelectorAll(".tr-input"), function (ta) { return ta.value; }),
+            fuzzy: cb ? cb.checked : false
+        };
+    }
+    function sameSnapshot(a, b) {
+        return a && b && a.fuzzy === b.fuzzy && a.values.join("\u0000") === b.values.join("\u0000");
+    }
+    function updateUndoButton() {
+        var f = form(), btn = f && f.querySelector("#btn-undo");
+        if (btn) btn.disabled = undoStack.length === 0;
+    }
+    function pushUndo() {
+        var s = trSnapshot();
+        if (!s || sameSnapshot(undoStack[undoStack.length - 1], s)) return;
+        undoStack.push(s);
+        if (undoStack.length > 50) undoStack.shift();
+        updateUndoButton();
+    }
+    window.trBeforeChange = pushUndo; // used by the thesaurus popup
+
+    // Compare the previous translation (replaced by AI) with the current text, word by word
+    function diffWords(a, b) {
+        var x = a.split(/(\s+)/), y = b.split(/(\s+)/), n = x.length, m = y.length;
+        var L = [];
+        for (var i = 0; i <= n; i++) { L.push(new Array(m + 1).fill(0)); }
+        for (i = n - 1; i >= 0; i--) for (var j = m - 1; j >= 0; j--)
+            L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+        var before = [], after = [];
+        i = 0; j = 0;
+        while (i < n && j < m) {
+            if (x[i] === y[j]) { before.push(["", x[i]]); after.push(["", y[j]]); i++; j++; }
+            else if (L[i + 1][j] >= L[i][j + 1]) { before.push(["del", x[i++]]); }
+            else { after.push(["ins", y[j++]]); }
+        }
+        while (i < n) before.push(["del", x[i++]]);
+        while (j < m) after.push(["ins", y[j++]]);
+        return [before, after];
+    }
+    function renderDiff(el, parts) {
+        el.innerHTML = "";
+        parts.forEach(function (p) {
+            var node = p[0] && p[1].trim() ? document.createElement(p[0]) : document.createTextNode(p[1]);
+            if (p[0] && p[1].trim()) node.textContent = p[1];
+            el.appendChild(node);
+        });
+    }
+    function replacedForms() {
+        var btn = form() && form().querySelector("#btn-compare");
+        if (!btn || !btn.dataset.replaced) return null;
+        try { return JSON.parse(btn.dataset.replaced); } catch (e) { return null; }
+    }
+    function showCompare() {
+        var f = form(), panel = f && f.querySelector("#cmp-panel"), forms = replacedForms(), ta = activePanel();
+        if (!panel || !forms || !ta) return;
+        var i = parseInt(ta.dataset.panel, 10) || 0;
+        var d = diffWords(forms[i] || "", ta.value);
+        renderDiff(panel.querySelector(".cmp-before"), d[0]);
+        renderDiff(panel.querySelector(".cmp-after"), d[1]);
+        panel.hidden = false;
+        f.querySelector("#btn-compare").classList.add("active");
+    }
+    function hideCompare() {
+        var f = form(), panel = f && f.querySelector("#cmp-panel");
+        if (panel) panel.hidden = true;
+        var btn = f && f.querySelector("#btn-compare");
+        if (btn) btn.classList.remove("active");
+    }
+    // the editor's own AI button reports what it replaced, so the comparison works before saving
+    function setReplaced(forms) {
+        var btn = form() && form().querySelector("#btn-compare");
+        if (!btn) return;
+        btn.dataset.replaced = JSON.stringify(forms);
+        btn.hidden = false;
+    }
+    document.addEventListener("click", function (ev) {
+        if (!ev.target.closest) return;
+        if (ev.target.closest("#btn-compare")) {
+            ev.preventDefault();
+            var panel = form() && form().querySelector("#cmp-panel");
+            if (panel && !panel.hidden) hideCompare(); else showCompare();
+        } else if (ev.target.closest("#cmp-close")) {
+            hideCompare();
+        } else if (ev.target.closest("#cmp-use-before")) {
+            var forms = replacedForms(), f = form();
+            if (!forms || !f || editorLocked()) return;
+            pushUndo();
+            f.querySelectorAll(".tr-input").forEach(function (ta) {
+                var i = parseInt(ta.dataset.panel, 10);
+                if (forms[i] !== undefined) ta.value = forms[i];
+            });
+            setDirty(true);
+            showCompare();
+        }
+    });
+    // keep the comparison current while typing
+    document.addEventListener("input", function (ev) {
+        var panel = form() && form().querySelector("#cmp-panel");
+        if (panel && !panel.hidden && ev.target.matches && ev.target.matches("#entry-form .tr-input")) showCompare();
+    });
+    function undo() {
+        var f = form(), s = undoStack.pop();
+        if (!f || !s) return;
+        f.querySelectorAll(".tr-input").forEach(function (ta, i) { if (s.values[i] !== undefined) ta.value = s.values[i]; });
+        var cb = f.querySelector("input[name=fuzzy]");
+        if (cb) { cb.checked = s.fuzzy; cb.dataset.touched = "1"; }
+        syncUnfuzzyButton();
+        setDirty(true);
+        lastTyping = 0;
+        updateUndoButton();
+        focusTranslation();
+    }
+    document.addEventListener("beforeinput", function (ev) {
+        if (!ev.target.matches || !ev.target.matches("#entry-form .tr-input")) return;
+        var now = Date.now();
+        if (now - lastTyping > 1200) pushUndo(); // a new burst of typing
+        lastTyping = now;
+    });
+    document.addEventListener("click", function (ev) {
+        if (ev.target.closest && ev.target.closest("#btn-undo")) { ev.preventDefault(); undo(); }
+    });
+
     // Glossary chips insert their translation at the cursor of the translation box
     document.addEventListener("click", function (ev) {
         var btn = ev.target.closest && ev.target.closest("#entry-form .gl-insert[data-insert]");
         if (!btn || readOnly) return;
         var ta = activePanel();
-        if (!ta) return;
+        if (!ta || ta.readOnly) return;
+        pushUndo();
         ta.setRangeText(btn.getAttribute("data-insert"), ta.selectionStart, ta.selectionEnd, "end");
         ta.focus();
         clearFuzzyOnEdit();
@@ -322,6 +706,7 @@
     function copySource() {
         var f = form();
         if (!f) return;
+        pushUndo();
         f.querySelectorAll(".tr-input").forEach(function (ta) {
             var idx = parseInt(ta.dataset.panel, 10);
             var src = f.querySelector('.src-text[data-src="' + Math.min(idx, 1) + '"]');
@@ -335,6 +720,7 @@
         var s = document.querySelector('.suggestion[data-index="' + index + '"]');
         var ta = activePanel();
         if (s && ta) {
+            pushUndo();
             ta.value = s.dataset.text;
             clearFuzzyOnEdit();
             setDirty(true);
@@ -458,10 +844,14 @@
             return;
         }
         if (!mod) return;
+        // editing shortcuts are off while the editor is locked; navigation keeps working
+        if (editorLocked() && /^(Enter|u|U|b|B|a|A)$/.test(ev.key)) { ev.preventDefault(); return; }
         switch (ev.key) {
             case "Enter":
                 ev.preventDefault();
-                if (ev.shiftKey) unfuzzySaveAndNext(); else saveAndNext();
+                // Ctrl+Enter presses the main save button: "clear needs work, save & next" when it
+                // is shown, else "save & next". Ctrl+Shift+Enter always saves keeping the flag.
+                if (!ev.shiftKey && unfuzzyShown()) unfuzzySaveAndNext(); else saveAndNext();
                 break;
             case "ArrowDown":
                 ev.preventDefault();
@@ -470,6 +860,12 @@
             case "ArrowUp":
                 ev.preventDefault();
                 select(neighbour(-1));
+                break;
+            case "a": case "A":
+                if (ev.shiftKey && form() && form().querySelector("#btn-ai-entry")) {
+                    ev.preventDefault();
+                    aiTranslateEntry();
+                }
                 break;
             case "u": case "U": {
                 var cb = form() && form().querySelector("input[name=fuzzy]");
@@ -1262,7 +1658,7 @@ document.addEventListener("click", function (ev) {
         fetch(tree.dataset.moveUrl + encodeURIComponent(li.dataset.slug) + "/move", { method: "POST", body: body, credentials: "same-origin" })
             .then(function (r) { return r.json(); })
             .then(function (res) {
-                if (res.error) { alert(res.error); return; }
+                if (res.error) { window.showMessage(res.error); return; }
                 location.reload();
             })
             .catch(function () { location.reload(); });
@@ -1382,32 +1778,157 @@ document.addEventListener("click", function (ev) {
 // Show <time data-local> timestamps in the reader's time zone (the server may run on UTC)
 (function () {
     function pad(n) { return (n < 10 ? "0" : "") + n; }
-    document.querySelectorAll("time[data-local][datetime]").forEach(function (el) {
+    window.formatLocalTime = function (el) {
         var d = new Date(el.getAttribute("datetime"));
         if (isNaN(d)) return;
         el.textContent = pad(d.getDate()) + "-" + pad(d.getMonth() + 1) + "-" + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+    };
+    document.querySelectorAll("time[data-local][datetime]").forEach(window.formatLocalTime);
+})();
+
+// Checkbox dropdowns ([data-multi-filter], e.g. the Berkas proyek version filter): none ticked
+// means all; "Tampilkan semua" clears (same as the editor's status filter). Changes bubble to the form.
+(function () {
+    function label(box) {
+        var l = box.querySelector(".mf-label");
+        var boxes = box.querySelectorAll("input[type=checkbox]");
+        var on = Array.prototype.filter.call(boxes, function (cb) { return cb.checked; });
+        if (!on.length) l.textContent = l.dataset.all;
+        else if (on.length === 1) l.textContent = on[0].parentNode.querySelector(".mf-text").textContent;
+        else l.textContent = l.dataset.many.replace("%d", on.length);
+        box.classList.toggle("mf-active", on.length > 0);
+    }
+    function setAll(box, value) {
+        var boxes = box.querySelectorAll("input[type=checkbox]");
+        boxes.forEach(function (cb) { cb.checked = value; });
+        label(box);
+        if (boxes[0]) boxes[0].dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    document.addEventListener("change", function (ev) {
+        var box = ev.target.closest && ev.target.closest("[data-multi-filter]");
+        if (box) label(box);
+    });
+    document.addEventListener("click", function (ev) {
+        document.querySelectorAll("[data-multi-filter]").forEach(function (box) {
+            if (ev.target.closest(".mf-none") && box.contains(ev.target)) { setAll(box, false); box.open = false; }
+            else if (box.open && !box.contains(ev.target)) box.open = false;
+        });
+    });
+    document.addEventListener("keydown", function (ev) {
+        if (ev.key !== "Escape") return;
+        document.querySelectorAll("[data-multi-filter][open]").forEach(function (box) { box.open = false; box.querySelector("summary").focus(); });
     });
 })();
 
-// Konteks popup in the editor: save the PO file's context without leaving the page
+// Commit button: disabled while there is nothing to commit. The badge inside it is
+// refreshed out-of-band after every save (and after a commit); follow it.
+(function () {
+    var btn = document.querySelector(".tb-commit");
+    if (!btn) return;
+    var title = btn.title;
+    function sync() {
+        var badge = document.getElementById("commit-badge");
+        var has = !!(badge && badge.textContent.trim());
+        btn.disabled = !has;
+        btn.title = has ? title : (btn.dataset.titleNone || title);
+    }
+    new MutationObserver(sync).observe(btn, { childList: true, subtree: true, characterData: true });
+    sync();
+})();
+
+// Konteks popup in the editor: the module's shared note, saved without leaving the page.
+// The form carries the version it was opened with; a save after someone else's is refused
+// (409) and the conflict box offers to copy the user's text and load the latest version.
 (function () {
     var form = document.getElementById("context-form");
     if (!form) return;
+    var ta = form.querySelector("textarea[name=note]");
+    var ver = form.querySelector("input[name=version]");
+    var box = form.querySelector(".context-conflict");
+    var latest = null;
+
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    function renderEdits(edits) {
+        var det = form.querySelector(".context-history");
+        if (!det || !edits) return;
+        var ul = det.querySelector(".context-history-list");
+        ul.textContent = "";
+        edits.forEach(function (e) {
+            var li = document.createElement("li");
+            if (e.username) {
+                var b = document.createElement("strong");
+                b.textContent = "@" + e.username;
+                li.appendChild(b);
+            } else {
+                li.appendChild(document.createTextNode("—"));
+            }
+            var span = document.createElement("span");
+            span.className = "muted";
+            span.appendChild(document.createTextNode(" · "));
+            var t = document.createElement("time");
+            var d = new Date(e.at);
+            t.setAttribute("datetime", e.at);
+            t.title = e.ago || "";
+            t.textContent = pad(d.getDate()) + "-" + pad(d.getMonth() + 1) + "-" + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+            span.appendChild(t);
+            li.appendChild(document.createTextNode(" "));
+            li.appendChild(span);
+            ul.appendChild(li);
+        });
+        det.querySelector(".context-history-n").textContent = edits.length;
+        det.hidden = edits.length === 0;
+    }
+
+    if (box) {
+        box.querySelector("[data-context-copy]").addEventListener("click", function () {
+            var btn = this;
+            var done = function () { btn.textContent = btn.dataset.copied; };
+            if (navigator.clipboard) navigator.clipboard.writeText(ta.value).then(done, function () { ta.select(); });
+            else { ta.select(); document.execCommand("copy"); done(); }
+        });
+        box.querySelector("[data-context-load]").addEventListener("click", function () {
+            if (!latest) return;
+            window.askConfirm(this.dataset.confirmMsg, { ok: this.textContent }).then(function (yes) {
+                if (!yes) return;
+                ta.value = latest.note || "";
+                ver.value = latest.version || 0;
+                box.hidden = true;
+                latest = null;
+                ta.focus();
+            });
+        });
+    }
+
     form.addEventListener("submit", function (ev) {
         ev.preventDefault();
-        var ta = form.querySelector("textarea[name=note]");
         if (!ta) return;
         var status = form.querySelector(".context-status");
         var btn = form.querySelector("button[type=submit]");
         var body = new URLSearchParams();
         body.set("note", ta.value);
+        if (ver) body.set("version", ver.value);
         btn.disabled = true;
         fetch(form.dataset.url, { method: "POST", body: body, credentials: "same-origin" })
             .then(function (r) { return r.json(); })
             .then(function (res) {
+                if (res.conflict && box) {
+                    latest = { note: res.note, version: res.version };
+                    box.querySelector(".context-conflict-help").textContent = res.help || "";
+                    var cp = box.querySelector("[data-context-copy]");
+                    if (!cp.dataset.label) cp.dataset.label = cp.textContent;
+                    cp.textContent = cp.dataset.label;
+                    box.hidden = false;
+                    renderEdits(res.edits);
+                    status.textContent = "";
+                    box.scrollIntoView({ block: "nearest" });
+                    return;
+                }
                 if (res.error) { status.textContent = res.error; status.classList.add("c-err"); return; }
+                if (box) box.hidden = true;
+                if (ver && res.version) ver.value = res.version;
                 status.classList.remove("c-err");
                 status.textContent = res.status;
+                renderEdits(res.edits);
                 var dot = document.getElementById("context-dot");
                 if (dot) dot.hidden = !res.has;
                 form.closest("dialog").close();
@@ -1417,3 +1938,144 @@ document.addEventListener("click", function (ev) {
             .finally(function () { btn.disabled = false; });
     });
 })();
+
+// Thesaurus: select a word or short phrase in the translation box to see synonyms;
+// clicking one replaces the selection (keeping a leading capital)
+(function () {
+    var app = document.getElementById("editor-app");
+    if (!app || !app.dataset.thesaurus) return;
+    var cache = {}, pop = null, timer = null, current = null;
+    var tags = {};
+    (app.dataset.thTags || "").split(",").forEach(function (p) { var kv = p.split(":"); if (kv.length === 2) tags[kv[0]] = kv[1]; });
+
+    function close() { if (pop) { pop.remove(); pop = null; } current = null; }
+
+    // pixel position of a character offset inside a textarea (mirror element technique)
+    function caretXY(ta, pos) {
+        var cs = getComputedStyle(ta), div = document.createElement("div");
+        ["boxSizing", "width", "borderTopWidth", "borderLeftWidth", "borderRightWidth", "paddingTop", "paddingLeft",
+         "paddingRight", "fontFamily", "fontSize", "fontWeight", "fontStyle", "lineHeight", "letterSpacing",
+         "wordSpacing", "textTransform", "textIndent", "tabSize"].forEach(function (k) { div.style[k] = cs[k]; });
+        div.style.position = "absolute"; div.style.visibility = "hidden"; div.style.top = "0"; div.style.left = "-9999px";
+        div.style.whiteSpace = "pre-wrap"; div.style.overflowWrap = "break-word"; div.style.height = "auto";
+        div.textContent = ta.value.slice(0, pos);
+        var span = document.createElement("span");
+        span.textContent = ta.value.slice(pos) || ".";
+        div.appendChild(span);
+        document.body.appendChild(div);
+        var lh = parseFloat(cs.lineHeight) || parseFloat(cs.fontSize) * 1.4;
+        var out = { x: span.offsetLeft - ta.scrollLeft, y: span.offsetTop - ta.scrollTop + lh };
+        div.remove();
+        return out;
+    }
+
+    function matchCase(word, sample) {
+        if (sample === sample.toUpperCase() && sample !== sample.toLowerCase() && sample.length > 1) return word.toUpperCase();
+        if (sample.charAt(0) !== sample.charAt(0).toLowerCase()) return word.charAt(0).toUpperCase() + word.slice(1);
+        return word;
+    }
+
+    function replace(ta, start, end, text) {
+        if (window.trBeforeChange) window.trBeforeChange();
+        ta.focus();
+        ta.setRangeText(text, start, end, "select");
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+        close();
+    }
+
+    function show(ta, start, end, res) {
+        close();
+        var sample = ta.value.slice(start, end);
+        pop = document.createElement("div");
+        pop.className = "th-pop";
+        pop.setAttribute("role", "dialog");
+        var head = document.createElement("div");
+        head.className = "th-head";
+        if (!res.found) {
+            head.textContent = app.dataset.thNone;
+            pop.appendChild(head);
+            pop.classList.add("th-empty");
+        } else {
+            head.innerHTML = "";
+            var w = document.createElement("strong"); w.textContent = res.asForm ? sample.trim() : res.word; head.appendChild(w);
+            if (res.tag) { var t = document.createElement("span"); t.className = "th-tag"; t.textContent = tags[res.tag] || res.tag; head.appendChild(t); }
+            if (res.asForm) { var f = document.createElement("span"); f.className = "th-form"; f.textContent = app.dataset.thAsForm.replace("%s", res.word); head.appendChild(f); }
+            pop.appendChild(head);
+            [["synonyms", app.dataset.thTitle], ["antonyms", app.dataset.thAntonyms]].forEach(function (kind) {
+                var list = res[kind[0]] || [];
+                if (!list.length) return;
+                var label = document.createElement("div"); label.className = "th-label"; label.textContent = kind[1];
+                pop.appendChild(label);
+                var box = document.createElement("div"); box.className = "th-words";
+                list.forEach(function (word) {
+                    var b = document.createElement("button");
+                    b.type = "button"; b.className = "th-word" + (kind[0] === "antonyms" ? " th-ant" : "");
+                    b.textContent = word;
+                    b.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+                    b.addEventListener("click", function () { replace(ta, start, end, matchCase(word, sample)); });
+                    box.appendChild(b);
+                });
+                pop.appendChild(box);
+            });
+            var src = document.createElement("div"); src.className = "th-src"; src.textContent = app.dataset.thSource;
+            pop.appendChild(src);
+        }
+        document.body.appendChild(pop);
+        var r = ta.getBoundingClientRect(), xy = caretXY(ta, start);
+        var top = r.top + Math.min(xy.y + 4, r.height), left = r.left + xy.x;
+        var pw = pop.offsetWidth, ph = pop.offsetHeight;
+        if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
+        if (top + ph > window.innerHeight - 8) top = r.top + xy.y - ph - 28;
+        pop.style.left = Math.max(8, left) + "px";
+        pop.style.top = Math.max(8, top) + "px";
+        current = { ta: ta, start: start, end: end };
+        if (!res.found) setTimeout(function () { if (pop && pop.classList.contains("th-empty")) close(); }, 1800);
+    }
+
+    function check(ta) {
+        if (ta.readOnly) { close(); return; }
+        clearTimeout(timer);
+        var start = ta.selectionStart, end = ta.selectionEnd;
+        var text = ta.value.slice(start, end);
+        var q = text.trim();
+        if (!q || q.length > 60 || /\n/.test(q) || !/\p{L}/u.test(q)) { if (!current || current.ta === ta) close(); return; }
+        if (current && current.ta === ta && current.start === start && current.end === end) return;
+        // trim surrounding spaces from the replaced range too
+        var lead = text.length - text.replace(/^\s+/, "").length, trail = text.length - text.replace(/\s+$/, "").length;
+        start += lead; end -= trail;
+        timer = setTimeout(function () {
+            var key = q.toLowerCase();
+            var done = function (res) { if (ta.selectionStart !== ta.selectionEnd) show(ta, start, end, res); };
+            if (cache[key]) return done(cache[key]);
+            fetch(app.dataset.thesaurus + "&q=" + encodeURIComponent(q), { credentials: "same-origin" })
+                .then(function (r) { return r.json(); })
+                .then(function (res) { cache[key] = res; done(res); })
+                .catch(function () {});
+        }, 180);
+    }
+
+    document.addEventListener("mouseup", function (ev) {
+        if (ev.target.matches && ev.target.matches("#entry-form .tr-input")) setTimeout(function () { check(ev.target); }, 0);
+        else if (pop && !pop.contains(ev.target)) close();
+    });
+    document.addEventListener("keyup", function (ev) {
+        if (ev.target.matches && ev.target.matches("#entry-form .tr-input") && (ev.shiftKey || ev.key === "Shift")) check(ev.target);
+    });
+    document.addEventListener("keydown", function (ev) {
+        if (ev.key === "Escape" && pop) { ev.stopPropagation(); close(); }
+    }, true);
+    document.addEventListener("input", function (ev) { if (pop && ev.target.matches && ev.target.matches(".tr-input")) close(); });
+    // a new entry replaces the editor pane
+    document.body.addEventListener("htmx:afterSwap", close);
+    window.addEventListener("resize", close);
+    document.addEventListener("scroll", function (ev) { if (pop && !pop.contains(ev.target)) close(); }, true);
+})();
+
+// "?" (outside text fields) opens the keyboard shortcut help in the editor
+document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "?" || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+    var t = ev.target;
+    if (t.isContentEditable || (t.matches && t.matches("input, textarea, select"))) return;
+    var dlg = document.getElementById("help-dialog");
+    if (dlg && !dlg.open && !document.querySelector("dialog[open]")) { ev.preventDefault(); dlg.showModal(); }
+});

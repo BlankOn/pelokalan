@@ -1,6 +1,7 @@
 package ai
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"math"
@@ -58,6 +59,50 @@ func Mentioned(text string, words map[string]bool) bool {
 	return false
 }
 
+// MatchCase adapts the capitalization of glossary translations to the source text. Glossary
+// terms mostly come from interface labels ("Contrast" → "Kontras"); when the source uses the
+// term in lowercase mid-sentence ("the mid-range contrast"), the hint becomes "kontras" so the
+// model does not copy the label's capital letter. Acronyms and all-caps words are kept.
+func MatchCase(hints []TermHint, source string) []TermHint {
+	words := strings.Fields(glossary.Clean(source))
+	for i, h := range hints {
+		termWords := strings.Fields(h.Term)
+		if len(termWords) == 0 {
+			continue
+		}
+		first := strings.ToLower(strings.Trim(termWords[0], ".,;:!?()\"'"))
+		usedLower, usedUpper := false, false
+		for _, w := range words {
+			bare := strings.Trim(w, ".,;:!?()\"'…<>")
+			if strings.ToLower(bare) != first || bare == "" {
+				continue
+			}
+			if r, _ := utf8.DecodeRuneInString(bare); unicode.IsUpper(r) {
+				usedUpper = true
+			} else {
+				usedLower = true
+			}
+		}
+		if usedLower && !usedUpper {
+			hints[i].Translation = lowerFirst(h.Translation)
+		}
+	}
+	return hints
+}
+
+// lowerFirst lowercases the first letter unless the first word is an acronym (all caps)
+func lowerFirst(s string) string {
+	first := strings.Fields(s)
+	if len(first) == 0 {
+		return s
+	}
+	if utf8.RuneCountInString(first[0]) > 1 && first[0] == strings.ToUpper(first[0]) {
+		return s
+	}
+	r, n := utf8.DecodeRuneInString(s)
+	return string(unicode.ToLower(r)) + s[n:]
+}
+
 // MarkOptional makes glossary hints the note talks about optional
 func MarkOptional(hints []TermHint, words map[string]bool) []TermHint {
 	for i := range hints {
@@ -77,7 +122,9 @@ type Item struct {
 	Notes    string     `json:"notes,omitempty"`
 	Forms    int        `json:"forms,omitempty"` // number of plural forms wanted
 	Glossary []TermHint `json:"glossary,omitempty"`
-	Flags    []string   `json:"-"`
+	// Current is the existing translation of an entry that needs review: a draft to improve
+	Current []string `json:"current,omitempty"`
+	Flags   []string `json:"-"`
 }
 
 // Term is a preferred glossary translation
@@ -211,12 +258,13 @@ const (
 func SystemPrompt(sourceLang, targetLang, projectContext, fileContext string) string {
 	p := fmt.Sprintf(`You are a professional software localizer translating user interface strings from %s to %s.
 Rules:
-1. Each item may contain "glossary": a list of term translations. When a glossary term appears in the source you MUST use its given translation (you may adjust letter case or add affixes required by grammar); it overrides your own preferences. Exception: a term marked "optional": true is discussed in the project or file context below; there that context decides, and the glossary translation is only a suggestion.
+1. Each item may contain "glossary": a list of term translations. When a glossary term appears in the source you MUST use its given translation (you may adjust letter case or add affixes required by grammar); it overrides your own preferences. A glossary entry fixes the word, not its capitalization: many entries come from interface labels written with a capital letter, so use normal sentence capitalization (lowercase in the middle of a sentence unless it is a name or the source capitalizes it). Exception: a term marked "optional": true is discussed in the project or file context below; there that context decides, and the glossary translation is only a suggestion.
 2. Keep every format placeholder exactly as in the source (e.g. %%s, %%d, %%1$s, {name}, $VAR), and keep markup tags and entities unchanged.
 3. Keep leading and trailing whitespace and newlines (\n) as in the source.
 4. If the source has a keyboard accelerator marker (_ or & before a letter), put exactly one marker before a suitable letter of the translation.
 5. "context" and "notes" explain where the string is used; do not translate them.
 6. When "forms" is given, return that many plural forms (form 0 first) following the target language's plural rules.
+6a. When "current" is given, it is the existing translation, marked for review, usually written by a person. Treat it as a draft to improve, not to replace: return it unchanged when its meaning is correct and placeholders are intact. Otherwise fix only what is wrong (wrong or missing meaning, broken placeholders, grammar errors, a term the file or project context asks for) and keep every other word. Never swap a correct word for a synonym, never rephrase for style, and treat the item's glossary terms as suggestions: keep the draft's own word choice when it is a correct translation.
 7. Use concise, natural, consistent UI language. Do not add explanations.
 Reply with JSON only: {"translations":[{"id":<id>,"forms":["..."]}]} with one entry per input item.`, sourceLang, targetLang)
 	if projectContext = strings.TrimSpace(projectContext); projectContext != "" {
@@ -241,12 +289,29 @@ Reply with JSON only: {"translations":[{"id":<id>,"forms":["..."]}]} with one en
 	return p
 }
 
-// UserPrompt serializes a batch of items
+// UserPrompt serializes a batch of items. Markup is sent as-is: with the default HTML
+// escaping, "<gui>" becomes "\u003cgui\u003e" and models echo those escapes back mangled
+// (as control characters), which destroyed tags in translations.
 func UserPrompt(items []Item) string {
-	b, _ := json.Marshal(struct {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(struct {
 		Items []Item `json:"items"`
 	}{items})
-	return string(b)
+	return strings.TrimRight(b.String(), "\n")
+}
+
+// HasControlChars reports invisible C0 control characters (tab and newlines allowed)
+func HasControlChars(forms []string) bool {
+	for _, f := range forms {
+		for _, r := range f {
+			if (r < 0x20 && r != '\t' && r != '\n' && r != '\r') || r == 0x7f {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // ParseResponse extracts translations per item id
@@ -281,6 +346,7 @@ func ParseResponse(content string) (map[int64][]string, error) {
 // Problem codes reported by Verify
 const (
 	ProblemGlossary = "glossary"
+	ProblemCorrupt  = "corrupt" // control characters in the result: not saved
 	ProblemFormat   = "format"
 	ProblemEmpty    = "empty"
 )
@@ -294,6 +360,10 @@ func Verify(it Item, forms []string, nplurals int) []string {
 		if strings.TrimSpace(f) == "" {
 			return []string{ProblemEmpty}
 		}
+	}
+	// garbage (e.g. markup turned into control characters) is never saved
+	if HasControlChars(forms) {
+		return []string{ProblemCorrupt}
 	}
 	pe := &po.Entry{ID: it.Source, IDPlural: it.Plural, Translation: forms, Flags: it.Flags}
 	if len(po.Validate(pe, nplurals)) > 0 {
@@ -379,6 +449,9 @@ func Batch(items []Item, maxItems, maxChars int) [][]Item {
 	size := 0
 	for _, it := range items {
 		n := len(it.Source) + len(it.Plural) + len(it.Notes)
+		for _, c := range it.Current {
+			n += len(c)
+		}
 		if len(cur) > 0 && (len(cur) >= maxItems || size+n > maxChars) {
 			out = append(out, cur)
 			cur, size = nil, 0

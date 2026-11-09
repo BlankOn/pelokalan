@@ -26,6 +26,7 @@ type Discussion struct {
 	// Filled by listing queries
 	LastAuthor   string
 	Participants int
+	Snippet      string // a matching comment when searching
 }
 
 // Comment is one message of a discussion

@@ -141,6 +141,9 @@ func addUnique(list []string, v string, max int) []string {
 	return append(list, v)
 }
 
+// DetectLanguage is the language of a PO file: its Language header, else the ".xx.po" suffix
+func DetectLanguage(cat *po.Catalog, name string) string { return detectLanguage(cat, name) }
+
 func detectLanguage(cat *po.Catalog, name string) string {
 	if l := strings.TrimSpace(cat.HeaderField("Language")); l != "" {
 		return l

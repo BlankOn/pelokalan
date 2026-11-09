@@ -1,18 +1,23 @@
 package service
 
 import (
+	"bytes"
+	"compress/gzip"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"io"
 	"log"
 	"regexp"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	"pelokalan/internal/glossary"
 	"pelokalan/internal/models"
+	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
 )
 
@@ -21,6 +26,19 @@ type GlossaryService struct {
 	repo     repository.GlossaryRepository
 	fetcher  *glossary.Fetcher
 	matchers matcherCache
+	syncing  sync.Mutex // one download round at a time (hourly sync or the Sync button)
+
+	stateMu   sync.Mutex
+	syncState map[int64]*SyncStatus // per project: the latest Sync button run
+}
+
+// SyncStatus is the progress of a project's Sync button run
+type SyncStatus struct {
+	Running  bool     `json:"running"`
+	Versions int      `json:"versions"` // versions with a sync link
+	Done     int      `json:"done"`
+	Changed  []string `json:"changed"` // labels re-imported
+	Failed   []string `json:"failed"`  // "label: error"
 }
 
 // NewGlossaryService creates a new glossary service
@@ -131,6 +149,10 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ProjectVersi
 		if err := s.repo.CreateImport(ctx, imp, terms); err != nil {
 			return nil, err
 		}
+		// keep the source's PO files of this language as project files
+		if err := s.repo.AddProjectFiles(ctx, projectFiles(files, imp, language)); err != nil {
+			log.Printf("glossary: store project files of import %d: %v", imp.ID, err)
+		}
 		res.Imports = append(res.Imports, imp)
 	}
 	return res, nil
@@ -220,6 +242,78 @@ func (s *GlossaryService) FetchNow(ctx context.Context, p *models.Project, versi
 	return s.Fetch(ctx, v), nil
 }
 
+// SyncAll downloads every version with a sync link again in the background and
+// re-imports the ones that changed (glossary and project files). Managers only.
+func (s *GlossaryService) SyncAll(ctx context.Context, p *models.Project) error {
+	if !p.Role.CanManage() {
+		return ErrForbidden
+	}
+	versions, err := s.repo.ListVersions(ctx, p.ID)
+	if err != nil {
+		return err
+	}
+	var feeds []*models.ProjectVersion
+	for _, v := range versions {
+		if v.HasFeed() {
+			feeds = append(feeds, v)
+		}
+	}
+	if len(feeds) == 0 {
+		return ErrNoSyncLink
+	}
+	if !s.syncing.TryLock() {
+		return ErrSyncRunning
+	}
+	st := &SyncStatus{Running: true, Versions: len(feeds)}
+	s.setSync(p.ID, st)
+	go func() {
+		defer s.syncing.Unlock()
+		ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
+		defer cancel()
+		for _, v := range feeds {
+			out := s.Fetch(ctx, v)
+			s.stateMu.Lock()
+			st.Done++
+			switch {
+			case out.Err != nil:
+				log.Printf("glossary: sync %s (version %d): %v", v.GlossaryURL, v.ID, out.Err)
+				st.Failed = append(st.Failed, v.Label()+": "+fetchErrorText(out.Err))
+			case out.Changed:
+				log.Printf("glossary: synced version %d from %s", v.ID, v.GlossaryURL)
+				st.Changed = append(st.Changed, v.Label())
+			}
+			s.stateMu.Unlock()
+		}
+		s.stateMu.Lock()
+		st.Running = false
+		s.stateMu.Unlock()
+	}()
+	return nil
+}
+
+func (s *GlossaryService) setSync(projectID int64, st *SyncStatus) {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	if s.syncState == nil {
+		s.syncState = map[int64]*SyncStatus{}
+	}
+	s.syncState[projectID] = st
+}
+
+// SyncState returns a copy of the project's latest Sync button run (nil = none)
+func (s *GlossaryService) SyncState(p *models.Project) *SyncStatus {
+	s.stateMu.Lock()
+	defer s.stateMu.Unlock()
+	st := s.syncState[p.ID]
+	if st == nil {
+		return nil
+	}
+	cp := *st
+	cp.Changed = append([]string(nil), st.Changed...)
+	cp.Failed = append([]string(nil), st.Failed...)
+	return &cp
+}
+
 // FetchOutcome describes one download
 type FetchOutcome struct {
 	Changed bool
@@ -235,9 +329,16 @@ func (s *GlossaryService) Fetch(ctx context.Context, v *models.ProjectVersion) *
 		out.Err = errors.New("fetcher not configured")
 		return out
 	}
-	// a full download is needed when nothing was imported yet
+	// a full download is needed when nothing was imported yet, or when an import from before
+	// project files existed has none stored
 	etag, lastMod := v.FetchETag, v.FetchLastModified
-	if v.ImportCount == 0 {
+	needFiles := false
+	if v.ImportCount > 0 {
+		if n, err := s.repo.CountVersionFiles(ctx, v.ID); err == nil && n == 0 {
+			needFiles = true
+		}
+	}
+	if v.ImportCount == 0 || needFiles {
 		etag, lastMod = "", ""
 	}
 	res, err := s.fetcher.Fetch(ctx, v.GlossaryURL, etag, lastMod)
@@ -251,7 +352,7 @@ func (s *GlossaryService) Fetch(ctx context.Context, v *models.ProjectVersion) *
 		sum := sha256.Sum256(res.Data)
 		hash := hex.EncodeToString(sum[:])
 		v.FetchETag, v.FetchLastModified = res.ETag, res.LastModified
-		if hash == v.FetchContentHash && v.ImportCount > 0 {
+		if hash == v.FetchContentHash && v.ImportCount > 0 && !needFiles {
 			v.LastFetchError = ""
 			break
 		}
@@ -286,6 +387,8 @@ func fetchErrorText(err error) string {
 
 // FetchDue downloads every source not fetched within the interval
 func (s *GlossaryService) FetchDue(ctx context.Context, interval time.Duration) {
+	s.syncing.Lock()
+	defer s.syncing.Unlock()
 	due, err := s.repo.DueFeeds(ctx, time.Now().Add(-interval))
 	if err != nil {
 		log.Printf("glossary: list due sources: %v", err)
@@ -461,4 +564,127 @@ func (s *GlossaryService) Search(ctx context.Context, p *models.Project, in Glos
 	}
 	next := in.Offset + len(groups)
 	return &GlossaryPage{Groups: groups, Total: total, Offset: in.Offset, NextOffset: next, HasMore: next < total}, nil
+}
+
+// projectFiles prepares the PO files of one language from a glossary source for storage:
+// statistics from the parsed file, contents gzip-compressed
+func projectFiles(files []glossary.File, imp *models.GlossaryImport, language string) []*models.ProjectFile {
+	var out []*models.ProjectFile
+	for _, f := range files {
+		cat, err := po.ParseBytes(f.Data)
+		if err != nil {
+			continue
+		}
+		lang := language
+		if lang == "" {
+			lang = glossary.DetectLanguage(cat, f.Name)
+		}
+		if lang != imp.Language {
+			continue
+		}
+		pf := &models.ProjectFile{ImportID: imp.ID, ProjectID: imp.ProjectID, VersionID: imp.VersionID,
+			Filename: f.Name, Language: lang, Size: int64(len(f.Data))}
+		for _, e := range cat.Entries {
+			if e.Obsolete {
+				continue
+			}
+			pf.Total++
+			switch {
+			case e.Fuzzy:
+				pf.Fuzzy++
+			case e.IsTranslated():
+				pf.Translated++
+			}
+		}
+		var buf bytes.Buffer
+		zw := gzip.NewWriter(&buf)
+		_, _ = zw.Write(f.Data)
+		_ = zw.Close()
+		pf.Data = buf.Bytes()
+		out = append(out, pf)
+	}
+	return out
+}
+
+// ProjectFilePageSize is how many project files are listed at a time
+const ProjectFilePageSize = 10
+
+// ProjectFiles lists the project's source PO files, newest first
+func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, query string, versionIDs []int64, offset int) ([]*models.ProjectFile, int, error) {
+	if offset < 0 {
+		offset = 0
+	}
+	if len(query) > 200 {
+		query = query[:200]
+	}
+	return s.repo.ListProjectFiles(ctx, p.ID, strings.TrimSpace(query), versionIDs, ProjectFilePageSize, offset)
+}
+
+// ProjectFileVersions lists the versions that have project files, newest first
+func (s *GlossaryService) ProjectFileVersions(ctx context.Context, p *models.Project) ([]*models.ProjectFileVersion, error) {
+	list, err := s.repo.ProjectFileVersions(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		a, b := list[i], list[j]
+		if a.Name != b.Name {
+			return a.Name < b.Name
+		}
+		return naturalLess(b.Version, a.Version)
+	})
+	return list, nil
+}
+
+// ProjectFile returns one source PO file with its uncompressed contents
+func (s *GlossaryService) ProjectFile(ctx context.Context, p *models.Project, id int64) (*models.ProjectFile, []byte, error) {
+	f, err := s.repo.GetProjectFile(ctx, p.ID, id)
+	if errors.Is(err, repository.ErrNotFound) {
+		return nil, nil, ErrNotFound
+	} else if err != nil {
+		return nil, nil, err
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(f.Data))
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := io.ReadAll(io.LimitReader(zr, 50<<20))
+	if err != nil {
+		return nil, nil, err
+	}
+	return f, data, nil
+}
+
+// UpstreamFor returns the project file a translation can be updated from: same
+// language, the same file name, else the same module from the newest version (nil = none).
+func (s *GlossaryService) UpstreamFor(ctx context.Context, p *models.Project, c *models.Catalog) (*models.ProjectFile, error) {
+	if c.IsTemplate {
+		return nil, nil
+	}
+	files, err := s.repo.ProjectFilesForLanguage(ctx, p.ID, c.Language)
+	if err != nil || len(files) == 0 {
+		return nil, err
+	}
+	versions, err := s.repo.ListVersions(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	SortVersions(versions)
+	rank := make(map[int64]int, len(versions))
+	for i, v := range versions {
+		rank[v.ID] = i
+	}
+	var best *models.ProjectFile
+	better := func(f *models.ProjectFile) bool {
+		return best == nil || rank[f.VersionID] < rank[best.VersionID]
+	}
+	for _, f := range files {
+		if f.Filename == c.Filename {
+			return f, nil
+		}
+		if moduleKey(f.Filename) == moduleKey(c.Filename) && better(f) {
+			best = f
+		}
+	}
+	return best, nil
 }

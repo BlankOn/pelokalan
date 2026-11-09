@@ -119,6 +119,23 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to initialize web handler: %v", err)
 	}
+	// Indonesian thesaurus for the editor: stored on first start, then served from memory
+	thesaurusService := service.NewThesaurusService(postgres.NewThesaurusRepository(db), fetcher, cfg.Glossary.ThesaurusURL)
+	webHandler.SetThesaurus(thesaurusService)
+	go func() {
+		for {
+			err := thesaurusService.Load(context.Background())
+			if err == nil {
+				return
+			}
+			log.Printf("thesaurus: %v (retrying in an hour)", err)
+			time.Sleep(time.Hour)
+		}
+	}()
+	// PO files can also be created from a URL: same SSRF-safe transport, upload size limit
+	webHandler.SetSyncInterval(cfg.Glossary.FetchInterval)
+	webHandler.SetPOFetcher(glossary.NewFetcher(cfg.Server.MaxUploadMB<<20, cfg.Glossary.AllowPrivateHosts,
+		cfg.Site.Name+" PO fetcher (+"+cfg.Site.BaseURL+")"))
 	authMiddleware := middleware.NewAuth(authService)
 
 	r := chi.NewRouter()
@@ -159,8 +176,12 @@ func main() {
 		r.Get("/projects/{id}/members", webHandler.MembersPage)
 		r.Get("/join/{token}", webHandler.JoinPage)
 		r.Get("/projects/{id}/wiki", webHandler.WikiIndex)
+		r.Get("/licenses", webHandler.LicensesPage)
 		r.Get("/projects/{id}/contexts", webHandler.ContextsPage)
+		r.Get("/projects/{id}/project-files", webHandler.ProjectFilesMore)
+		r.Get("/projects/{id}/project-files/{fid}/download", webHandler.ProjectFileDownload)
 		r.Get("/projects/{id}/topics/{key}", webHandler.TopicPage)
+		r.Get("/projects/{id}/threads/{type}/{key}", webHandler.ThreadPage)
 		r.Get("/projects/{id}/wiki/files/{fid}/{filename}", webHandler.WikiFile)
 		r.Get("/projects/{id}/wiki/{slug}", webHandler.WikiPage)
 		r.Get("/projects/{id}/glossary/{hash}", webHandler.GlossaryTermPage)
@@ -203,6 +224,7 @@ func main() {
 		// Changes to PO files (the owner only; checked per file)
 		r.Post("/catalogs/{cid}/entries/{eid}", webHandler.SaveEntry)
 		r.Post("/catalogs/{cid}/context", webHandler.SaveCatalogContext)
+		r.Post("/catalogs/{cid}/entries/{eid}/ai", webHandler.AITranslateEntry)
 		r.Post("/catalogs/{cid}/update", webHandler.UpdateFromTemplate)
 		r.Post("/catalogs/{cid}/pretranslate", webHandler.PreTranslate)
 		r.Post("/catalogs/{cid}/replace", webHandler.ReplaceCatalog)
@@ -230,6 +252,7 @@ func main() {
 
 		// Members and settings
 		r.Post("/projects/{id}/discussions/{type}/{key}/comments", webHandler.PostComment)
+		r.Post("/projects/{id}/discussions/{type}/{key}/delete", webHandler.DeleteDiscussion)
 		r.Post("/projects/{id}/comments/{cid}/edit", webHandler.EditComment)
 		r.Post("/projects/{id}/comments/{cid}/delete", webHandler.DeleteComment)
 		r.Post("/projects/{id}/members/invite", webHandler.Invite)
@@ -240,6 +263,10 @@ func main() {
 		r.Post("/projects/{id}/invite-links/{lid}/delete", webHandler.DeleteInviteLink)
 		r.Post("/join/{token}", webHandler.Join)
 		r.Get("/projects/{id}/wiki/new", webHandler.WikiNew)
+		r.Get("/projects/{id}/thesaurus", webHandler.ThesaurusLookup)
+		r.Post("/projects/{id}/project-files/{fid}/take", webHandler.ProjectFileTake)
+		r.Post("/projects/{id}/project-files/sync", webHandler.ProjectFilesSync)
+		r.Get("/projects/{id}/project-files/sync", webHandler.ProjectFilesSyncStatus)
 		r.Get("/projects/{id}/topics/new", webHandler.TopicNew)
 		r.Post("/projects/{id}/topics/new", webHandler.TopicCreate)
 		r.Post("/projects/{id}/wiki/new", webHandler.WikiCreate)
@@ -258,10 +285,10 @@ func main() {
 
 	})
 
-	// Download glossary sources that are due (checked hourly, each URL once per interval)
+	// Download glossary sources that are due (checked every 15 minutes, each URL once per interval)
 	go func() {
 		glossaryService.FetchDue(context.Background(), cfg.Glossary.FetchInterval)
-		t := time.NewTicker(time.Hour)
+		t := time.NewTicker(15 * time.Minute)
 		defer t.Stop()
 		for range t.C {
 			glossaryService.FetchDue(context.Background(), cfg.Glossary.FetchInterval)

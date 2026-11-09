@@ -23,7 +23,15 @@
     </main>
     <footer class="site-footer">
         {{.SiteName}} · {{t .Lang "footer.tagline"}}
+        <div class="footer-links"><a href="/licenses">{{t .Lang "footer.licenses"}}</a></div>
     </footer>
     {{end}}
+    <dialog id="confirm-dialog" class="dialog confirm-dialog" data-delete-label="{{t .Lang "action.delete"}}">
+        <p class="confirm-msg"></p>
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-confirm-cancel>{{t .Lang "action.cancel"}}</button>
+            <button type="button" class="btn btn-primary" data-confirm-ok>{{t .Lang "action.continue"}}</button>
+        </div>
+    </dialog>
 </body>
 </html>{{end}}

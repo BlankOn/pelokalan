@@ -5,5 +5,6 @@
     <h1>{{$t.Subject.Title}}</h1>
     {{with .Data.Starter}}<p class="muted small">{{t $.Lang "topic.started_by" .AuthorName (timeAgo $.Lang .CreatedAt)}}</p>{{end}}
 </div>
+{{if .Data.ReadOnly}}<div class="alert alert-warn">{{t .Lang "discuss.read_only_gone"}}</div>{{end}}
 {{template "discussion_thread" .Data.Thread}}
 {{end}}

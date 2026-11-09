@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"html/template"
@@ -20,6 +21,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"pelokalan/internal/config"
+	"pelokalan/internal/glossary"
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
@@ -42,6 +44,9 @@ type Handler struct {
 	discuss        *service.DiscussionService
 	wiki           *service.WikiService
 	contexts       *service.ContextService
+	poFetcher      *glossary.Fetcher // downloads PO files from a URL (SSRF-safe)
+	syncEvery      time.Duration     // automatic glossary/project file sync interval
+	thesaurus      *service.ThesaurusService
 	assetVersion   string
 }
 
@@ -78,6 +83,15 @@ func NewHandler(
 	}
 	return h, nil
 }
+
+// SetThesaurus enables synonym suggestions in the editor
+func (h *Handler) SetThesaurus(t *service.ThesaurusService) { h.thesaurus = t }
+
+// SetPOFetcher enables creating PO files from a URL
+func (h *Handler) SetPOFetcher(f *glossary.Fetcher) { h.poFetcher = f }
+
+// SetSyncInterval sets how often sync links are downloaded automatically (shown to users)
+func (h *Handler) SetSyncInterval(d time.Duration) { h.syncEvery = d }
 
 // PageData is passed to every template
 type PageData struct {
@@ -177,6 +191,10 @@ func funcMap() template.FuncMap {
 				return strings.ToUpper(string(r))
 			}
 			return "?"
+		},
+		"toJSON": func(v any) string {
+			b, _ := json.Marshal(v)
+			return string(b)
 		},
 		"has": func(list []string, v string) bool {
 			for _, x := range list {

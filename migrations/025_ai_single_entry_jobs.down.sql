@@ -1,0 +1,1 @@
+ALTER TABLE ai_jobs DROP COLUMN IF EXISTS single;

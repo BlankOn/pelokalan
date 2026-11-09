@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"path"
 	"path/filepath"
 	"sort"
 	"strconv"
@@ -54,13 +55,14 @@ type MergeResult struct {
 	Added    int
 	Kept     int
 	Obsolete int
+	Skipped  int // files of another module the template was not merged into
 }
 
 // ListAll returns every member's files in the project
 func (s *CatalogService) ListAll(ctx context.Context, user *models.User, p *models.Project) ([]*models.Catalog, error) {
 	list, err := s.catalogs.ListAllByProject(ctx, p.ID)
 	for _, c := range list {
-		c.Owned = user != nil && c.OwnerID == user.ID
+		c.Owned = user != nil && c.WritableBy(user.ID)
 	}
 	return list, err
 }
@@ -80,7 +82,7 @@ func (s *CatalogService) Get(ctx context.Context, user *models.User, id int64) (
 	} else if err != nil {
 		return nil, nil, err
 	}
-	c.Owned = user != nil && c.OwnerID == user.ID
+	c.Owned = user != nil && c.WritableBy(user.ID)
 	p, err := s.projects.GetPublic(ctx, user, c.ProjectID)
 	if err != nil {
 		return nil, nil, err
@@ -215,7 +217,7 @@ func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *model
 
 // Replace imports a new version of an existing translation file
 func (s *CatalogService) Replace(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, filename string, data []byte) error {
-	if c.OwnerID != user.ID || c.IsTemplate {
+	if !c.WritableBy(user.ID) || c.IsTemplate {
 		return ErrForbidden
 	}
 	s.SafetyCommit(ctx, user.ID, c, CommitMsgBeforeReplace)
@@ -366,6 +368,11 @@ func (s *CatalogService) UpdateFromTemplate(ctx context.Context, p *models.Proje
 	if err != nil {
 		return nil, err
 	}
+	// A member keeps several modules in one project; never merge the
+	// template into a file of another module (it would turn every string obsolete).
+	if !templateFits(tentries, current) {
+		return nil, ErrTemplateMismatch
+	}
 	s.SafetyCommit(ctx, c.OwnerID, c, CommitMsgBeforeMerge)
 	merged, res := mergeEntries(tentries, current, c.NPlurals)
 	return res, s.catalogs.ReplaceEntries(ctx, c, merged)
@@ -386,6 +393,10 @@ func (s *CatalogService) UpdateAllFromTemplate(ctx context.Context, user *models
 			continue
 		}
 		res, err := s.UpdateFromTemplate(ctx, p, c)
+		if errors.Is(err, ErrTemplateMismatch) {
+			total.Skipped++
+			continue
+		}
 		if err != nil {
 			return nil, err
 		}
@@ -394,6 +405,27 @@ func (s *CatalogService) UpdateAllFromTemplate(ctx context.Context, user *models
 		total.Obsolete += res.Obsolete
 	}
 	return total, nil
+}
+
+// templateFits reports whether a translation belongs to the template's module:
+// at least half of its current strings must still be in the template. Empty
+// files fit any template.
+func templateFits(tmpl, current []*models.Entry) bool {
+	keys := make(map[string]bool, len(tmpl))
+	for _, te := range tmpl {
+		keys[te.Key()] = true
+	}
+	active, matched := 0, 0
+	for _, ce := range current {
+		if ce.Obsolete || ce.MsgID == "" {
+			continue
+		}
+		active++
+		if keys[ce.Key()] {
+			matched++
+		}
+	}
+	return active == 0 || matched*2 >= active
 }
 
 func mergeEntries(tmpl, current []*models.Entry, nplurals int) ([]*models.Entry, *MergeResult) {
@@ -426,6 +458,7 @@ func mergeEntries(tmpl, current []*models.Entry, nplurals int) ([]*models.Entry,
 			ne.Previous = ce.Previous
 			ne.UpdatedBy = ce.UpdatedBy
 			ne.Origin = ce.Origin
+			ne.ReplacedMsgStr = ce.ReplacedMsgStr
 			res.Kept++
 		} else {
 			ne.MsgStr = emptyForms(te.IsPlural(), nplurals)
@@ -474,10 +507,10 @@ func fitForms(forms []string, plural bool, nplurals int) []string {
 
 // Delete removes a file from the project
 func (s *CatalogService) Delete(ctx context.Context, user *models.User, c *models.Catalog) error {
-	if c.OwnerID != user.ID {
+	if !c.WritableBy(user.ID) {
 		return ErrForbidden
 	}
-	return s.catalogs.Delete(ctx, c.ID)
+	return s.catalogs.Delete(ctx, c.ID, user.ID)
 }
 
 // Entries lists, filters and validates the entries of a catalog
@@ -613,7 +646,7 @@ type EntryInput struct {
 // SaveEntry stores a translation. It fails with ErrEntryConflict when someone
 // else saved the entry since it was loaded.
 func (s *CatalogService) SaveEntry(ctx context.Context, user *models.User, c *models.Catalog, id int64, in EntryInput) (*models.Entry, error) {
-	if c.IsTemplate || user == nil || c.OwnerID != user.ID {
+	if c.IsTemplate || user == nil || !c.WritableBy(user.ID) {
 		return nil, ErrForbidden
 	}
 	e, err := s.Entry(ctx, c, id)
@@ -630,6 +663,7 @@ func (s *CatalogService) SaveEntry(ctx context.Context, user *models.User, c *mo
 	e.TranslatorComments = strings.TrimRight(strings.ReplaceAll(in.Comment, "\r\n", "\n"), "\n")
 	e.Version = in.Version
 	e.Origin = "" // saved by a person: no longer an unreviewed machine translation
+	e.ReplacedMsgStr = nil
 	if err := s.catalogs.UpdateEntry(ctx, e, user.ID); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
 			return nil, ErrEntryConflict
@@ -649,7 +683,7 @@ func (s *CatalogService) Suggestions(ctx context.Context, user *models.User, c *
 
 // PreTranslate fills untranslated entries from the translation memory
 func (s *CatalogService) PreTranslate(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, markFuzzy bool) (int, error) {
-	if c.IsTemplate || user == nil || c.OwnerID != user.ID {
+	if c.IsTemplate || user == nil || !c.WritableBy(user.ID) {
 		return 0, ErrForbidden
 	}
 	s.SafetyCommit(ctx, user.ID, c, CommitMsgBeforeMemory)
@@ -696,7 +730,7 @@ func (s *CatalogService) Build(ctx context.Context, user *models.User, c *models
 // SaveRaw replaces the catalog with edited PO text. updatedAt must be the
 // catalog's UpdatedAt when the text was loaded; a newer change is a conflict.
 func (s *CatalogService) SaveRaw(ctx context.Context, user *models.User, c *models.Catalog, text string, updatedAt int64) error {
-	if c.OwnerID != user.ID {
+	if !c.WritableBy(user.ID) {
 		return ErrForbidden
 	}
 	if c.UpdatedAt.UnixNano() != updatedAt {
@@ -727,7 +761,7 @@ func (s *CatalogService) Properties(c *models.Catalog) CatalogProperties {
 
 // UpdateProperties saves header values and the contributor comments
 func (s *CatalogService) UpdateProperties(ctx context.Context, user *models.User, c *models.Catalog, in CatalogProperties) error {
-	if c.OwnerID != user.ID {
+	if !c.WritableBy(user.ID) {
 		return ErrForbidden
 	}
 	clean := func(v string) string { return strings.TrimSpace(strings.NewReplacer("\n", " ", "\r", " ").Replace(v)) }
@@ -800,4 +834,57 @@ func (s *CatalogService) GetByPath(ctx context.Context, user *models.User, proje
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+// moduleKey names the module a PO file belongs to: the part before the first dot,
+// so "tecla.po-ui.gnome-51.id.po" and "tecla.gnome-51.id.po" are the same module.
+func moduleKey(filename string) string {
+	name := strings.ToLower(path.Base(filename))
+	if i := strings.IndexByte(name, '.'); i > 0 {
+		name = name[:i]
+	}
+	return name
+}
+
+// MatchOwnFiles sets ProjectFile.Mine to the user's own translation of the same
+// module and language (same file name first, else the most recently updated).
+func (s *CatalogService) MatchOwnFiles(ctx context.Context, user *models.User, p *models.Project, files []*models.ProjectFile) error {
+	if user == nil || len(files) == 0 {
+		return nil
+	}
+	list, err := s.catalogs.ListAllByProject(ctx, p.ID)
+	if err != nil {
+		return err
+	}
+	for _, f := range files {
+		var best *models.Catalog
+		for _, c := range list {
+			if c.OwnerID != user.ID || c.IsTemplate || c.Language != f.Language {
+				continue
+			}
+			if c.Filename == f.Filename {
+				best = c
+				break
+			}
+			if moduleKey(c.Filename) == moduleKey(f.Filename) && (best == nil || c.UpdatedAt.After(best.UpdatedAt)) {
+				best = c
+			}
+		}
+		f.Mine = best
+	}
+	return nil
+}
+
+// UpdateFromUpstream replaces the user's file with a newer project file. History
+// continues: the current state is committed first, then the upstream version.
+func (s *CatalogService) UpdateFromUpstream(ctx context.Context, user *models.User, c *models.Catalog, label string, data []byte) error {
+	if !c.WritableBy(user.ID) || c.IsTemplate {
+		return ErrForbidden
+	}
+	s.SafetyCommit(ctx, user.ID, c, CommitMsgBeforeReplace)
+	if err := s.replaceContent(ctx, user, c, data); err != nil {
+		return err
+	}
+	s.SafetyCommit(ctx, user.ID, c, CommitMsgFromUpstream+"|"+label)
+	return nil
 }

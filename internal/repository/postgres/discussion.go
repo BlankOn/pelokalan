@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/repository"
@@ -65,6 +66,23 @@ func (r *discussionRepository) List(ctx context.Context, projectID int64, f repo
 		where += ` AND EXISTS (SELECT 1 FROM comments c JOIN comment_mentions m ON m.comment_id = c.id
 		           WHERE c.discussion_id = d.id AND c.deleted_at IS NULL AND m.user_id = $` + itoaArg(len(args)) + `)`
 	}
+	// search: each word must appear in the title or in a visible comment (case-insensitive)
+	snippet := `''`
+	words := strings.Fields(strings.ToLower(f.Query))
+	if len(words) > 8 {
+		words = words[:8]
+	}
+	for i, w := range words {
+		args = append(args, "%"+escapeLike(w)+"%")
+		n := itoaArg(len(args))
+		where += ` AND (d.title ILIKE $` + n + ` OR EXISTS (SELECT 1 FROM comments c
+		           WHERE c.discussion_id = d.id AND c.deleted_at IS NULL AND c.body ILIKE $` + n + `))`
+		if i == 0 {
+			// the newest comment containing the first word, shown under the result
+			snippet = `COALESCE((SELECT c.body FROM comments c WHERE c.discussion_id = d.id AND c.deleted_at IS NULL
+			           AND c.body ILIKE $` + n + ` ORDER BY c.id DESC LIMIT 1), '')`
+		}
+	}
 	var total int
 	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM discussions d WHERE `+where, args...).Scan(&total); err != nil {
 		return nil, 0, err
@@ -77,7 +95,8 @@ func (r *discussionRepository) List(ctx context.Context, projectID int64, f repo
 		`SELECT `+discussionColumns+`,
 		        COALESCE((SELECT COALESCE(NULLIF(u.name, ''), u.username) FROM comments c JOIN users u ON u.id = c.author_id
 		                  WHERE c.discussion_id = d.id AND c.deleted_at IS NULL ORDER BY c.id DESC LIMIT 1), ''),
-		        (SELECT COUNT(DISTINCT c.author_id) FROM comments c WHERE c.discussion_id = d.id AND c.deleted_at IS NULL)
+		        (SELECT COUNT(DISTINCT c.author_id) FROM comments c WHERE c.discussion_id = d.id AND c.deleted_at IS NULL),
+		        `+snippet+`
 		 FROM discussions d WHERE `+where+`
 		 ORDER BY d.last_activity_at DESC LIMIT $`+itoaArg(len(args)-1)+` OFFSET $`+itoaArg(len(args)), args...)
 	if err != nil {
@@ -86,13 +105,13 @@ func (r *discussionRepository) List(ctx context.Context, projectID int64, f repo
 	defer rows.Close()
 	var out []*models.Discussion
 	for rows.Next() {
-		var last string
+		var last, snip string
 		var participants int
-		d, err := scanDiscussion(rows, &last, &participants)
+		d, err := scanDiscussion(rows, &last, &participants, &snip)
 		if err != nil {
 			return nil, 0, err
 		}
-		d.LastAuthor, d.Participants = last, participants
+		d.LastAuthor, d.Participants, d.Snippet = last, participants, snip
 		out = append(out, d)
 	}
 	return out, total, rows.Err()
@@ -294,4 +313,9 @@ func (r *discussionRepository) DeleteComment(ctx context.Context, id, byUserID i
 		return err
 	}
 	return tx.Commit()
+}
+
+func (r *discussionRepository) DeleteDiscussion(ctx context.Context, id int64) error {
+	_, err := r.db.ExecContext(ctx, `DELETE FROM discussions WHERE id = $1`, id)
+	return err
 }

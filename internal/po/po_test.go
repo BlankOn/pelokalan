@@ -187,3 +187,33 @@ func TestAddContributor(t *testing.T) {
 		t.Fatalf("not appended: %q", got)
 	}
 }
+
+func TestValidateMarkupAndControlChars(t *testing.T) {
+	src := "Choose <guiseq><gui>View</gui><gui>Slideshow</gui></guiseq> or press <key>F5</key>."
+	ok := &Entry{ID: src, Translation: []string{"Pilih <guiseq><gui>Lihat</gui><gui>Tayangan slide</gui></guiseq> atau tekan <key>F5</key>."}}
+	if issues := Validate(ok, 2); len(issues) != 0 {
+		t.Fatalf("correct markup flagged: %v", issues)
+	}
+	mangled := &Entry{ID: src, Translation: []string{"Pilih \x01guiseq\x02\x01gui\x02Tampilan\x01/gui\x02 atau tekan \x01key\x02F5\x01/key\x02."}}
+	issues := Validate(mangled, 2)
+	if !contains(issues, IssueControlChars) || !contains(issues, IssueMarkup) {
+		t.Fatalf("mangled markup not flagged: %v", issues)
+	}
+	dropped := &Entry{ID: src, Translation: []string{"Pilih Lihat lalu Tayangan slide atau tekan F5."}}
+	if !contains(Validate(dropped, 2), IssueMarkup) {
+		t.Fatal("dropped tags not flagged")
+	}
+	plain := &Entry{ID: "a < b and x > y", Translation: []string{"a < b dan x > y"}}
+	if len(Validate(plain, 2)) != 0 {
+		t.Fatal("comparison signs are not markup")
+	}
+}
+
+func contains(list []string, v string) bool {
+	for _, x := range list {
+		if x == v {
+			return true
+		}
+	}
+	return false
+}

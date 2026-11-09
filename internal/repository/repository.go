@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/thesaurus"
 )
 
 // ErrNotFound is returned when a record does not exist
@@ -85,7 +86,8 @@ type CatalogRepository interface {
 	// ListAllByProject returns the files of every member of a project
 	ListAllByProject(ctx context.Context, projectID int64) ([]*models.Catalog, error)
 	UpdateHeader(ctx context.Context, c *models.Catalog) error
-	Delete(ctx context.Context, id int64) error
+	// Delete marks a file deleted (kept read-only with its entries and history)
+	Delete(ctx context.Context, id, byUserID int64) error
 	// ReplaceEntries replaces all entries (used by merges and re-uploads)
 	ReplaceEntries(ctx context.Context, c *models.Catalog, entries []*models.Entry) error
 
@@ -137,6 +139,14 @@ type GlossaryTerm struct {
 
 // GlossaryRepository defines methods for glossary data access
 type GlossaryRepository interface {
+	// project files: the PO files of glossary sources
+	AddProjectFiles(ctx context.Context, files []*models.ProjectFile) error
+	// ListProjectFiles pages the project files matching query, limited to versionIDs when given
+	ListProjectFiles(ctx context.Context, projectID int64, query string, versionIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error)
+	ProjectFileVersions(ctx context.Context, projectID int64) ([]*models.ProjectFileVersion, error)
+	GetProjectFile(ctx context.Context, projectID, id int64) (*models.ProjectFile, error)
+	CountVersionFiles(ctx context.Context, versionID int64) (int, error)
+	ProjectFilesForLanguage(ctx context.Context, projectID int64, language string) ([]*models.ProjectFile, error)
 	// Stamp changes whenever imports of a project and language are added, replaced or removed
 	Stamp(ctx context.Context, projectID int64, language string) (string, error)
 	GetOrCreateVersion(ctx context.Context, projectID int64, name, version string) (*models.ProjectVersion, error)
@@ -207,6 +217,7 @@ type CommitRepository interface {
 type DiscussionFilter struct {
 	MentionedUserID int64 // only discussions mentioning this user
 	SubjectType     string
+	Query           string // every word must appear in the title or a visible comment
 	Limit, Offset   int
 }
 
@@ -228,6 +239,8 @@ type DiscussionRepository interface {
 	GetComment(ctx context.Context, id int64) (*models.Comment, error)
 	UpdateComment(ctx context.Context, id int64, body string, mentions []int64) error
 	DeleteComment(ctx context.Context, id, byUserID int64) error
+	// DeleteDiscussion removes a discussion with its comments, mentions and attachment links
+	DeleteDiscussion(ctx context.Context, id int64) error
 }
 
 // Repositories holds all repositories
@@ -271,11 +284,21 @@ type ModuleCount struct {
 	Terms int64
 }
 
-// ContextRepository stores Konteks notes of PO files
+// ContextRepository stores Konteks notes, one per module of a project
 type ContextRepository interface {
-	Get(ctx context.Context, catalogID int64) (*models.CatalogContext, error)
-	// Set stores a note; an empty note removes it
-	Set(ctx context.Context, c *models.CatalogContext) error
-	// ListForProject lists the notes of a project's PO files, optionally matching q
-	ListForProject(ctx context.Context, projectID int64, q string) ([]*models.CatalogContext, error)
+	Get(ctx context.Context, projectID int64, module string) (*models.ModuleContext, error)
+	// Save stores the note and records the edit. version is the version the editor
+	// started from (0 = none yet); ErrConflict when someone saved in between.
+	Save(ctx context.Context, c *models.ModuleContext, version int64) error
+	Edits(ctx context.Context, contextID int64, limit int) ([]models.ContextEdit, error)
+	// ListForProject lists the project's non-empty notes, optionally matching q
+	ListForProject(ctx context.Context, projectID int64, q string) ([]*models.ModuleContext, error)
+}
+
+// ThesaurusRepository stores the thesaurus
+type ThesaurusRepository interface {
+	Count(ctx context.Context) (int, error)
+	All(ctx context.Context) ([]thesaurus.Entry, error)
+	// ReplaceAll swaps the whole thesaurus in one transaction
+	ReplaceAll(ctx context.Context, entries []thesaurus.Entry) error
 }

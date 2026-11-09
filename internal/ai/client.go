@@ -144,6 +144,7 @@ type chatMessage struct {
 type chatRequest struct {
 	Model          string        `json:"model"`
 	Messages       []chatMessage `json:"messages"`
+	Temperature    *float64      `json:"temperature,omitempty"`
 	ResponseFormat struct {
 		Type string `json:"type"`
 	} `json:"response_format"`
@@ -159,6 +160,9 @@ type chatResponse struct {
 	Usage Usage `json:"usage"`
 }
 
+// chatTemperature is the sampling temperature for translations
+const chatTemperature = 0.2
+
 // Chat sends a system and user message and returns the JSON reply
 func (c *Client) Chat(ctx context.Context, system, user string) (string, Usage, error) {
 	req := chatRequest{
@@ -166,8 +170,18 @@ func (c *Client) Chat(ctx context.Context, system, user string) (string, Usage, 
 		Messages: []chatMessage{{Role: "system", Content: system}, {Role: "user", Content: user}},
 	}
 	req.ResponseFormat.Type = "json_object"
+	// a low temperature keeps translations consistent; some models only accept their
+	// default, so a rejected temperature is retried without it
+	t := chatTemperature
+	req.Temperature = &t
 	var resp chatResponse
-	if err := c.do(ctx, http.MethodPost, "/chat/completions", req, &resp); err != nil {
+	err := c.do(ctx, http.MethodPost, "/chat/completions", req, &resp)
+	if err != nil && strings.Contains(strings.ToLower(err.Error()), "temperature") {
+		req.Temperature = nil
+		resp = chatResponse{}
+		err = c.do(ctx, http.MethodPost, "/chat/completions", req, &resp)
+	}
+	if err != nil {
 		return "", Usage{}, err
 	}
 	if len(resp.Choices) == 0 {
