@@ -12,7 +12,6 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
-	"pelokalan/internal/config"
 	"pelokalan/internal/models"
 	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
@@ -23,12 +22,11 @@ type CatalogService struct {
 	catalogs repository.CatalogRepository
 	commits  repository.CommitRepository
 	projects *ProjectService
-	site     config.SiteConfig
 }
 
 // NewCatalogService creates a new catalog service
-func NewCatalogService(catalogs repository.CatalogRepository, commits repository.CommitRepository, projects *ProjectService, site config.SiteConfig) *CatalogService {
-	return &CatalogService{catalogs: catalogs, commits: commits, projects: projects, site: site}
+func NewCatalogService(catalogs repository.CatalogRepository, commits repository.CommitRepository, projects *ProjectService) *CatalogService {
+	return &CatalogService{catalogs: catalogs, commits: commits, projects: projects}
 }
 
 // EntryFilter narrows an entry listing
@@ -719,7 +717,7 @@ func (s *CatalogService) Build(ctx context.Context, user *models.User, c *models
 		pc.HeaderComments = po.AddContributor(pc.HeaderComments, user.CreditName(), user.CreditEmail(), now.Year())
 		pc.Header = po.SetHeaderField(pc.Header, "Language", c.Language)
 		pc.Header = po.SetHeaderField(pc.Header, "Plural-Forms", c.PluralForms)
-		pc.Header = po.SetHeaderField(pc.Header, "X-Generator", s.site.Name)
+		pc.Header = po.SetHeaderField(pc.Header, "X-Generator", "pelokalan.blankon.id")
 	}
 	for _, e := range entries {
 		pc.Entries = append(pc.Entries, e.ToPO())

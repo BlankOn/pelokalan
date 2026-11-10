@@ -88,7 +88,7 @@ func main() {
 	mailer := service.NewMailer(cfg.Mail)
 	authService := service.NewAuthService(repos.User, repos.OTP, mailer, cfg.Auth, cfg.Site, cfg.JWT)
 	projectService := service.NewProjectService(repos.Project, repos.User, mailer, authService, cfg.Auth, cfg.Site)
-	catalogService := service.NewCatalogService(repos.Catalog, repos.Commit, projectService, cfg.Site)
+	catalogService := service.NewCatalogService(repos.Catalog, repos.Commit, projectService)
 	fetcher := glossary.NewFetcher(cfg.Glossary.MaxDownloadMB<<20, cfg.Glossary.AllowPrivateHosts,
 		cfg.Site.Name+" glossary fetcher (+"+cfg.Site.BaseURL+")")
 	glossaryService := service.NewGlossaryService(repos.Glossary, fetcher)
