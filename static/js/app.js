@@ -310,7 +310,6 @@
         var row = currentId && document.getElementById("row-" + currentId);
         if (row) scrollToRow(row);
                 if (ed && !ed.querySelector(".ed-alert-error")) focusTranslation();
-        updateWSHint();
         if (window.loadThreads) window.loadThreads(document.getElementById("sidebar"));
     }
 
@@ -425,31 +424,6 @@
             ta.setSelectionRange(ta.value.length, ta.value.length);
         }
     }
-
-    // Live hint: when the source string starts or ends with a space, nudge the
-    // translator to keep it, and show whether their current text matches.
-    function leadBlank(s) { return s.length > 0 && (s[0] === " " || s[0] === "\t"); }
-    function trailBlank(s) { return s.length > 0 && (s[s.length - 1] === " " || s[s.length - 1] === "\t"); }
-    function updateWSHint() {
-        var hint = document.getElementById("ws-hint");
-        var ta = activePanel();
-        if (!hint || !ta) return;
-        var f = form();
-        var idx = Math.min(parseInt(ta.dataset.panel, 10) || 0, 1);
-        var src = f && f.querySelector('.src-text[data-src="' + idx + '"]');
-        var s = src ? (src.dataset.text != null ? src.dataset.text : src.textContent) : "";
-        var tr = ta.value;
-        var parts = [], missing = false;
-        if (leadBlank(s)) { parts.push(hint.dataset.start); if (!leadBlank(tr)) missing = true; }
-        if (trailBlank(s)) { parts.push(hint.dataset.end); if (!trailBlank(tr)) missing = true; }
-        if (!parts.length) { hint.hidden = true; return; }
-        hint.hidden = false;
-        hint.textContent = "␣ " + parts.join(" · ");
-        hint.classList.toggle("ws-miss", missing);
-        hint.classList.toggle("ws-ok", !missing);
-        hint.title = missing ? hint.dataset.miss : hint.dataset.ok;
-    }
-    window.updateWSHint = updateWSHint;
 
     // The orange "clear needs work, save & next" button is only shown while the
     // needs-work box is checked.
@@ -774,7 +748,6 @@
             f.querySelectorAll(".ptab").forEach(function (t) { t.classList.toggle("active", t === tab); });
             f.querySelectorAll(".tr-input").forEach(function (ta) { ta.hidden = ta.dataset.panel !== tab.dataset.tab; });
             focusTranslation();
-            updateWSHint();
         }
         var filterLink = ev.target.closest("[data-filter-status]");
         if (filterLink) {
@@ -848,7 +821,7 @@
 
     document.addEventListener("input", function (ev) {
         if (ev.target.closest("#entry-form") || ev.target.matches(".comment-input")) {
-            if (ev.target.matches(".tr-input")) { clearFuzzyOnEdit(); updateWSHint(); }
+            if (ev.target.matches(".tr-input")) clearFuzzyOnEdit();
             if (ev.target.matches("input[name=fuzzy]")) ev.target.dataset.touched = "1";
             setDirty(true);
         }

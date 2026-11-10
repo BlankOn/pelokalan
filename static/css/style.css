@@ -382,10 +382,6 @@ h1 .ai-badge { font-size: 12px; }
 }
 .ws-tag-end { margin-left: 4px; }
 .ws-tag-start { margin-right: 4px; }
-/* Live trailing/leading-space hint next to the translation box */
-.ws-hint { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; text-transform: none; letter-spacing: 0; white-space: nowrap; }
-.ws-hint.ws-miss { background: rgba(231,165,49,.18); color: #b8740c; }
-.ws-hint.ws-ok { background: var(--ok-soft); color: #1d5e39; }
 .ed-translation { flex: 1; }
 .tr-input { font-size: 15px; min-height: 90px; flex: 1; width: 100%; line-height: 1.5; }
 .fuzzy-toggle { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 12px; color: var(--fuzzy); display: flex; gap: 5px; align-items: center; cursor: pointer; }
