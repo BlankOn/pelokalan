@@ -144,6 +144,14 @@ type GlossaryRepository interface {
 	// ListProjectFiles pages the project files matching query, limited to versionIDs when given
 	ListProjectFiles(ctx context.Context, projectID int64, query string, versionIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error)
 	ProjectFileVersions(ctx context.Context, projectID int64) ([]*models.ProjectFileVersion, error)
+	// ProjectFileNames lists (version id, file name) of the project files, for module groups
+	ProjectFileNames(ctx context.Context, projectID int64) (map[int64][]string, error)
+	// RecordGroupStats stores the current totals of a version's project files per language
+	// (every version when versionID is 0), skipping ones whose last point is newer than
+	// minGap and unchanged
+	RecordGroupStats(ctx context.Context, versionID int64, minGap time.Duration) error
+	// GroupStats returns a version's recorded totals for a language since a moment, oldest first
+	GroupStats(ctx context.Context, versionID int64, language string, since time.Time) ([]models.GroupStat, error)
 	GetProjectFile(ctx context.Context, projectID, id int64) (*models.ProjectFile, error)
 	CountVersionFiles(ctx context.Context, versionID int64) (int, error)
 	ProjectFilesForLanguage(ctx context.Context, projectID int64, language string) ([]*models.ProjectFile, error)
@@ -282,6 +290,13 @@ type WikiRepository interface {
 type ModuleCount struct {
 	Name  string
 	Terms int64
+}
+
+// NotificationRepository stores members' email choices per project
+type NotificationRepository interface {
+	// Settings returns the choices of the given users (missing users have the defaults)
+	Settings(ctx context.Context, projectID int64, userIDs []int64) (map[int64]*models.NotificationSettings, error)
+	Save(ctx context.Context, userID, projectID int64, s *models.NotificationSettings) error
 }
 
 // ContextRepository stores Konteks notes, one per module of a project

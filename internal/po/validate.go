@@ -9,11 +9,13 @@ import (
 // Issue codes returned by Validate
 const (
 	IssuePlaceholders = "placeholders"
-	IssueNewlineStart = "newline_start"
-	IssueNewlineEnd   = "newline_end"
-	IssuePluralCount  = "plural_count"
-	IssueControlChars = "control_chars" // invisible control characters (e.g. mangled markup)
-	IssueMarkup       = "markup"        // XML-like tags (<gui>, <key>…) differ from the source
+	// a plural translation lacks the placeholders of msgid_plural (msgfmt -c rejects the file)
+	IssuePluralPlaceholders = "plural_placeholders"
+	IssueNewlineStart       = "newline_start"
+	IssueNewlineEnd         = "newline_end"
+	IssuePluralCount        = "plural_count"
+	IssueControlChars       = "control_chars" // invisible control characters (e.g. mangled markup)
+	IssueMarkup             = "markup"        // XML-like tags (<gui>, <key>…) differ from the source
 )
 
 // markupTagRe matches XML-like tags such as <gui>, </key>, <link href="…"> or <br/>
@@ -45,8 +47,16 @@ var (
 	braceFormatRe  = regexp.MustCompile(`\{[A-Za-z0-9_.\[\]]*(?:![rsa])?(?::[^{}]*)?\}`)
 )
 
-// Validate checks a translated entry for common problems and returns issue codes
+// Validate checks a translated entry for common problems and returns issue codes.
+// Without the file's Plural-Forms it assumes gettext's default plural rule; use
+// ValidateWith to check plural placeholders exactly like msgfmt -c does.
 func Validate(e *Entry, nplurals int) []string {
+	return ValidateWith(e, PluralFor("", nplurals))
+}
+
+// ValidateWith is Validate with the file's plural rule (PluralFor of its Plural-Forms)
+func ValidateWith(e *Entry, plural Plural) []string {
+	nplurals := plural.N
 	if !e.IsTranslated() {
 		return nil
 	}
@@ -83,14 +93,26 @@ func Validate(e *Entry, nplurals int) []string {
 			add(IssueMarkup)
 		}
 		if re != nil {
-			want := placeholders(re, src)
+			// like msgfmt -c: every plural form is checked against msgid_plural. Only a
+			// form used for at most one number (e.g. "one file" for n == 1), in a file with
+			// several forms, may leave out a placeholder. With a single form (Indonesian,
+			// Japanese…) msgstr[0] stands for every number and must match msgid_plural.
+			ref := src
+			if e.IsPlural() {
+				ref = e.IDPlural
+			}
+			want := placeholders(re, ref)
 			got := placeholders(re, tr)
-			// a plural form may legitimately drop the count placeholder (e.g. "one file")
-			if e.IsPlural() && len(got) < len(want) && subset(got, want) {
+			relaxed := e.IsPlural() && len(e.Translation) > 1 && plural.SingleValue(i)
+			if relaxed && len(got) < len(want) && subset(got, want) {
 				continue
 			}
 			if !equal(want, got) {
-				add(IssuePlaceholders)
+				if e.IsPlural() {
+					add(IssuePluralPlaceholders)
+				} else {
+					add(IssuePlaceholders)
+				}
 			}
 		}
 	}

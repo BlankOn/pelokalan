@@ -40,7 +40,17 @@ func (h *Handler) renderSettings(w http.ResponseWriter, r *http.Request, p *mode
 	}
 	data.Data["Project"] = p
 	data.Data["Tab"] = "settings"
-	h.aiSettingsData(r, p, data)
+	if n, err := h.discuss.NotificationSettings(r.Context(), middleware.GetUser(r.Context()), p); err == nil {
+		data.Data["Notify"] = n
+	}
+	data.Data["NotifyGroups"] = []notifyGroup{
+		{"notify.group_me", []string{models.NotifyMention, models.NotifyMyFile}},
+		{"notify.group_follow", []string{models.NotifyStarted, models.NotifyParticipated}},
+		{"notify.group_project", []string{models.NotifyNewTopic, models.NotifyOtherTopic, models.NotifyOtherGlossary, models.NotifyOtherEntry}},
+	}
+	if p.Role.CanManage() {
+		h.aiSettingsData(r, p, data)
+	}
 	h.render(w, "settings", data)
 }
 
@@ -193,4 +203,10 @@ func (h *Handler) editorAIData(r *http.Request, p *models.Project, c *models.Cat
 			data.Data["AIJob"] = map[string]any{"Lang": data.Lang, "J": job, "Catalog": c}
 		}
 	}
+}
+
+// notifyGroup is a block of switches on the notification settings form
+type notifyGroup struct {
+	Title string
+	Kinds []string
 }

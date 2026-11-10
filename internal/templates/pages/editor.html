@@ -70,12 +70,12 @@
         </button>
         {{end}}
         <div class="tb-sep"></div>
-        <a class="tb-btn" href="/catalogs/{{$c.ID}}/download" title="{{t .Lang "action.download_po"}}">
+        <a class="tb-btn" href="/catalogs/{{$c.ID}}/download" title="{{t .Lang "action.download_po"}}" data-check-issues="{{t .Lang "editor.download_issues"}}" data-check-ok="{{t .Lang "editor.download_anyway"}}" data-check-show="{{t .Lang "editor.show_issues"}}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
             <span>{{if $c.IsTemplate}}POT{{else}}PO{{end}}</span>
         </a>
         {{if not $c.IsTemplate}}
-        <a class="tb-btn" href="/catalogs/{{$c.ID}}/download.mo" title="{{t .Lang "action.download_mo"}}">
+        <a class="tb-btn" href="/catalogs/{{$c.ID}}/download.mo" title="{{t .Lang "action.download_mo"}}" data-check-issues="{{t .Lang "editor.download_issues"}}" data-check-ok="{{t .Lang "editor.download_anyway"}}" data-check-show="{{t .Lang "editor.show_issues"}}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
             <span>MO</span>
         </a>

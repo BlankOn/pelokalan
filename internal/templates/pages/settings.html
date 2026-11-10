@@ -1,6 +1,27 @@
 {{define "content"}}{{$p := .Data.Project}}
 {{template "project_header" .}}
 
+{{with .Data.Notify}}{{$n := .}}
+<section class="card" id="notifications">
+    <h2>{{t $.Lang "notify.title"}}</h2>
+    <p class="muted small">{{t $.Lang "notify.help"}}</p>
+    <form method="post" action="{{$p.Path}}/notifications" class="form notify-form">
+        <label class="check notify-muted"><input type="checkbox" name="muted" value="1" {{if $n.Muted}}checked{{end}} data-notify-mute> {{t $.Lang "notify.muted"}}</label>
+        <div class="notify-kinds"{{if $n.Muted}} data-muted{{end}}>
+            {{range $.Data.NotifyGroups}}
+            <fieldset class="notify-group">
+                <legend>{{t $.Lang .Title}}</legend>
+                {{range .Kinds}}<label class="check"><input type="checkbox" name="n_{{.}}" value="1" {{if $n.On .}}checked{{end}}> {{t $.Lang (printf "notify.%s" .)}}</label>{{end}}
+            </fieldset>
+            {{end}}
+        </div>
+        <p class="muted small">{{t $.Lang "notify.always"}}</p>
+        <div class="row-actions"><button type="submit" class="btn btn-primary">{{t $.Lang "notify.save"}}</button></div>
+    </form>
+</section>
+{{end}}
+
+{{if $p.Role.CanManage}}
 <section class="card">
     <h2>{{t .Lang "settings.general"}}</h2>
     <form method="post" action="{{$p.Path}}/settings" class="form">
@@ -84,5 +105,6 @@
         <button type="submit" class="btn btn-danger">{{t .Lang "settings.delete_project"}}</button>
     </form>
 </section>
+{{end}}
 {{end}}
 {{end}}

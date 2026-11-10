@@ -9,13 +9,13 @@
     {{else if not .User}}<a class="btn btn-small" href="/login?next={{$p.Path}}">{{t .Lang "project.login_to_contribute"}}</a>{{end}}
 </div>
 <nav class="tabs-nav">
-    <a href="{{$p.Path}}" class="{{if eq .Data.Tab "glossary"}}active{{end}}">{{template "tab_icon" "glossary"}}{{t .Lang "project.tab_glossary"}}</a>
     <a href="{{$p.Path}}/files" class="{{if eq .Data.Tab "files"}}active{{end}}">{{template "tab_icon" "files"}}{{t .Lang "project.tab_files"}}</a>
+    <a href="{{$p.Path}}/glossary" class="{{if eq .Data.Tab "glossary"}}active{{end}}">{{template "tab_icon" "glossary"}}{{t .Lang "project.tab_glossary"}}</a>
     <a href="{{$p.Path}}/contexts" class="{{if eq .Data.Tab "contexts"}}active{{end}}">{{template "tab_icon" "contexts"}}{{t .Lang "project.tab_contexts"}}</a>
     <a href="{{$p.Path}}/discussions" class="{{if eq .Data.Tab "discussions"}}active{{end}}">{{template "tab_icon" "discussions"}}{{t .Lang "project.tab_discussions"}}</a>
     <a href="{{$p.Path}}/wiki" class="{{if eq .Data.Tab "wiki"}}active{{end}}">{{template "tab_icon" "wiki"}}{{t .Lang "project.tab_wiki"}}</a>
     <a href="{{$p.Path}}/members" class="{{if eq .Data.Tab "members"}}active{{end}}">{{template "tab_icon" "members"}}{{t .Lang "project.tab_members"}}</a>
-    {{if $p.Role.CanManage}}<a href="{{$p.Path}}/settings" class="{{if eq .Data.Tab "settings"}}active{{end}}">{{template "tab_icon" "settings"}}{{t .Lang "project.tab_settings"}}</a>{{end}}
+    {{if $p.Role.IsMember}}<a href="{{$p.Path}}/settings" class="{{if eq .Data.Tab "settings"}}active{{end}}">{{template "tab_icon" "settings"}}{{t .Lang "project.tab_settings"}}</a>{{end}}
 </nav>
 {{end}}
 

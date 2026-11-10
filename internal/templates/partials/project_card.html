@@ -41,3 +41,113 @@
 <tr class="pf-more"><td colspan="4"><button type="button" class="btn btn-block gl-more" hx-get="{{.Project.Path}}/project-files?offset={{.Next}}" hx-include="#pf-filter" hx-target="closest tr" hx-swap="outerHTML">{{t .Lang "files.load_more" .Next .Total}}</button></td></tr>
 {{end}}
 {{end}}
+
+{{/* "Grup modul" checkbox dropdown (name g); NoGroup adds "Tanpa grup" (value 0) */}}
+{{define "group_filter"}}
+<details class="multi-filter" data-multi-filter>
+    <summary class="mf-btn" title="{{t .Lang "files.group_filter"}}">
+        <svg class="mf-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8z"/></svg>
+        <span class="mf-label" data-all="{{t .Lang "files.all_groups"}}" data-many="{{t .Lang "files.n_groups"}}">{{t .Lang "files.all_groups"}}</span>
+        <span class="combo-caret">▾</span>
+    </summary>
+    <div class="mf-pop">
+        {{$sel := .Selected}}{{range .Groups}}<label class="mf-opt"><input type="checkbox" name="g" value="{{.ID}}"{{if and $sel (index $sel .ID)}} checked{{end}}> <span class="mf-text">{{.Label}}</span>{{if .Files}} <span class="muted small">{{.Files}}</span>{{end}}</label>{{end}}
+        {{if .NoGroup}}<label class="mf-opt"><input type="checkbox" name="g" value="0"> <span class="mf-text">{{t .Lang "files.no_group"}}</span></label>{{end}}
+        <button type="button" class="linklike small mf-clear mf-none">{{t .Lang "filter.clear"}}</button>
+    </div>
+</details>
+{{end}}
+
+{{/* search + module group filter above a file list (Berkas Anda, Berkas anggota lain) */}}
+{{define "file_filter"}}
+<div class="context-search pf-toolbar">
+    <form id="{{.ID}}-filter" class="pf-filter" hx-get="{{.URL}}" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change, submit" hx-target="#{{.ID}}-file-rows" hx-swap="innerHTML">
+        <input type="search" name="q" placeholder="{{t .Lang "files.search"}}" aria-label="{{t .Lang "files.search"}}" autocomplete="off">
+        {{if .Groups}}{{template "group_filter" (dict "Lang" .Lang "Groups" .Groups "NoGroup" true)}}{{end}}
+    </form>
+</div>
+{{end}}
+
+{{/* a page of PO files: the user's own (Mine) or other members' (read-only) */}}
+{{define "file_rows"}}{{$v := .}}
+{{range .Files}}
+<tr>
+    <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a>
+        <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div></td>
+    <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>{{end}}</td>
+    <td class="num">{{if not .IsTemplate}}{{.Stats.Translated}}{{end}}</td>
+    <td class="num">{{if not .IsTemplate}}{{.Stats.Fuzzy}}{{end}}</td>
+    <td class="num">{{if not .IsTemplate}}{{.Stats.Untranslated}}{{else}}{{t $v.Lang "project.template_strings" .Stats.Total}}{{end}}</td>
+    <td class="small muted">{{timeAgo $v.Lang .UpdatedAt}}</td>
+    <td class="actions">
+        {{if $v.Mine}}
+        <a class="btn btn-small btn-primary" href="{{.URL}}">{{t $v.Lang "action.translate"}}</a>
+        <details class="dropdown">
+            <summary class="btn btn-small" aria-label="{{t $v.Lang "action.more"}}">⋯</summary>
+            <div class="menu">
+                <a href="/catalogs/{{.ID}}/download">{{t $v.Lang "action.download_po"}}</a>
+                <a href="/catalogs/{{.ID}}/download.mo">{{t $v.Lang "action.download_mo"}}</a>
+                {{if $v.HasTemplate}}
+                <form method="post" action="/catalogs/{{.ID}}/update"><button class="linklike">{{t $v.Lang "action.update_from_template"}}</button></form>
+                {{end}}
+                <form method="post" action="/catalogs/{{.ID}}/replace" enctype="multipart/form-data" class="inline-upload">
+                    <label class="linklike">{{t $v.Lang "action.upload_new_version"}}<input type="file" name="file" accept=".po" data-autosubmit hidden></label>
+                </form>
+                <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $v.Lang "confirm.delete_file"}}"><button class="linklike danger">{{t $v.Lang "action.delete"}}</button></form>
+            </div>
+        </details>
+        {{else}}
+        <a class="btn btn-small" href="{{.URL}}">{{t $v.Lang "action.view"}}</a>
+        <a class="btn btn-small btn-icon" href="/catalogs/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
+        {{end}}
+    </td>
+</tr>
+{{else}}
+{{if .Searched}}<tr class="pf-more"><td colspan="7" class="muted">{{t .Lang "files.project_none"}}</td></tr>{{end}}
+{{end}}
+{{if lt .Next .Total}}
+<tr class="pf-more"><td colspan="7"><button type="button" class="btn btn-block gl-more" hx-get="{{.Project.Path}}/{{if .Mine}}my-files{{else}}member-files{{end}}?offset={{.Next}}" hx-include="#{{if .Mine}}my{{else}}member{{end}}-filter" hx-target="closest tr" hx-swap="outerHTML">{{t .Lang "files.load_more" .Next .Total}}</button></td></tr>
+{{end}}
+{{end}}
+
+{{/* progress of a module group over time (recorded at every sync) */}}
+{{define "group_chart"}}{{$c := .}}
+<section class="card group-chart" id="group-chart">
+    <form class="gc-controls" hx-get="{{.Project.Path}}/group-chart" hx-trigger="change" hx-target="#gc-body" hx-select="#gc-body" hx-swap="outerHTML">
+        {{template "group_filter" (dict "Lang" .Lang "Groups" .Groups "NoGroup" false "Selected" .Selected)}}
+        <div class="seg" title="{{t .Lang "chart.scale"}}">
+            <label class="seg-opt"><input type="radio" name="cs" value="" {{if not $c.Scale}}checked{{end}}> {{t .Lang "chart.scale_shared"}}</label>
+            <label class="seg-opt"><input type="radio" name="cs" value="each" {{if eq $c.Scale "each"}}checked{{end}}> {{t .Lang "chart.scale_each"}}</label>
+        </div>
+        <div class="seg">
+            {{range .Ranges}}<label class="seg-opt"><input type="radio" name="cr" value="{{.Key}}" {{if eq .Key $c.Range}}checked{{end}}> {{t $c.Lang (printf "chart.range_%s" .Key)}}</label>{{end}}
+        </div>
+    </form>
+    <div id="gc-body">
+    {{if .HasPoint}}
+    <div class="gc-plot">
+    <div class="gc-legend">
+        {{range .Series}}<span class="gc-key gc-{{.Key}}"><span class="gc-swatch"></span> {{t $c.Lang (printf "chart.%s" .Key)}} <strong>{{num .Latest}}</strong>{{if .Change}} <span class="gc-change">({{if gt .Change 0}}+{{end}}{{.Change}})</span>{{end}}{{if eq $c.Scale "each"}} <span class="gc-range">[{{num .Min}}–{{num .Max}}]</span>{{end}}</span>{{end}}
+    </div>
+    <div class="gc-area{{if .YLabels}} gc-has-y{{end}}">
+    {{if .YLabels}}<div class="gc-ylabels">{{range .YLabels}}<span style="top: {{printf "%.2f" (pct .Y $c.H)}}%">{{num .Value}}</span>{{end}}</div>{{end}}
+    <svg class="gc-svg" viewBox="0 0 {{.W}} {{.H}}" role="img" aria-label="{{t .Lang "chart.title"}}">
+        <line x1="0" x2="{{.W}}" y1="{{.PlotTop}}" y2="{{.PlotTop}}" class="grid"/>
+        <line x1="0" x2="{{.W}}" y1="{{.PlotBot}}" y2="{{.PlotBot}}" class="grid"/>
+        {{range .XLabels}}<line x1="{{printf "%.1f" .X}}" x2="{{printf "%.1f" .X}}" y1="{{$c.PlotTop}}" y2="{{$c.PlotBot}}" class="grid grid-v"/>{{end}}
+        {{range .Series}}<polyline points="{{.Line}}" class="gc-line gc-{{.Key}}"/>{{end}}
+        <line class="gc-guide" x1="0" x2="0" y1="{{.PlotTop}}" y2="{{.PlotBot}}" hidden/>
+        {{range .Points}}<g class="gc-pt" data-x="{{printf "%.1f" .X}}" data-t="{{.Stat.RecordedAt.Format "2006-01-02T15:04:05Z07:00"}}" data-translated="{{num .Stat.Translated}}" data-fuzzy="{{num .Stat.Fuzzy}}" data-untranslated="{{num .Stat.Untranslated}}">
+            <circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .Y1}}" r="3" class="gc-dot gc-translated"/><circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .Y2}}" r="3" class="gc-dot gc-fuzzy"/><circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .Y3}}" r="3" class="gc-dot gc-untranslated"/></g>{{end}}
+    </svg>
+    </div>
+    <div class="gc-tip" role="tooltip" hidden data-l-translated="{{t .Lang "chart.translated"}}" data-l-fuzzy="{{t .Lang "chart.fuzzy"}}" data-l-untranslated="{{t .Lang "chart.untranslated"}}"></div>
+    <div class="gc-xlabels">{{range .XLabels}}<span style="left: {{printf "%.2f" (pct .X $c.W)}}%" data-t="{{.Time.Format "2006-01-02T15:04:05Z07:00"}}"{{if .WithTime}} data-with-time{{end}}>{{.Label}}</span>{{end}}</div>
+    </div>
+    <p class="muted small">{{if eq .Scale "each"}}{{t .Lang "chart.note_each"}}{{else}}{{t .Lang "chart.note_shared"}}{{end}}</p>
+    {{else}}
+    <p class="muted small">{{t .Lang "chart.empty"}}</p>
+    {{end}}
+    </div>
+</section>
+{{end}}

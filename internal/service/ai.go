@@ -579,7 +579,7 @@ func (s *AIService) run(job *models.AIJob, st *models.AISettings, cl chatClient,
 				continue
 			}
 			forms = ai.FitForms(forms, it.Plural != "", c.NPlurals)
-			problems := ai.Verify(it, forms, c.NPlurals)
+			problems := ai.Verify(it, forms, c.NPlurals, c.PluralForms)
 			if len(problems) > 0 && (problems[0] == ai.ProblemEmpty || problems[0] == ai.ProblemCorrupt) {
 				job.Skipped++
 				job.Processed++
@@ -781,7 +781,7 @@ func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *mo
 		return nil, userErr("err.ai_entry_empty")
 	}
 	forms := ai.FitForms(results[e.ID], e.IsPlural(), c.NPlurals)
-	problems := ai.Verify(it, forms, c.NPlurals)
+	problems := ai.Verify(it, forms, c.NPlurals, c.PluralForms)
 	if len(problems) > 0 && (problems[0] == ai.ProblemEmpty || problems[0] == ai.ProblemCorrupt) {
 		return nil, userErr("err.ai_entry_empty")
 	}

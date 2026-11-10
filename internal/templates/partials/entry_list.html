@@ -19,7 +19,7 @@
     <span>{{t $.Lang "status.translated" .Stats.Translated .Stats.Total .Stats.Percent}}</span>
     <span class="sb-sep">·</span><span class="c-fuzzy">{{t $.Lang "status.fuzzy" .Stats.Fuzzy}}</span>
     <span class="sb-sep">·</span><span>{{t $.Lang "status.untranslated" .Stats.Untranslated}}</span>
-    {{if .Issues}}<span class="sb-sep">·</span><a href="#" class="c-err" data-filter-status="issues">{{t $.Lang "status.issues" .Issues}}</a>{{end}}
+    {{if .Issues}}<span class="sb-sep">·</span><a href="#" class="c-err" data-filter-status="issues" data-issue-count="{{.Issues}}">{{t $.Lang "status.issues" .Issues}}</a>{{end}}
     {{if .AI}}<span class="sb-sep">·</span><a href="#" class="c-ai" data-filter-status="ai">{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}} {{t $.Lang "status.ai" .AI}}</a>{{end}}
     {{if .Glossary}}<span class="sb-sep">·</span><a href="#" class="c-glossary" data-filter-status="glossary">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} {{t $.Lang "status.glossary" .Glossary}}</a>{{end}}
     {{if .Memory}}<span class="sb-sep">·</span><a href="#" class="c-memory" data-filter-status="memory">{{template "icon_memory" (dict "Title" "" "Fuzzy" false)}} {{t $.Lang "status.memory" .Memory}}</a>{{end}}

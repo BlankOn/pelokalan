@@ -51,6 +51,8 @@
         var cancel = d.querySelector("[data-confirm-cancel]");
         if (!ok.dataset.label) ok.dataset.label = ok.textContent;
         cancel.hidden = !!opts.notice;
+        if (!cancel.dataset.label) cancel.dataset.label = cancel.textContent;
+        cancel.textContent = opts.cancel || cancel.dataset.label;
         d.querySelector(".confirm-msg").textContent = msg;
         ok.textContent = opts.ok || (opts.danger ? d.dataset.deleteLabel : opts.notice ? "OK" : ok.dataset.label);
         ok.classList.toggle("btn-danger", !!opts.danger);
@@ -769,10 +771,11 @@
         else label.textContent = label.dataset.many.replace("%d", on.length);
         box.classList.toggle("mf-active", on.length > 0);
     }
-    // shortcuts (status bar counts, Validasi) show exactly one filter
+    // shortcuts show exactly these filters: status bar counts tick one, Validasi ticks
+    // everything that still needs work (problems, untranslated, needs review)
     function setFilter(status) {
-        var boxes = filterBoxes(), target = null;
-        boxes.forEach(function (cb) { cb.checked = cb.value === status; if (cb.checked) target = cb; });
+        var want = [].concat(status), boxes = filterBoxes(), target = null;
+        boxes.forEach(function (cb) { cb.checked = want.indexOf(cb.value) >= 0; if (cb.checked && !target) target = cb; });
         updateFilterLabel();
         (target || boxes[0]).dispatchEvent(new Event("change", { bubbles: true }));
     }
@@ -798,8 +801,23 @@
     });
     updateFilterLabel();
 
+    // Downloading a file that still has problem entries (e.g. placeholders msgfmt -c would
+    // reject): ask first, or show those entries
+    document.addEventListener("click", function (ev) {
+        var link = ev.target.closest && ev.target.closest("a[data-check-issues]");
+        if (!link) return;
+        var count = document.querySelector("[data-issue-count]");
+        var n = count ? parseInt(count.dataset.issueCount, 10) || 0 : 0;
+        if (!n || link.dataset.checked === "1") { link.dataset.checked = ""; return; }
+        ev.preventDefault();
+        window.askConfirm(link.dataset.checkIssues.replace("%d", n), { ok: link.dataset.checkOk, cancel: link.dataset.checkShow }).then(function (yes) {
+            if (yes) { link.dataset.checked = "1"; link.click(); }
+            else setFilter("issues");
+        });
+    });
+
     var validate = document.getElementById("btn-validate");
-    if (validate) validate.addEventListener("click", function () { setFilter("issues"); });
+    if (validate) validate.addEventListener("click", function () { setFilter(["issues", "untranslated", "fuzzy"]); });
 
     document.addEventListener("input", function (ev) {
         if (ev.target.closest("#entry-form") || ev.target.matches(".comment-input")) {
@@ -1481,7 +1499,6 @@ document.addEventListener("click", function (ev) {
     var write = form.querySelector('[data-wpanel="write"]');
     var preview = form.querySelector('[data-wpanel="preview"]');
     var errBox = write.querySelector(".att-error");
-    var IMAGE_TYPES = ["image/png", "image/jpeg", "image/gif", "image/webp"];
     var MAX_BYTES = 10 * 1024 * 1024;
     var dirty = false, uploads = 0;
 
@@ -1511,7 +1528,8 @@ document.addEventListener("click", function (ev) {
         });
     });
 
-    // uploads: each image is stored right away and its Markdown inserted at the cursor
+    // uploads: each file is stored right away and its Markdown inserted at the cursor
+    // (images as pictures, other files as a 📎 download link)
     function insertAtCursor(text) {
         var start = ta.selectionStart, end = ta.selectionEnd;
         var before = ta.value.slice(0, start);
@@ -1522,14 +1540,13 @@ document.addEventListener("click", function (ev) {
     function upload(files) {
         var ok = [], errs = [];
         files.forEach(function (f) {
-            if (IMAGE_TYPES.indexOf(f.type) < 0) errs.push(ta.dataset.errType);
-            else if (f.size > MAX_BYTES) errs.push(ta.dataset.errSize);
+            if (f.size > MAX_BYTES) errs.push(ta.dataset.errSize);
             else ok.push(f);
         });
         showError(errs.filter(function (e, i) { return errs.indexOf(e) === i; }).join(" "));
         if (!ok.length) return;
         // a placeholder marks where the images will go while they upload
-        var marker = "![" + ta.dataset.uploading + " " + ok.map(function (f) { return f.name; }).join(", ") + "…]()";
+        var marker = "[" + ta.dataset.uploading + " " + ok.map(function (f) { return f.name; }).join(", ") + "…]()";
         insertAtCursor(marker);
         var fd = new FormData();
         ok.forEach(function (f) { fd.append("files", f, f.name); });
@@ -1814,6 +1831,11 @@ document.addEventListener("click", function (ev) {
             else if (box.open && !box.contains(ev.target)) box.open = false;
         });
     });
+    // dropdowns rendered with ticked boxes show their selection
+    document.querySelectorAll("[data-multi-filter]").forEach(label);
+    document.addEventListener("htmx:load", function (ev) {
+        if (ev.detail && ev.detail.elt && ev.detail.elt.querySelectorAll) ev.detail.elt.querySelectorAll("[data-multi-filter]").forEach(label);
+    });
     document.addEventListener("keydown", function (ev) {
         if (ev.key !== "Escape") return;
         document.querySelectorAll("[data-multi-filter][open]").forEach(function (box) { box.open = false; box.querySelector("summary").focus(); });
@@ -1834,6 +1856,97 @@ document.addEventListener("click", function (ev) {
     }
     new MutationObserver(sync).observe(btn, { childList: true, subtree: true, characterData: true });
     sync();
+})();
+
+// Notification settings: "no email at all" greys out the individual switches
+document.addEventListener("change", function (ev) {
+    if (!ev.target.matches || !ev.target.matches("[data-notify-mute]")) return;
+    var kinds = ev.target.form.querySelector(".notify-kinds");
+    if (kinds) kinds.toggleAttribute("data-muted", ev.target.checked);
+});
+
+// Progress chart: a floating card follows the pointer and shows the nearest point
+(function () {
+    function pad(n) { return (n < 10 ? "0" : "") + n; }
+    // dates under the chart in the reader's time zone
+    function localLabels(root) {
+        (root || document).querySelectorAll(".gc-xlabels [data-t]").forEach(function (el) {
+            var d = new Date(el.dataset.t);
+            if (isNaN(d)) return;
+            var s = pad(d.getDate()) + "-" + pad(d.getMonth() + 1);
+            if (el.hasAttribute("data-with-time")) s += " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+            el.textContent = s;
+        });
+    }
+    localLabels();
+    document.addEventListener("htmx:load", function (ev) { if (ev.detail && ev.detail.elt && ev.detail.elt.querySelectorAll) localLabels(ev.detail.elt); });
+    function nearest(svg, clientX) {
+        var rect = svg.getBoundingClientRect();
+        var vb = svg.viewBox.baseVal;
+        var x = (clientX - rect.left) / rect.width * vb.width;
+        var best = null, dist = Infinity;
+        svg.querySelectorAll(".gc-pt").forEach(function (g) {
+            var d = Math.abs(parseFloat(g.dataset.x) - x);
+            if (d < dist) { dist = d; best = g; }
+        });
+        return best;
+    }
+    function hide(chart) {
+        var tip = chart.querySelector(".gc-tip"), guide = chart.querySelector(".gc-guide");
+        if (tip) tip.hidden = true;
+        if (guide) guide.setAttribute("hidden", "");
+        chart.querySelectorAll(".gc-pt.on").forEach(function (g) { g.classList.remove("on"); });
+    }
+    function show(chart, svg, ev) {
+        var g = nearest(svg, ev.clientX);
+        var tip = chart.querySelector(".gc-tip"), guide = chart.querySelector(".gc-guide");
+        if (!g || !tip) return;
+        chart.querySelectorAll(".gc-pt.on").forEach(function (o) { if (o !== g) o.classList.remove("on"); });
+        g.classList.add("on");
+        guide.setAttribute("x1", g.dataset.x);
+        guide.setAttribute("x2", g.dataset.x);
+        guide.removeAttribute("hidden");
+        var d = new Date(g.dataset.t);
+        tip.textContent = "";
+        var head = document.createElement("div");
+        head.className = "gc-tip-date";
+        head.textContent = pad(d.getDate()) + "-" + pad(d.getMonth() + 1) + "-" + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
+        tip.appendChild(head);
+        ["translated", "fuzzy", "untranslated"].forEach(function (k) {
+            var row = document.createElement("div");
+            row.className = "gc-tip-row gc-" + k;
+            var sw = document.createElement("span");
+            sw.className = "gc-swatch";
+            var label = document.createElement("span");
+            label.textContent = tip.dataset["l" + k.charAt(0).toUpperCase() + k.slice(1)];
+            var val = document.createElement("strong");
+            val.textContent = g.dataset[k];
+            row.appendChild(sw); row.appendChild(label); row.appendChild(val);
+            tip.appendChild(row);
+        });
+        tip.hidden = false;
+        // place it beside the point, inside the chart
+        var plot = chart.querySelector(".gc-plot").getBoundingClientRect();
+        var rect = svg.getBoundingClientRect();
+        var px = rect.left - plot.left + parseFloat(g.dataset.x) / svg.viewBox.baseVal.width * rect.width;
+        var left = px + 14;
+        if (left + tip.offsetWidth > plot.width) left = px - 14 - tip.offsetWidth;
+        tip.style.left = Math.max(0, left) + "px";
+        tip.style.top = Math.max(0, ev.clientY - plot.top - tip.offsetHeight / 2) + "px";
+    }
+    document.addEventListener("mousemove", function (ev) {
+        var svg = ev.target.closest && ev.target.closest(".gc-svg");
+        document.querySelectorAll(".group-chart").forEach(function (chart) {
+            if (svg && chart.contains(svg)) show(chart, svg, ev);
+            else hide(chart);
+        });
+    });
+    document.addEventListener("touchstart", function (ev) {
+        var svg = ev.target.closest && ev.target.closest(".gc-svg");
+        if (!svg) return;
+        var t = ev.touches[0];
+        show(svg.closest(".group-chart"), svg, { clientX: t.clientX, clientY: t.clientY });
+    }, { passive: true });
 })();
 
 // Konteks popup in the editor: the module's shared note, saved without leaving the page.

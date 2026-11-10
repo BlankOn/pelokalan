@@ -159,7 +159,21 @@ func funcMap() template.FuncMap {
 				return fmt.Sprintf("$%.2f", v)
 			}
 		},
-		"num": func(v int64) string { return groupDigits(v) },
+		"num": func(v any) string {
+			switch n := v.(type) {
+			case int:
+				return groupDigits(int64(n))
+			case int64:
+				return groupDigits(n)
+			}
+			return fmt.Sprint(v)
+		},
+		"pct": func(x, w float64) float64 {
+			if w == 0 {
+				return 0
+			}
+			return x / w * 100
+		},
 		"commitMsg": func(lang, s string) string {
 			parts := strings.Split(s, "|")
 			if len(parts) > 0 && i18n.Has(parts[0]) {

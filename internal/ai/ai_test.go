@@ -51,16 +51,16 @@ func TestGlossaryExact(t *testing.T) {
 
 func TestVerify(t *testing.T) {
 	it := Item{Source: "Open %s", Flags: []string{"c-format"}, Glossary: []TermHint{{Term: "Open", Translation: "Buka"}}}
-	if p := Verify(it, []string{"Buka %s"}, 1); len(p) != 0 {
+	if p := Verify(it, []string{"Buka %s"}, 1, ""); len(p) != 0 {
 		t.Errorf("good translation flagged: %v", p)
 	}
-	if p := Verify(it, []string{"_Membuka %s"}, 1); len(p) != 0 {
+	if p := Verify(it, []string{"_Membuka %s"}, 1, ""); len(p) != 0 {
 		t.Errorf("affix + accelerator should pass: %v", p)
 	}
-	if p := Verify(it, []string{"Lihat %s"}, 1); len(p) != 1 || p[0] != ProblemGlossary {
+	if p := Verify(it, []string{"Lihat %s"}, 1, ""); len(p) != 1 || p[0] != ProblemGlossary {
 		t.Errorf("glossary violation not detected: %v", p)
 	}
-	if p := Verify(it, []string{"Buka"}, 1); len(p) == 0 || p[0] != ProblemFormat {
+	if p := Verify(it, []string{"Buka"}, 1, ""); len(p) == 0 || p[0] != ProblemFormat {
 		t.Errorf("missing placeholder not detected: %v", p)
 	}
 }
@@ -174,10 +174,10 @@ func TestContextMakesGlossaryOptional(t *testing.T) {
 	}
 	// an optional term missing from the result is not a glossary problem; a required one is
 	it := Item{Source: "Key Description", Glossary: hints}
-	if p := Verify(it, []string{"Deskripsi Tombol"}, 2); len(p) != 0 {
+	if p := Verify(it, []string{"Deskripsi Tombol"}, 2, ""); len(p) != 0 {
 		t.Fatalf("Deskripsi Tombol should pass, got %v", p)
 	}
-	if p := Verify(it, []string{"Keterangan Tombol"}, 2); len(p) == 0 {
+	if p := Verify(it, []string{"Keterangan Tombol"}, 2, ""); len(p) == 0 {
 		t.Fatal("missing required term must be flagged")
 	}
 	if !strings.Contains(SystemPrompt("English", "Indonesian", "", note), `"optional": true`) {
@@ -224,7 +224,7 @@ func TestDraftPromptRules(t *testing.T) {
 	// a kept draft without the (optional) glossary term is not flagged
 	it := Item{Source: "Learn about ways of viewing your photos in a grid", Current: []string{"Pelajari cara melihat foto dalam kotak"},
 		Glossary: []TermHint{{Term: "Grid", Translation: "kisi", Optional: true}, {Term: "Learn", Translation: "Belajar", Optional: true}}}
-	if p := Verify(it, it.Current, 2); len(p) != 0 {
+	if p := Verify(it, it.Current, 2, ""); len(p) != 0 {
 		t.Fatalf("draft kept as-is must pass, got %v", p)
 	}
 }
@@ -261,13 +261,13 @@ func TestMarkupIsSentAsIs(t *testing.T) {
 		t.Fatalf("markup must not be escaped: %s", p)
 	}
 	it := Item{Source: "press <key>F5</key>"}
-	if p := Verify(it, []string{"tekan \x01key\x02F5\x01/key\x02"}, 2); len(p) != 1 || p[0] != ProblemCorrupt {
+	if p := Verify(it, []string{"tekan \x01key\x02F5\x01/key\x02"}, 2, ""); len(p) != 1 || p[0] != ProblemCorrupt {
 		t.Fatalf("control characters must be rejected, got %v", p)
 	}
-	if p := Verify(it, []string{"tekan F5"}, 2); len(p) == 0 {
+	if p := Verify(it, []string{"tekan F5"}, 2, ""); len(p) == 0 {
 		t.Fatal("dropped markup must be flagged")
 	}
-	if p := Verify(it, []string{"tekan <key>F5</key>"}, 2); len(p) != 0 {
+	if p := Verify(it, []string{"tekan <key>F5</key>"}, 2, ""); len(p) != 0 {
 		t.Fatalf("kept markup must pass, got %v", p)
 	}
 }

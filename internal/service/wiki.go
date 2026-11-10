@@ -422,8 +422,9 @@ func (s *WikiService) Delete(ctx context.Context, user *models.User, p *models.P
 	return s.repo.DeletePage(ctx, p.ID, pg.ID)
 }
 
-// Upload stores images for wiki pages (project members). Same rules as comment
-// attachments: png/jpeg/gif/webp detected from the content, 10 MB each, 5 per request.
+// Upload stores files for wiki pages (project members): 10 MB each, 5 per request. Any
+// type is accepted; images (png/jpeg/gif/webp, detected from the content) are shown in the
+// page, everything else is served as a download (application/octet-stream, sandboxed).
 func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.Project, uploads []Upload) ([]*models.WikiFile, error) {
 	if !p.Role.IsMember() {
 		return nil, ErrForbidden
@@ -444,9 +445,6 @@ func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.P
 			return nil, userErr("err.attachment_size", MaxAttachmentBytes>>20)
 		}
 		ctype, _, _ := strings.Cut(http.DetectContentType(u.Data), ";")
-		if !models.IsInlineType(ctype) {
-			return nil, userErr("err.attachment_type")
-		}
 		ok = append(ok, checked{u, ctype})
 	}
 	var out []*models.WikiFile

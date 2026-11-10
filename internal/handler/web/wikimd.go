@@ -42,13 +42,30 @@ func (localImages) Transform(doc *ast.Document, _ text.Reader, _ parser.Context)
 	}
 }
 
+// wikiFileRe matches this site's wiki uploads (/projects/<slug>/wiki/files/<id>/<name>)
+var wikiFileRe = regexp.MustCompile(`^/projects/[^/]+/wiki/files/\d+/`)
+
+// fileLinks marks links to uploaded wiki files (attachments other than images) so they
+// look like attachments and download when clicked
+type fileLinks struct{}
+
+func (fileLinks) Transform(doc *ast.Document, _ text.Reader, _ parser.Context) {
+	_ = ast.Walk(doc, func(n ast.Node, entering bool) (ast.WalkStatus, error) {
+		if l, ok := n.(*ast.Link); ok && entering && wikiFileRe.Match(l.Destination) {
+			l.SetAttributeString("class", []byte("wiki-file"))
+			l.SetAttributeString("download", []byte(""))
+		}
+		return ast.WalkContinue, nil
+	})
+}
+
 // wikiMarkdown renders wiki pages: GFM (tables, task lists, strikethrough, autolinks) in
 // goldmark's safe mode (raw HTML and javascript: links are dropped), with heading anchors.
 var wikiMarkdown = goldmark.New(
 	goldmark.WithExtensions(extension.GFM),
 	goldmark.WithParserOptions(
 		parser.WithAutoHeadingID(),
-		parser.WithASTTransformers(util.Prioritized(localImages{}, 100)),
+		parser.WithASTTransformers(util.Prioritized(localImages{}, 100), util.Prioritized(fileLinks{}, 200)),
 	),
 )
 

@@ -522,7 +522,7 @@ func (s *CatalogService) Entries(ctx context.Context, c *models.Catalog, f Entry
 	l := &EntryListing{}
 	q := strings.ToLower(strings.TrimSpace(f.Query))
 	for _, e := range all {
-		e.Issues = po.Validate(e.ToPO(), c.NPlurals)
+		e.Issues = po.ValidateWith(e.ToPO(), po.PluralFor(c.PluralForms, c.NPlurals))
 		l.Stats.Total++
 		switch e.Status() {
 		case "translated":
@@ -631,7 +631,7 @@ func (s *CatalogService) Entry(ctx context.Context, c *models.Catalog, id int64)
 	if err != nil || e.CatalogID != c.ID || e.Obsolete {
 		return nil, ErrNotFound
 	}
-	e.Issues = po.Validate(e.ToPO(), c.NPlurals)
+	e.Issues = po.ValidateWith(e.ToPO(), po.PluralFor(c.PluralForms, c.NPlurals))
 	return e, nil
 }
 

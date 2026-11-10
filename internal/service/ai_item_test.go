@@ -20,7 +20,7 @@ func TestBuildItemDraftMakesGlossaryOptional(t *testing.T) {
 	if len(draft.Glossary) != 2 || !draft.Glossary[0].Optional || !draft.Glossary[1].Optional || len(draft.Current) != 1 {
 		t.Fatalf("with a draft every glossary hint must be optional: %+v", draft)
 	}
-	if p := ai.Verify(draft, draft.Current, 1); len(p) != 0 {
+	if p := ai.Verify(draft, draft.Current, 1, ""); len(p) != 0 {
 		t.Fatalf("an unchanged draft must not be flagged: %v", p)
 	}
 }

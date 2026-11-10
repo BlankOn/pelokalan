@@ -4,28 +4,20 @@
 {{if not .User}}
 <div class="alert alert-warn">{{t .Lang "files.guest_prefix"}} <a href="/login?next={{$p.Path}}/files">{{t .Lang "files.guest_login"}}</a> {{t .Lang "files.guest_or"}} <a href="/register?next={{$p.Path}}/files">{{t .Lang "files.guest_register"}}</a> {{t .Lang "files.guest_suffix"}}</div>
 {{end}}
+{{with .Data.GroupChart}}
+<h2 class="section-title">{{t $.Lang "chart.title"}}</h2>
+{{template "group_chart" .}}
+{{end}}
 {{with .Data.ProjectFiles}}{{if .Files}}
 <h2 class="section-title">{{t $.Lang "files.project"}} <span class="muted small">({{.Total}})</span></h2>
 {{if .HasFeed}}<p class="pf-synced small muted">{{t $.Lang "files.synced_label"}}
     {{with .LastSync}}<time data-local datetime="{{.Format "2006-01-02T15:04:05Z07:00"}}">{{.Format "02-01-2006 15:04"}}</time> (<span class="pf-synced-ago">{{timeAgo $.Lang .}}</span>){{else}}<time data-local></time> (<span class="pf-synced-ago">{{t $.Lang "files.never_synced"}}</span>){{end}}
-    · {{t $.Lang "files.sync_every" .SyncHours}}</p>{{end}}
+    · {{if eq .SyncHours 1}}{{t $.Lang "files.sync_hourly"}}{{else}}{{t $.Lang "files.sync_every" .SyncHours}}{{end}}</p>{{end}}
 <section class="card">
     <div class="context-search pf-toolbar">
         <form id="pf-filter" class="pf-filter" hx-get="{{.Project.Path}}/project-files" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change, submit" hx-target="#project-file-rows" hx-swap="innerHTML">
         <input type="search" name="q" placeholder="{{t $.Lang "files.project_search"}}" aria-label="{{t $.Lang "files.project_search"}}" autocomplete="off">
-        {{if gt (len .Versions) 1}}
-        <details class="multi-filter" data-multi-filter>
-            <summary class="mf-btn" title="{{t $.Lang "files.version_filter"}}">
-                <svg class="mf-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16l-6.2 7.4V19l-3.6-1.8v-4.8z"/></svg>
-                <span class="mf-label" data-all="{{t $.Lang "files.all_versions"}}" data-many="{{t $.Lang "files.n_versions"}}">{{t $.Lang "files.all_versions"}}</span>
-                <span class="combo-caret">▾</span>
-            </summary>
-            <div class="mf-pop">
-                {{range .Versions}}<label class="mf-opt"><input type="checkbox" name="v" value="{{.ID}}"> <span class="mf-text">{{.Label}}</span> <span class="muted small">{{.Files}}</span></label>{{end}}
-                <button type="button" class="linklike small mf-clear mf-none">{{t $.Lang "filter.clear"}}</button>
-            </div>
-        </details>
-        {{end}}
+        {{if .Versions}}{{template "group_filter" (dict "Lang" $.Lang "Groups" .Versions "NoGroup" false)}}{{end}}
         </form>
         {{if .CanManage}}<form method="post" action="{{.Project.Path}}/project-files/sync" data-sync data-syncing="{{t $.Lang "files.syncing"}}">
             <button class="btn" title="{{t $.Lang "files.sync_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync"}}</span></button>
@@ -33,14 +25,14 @@
     </div>
     <p class="pf-sync-msg small" role="status" hidden></p>
     <table class="table files-table project-files">
-        <thead><tr><th>{{t $.Lang "project.col_file"}}</th><th class="w-progress">{{t $.Lang "project.col_progress"}}</th><th>{{t $.Lang "glossary.version"}}</th><th></th></tr></thead>
+        <thead><tr><th>{{t $.Lang "project.col_file"}}</th><th class="w-progress">{{t $.Lang "project.col_progress"}}</th><th>{{t $.Lang "files.module_group"}}</th><th></th></tr></thead>
         <tbody id="project-file-rows">{{template "project_file_rows" .}}</tbody>
     </table>
 </section>
 {{end}}{{end}}
 
 {{if $canManage}}
-<h2 class="section-title">{{t .Lang "files.mine"}}</h2>
+<h2 class="section-title">{{t .Lang "files.mine"}} <span class="muted small">({{.Data.MyFiles.All}})</span></h2>
 <section class="card">
     <div class="card-head">
         <h2>{{t .Lang "project.translations"}}</h2>
@@ -52,53 +44,26 @@
         {{end}}
     </div>
 
-    {{if .Data.Catalogs}}
+    {{with .Data.MyFiles}}
+    {{if .All}}
+    {{template "file_filter" (dict "Lang" $.Lang "ID" "my" "URL" (printf "%s/my-files" .Project.Path) "Groups" .Groups)}}
     <table class="table files-table">
         <thead><tr>
-            <th>{{t .Lang "project.col_file"}}</th>
-            <th class="w-progress">{{t .Lang "project.col_progress"}}</th>
-            <th class="num">{{t .Lang "stats.translated"}}</th>
-            <th class="num">{{t .Lang "stats.fuzzy"}}</th>
-            <th class="num">{{t .Lang "stats.untranslated"}}</th>
-            <th>{{t .Lang "project.col_updated"}}</th>
+            <th>{{t $.Lang "project.col_file"}}</th>
+            <th class="w-progress">{{t $.Lang "project.col_progress"}}</th>
+            <th class="num">{{t $.Lang "stats.translated"}}</th>
+            <th class="num">{{t $.Lang "stats.fuzzy"}}</th>
+            <th class="num">{{t $.Lang "stats.untranslated"}}</th>
+            <th>{{t $.Lang "project.col_updated"}}</th>
             <th></th>
         </tr></thead>
-        <tbody>
-        {{range .Data.Catalogs}}
-        <tr>
-            <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a><div class="muted small">{{.LanguageName}} · {{.Language}}</div></td>
-            <td>{{template "progress" (dict "Stats" .Stats "Lang" $.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span></td>
-            <td class="num">{{.Stats.Translated}}</td>
-            <td class="num">{{.Stats.Fuzzy}}</td>
-            <td class="num">{{.Stats.Untranslated}}</td>
-            <td class="small muted">{{timeAgo $.Lang .UpdatedAt}}</td>
-            <td class="actions">
-                <a class="btn btn-small btn-primary" href="{{.URL}}">{{t $.Lang "action.translate"}}</a>
-                <details class="dropdown">
-                    <summary class="btn btn-small" aria-label="{{t $.Lang "action.more"}}">⋯</summary>
-                    <div class="menu">
-                        <a href="/catalogs/{{.ID}}/download">{{t $.Lang "action.download_po"}}</a>
-                        <a href="/catalogs/{{.ID}}/download.mo">{{t $.Lang "action.download_mo"}}</a>
-                        {{if $canManage}}
-                        {{if $.Data.Template}}
-                        <form method="post" action="/catalogs/{{.ID}}/update"><button class="linklike">{{t $.Lang "action.update_from_template"}}</button></form>
-                        {{end}}
-                        <form method="post" action="/catalogs/{{.ID}}/replace" enctype="multipart/form-data" class="inline-upload">
-                            <label class="linklike">{{t $.Lang "action.upload_new_version"}}<input type="file" name="file" accept=".po" data-autosubmit hidden></label>
-                        </form>
-                        <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $.Lang "confirm.delete_file"}}"><button class="linklike danger">{{t $.Lang "action.delete"}}</button></form>
-                        {{end}}
-                    </div>
-                </details>
-            </td>
-        </tr>
-        {{end}}
-        </tbody>
+        <tbody id="my-file-rows">{{template "file_rows" .}}</tbody>
     </table>
     {{else}}
     <div class="empty-inline">
-        <p class="muted">{{if .Data.Template}}{{t .Lang "project.no_translations_with_template"}}{{else}}{{t .Lang "project.no_files"}}{{end}}</p>
+        <p class="muted">{{if $.Data.Template}}{{t $.Lang "project.no_translations_with_template"}}{{else}}{{t $.Lang "project.no_files"}}{{end}}</p>
     </div>
+    {{end}}
     {{end}}
 </section>
 
@@ -132,12 +97,11 @@
 
 {{end}}
 
-<h2 class="section-title">{{t .Lang "files.others"}}</h2>
-{{range .Data.Others}}
+{{with .Data.MemberFiles}}
+<h2 class="section-title">{{t $.Lang "files.others"}} <span class="muted small">({{.All}})</span></h2>
+{{if .All}}
 <section class="card">
-    <div class="card-head">
-        <h2><span class="avatar avatar-sm">{{initial .Username}}</span> @{{.Username}}</h2>
-    </div>
+    {{template "file_filter" (dict "Lang" $.Lang "ID" "member" "URL" (printf "%s/member-files" .Project.Path) "Groups" .Groups)}}
     <table class="table files-table">
         <thead><tr>
             <th>{{t $.Lang "project.col_file"}}</th>
@@ -148,26 +112,12 @@
             <th>{{t $.Lang "project.col_updated"}}</th>
             <th></th>
         </tr></thead>
-        <tbody>
-        {{range .Files}}
-        <tr>
-            <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a><div class="muted small">{{if .IsTemplate}}{{t $.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}</div></td>
-            <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>{{end}}</td>
-            <td class="num">{{if not .IsTemplate}}{{.Stats.Translated}}{{end}}</td>
-            <td class="num">{{if not .IsTemplate}}{{.Stats.Fuzzy}}{{end}}</td>
-            <td class="num">{{if not .IsTemplate}}{{.Stats.Untranslated}}{{else}}{{t $.Lang "project.template_strings" .Stats.Total}}{{end}}</td>
-            <td class="small muted">{{timeAgo $.Lang .UpdatedAt}}</td>
-            <td class="actions">
-                <a class="btn btn-small" href="{{.URL}}">{{t $.Lang "action.view"}}</a>
-                <a class="btn btn-small btn-icon" href="/catalogs/{{.ID}}/download" title="{{t $.Lang "action.download"}} {{.Filename}}" aria-label="{{t $.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
-            </td>
-        </tr>
-        {{end}}
-        </tbody>
+        <tbody id="member-file-rows">{{template "file_rows" .}}</tbody>
     </table>
 </section>
 {{else}}
-<p class="muted">{{t .Lang "files.others_none"}}</p>
+<p class="muted">{{t $.Lang "files.others_none"}}</p>
+{{end}}
 {{end}}
 
 {{if $canManage}}

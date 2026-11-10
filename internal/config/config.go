@@ -162,7 +162,7 @@ func Load() *Config {
 			AllowPrivateHosts: getEnv("AI_ALLOW_PRIVATE_HOSTS", "false") == "true",
 		},
 		Glossary: GlossaryConfig{
-			FetchInterval:     time.Duration(getEnvInt("GLOSSARY_FETCH_INTERVAL_HOURS", 3)) * time.Hour,
+			FetchInterval:     time.Duration(getEnvInt("GLOSSARY_FETCH_INTERVAL_HOURS", 1)) * time.Hour,
 			MaxDownloadMB:     int64(getEnvInt("GLOSSARY_MAX_DOWNLOAD_MB", 100)),
 			AllowPrivateHosts: getEnv("GLOSSARY_ALLOW_PRIVATE_HOSTS", "false") == "true",
 			ThesaurusURL: getEnv("THESAURUS_URL",

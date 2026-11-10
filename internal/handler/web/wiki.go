@@ -291,8 +291,13 @@ func (h *Handler) WikiUpload(w http.ResponseWriter, r *http.Request) {
 	res := wikiUploadResult{}
 	for _, f := range files {
 		u := wikiFileURL(p, f)
-		alt := strings.NewReplacer("[", "", "]", "", "\n", " ").Replace(strings.TrimSuffix(f.Filename, filepath.Ext(f.Filename)))
-		res.Files = append(res.Files, wikiUploadFile{Name: f.Filename, URL: u, Markdown: "![" + alt + "](" + u + ")"})
+		clean := strings.NewReplacer("[", "", "]", "", "\n", " ")
+		md := "![" + clean.Replace(strings.TrimSuffix(f.Filename, filepath.Ext(f.Filename))) + "](" + u + ")"
+		if !f.IsImage() {
+			// other files become a download link: "📎 notes.pdf (1.2 MB)"
+			md = "[📎 " + clean.Replace(f.Filename) + " (" + humanSize(f.Size) + ")](" + u + ")"
+		}
+		res.Files = append(res.Files, wikiUploadFile{Name: f.Filename, URL: u, Markdown: md})
 	}
 	_ = json.NewEncoder(w).Encode(res)
 }
@@ -341,4 +346,16 @@ func (h *Handler) WikiMove(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	_ = json.NewEncoder(w).Encode(map[string]bool{"ok": true})
+}
+
+// humanSize writes a byte count like "820 B", "14 KB" or "1.2 MB"
+func humanSize(n int64) string {
+	switch {
+	case n < 1024:
+		return strconv.FormatInt(n, 10) + " B"
+	case n < 1024*1024:
+		return strconv.FormatInt((n+512)/1024, 10) + " KB"
+	default:
+		return strconv.FormatFloat(float64(n)/(1024*1024), 'f', 1, 64) + " MB"
+	}
 }

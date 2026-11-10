@@ -101,9 +101,14 @@ make test
   "Muat lagi" via `GET /projects/{id}/project-files?offset=`); download, or "Ambil" copies one into
   the member's own files (`catalogService.Upload`). Synced versions imported before 027 count as due
   (`DueFeeds`) and are re-fetched to fill them in; versions uploaded by hand need a re-upload.
-  Searchable (every word in file name, language or version label) and filterable by glossary version
-  (checkbox dropdown `[data-multi-filter]` with "Tampilkan semua" like the editor filter, shown with 2+ versions;
-  `v` params). Search and filter live in `#pf-filter`; "Muat lagi" includes it (`hx-include`).
+  Searchable (every word in file name, language or group label) and filterable by **module group**
+  (= glossary version with project files, e.g. gnome-51; `group_filter` partial, checkbox dropdown
+  `[data-multi-filter]` with "Tampilkan semua" like the editor filter, shown when there is a group; `g` params).
+  Search and filter live in `#pf-filter`; "Muat lagi" includes it (`hx-include`).
+- "Berkas Anda" and "Berkas anggota lain" (one list, owner under each file) show 5 files at a time
+  (`FileListPageSize`, `GET /projects/{id}/my-files|member-files?q=&g=&offset=`, `Handler.fileList`, partial
+  `file_rows`) with search and the same module group filter: a file is in a group when its module
+  (`service.ModuleOf`) is among that group's project files (`GlossaryService.ModuleGroups`); `g=0` = no group.
   Managers get "Sinkronkan" (`POST /projects/{id}/project-files/sync` → `GlossaryService.SyncAll`):
   fetches every version with a sync link in a background goroutine (requests time out after 30 s);
   `GlossaryService.syncing` makes it and the hourly `FetchDue` run one at a time. app.js (`form[data-sync]`)
@@ -166,8 +171,14 @@ make test
   all its translations. The module list (`GlossaryRepository.Modules`) feeds a searchable dropdown
   (`[data-combo]` in app.js).
 - The sync status above the glossary always describes the newest version with data.
-- Every new comment emails all other project members in the background (mentioned members
-  get the mention wording).
+- New comments email other project members in the background, filtered by each member's
+  notification settings (`notification_settings`, migration 030; Pengaturan tab, visible to every member,
+  `POST /projects/{id}/notifications`). A member gets at most one email per comment, sent when any reason that
+  applies to them (`models.Notify*`: mention, my_file, started, participated, new_topic, other_topic,
+  other_glossary, other_entry; `DiscussionService.reasons`, strongest first) is on; "muted" turns off all
+  project email. Everything is on by default (kinds are stored as "off"). Emails say which setting caused
+  them and link to the settings. Sign-in codes and invitations are always sent. Email buttons use
+  `emailButton` (small).
 - Comments: project members only; readable publicly. Deletion is soft (`deleted_at`, `deleted_by`): the
   author, username and time stay visible with a note saying who deleted it and when. `@username` mentions of members are
   stored and emailed. Authors edit/delete their own; owners/managers can delete any. Bodies are
@@ -215,6 +226,14 @@ make test
   `ai.ContextWords`/`ai.Mentioned`; plain sentences and examples do not count) are sent as `optional` hints (not enforced by `ai.Verify`), and
   whole-string glossary matches containing such a word go to the model instead of being applied.
 - Project tabs carry monochrome line icons (`tab_icon` in project_header.html).
+- Module group progress chart above Berkas proyek (`group_chart` partial, `groupchart.go`): `group_stats`
+  (migration 031) records each group's project file totals per language at every 15-minute check when they
+  changed, and at least hourly (`GlossaryService.RecordStats`, `StatsInterval`), plus after uploads. Groups are
+  chosen with the same `group_filter` dropdown (none = all; several are added up per hour, `sumByHour`);
+  ranges Hari ini (last 24 h, hourly points) / 7 / 30 days / all (daily points, `lastPerBucket`). Lines (translated green, fuzzy orange, untranslated red) share one scale with tidy value labels by default (`niceStep`), so distances are real; "Skala per garis" (`cs=each`) zooms each line to its own range and shows [min–max] in the legend; a
+  floating card (app.js) shows the nearest point. History starts on the day it was deployed.
+- Penerjemahan (`/projects/{id}/files`) is the first tab and the landing page: `/projects/{id}` redirects
+  there (`ProjectHome`, query kept); the glossary lives at `/projects/{id}/glossary`.
 
 ## Thesaurus
 
@@ -251,8 +270,10 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - Rendering: `wikiHTML` (goldmark GFM, safe mode, heading ids). Images are only shown when
   served by this site (`localImages` turns others into links); external links open in a new tab.
   The editor preview posts to `/wiki/preview`, so it matches the saved page.
-- Uploads: `wiki_files` share the blob store with comment attachments (same image-only, 10 MB
-  rules); they are uploaded immediately and Markdown is inserted at the cursor. Blob GC keeps
+- Uploads: `wiki_files` share the blob store with comment attachments (10 MB each, 5 per upload) but
+  accept any file type. They are uploaded immediately and Markdown is inserted at the cursor: images as
+  `![…](…)` (shown in the page), other files as `[📎 name (size)](…)` download links (`fileLinks` marks
+  them `.wiki-file` with `download`; served as octet-stream attachments under a sandbox CSP). Blob GC keeps
   blobs referenced by `wiki_files`. Images in `.wiki-body` open in the lightbox.
 
 ## Versions and automatic downloads
@@ -260,7 +281,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - `project_versions` (name + version, label "gnome-51") group glossary imports; sorted
   naturally (`service.SortVersions`), newest first. Re-importing a version+language replaces it.
 - A version may have `glossary_url`; `GlossaryService.FetchDue` runs every 15 minutes from main.go and
-  fetches URLs older than `GLOSSARY_FETCH_INTERVAL_HOURS` (default 3), using ETag/Last-Modified and a
+  fetches URLs older than `GLOSSARY_FETCH_INTERVAL_HOURS` (default 1), using ETag/Last-Modified and a
   content hash to skip unchanged archives. `glossary.Fetcher` refuses private/local
   addresses at dial time (SSRF protection) unless `GLOSSARY_ALLOW_PRIVATE_HOSTS=true`.
 
@@ -368,7 +389,9 @@ search box fills the space after the buttons, followed by the filter (funnel) an
 All phone rules live in one `@media (max-width: 700px)` block at the end of style.css (it must
 stay last to override). Rules of thumb: nothing may be wider than the screen (tabs scroll
 sideways, tables become stacked blocks: `.files-table`, `.gl-table`), grid tracks use
-`minmax(0, 1fr)`, and fields use 16px text so iOS does not zoom in.
+`minmax(0, 1fr)`, and fields use 16px text so iOS does not zoom in. Tablets (701–960px, e.g. iPad mini
+portrait 744px): the file tables hide their three count columns; the project tabs scroll sideways at
+every width so they never widen the page (a page wider than the screen makes iPad zoom out).
 
 ## Static assets
 
@@ -395,6 +418,11 @@ deploys never run stale JS/CSS.
   the list and current entry reload. "Terjemahkan AI" locks the box with a shimmer (`.ai-filling`).
 - "Urungkan" (`#btn-undo`) undoes the last change to the translation: typing bursts and every tool
   (copy source, AI, glossary chip, thesaurus via `window.trBeforeChange`, suggestions) push a snapshot.
+- Plural placeholders are checked like `msgfmt -c` (`po.ValidateWith` + `po.PluralFor(c.PluralForms, …)`, which
+  evaluates the Plural-Forms formula for n = 0…1000): every `msgstr[i]` is compared with `msgid_plural`; only a
+  form used for at most one number, in a file with several forms, may drop a placeholder. With one form
+  (Indonesian) `msgstr[0]` must have the placeholders of `msgid_plural` (issue `plural_placeholders`).
+  Downloading PO/MO from the editor while the file has problem entries asks first ("Lihat masalah" filters them).
 - Validation flags `control_chars` and `markup` (tags such as <gui>, <key> differing from the source);
   `ai.UserPrompt` sends markup unescaped, and AI results with control characters are never saved.
 - The editor's Bantuan button (and `?` outside text fields) opens `#help-dialog` with all shortcuts;
@@ -405,7 +433,8 @@ deploys never run stale JS/CSS.
 - "Unggah berkas" accepts a file or a URL; URLs are fetched server-side with an SSRF-safe
   `glossary.Fetcher` (`Handler.SetPOFetcher`, upload size limit) and then handled like uploads.
 - The status filter is a dropdown of checkboxes (`#filter-status`, `EntryFilter.Statuses`): an entry
-  shows when it matches any ticked status; none = all. Shortcuts (status bar, Validasi) tick one.
+  shows when it matches any ticked status; none = all. Status bar counts tick one; Validasi ticks
+  Bermasalah, Belum diterjemahkan and Perlu ditinjau.
 - Entry load/save deliberately use `fetch` (not htmx): a new load aborts the previous one,
   requests time out after 20 s, navigation during a save waits for it, and a failed save asks
   before moving on. htmx's per-element request queue could otherwise freeze the editor after

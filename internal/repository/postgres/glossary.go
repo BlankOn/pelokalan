@@ -596,3 +596,63 @@ func (r *glossaryRepository) ProjectFileVersions(ctx context.Context, projectID 
 	}
 	return out, rows.Err()
 }
+
+func (r *glossaryRepository) ProjectFileNames(ctx context.Context, projectID int64) (map[int64][]string, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT DISTINCT version_id, filename FROM project_files WHERE project_id = $1`, projectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[int64][]string{}
+	for rows.Next() {
+		var id int64
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
+			return nil, err
+		}
+		out[id] = append(out[id], name)
+	}
+	return out, rows.Err()
+}
+
+func (r *glossaryRepository) RecordGroupStats(ctx context.Context, versionID int64, minGap time.Duration) error {
+	// one row per version and language (all versions when versionID is 0); skipped when the
+	// last point is newer than minGap and has the same numbers
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO group_stats (project_id, version_id, language, total, translated, fuzzy)
+		SELECT f.project_id, f.version_id, f.language, SUM(f.total), SUM(f.translated), SUM(f.fuzzy)
+		  FROM project_files f
+		 WHERE $1 = 0 OR f.version_id = $1
+		 GROUP BY f.project_id, f.version_id, f.language
+		HAVING NOT EXISTS (
+		       SELECT 1 FROM (SELECT g.total, g.translated, g.fuzzy, g.recorded_at FROM group_stats g
+		                       WHERE g.version_id = f.version_id AND g.language = f.language
+		                       ORDER BY g.recorded_at DESC LIMIT 1) last
+		        WHERE last.recorded_at > NOW() - make_interval(secs => $2)
+		          AND last.total = SUM(f.total) AND last.translated = SUM(f.translated) AND last.fuzzy = SUM(f.fuzzy))`,
+		versionID, minGap.Seconds())
+	return err
+}
+
+func (r *glossaryRepository) GroupStats(ctx context.Context, versionID int64, language string, since time.Time) ([]models.GroupStat, error) {
+	if language == "" { // the group's main language
+		_ = r.db.QueryRowContext(ctx, `SELECT language FROM group_stats WHERE version_id = $1
+			GROUP BY language ORDER BY MAX(total) DESC LIMIT 1`, versionID).Scan(&language)
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT version_id, language, total, translated, fuzzy, recorded_at
+		FROM group_stats WHERE version_id = $1 AND language = $2 AND recorded_at >= $3 ORDER BY recorded_at`,
+		versionID, language, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.GroupStat
+	for rows.Next() {
+		var g models.GroupStat
+		if err := rows.Scan(&g.VersionID, &g.Language, &g.Total, &g.Translated, &g.Fuzzy, &g.RecordedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, g)
+	}
+	return out, rows.Err()
+}

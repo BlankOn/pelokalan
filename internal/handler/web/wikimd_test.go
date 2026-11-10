@@ -26,3 +26,13 @@ func TestWikiHTML(t *testing.T) {
 		}
 	}
 }
+
+func TestWikiFileLinks(t *testing.T) {
+	out := string(wikiHTML("[📎 notes.pdf (1.2 MB)](/projects/gnome-id/wiki/files/12/notes.pdf) and [page](/projects/gnome-id/wiki/other)"))
+	if !strings.Contains(out, `class="wiki-file"`) || !strings.Contains(out, `download`) {
+		t.Errorf("attachment link not marked: %s", out)
+	}
+	if strings.Count(out, `class="wiki-file"`) != 1 {
+		t.Errorf("only links to wiki files are attachments: %s", out)
+	}
+}

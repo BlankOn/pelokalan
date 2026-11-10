@@ -93,6 +93,7 @@ func main() {
 		cfg.Site.Name+" glossary fetcher (+"+cfg.Site.BaseURL+")")
 	glossaryService := service.NewGlossaryService(repos.Glossary, fetcher)
 	discussionService := service.NewDiscussionService(repos.Discuss, repos.Project, repos.Glossary, repos.Catalog, blobs, mailer, cfg.Site)
+	discussionService.SetNotifications(postgres.NewNotificationRepository(db))
 	wikiService := service.NewWikiService(postgres.NewWikiRepository(db), blobs)
 	contextService := service.NewContextService(postgres.NewContextRepository(db))
 	aiService := service.NewAIService(repos.AI, repos.Catalog, repos.Glossary, ai.NewBox(cfg.AI.SecretKey), cfg.AI.AllowPrivateHosts)
@@ -170,7 +171,7 @@ func main() {
 		r.Post("/logout", webHandler.Logout)
 
 		r.Get("/projects", webHandler.Projects)
-		r.Get("/projects/{id}", webHandler.GlossaryPage)
+		r.Get("/projects/{id}", webHandler.ProjectHome)
 		r.Get("/projects/{id}/glossary", webHandler.GlossaryPage)
 		r.Get("/projects/{id}/glossary/search", webHandler.GlossarySearch)
 		r.Get("/projects/{id}/members", webHandler.MembersPage)
@@ -179,6 +180,9 @@ func main() {
 		r.Get("/licenses", webHandler.LicensesPage)
 		r.Get("/projects/{id}/contexts", webHandler.ContextsPage)
 		r.Get("/projects/{id}/project-files", webHandler.ProjectFilesMore)
+		r.Get("/projects/{id}/my-files", webHandler.MyFiles)
+		r.Get("/projects/{id}/group-chart", webHandler.GroupChart)
+		r.Get("/projects/{id}/member-files", webHandler.MemberFiles)
 		r.Get("/projects/{id}/project-files/{fid}/download", webHandler.ProjectFileDownload)
 		r.Get("/projects/{id}/topics/{key}", webHandler.TopicPage)
 		r.Get("/projects/{id}/threads/{type}/{key}", webHandler.ThreadPage)
@@ -278,6 +282,7 @@ func main() {
 		r.Post("/projects/{id}/wiki/{slug}/move", webHandler.WikiMove)
 		r.Get("/projects/{id}/settings", webHandler.SettingsPage)
 		r.Post("/projects/{id}/settings", webHandler.UpdateSettings)
+		r.Post("/projects/{id}/notifications", webHandler.SaveNotifications)
 		r.Post("/projects/{id}/delete", webHandler.DeleteProject)
 		r.Post("/projects/{id}/ai", webHandler.SaveAISettings)
 		r.Post("/projects/{id}/ai/test", webHandler.TestAISettings)
@@ -286,12 +291,15 @@ func main() {
 	})
 
 	// Download glossary sources that are due (checked every 15 minutes, each URL once per interval)
+	// and record each module group's totals for the progress chart (at most hourly)
 	go func() {
 		glossaryService.FetchDue(context.Background(), cfg.Glossary.FetchInterval)
+		glossaryService.RecordStats(context.Background())
 		t := time.NewTicker(15 * time.Minute)
 		defer t.Stop()
 		for range t.C {
 			glossaryService.FetchDue(context.Background(), cfg.Glossary.FetchInterval)
+			glossaryService.RecordStats(context.Background())
 		}
 	}()
 

@@ -142,37 +142,18 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 		return
 	}
 	var template *models.Catalog
-	var translations []*models.Catalog
-	others := map[string]*ownerFiles{}
-	var otherOrder []string
 	for _, c := range catalogs {
-		switch {
-		case c.Owned && c.IsTemplate:
+		if c.Owned && c.IsTemplate {
 			template = c
-		case c.Owned:
-			translations = append(translations, c)
-		default:
-			g, ok := others[c.OwnerUsername]
-			if !ok {
-				g = &ownerFiles{Username: c.OwnerUsername}
-				others[c.OwnerUsername] = g
-				otherOrder = append(otherOrder, c.OwnerUsername)
-			}
-			g.Files = append(g.Files, c)
 		}
-	}
-	sort.Strings(otherOrder)
-	var otherGroups []*ownerFiles
-	for _, u := range otherOrder {
-		otherGroups = append(otherGroups, others[u])
 	}
 	data := h.page(r, "")
 	data.Title = i18n.T(data.Lang, "project.tab_files") + " · " + p.Name
 	data.Error = errMsg
 	data.Data["Project"] = p
 	data.Data["Template"] = template
-	data.Data["Catalogs"] = translations
-	data.Data["Others"] = otherGroups
+	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, 0)
+	data.Data["MemberFiles"] = h.fileList(r, p, catalogs, false, "", nil, 0)
 	data.Data["Tab"] = "files"
 	if pf, total, err := h.glossary.ProjectFiles(r.Context(), p, "", nil, 0); err == nil {
 		_ = h.catalogService.MatchOwnFiles(r.Context(), middleware.GetUser(r.Context()), p, pf)
@@ -182,6 +163,7 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 		view.HasFeed, view.LastSync = h.lastSync(r, p)
 		view.Versions, _ = h.glossary.ProjectFileVersions(r.Context(), p)
 		data.Data["ProjectFiles"] = view
+		data.Data["GroupChart"] = h.groupChart(r, p, view.Versions)
 	}
 	if msg := r.URL.Query().Get("merged"); msg != "" {
 		data.Flash = i18n.T(data.Lang, "flash.merged", r.URL.Query().Get("added"), r.URL.Query().Get("obsolete"))
@@ -391,11 +373,8 @@ func (h *Handler) SettingsPage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	// settings are for owners and managers only
-	if !p.Role.CanManage() {
-		h.fail(w, r, service.ErrForbidden)
-		return
-	}
+	// every member manages their email notifications here; the project settings below
+	// them are for owners and managers only
 	h.renderSettings(w, r, p, "", "")
 }
 
@@ -590,11 +569,7 @@ func (h *Handler) ProjectFilesMore(w http.ResponseWriter, r *http.Request) {
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	q := r.URL.Query().Get("q")
 	var versionIDs []int64
-	for _, v := range r.URL.Query()["v"] {
-		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
-			versionIDs = append(versionIDs, id)
-		}
-	}
+	versionIDs = groupParams(r)
 	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, versionIDs, offset)
 	if err != nil {
 		h.fail(w, r, err)
@@ -738,4 +713,142 @@ func (h *Handler) lastSync(r *http.Request, p *models.Project) (bool, *time.Time
 		}
 	}
 	return has, last
+}
+
+// FileListPageSize is how many of the user's / other members' files a page shows
+const FileListPageSize = 5
+
+// fileListView is a page of "Berkas Anda" (Mine) or "Berkas anggota lain"
+type fileListView struct {
+	Lang        string
+	Project     *models.Project
+	Mine        bool
+	Files       []*models.Catalog
+	Total       int // matching the search and filter
+	All         int // without search and filter
+	Next        int // offset of the next page
+	CanManage   bool
+	HasTemplate bool
+	Groups      []*models.ProjectFileVersion // module group filter options
+	Searched    bool
+}
+
+// fileList filters a project's PO files: the user's own (mine) or the other members'.
+// q: every word must appear in the file name, language or owner; groups: module groups
+// (glossary versions whose project files contain the file's module), 0 = no group.
+func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Catalog, mine bool, q string, groups []int64, offset int) fileListView {
+	v := fileListView{Lang: middleware.GetLang(r.Context()), Project: p, Mine: mine, CanManage: p.Role.IsMember(),
+		Searched: q != "" || len(groups) > 0}
+	v.Groups, _ = h.glossary.ProjectFileVersions(r.Context(), p)
+	moduleGroups, _ := h.glossary.ModuleGroups(r.Context(), p)
+	want := map[int64]bool{}
+	for _, g := range groups {
+		want[g] = true
+	}
+	words := strings.Fields(strings.ToLower(q))
+	var list []*models.Catalog
+	for _, c := range all {
+		if mine {
+			if !c.Owned {
+				continue
+			}
+			if c.IsTemplate {
+				v.HasTemplate = true
+				continue
+			}
+		} else if c.Owned {
+			continue
+		}
+		v.All++
+		hay := strings.ToLower(c.Filename + " " + c.Language + " " + c.LanguageName() + " @" + c.OwnerUsername)
+		ok := true
+		for _, w := range words {
+			if !strings.Contains(hay, w) {
+				ok = false
+				break
+			}
+		}
+		if ok && len(want) > 0 {
+			in := moduleGroups[service.ModuleOf(c)]
+			ok = len(in) == 0 && want[0]
+			for _, g := range in {
+				if want[g] {
+					ok = true
+				}
+			}
+		}
+		if ok {
+			list = append(list, c)
+		}
+	}
+	if !mine {
+		sort.SliceStable(list, func(i, j int) bool { return list[i].OwnerUsername < list[j].OwnerUsername })
+	}
+	v.Total = len(list)
+	if offset < 0 || offset > len(list) {
+		offset = 0
+	}
+	end := min(offset+FileListPageSize, len(list))
+	v.Files = list[offset:end]
+	v.Next = end
+	return v
+}
+
+func groupParams(r *http.Request) []int64 {
+	var out []int64
+	for _, g := range r.URL.Query()["g"] {
+		if id, err := strconv.ParseInt(g, 10, 64); err == nil {
+			out = append(out, id)
+		}
+	}
+	return out
+}
+
+// MyFiles / MemberFiles return a page of rows for "Muat lagi", search and filter (htmx)
+func (h *Handler) MyFiles(w http.ResponseWriter, r *http.Request)     { h.fileRows(w, r, true) }
+func (h *Handler) MemberFiles(w http.ResponseWriter, r *http.Request) { h.fileRows(w, r, false) }
+
+func (h *Handler) fileRows(w http.ResponseWriter, r *http.Request, mine bool) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	all, err := h.catalogService.ListAll(r.Context(), middleware.GetUser(r.Context()), p)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	h.renderPartials(w, partial{"file_rows", h.fileList(r, p, all, mine, strings.TrimSpace(r.URL.Query().Get("q")), groupParams(r), offset)})
+}
+
+// SaveNotifications stores the member's email notification choices for the project
+func (h *Handler) SaveNotifications(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	on := map[string]bool{}
+	for _, k := range models.NotifyKinds {
+		on[k] = r.FormValue("n_"+k) == "1"
+	}
+	if err := h.discuss.SaveNotificationSettings(r.Context(), middleware.GetUser(r.Context()), p, r.FormValue("muted") == "1", on); err != nil {
+		h.renderSettings(w, r, p, h.errorMessage(r, err), "")
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/settings?flash=notifications_saved#notifications", http.StatusSeeOther)
+}
+
+// ProjectHome is the project's landing page: Penerjemahan (/projects/{id}/files).
+// The query (e.g. ?flash=) is kept.
+func (h *Handler) ProjectHome(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	target := p.Path() + "/files"
+	if r.URL.RawQuery != "" {
+		target += "?" + r.URL.RawQuery
+	}
+	http.Redirect(w, r, target, http.StatusFound)
 }

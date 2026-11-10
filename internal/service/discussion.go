@@ -56,6 +56,45 @@ type DiscussionService struct {
 	blobs    blobstore.Store
 	mailer   Mailer
 	site     config.SiteConfig
+	notifs   repository.NotificationRepository // members' email choices (nil: email everyone)
+}
+
+// SetNotifications connects the members' notification settings
+func (s *DiscussionService) SetNotifications(r repository.NotificationRepository) { s.notifs = r }
+
+// NotificationSettings returns a member's email choices in a project
+func (s *DiscussionService) NotificationSettings(ctx context.Context, user *models.User, p *models.Project) (*models.NotificationSettings, error) {
+	if user == nil || !p.Role.IsMember() {
+		return nil, ErrForbidden
+	}
+	if s.notifs == nil {
+		return &models.NotificationSettings{Off: map[string]bool{}}, nil
+	}
+	all, err := s.notifs.Settings(ctx, p.ID, []int64{user.ID})
+	if err != nil {
+		return nil, err
+	}
+	if n := all[user.ID]; n != nil {
+		return n, nil
+	}
+	return &models.NotificationSettings{Off: map[string]bool{}}, nil
+}
+
+// SaveNotificationSettings stores a member's email choices; on lists the kinds switched on
+func (s *DiscussionService) SaveNotificationSettings(ctx context.Context, user *models.User, p *models.Project, muted bool, on map[string]bool) error {
+	if user == nil || !p.Role.IsMember() {
+		return ErrForbidden
+	}
+	if s.notifs == nil {
+		return nil
+	}
+	n := &models.NotificationSettings{Muted: muted, Off: map[string]bool{}}
+	for _, k := range models.NotifyKinds {
+		if !on[k] {
+			n.Off[k] = true
+		}
+	}
+	return s.notifs.Save(ctx, user.ID, p.ID, n)
 }
 
 // NewDiscussionService creates the discussion service
@@ -364,7 +403,7 @@ func (s *DiscussionService) post(ctx context.Context, user *models.User, p *mode
 		return nil, err
 	}
 	// emails go out in the background so posting stays fast
-	go s.notify(context.Background(), user, p, subj, c, mentioned, members)
+	go s.notify(context.Background(), user, p, subj, d, c, mentioned, members)
 	return c, nil
 }
 
@@ -386,10 +425,41 @@ func ids(users []*models.User) []int64 {
 	return out
 }
 
-// notify emails every other project member about a new comment; mentioned
-// members get the mention wording instead
-func (s *DiscussionService) notify(ctx context.Context, author *models.User, p *models.Project, subj *Subject, c *models.Comment,
-	mentioned []*models.User, members map[string]*models.User) {
+// reasons lists why a member hears about a comment, strongest first (models.Notify*)
+func (s *DiscussionService) reasons(u *models.User, subj *Subject, d *models.Discussion, fileOwner int64,
+	commenters map[int64]bool, newTopic, mentioned bool) []string {
+	var out []string
+	if mentioned {
+		out = append(out, models.NotifyMention)
+	}
+	if fileOwner == u.ID {
+		out = append(out, models.NotifyMyFile)
+	}
+	if d.CreatedBy != nil && *d.CreatedBy == u.ID {
+		out = append(out, models.NotifyStarted)
+	}
+	if commenters[u.ID] {
+		out = append(out, models.NotifyParticipated)
+	}
+	if newTopic {
+		out = append(out, models.NotifyNewTopic)
+	}
+	switch subj.Type {
+	case models.SubjectTopic:
+		out = append(out, models.NotifyOtherTopic)
+	case models.SubjectGlossaryTerm:
+		out = append(out, models.NotifyOtherGlossary)
+	case models.SubjectPOEntry:
+		out = append(out, models.NotifyOtherEntry)
+	}
+	return out
+}
+
+// notify emails the other project members about a new comment. Each member gets at most
+// one email, sent when any reason that applies to them is switched on in their settings;
+// the email says which reason it was and links to the settings.
+func (s *DiscussionService) notify(ctx context.Context, author *models.User, p *models.Project, subj *Subject, d *models.Discussion,
+	c *models.Comment, mentioned []*models.User, members map[string]*models.User) {
 	defer func() {
 		if r := recover(); r != nil {
 			log.Printf("discussion: notify panicked: %v", r)
@@ -400,33 +470,84 @@ func (s *DiscussionService) notify(ctx context.Context, author *models.User, p *
 		link = link[:strings.Index(link, "#")]
 	}
 	link += "#comment-" + strconv.FormatInt(c.ID, 10)
+	settingsLink := s.site.BaseURL + p.Path() + "/settings#notifications"
 	isMentioned := map[int64]bool{}
 	for _, u := range mentioned {
 		isMentioned[u.ID] = true
+	}
+	// who commented before this comment, and whether this comment started a free discussion
+	commenters := map[int64]bool{}
+	earlier := 0
+	if list, err := s.repo.Comments(ctx, d.ID); err == nil {
+		for _, x := range list {
+			if x.ID == c.ID {
+				continue
+			}
+			earlier++
+			if x.AuthorID != nil {
+				commenters[*x.AuthorID] = true
+			}
+		}
+	}
+	newTopic := subj.Type == models.SubjectTopic && earlier == 0
+	var fileOwner int64
+	if subj.Type == models.SubjectPOEntry {
+		if cat, _, err := s.entryCatalog(ctx, p, subj.Key); err == nil {
+			fileOwner = cat.OwnerID
+		}
+	}
+	var memberIDs []int64
+	for _, u := range members {
+		memberIDs = append(memberIDs, u.ID)
+	}
+	settings := map[int64]*models.NotificationSettings{}
+	if s.notifs != nil {
+		if got, err := s.notifs.Settings(ctx, p.ID, memberIDs); err == nil {
+			settings = got
+		} else {
+			log.Printf("discussion: notification settings: %v", err)
+		}
 	}
 	for _, u := range members {
 		if u.ID == author.ID {
 			continue
 		}
+		reason := ""
+		for _, r := range s.reasons(u, subj, d, fileOwner, commenters, newTopic, isMentioned[u.ID]) {
+			if settings[u.ID].Wants(r) {
+				reason = r
+				break
+			}
+		}
+		if reason == "" {
+			continue // switched off by the member
+		}
 		kind := "comment"
-		if isMentioned[u.ID] {
+		if reason == models.NotifyMention {
 			kind = "mention"
 		}
 		lang := i18n.Normalize(u.Lang)
 		subject := i18n.T(lang, "mail."+kind+"_subject", author.DisplayName(), subj.Title)
 		intro := i18n.T(lang, "mail."+kind+"_intro", author.DisplayName(), subj.Title, p.Name)
-		text := intro + "\n\n" + c.Body + "\n\n" + link + "\n\n— " + s.site.Name
+		why := i18n.T(lang, "mail.reason", i18n.T(lang, "notify."+reason))
+		manage := i18n.T(lang, "mail.manage_notifications")
+		text := intro + "\n\n" + c.Body + "\n\n" + link + "\n\n— " + s.site.Name + "\n" + why + "\n" + manage + ": " + settingsLink
 		htmlBody := fmt.Sprintf(`<div style="font-family:sans-serif;max-width:560px"><p>%s</p>
 <blockquote style="border-left:3px solid #ccc;margin:0;padding:6px 12px;color:#333;white-space:pre-wrap">%s</blockquote>
-<p><a href="%s" style="display:inline-block;background:#2f6fde;color:#fff;padding:9px 16px;border-radius:6px;text-decoration:none">%s</a></p>
-<p style="color:#888;font-size:12px">%s</p></div>`,
-			html.EscapeString(intro), html.EscapeString(c.Body), link,
-			html.EscapeString(i18n.T(lang, "mail.mention_button")),
-			html.EscapeString(i18n.T(lang, "mail.comment_footer", p.Name)))
+<p>%s</p>
+<p style="color:#888;font-size:12px">%s<br>%s · <a href="%s" style="color:#888">%s</a></p></div>`,
+			html.EscapeString(intro), html.EscapeString(c.Body), emailButton(link, i18n.T(lang, "mail.mention_button")),
+			html.EscapeString(i18n.T(lang, "mail.comment_footer", p.Name)), html.EscapeString(why), settingsLink, html.EscapeString(manage))
 		if err := s.mailer.Send(ctx, &Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: kind}); err != nil {
 			log.Printf("discussion: %s email to %s: %v", kind, u.Email, err)
 		}
 	}
+}
+
+// emailButton is the call-to-action link of an email: a small, plain button
+func emailButton(href, label string) string {
+	return fmt.Sprintf(`<a href="%s" style="display:inline-block;background:#2f6fde;color:#fff;padding:5px 12px;border-radius:5px;font-size:14px;line-height:20px;text-decoration:none">%s</a>`,
+		html.EscapeString(href), html.EscapeString(label))
 }
 
 func (s *DiscussionService) projectComment(ctx context.Context, p *models.Project, id int64) (*models.Comment, *models.Discussion, error) {

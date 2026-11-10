@@ -150,6 +150,11 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ProjectVersi
 			return nil, err
 		}
 		// keep the source's PO files of this language as project files
+		defer func() { // a point for the progress chart right after an upload
+			if err := s.repo.RecordGroupStats(ctx, v.ID, 0); err != nil {
+				log.Printf("glossary: record stats of version %d: %v", v.ID, err)
+			}
+		}()
 		if err := s.repo.AddProjectFiles(ctx, projectFiles(files, imp, language)); err != nil {
 			log.Printf("glossary: store project files of import %d: %v", imp.ID, err)
 		}
@@ -687,4 +692,57 @@ func (s *GlossaryService) UpstreamFor(ctx context.Context, p *models.Project, c 
 		}
 	}
 	return best, nil
+}
+
+// ModuleGroups maps each module (file name before the first dot) to the module groups
+// (glossary versions with project files, e.g. "gnome-51") whose project files include it
+func (s *GlossaryService) ModuleGroups(ctx context.Context, p *models.Project) (map[string][]int64, error) {
+	names, err := s.repo.ProjectFileNames(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	out := map[string][]int64{}
+	for vid, files := range names {
+		seen := map[string]bool{}
+		for _, f := range files {
+			if m := moduleKey(f); !seen[m] {
+				seen[m] = true
+				out[m] = append(out[m], vid)
+			}
+		}
+	}
+	return out, nil
+}
+
+// StatsInterval is how often each module group gets a point on the progress chart
+// (a changed total is recorded at the next check, at most 15 minutes later)
+const StatsInterval = 55 * time.Minute
+
+// RecordStats stores the current totals of every module group for the progress chart
+func (s *GlossaryService) RecordStats(ctx context.Context) {
+	if err := s.repo.RecordGroupStats(ctx, 0, StatsInterval); err != nil {
+		log.Printf("glossary: record group stats: %v", err)
+	}
+}
+
+// StatsRange is how far back the progress chart looks
+type StatsRange struct {
+	Key  string
+	Days int // 0 = everything
+}
+
+// StatsRanges are the choices above the chart
+var StatsRanges = []StatsRange{{"1", 1}, {"7", 7}, {"30", 30}, {"all", 0}}
+
+// GroupStats returns a module group's recorded totals for a language within the last days
+// (0 = all), oldest first
+func (s *GlossaryService) GroupStats(ctx context.Context, p *models.Project, versionID int64, language string, days int) ([]models.GroupStat, error) {
+	if _, err := s.projectVersion(ctx, p, versionID); err != nil {
+		return nil, err
+	}
+	since := time.Time{}
+	if days > 0 {
+		since = time.Now().AddDate(0, 0, -days)
+	}
+	return s.repo.GroupStats(ctx, versionID, language, since)
 }

@@ -354,7 +354,7 @@ const (
 // Verify checks a model translation: format placeholders, newlines and use of
 // the required glossary translations. A non-empty result means the translation
 // must be reviewed by a person.
-func Verify(it Item, forms []string, nplurals int) []string {
+func Verify(it Item, forms []string, nplurals int, pluralForms string) []string {
 	var problems []string
 	for _, f := range forms {
 		if strings.TrimSpace(f) == "" {
@@ -366,7 +366,7 @@ func Verify(it Item, forms []string, nplurals int) []string {
 		return []string{ProblemCorrupt}
 	}
 	pe := &po.Entry{ID: it.Source, IDPlural: it.Plural, Translation: forms, Flags: it.Flags}
-	if len(po.Validate(pe, nplurals)) > 0 {
+	if len(po.ValidateWith(pe, po.PluralFor(pluralForms, nplurals))) > 0 {
 		problems = append(problems, ProblemFormat)
 	}
 	joined := strings.ToLower(glossary.Clean(strings.Join(forms, "\n")))

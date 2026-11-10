@@ -122,6 +122,19 @@ type ProjectFile struct {
 }
 
 // Percent is the share of translated entries
+// GroupStat is a recorded total of a module group's project files at one moment
+type GroupStat struct {
+	VersionID  int64
+	Language   string
+	Total      int
+	Translated int
+	Fuzzy      int
+	RecordedAt time.Time
+}
+
+// Untranslated is what is neither translated nor fuzzy
+func (g GroupStat) Untranslated() int { return g.Total - g.Translated - g.Fuzzy }
+
 // ProjectFileVersion is a glossary version that has project files (filter option)
 type ProjectFileVersion struct {
 	ID      int64

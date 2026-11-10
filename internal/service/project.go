@@ -296,10 +296,10 @@ func (s *ProjectService) Invite(ctx context.Context, inviter *models.User, p *mo
 	subject := i18n.T(lang, "mail.invite_subject", inv.InviterName, p.Name)
 	text := i18n.T(lang, "mail.invite_body", inv.InviterName, p.Name, roleName, link, s.site.Name)
 	htmlBody := fmt.Sprintf(`<div style="font-family:sans-serif;max-width:480px"><p>%s</p>
-<p><a href="%s" style="display:inline-block;background:#2f6fde;color:#fff;padding:10px 18px;border-radius:6px;text-decoration:none">%s</a></p>
+<p>%s</p>
 <p style="color:#666">%s</p></div>`,
 		html.EscapeString(i18n.T(lang, "mail.invite_intro", inv.InviterName, p.Name, roleName)),
-		link, html.EscapeString(i18n.T(lang, "mail.invite_button")),
+		emailButton(link, i18n.T(lang, "mail.invite_button")),
 		html.EscapeString(i18n.T(lang, "mail.invite_footer", s.site.Name)))
 	if err := s.mailer.Send(ctx, &Message{To: email, Subject: subject, Text: text, HTML: htmlBody, Category: "invitation"}); err != nil {
 		// The invitation stays valid and is shown after sign in, so do not fail.

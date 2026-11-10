@@ -33,12 +33,12 @@
                 <button type="button" role="tab" class="wtab active" data-wtab="write" aria-selected="true">{{t .Lang "wiki.write"}}</button>
                 <button type="button" role="tab" class="wtab" data-wtab="preview" aria-selected="false">{{t .Lang "wiki.preview"}}</button>
                 <span class="spacer"></span>
-                <label class="att-add small">📎 {{t .Lang "wiki.attach"}}<input type="file" id="wiki-files" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp"></label>
+                <label class="att-add small">📎 {{t .Lang "wiki.attach"}}<input type="file" id="wiki-files" multiple hidden></label>
             </div>
             <div class="wiki-write" data-wpanel="write">
                 <textarea id="wiki-body" name="body" rows="22" placeholder="{{t .Lang "wiki.body_placeholder"}}" data-uploading="{{t .Lang "wiki.uploading"}}"
-                          data-err-type="{{t .Lang "err.attachment_type"}}" data-err-size="{{t .Lang "err.attachment_size" 10}}">{{$in.Body}}</textarea>
-                <p class="muted small">{{t .Lang "wiki.markdown_help"}} · {{t .Lang "discuss.attach_help"}}</p>
+                          data-err-type="{{t .Lang "err.upload_failed"}}" data-err-size="{{t .Lang "err.attachment_size" 10}}">{{$in.Body}}</textarea>
+                <p class="muted small">{{t .Lang "wiki.markdown_help"}} · {{t .Lang "wiki.attach_help"}}</p>
                 <div class="att-error c-err small" role="alert" hidden></div>
             </div>
             <div class="wiki-preview wiki-body" data-wpanel="preview" hidden
