@@ -903,11 +903,9 @@
                 ev.preventDefault();
                 document.getElementById("filter-q").focus();
                 break;
-            default:
-                if (/^[1-5]$/.test(ev.key) && !readOnly) {
-                    ev.preventDefault();
-                    useSuggestion(ev.key);
-                }
+            // Note: Ctrl/Cmd+digit is deliberately NOT bound — it is the browser's
+            // tab-switch shortcut (Cmd+1..9 on macOS, Ctrl+1..8 on Windows/Linux).
+            // Insert a translation suggestion by clicking it in the sidebar instead.
         }
     });
 
