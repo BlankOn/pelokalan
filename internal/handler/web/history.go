@@ -109,6 +109,21 @@ func (h *Handler) HistoryDiff(w http.ResponseWriter, r *http.Request) {
 	h.renderPartials(w, partial{"history_diff", view})
 }
 
+// CommitPreview renders the pending changes as a table for review before committing (HTMX)
+func (h *Handler) CommitPreview(w http.ResponseWriter, r *http.Request) {
+	c, _, ok := h.loadOwnCatalog(w, r)
+	if !ok {
+		return
+	}
+	d, err := h.catalogService.WorkingDiff(r.Context(), c)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	lang := middleware.GetLang(r.Context())
+	h.renderPartials(w, partial{"commit_diff", map[string]any{"Lang": lang, "Diff": d}})
+}
+
 // CommitCatalog saves the current state as a new version
 func (h *Handler) CommitCatalog(w http.ResponseWriter, r *http.Request) {
 	c, _, ok := h.loadOwnCatalog(w, r)

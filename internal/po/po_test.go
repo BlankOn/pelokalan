@@ -156,6 +156,21 @@ func TestValidate(t *testing.T) {
 	if issues := Validate(e, 2); len(issues) != 0 {
 		t.Errorf("plural issues = %v", issues)
 	}
+	// trailing space in the source dropped by the translation
+	e = &Entry{ID: "Failed to create user: ", Translation: []string{"Gagal membuat pengguna:"}}
+	if issues := Validate(e, 1); len(issues) != 1 || issues[0] != IssueSpaceEnd {
+		t.Errorf("trailing space issues = %v", issues)
+	}
+	// keeping the trailing space is fine
+	e = &Entry{ID: "Failed to create user: ", Translation: []string{"Gagal membuat pengguna: "}}
+	if issues := Validate(e, 1); len(issues) != 0 {
+		t.Errorf("kept trailing space issues = %v", issues)
+	}
+	// leading space present only in the translation
+	e = &Entry{ID: "Name", Translation: []string{" Nama"}}
+	if issues := Validate(e, 1); len(issues) != 1 || issues[0] != IssueSpaceStart {
+		t.Errorf("leading space issues = %v", issues)
+	}
 }
 
 func TestHeaderFields(t *testing.T) {

@@ -207,13 +207,16 @@
 {{end}}
 
 {{if .Data.Owned}}
-<dialog id="commit-dialog" class="dialog">
+<dialog id="commit-dialog" class="dialog commit-dialog">
     <form class="form" hx-post="/catalogs/{{$c.ID}}/commit" hx-swap="none">
         <h2>{{t .Lang "history.commit_title"}}</h2>
         {{template "commit_status" (dict "N" .Data.Uncommitted "Lang" .Lang "OOB" false)}}
         <label for="commit-msg">{{t .Lang "history.message"}}</label>
         <input id="commit-msg" name="message" required maxlength="500" placeholder="{{t .Lang "history.message_placeholder"}}">
         <p class="muted small"><a href="{{$c.URL}}/history">{{t .Lang "history.view"}}</a></p>
+        <div id="commit-diff" class="commit-diff" data-url="/catalogs/{{$c.ID}}/commit/preview" aria-label="{{t .Lang "history.review"}}">
+            <p class="muted small">{{t .Lang "history.review_loading"}}</p>
+        </div>
         <div class="dialog-actions">
             <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
             <button type="submit" class="btn btn-primary">{{t .Lang "history.commit"}}</button>

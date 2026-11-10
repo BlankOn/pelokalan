@@ -236,6 +236,7 @@ func main() {
 		r.Post("/catalogs/{cid}/raw", webHandler.SaveRaw)
 		r.Post("/catalogs/{cid}/properties", webHandler.UpdateProperties)
 		r.Post("/catalogs/{cid}/history/{hid}/restore", webHandler.RestoreCommit)
+		r.Get("/catalogs/{cid}/commit/preview", webHandler.CommitPreview)
 		r.Post("/catalogs/{cid}/commit", webHandler.CommitCatalog)
 		r.Post("/catalogs/{cid}/history/discard", webHandler.DiscardChanges)
 		r.Get("/catalogs/{cid}/ai/estimate", webHandler.AIEstimate)

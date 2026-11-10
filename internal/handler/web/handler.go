@@ -131,6 +131,7 @@ func funcMap() template.FuncMap {
 		"issueName": func(lang, code string) string {
 			return i18n.T(lang, "issue."+code)
 		},
+		"srcWS": sourceWS,
 		"pluralLabel": func(lang string, idx, n int) string {
 			if n == 2 {
 				if idx == 0 {
@@ -382,6 +383,46 @@ func redirect(w http.ResponseWriter, r *http.Request, url string) {
 }
 
 func isHTMX(r *http.Request) bool { return r.Header.Get("HX-Request") == "true" }
+
+// sourceWS renders a source/translation string as HTML and, when it begins or
+// ends with whitespace (spaces or tabs) that is easy to lose, appends a small
+// inline label at that end — e.g. "␣ spasi di akhir" right after the sentence.
+// The real whitespace stays in the text; the labels are decoration, so copy and
+// the live hint read the raw string from the element's data-text attribute.
+func sourceWS(lang, s string) template.HTML {
+	if s == "" {
+		return ""
+	}
+	runes := []rune(s)
+	n := len(runes)
+	isBlank := func(r rune) bool { return r == ' ' || r == '\t' }
+	lead := 0
+	for lead < n && isBlank(runes[lead]) {
+		lead++
+	}
+	trail := 0
+	for trail < n-lead && isBlank(runes[n-1-trail]) {
+		trail++
+	}
+	var b strings.Builder
+	if lead > 0 {
+		b.WriteString(wsLabel(i18n.T(lang, "editor.ws_start"), lead, "ws-tag-start"))
+	}
+	b.WriteString(template.HTMLEscapeString(s))
+	if trail > 0 {
+		b.WriteString(wsLabel(i18n.T(lang, "editor.ws_end"), trail, "ws-tag-end"))
+	}
+	return template.HTML(b.String())
+}
+
+// wsLabel builds the inline whitespace label, with a ×N suffix when more than
+// one space is involved so the count is not lost.
+func wsLabel(text string, count int, cls string) string {
+	if count > 1 {
+		text += " ×" + strconv.Itoa(count)
+	}
+	return `<span class="ws-tag ` + cls + `">␣ ` + template.HTMLEscapeString(text) + `</span>`
+}
 
 func idParam(r *http.Request, name string) int64 {
 	id, _ := strconv.ParseInt(chi.URLParam(r, name), 10, 64)

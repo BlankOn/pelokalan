@@ -375,6 +375,17 @@ h1 .ai-badge { font-size: 12px; }
 }
 .src-plural { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .src-plural .sub { font-size: 11px; color: var(--muted); }
+/* Inline label marking leading/trailing whitespace at the end (or start) of the source */
+.ws-tag {
+    font-size: 10px; font-weight: 600; line-height: 1.4; white-space: nowrap; user-select: none;
+    background: rgba(231,165,49,.18); color: #b8740c; border-radius: 4px; padding: 0 5px; vertical-align: middle;
+}
+.ws-tag-end { margin-left: 4px; }
+.ws-tag-start { margin-right: 4px; }
+/* Live trailing/leading-space hint next to the translation box */
+.ws-hint { font-size: 11px; font-weight: 600; padding: 1px 8px; border-radius: 999px; text-transform: none; letter-spacing: 0; white-space: nowrap; }
+.ws-hint.ws-miss { background: rgba(231,165,49,.18); color: #b8740c; }
+.ws-hint.ws-ok { background: var(--ok-soft); color: #1d5e39; }
 .ed-translation { flex: 1; }
 .tr-input { font-size: 15px; min-height: 90px; flex: 1; width: 100%; line-height: 1.5; }
 .fuzzy-toggle { margin-left: auto; text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 12px; color: var(--fuzzy); display: flex; gap: 5px; align-items: center; cursor: pointer; }
@@ -658,6 +669,24 @@ h1 .ai-badge { font-size: 12px; }
 .diff-none { padding: 2px 6px; font-style: italic; }
 .diff-old { background: var(--error-soft); color: #8f1f1b; text-decoration: line-through; text-decoration-color: rgba(143,31,27,.4); }
 .diff-new { background: var(--ok-soft); color: #1d5e39; }
+
+/* Commit dialog: review the pending diff before committing */
+.commit-dialog { width: min(680px, 94vw); }
+.commit-diff { margin-top: 10px; }
+.commit-diff-summary { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 6px; }
+.commit-diff-scroll { max-height: 42vh; overflow: auto; border: 1px solid var(--border-soft); border-radius: 8px; }
+.commit-diff-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.commit-diff-table th, .commit-diff-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border-soft); vertical-align: top; }
+.commit-diff-table thead th { position: sticky; top: 0; background: var(--surface-2); z-index: 1; font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
+.commit-diff-table tbody tr:last-child td { border-bottom: none; }
+.commit-diff-table .cd-kind { white-space: nowrap; width: 1%; }
+.commit-diff-table .cd-src { font-weight: 600; word-break: break-word; max-width: 240px; }
+.commit-diff-table .cd-change { word-break: break-word; }
+.cd-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; }
+.cd-badge-added { background: var(--ok-soft); color: #1d5e39; }
+.cd-badge-changed { background: rgba(231,165,49,.18); color: #b8740c; }
+.cd-badge-removed { background: var(--error-soft); color: #8f1f1b; }
+.cd-badge-reviewed { background: var(--surface-2); color: var(--muted); }
 .glossary-toolbar { justify-content: space-between; align-items: center; gap: 12px; }
 .sync-status { display: inline-flex; align-items: center; gap: 6px; }
 .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--ok); display: inline-block; }

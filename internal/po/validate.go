@@ -16,7 +16,15 @@ const (
 	IssuePluralCount        = "plural_count"
 	IssueControlChars       = "control_chars" // invisible control characters (e.g. mangled markup)
 	IssueMarkup             = "markup"        // XML-like tags (<gui>, <key>…) differ from the source
+	IssueSpaceStart         = "space_start"   // leading space/tab present in one of source/translation but not the other
+	IssueSpaceEnd           = "space_end"     // trailing space/tab present in one of source/translation but not the other
 )
+
+// hasLeadingBlank reports whether s begins with a space or tab
+func hasLeadingBlank(s string) bool { return strings.HasPrefix(s, " ") || strings.HasPrefix(s, "\t") }
+
+// hasTrailingBlank reports whether s ends with a space or tab
+func hasTrailingBlank(s string) bool { return strings.HasSuffix(s, " ") || strings.HasSuffix(s, "\t") }
 
 // markupTagRe matches XML-like tags such as <gui>, </key>, <link href="…"> or <br/>
 var markupTagRe = regexp.MustCompile(`<(/?)([A-Za-z][\w:.-]*)(?:\s[^<>]*)?(/?)>`)
@@ -85,6 +93,12 @@ func ValidateWith(e *Entry, plural Plural) []string {
 		}
 		if strings.HasSuffix(src, "\n") != strings.HasSuffix(tr, "\n") {
 			add(IssueNewlineEnd)
+		}
+		if hasLeadingBlank(src) != hasLeadingBlank(tr) {
+			add(IssueSpaceStart)
+		}
+		if hasTrailingBlank(src) != hasTrailingBlank(tr) {
+			add(IssueSpaceEnd)
 		}
 		if hasControlChars(tr) && !hasControlChars(src) {
 			add(IssueControlChars)

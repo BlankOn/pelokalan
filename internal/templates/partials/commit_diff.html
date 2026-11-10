@@ -1,0 +1,42 @@
+{{define "commit_diff"}}{{$d := .Diff}}
+{{if $d.Empty}}
+<p class="muted small">{{t .Lang "history.no_changes"}}</p>
+{{else}}
+<div class="commit-diff-summary small">
+    <span class="d-add">+{{$d.Added}} {{t .Lang "history.added"}}</span>
+    <span class="d-chg">~{{$d.Changed}} {{t .Lang "history.changed"}}</span>
+    <span class="d-del">−{{$d.Removed}} {{t .Lang "history.removed"}}</span>
+    {{if $d.Reviewed}}<span class="d-rev">✓{{$d.Reviewed}} {{t .Lang "history.reviewed"}}</span>{{end}}
+    {{if $d.HeaderChanged}}<span class="muted">· {{t .Lang "history.header_changed"}}</span>{{end}}
+</div>
+<div class="commit-diff-scroll">
+    <table class="commit-diff-table">
+        <thead><tr>
+            <th>{{t .Lang "history.col_status"}}</th>
+            <th>{{t .Lang "history.col_source"}}</th>
+            <th>{{t .Lang "history.col_change"}}</th>
+        </tr></thead>
+        <tbody>
+        {{range $d.Items}}
+        <tr class="cd-{{.Kind}}">
+            <td class="cd-kind"><span class="cd-badge cd-badge-{{.Kind}}">{{if eq .Kind "added"}}{{t $.Lang "history.added"}}{{else if eq .Kind "changed"}}{{t $.Lang "history.changed"}}{{else if eq .Kind "removed"}}{{t $.Lang "history.removed"}}{{else}}{{t $.Lang "history.reviewed"}}{{end}}</span></td>
+            <td class="cd-src">{{if .Context}}<span class="ctx-tag">{{.Context}}</span>{{end}}{{.Source}}</td>
+            <td class="cd-change">
+                {{if eq .Kind "reviewed"}}
+                <div class="diff-review small">{{template "origin_tag" (dict "O" .OldOrigin "Lang" $.Lang)}} <span class="arrow">→</span> <span class="approved">✓ {{t $.Lang "history.approved"}}</span></div>
+                <div class="diff-same">{{range .New}}<span class="t">{{.}}</span>{{end}}</div>
+                {{else}}
+                {{if .HasOld}}<div class="diff-old">{{if .OldFuzzy}}<span class="mark-fuzzy" title="{{t $.Lang "filter.fuzzy"}}"></span> {{end}}{{range .Old}}<span class="t">{{.}}</span>{{end}}</div>
+                {{else if ne .Kind "added"}}<div class="diff-none muted small">{{t $.Lang "history.was_empty"}}</div>{{end}}
+                {{if .HasNew}}<div class="diff-new">{{if .NewFuzzy}}<span class="mark-fuzzy" title="{{t $.Lang "filter.fuzzy"}}"></span> {{end}}{{range .New}}<span class="t">{{.}}</span>{{end}}</div>
+                {{else if ne .Kind "removed"}}<div class="diff-none muted small">{{t $.Lang "history.now_empty"}}</div>{{end}}
+                {{end}}
+            </td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+</div>
+{{if $d.Truncated}}<p class="muted small">{{t .Lang "history.truncated"}}</p>{{end}}
+{{end}}
+{{end}}
