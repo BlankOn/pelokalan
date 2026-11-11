@@ -74,9 +74,6 @@ lint:
 dbshell:
 	docker exec -ti -e POSTGRES_PASSWORD=${POSTGRES_PASS} ${POSTGRES_CONTAINER_NAME} psql -U ${POSTGRES_USER} -d ${POSTGRES_DB}
 
-# --------------------------------------------------------------------------
-# Production (pelokalan.blankon.id), see DEPLOY.md
-# --------------------------------------------------------------------------
 DEPLOY_HOST ?= user@192.168.200.1
 DEPLOY_DIR  ?= src/pelokalan
 

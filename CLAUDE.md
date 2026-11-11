@@ -285,7 +285,7 @@ make test
 
 `/about` (footer link "Tentang", before Lisensi; `AboutPage`, pages/about.html, `about.*` strings) explains the
 goals (easy upstream contributions for newcomers, letting contributors focus on reviewing) and that the
-project is funded by the BlankOn Foundation.
+project is funded by the BlankOn Foundation, and links the source code (https://github.com/BlankOn/pelokalan, MIT License, see LICENSE).
 
 ## Licenses page
 
