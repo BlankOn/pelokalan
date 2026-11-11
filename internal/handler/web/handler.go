@@ -47,6 +47,7 @@ type Handler struct {
 	poFetcher      *glossary.Fetcher // downloads PO files from a URL (SSRF-safe)
 	syncEvery      time.Duration     // automatic glossary/project file sync interval
 	thesaurus      *service.ThesaurusService
+	activity       *service.ActivityService
 	assetVersion   string
 }
 
@@ -127,11 +128,39 @@ func funcMap() template.FuncMap {
 		"timeAgo":  timeAgo,
 		"date":     func(t time.Time) string { return t.Format("2006-01-02 15:04") },
 		"langName": po.LanguageName,
-		"roleName": func(lang string, role models.ProjectRole) string { return i18n.T(lang, "role."+string(role)) },
+		// options of the upstream state filter (upstream_filter)
+		"upstreamFilters": func() []string { return models.UpstreamFilters },
+		"roleName":        func(lang string, role models.ProjectRole) string { return i18n.T(lang, "role."+string(role)) },
 		"issueName": func(lang, code string) string {
 			return i18n.T(lang, "issue."+code)
 		},
 		"srcWS": sourceWS,
+		// editor settings: every check, and the statuses Validasi ticks for the user
+		"editorChecks":   func() []string { return po.Checks },
+		"editorStatuses": func() []string { return service.EditorStatuses },
+		"validateStatuses": func(u *models.User) string {
+			var out []string
+			for _, c := range po.Checks {
+				if u.CheckOn(c) {
+					out = append(out, "issues")
+					break
+				}
+			}
+			for _, st := range service.EditorStatuses {
+				if u.CheckOn(st) {
+					out = append(out, st)
+				}
+			}
+			return strings.Join(out, ",")
+		},
+		// creditFix: the credits translation with the owner's name and this year added
+		"creditFix": func(c *models.Catalog, e *models.Entry) string {
+			text := ""
+			if len(e.MsgStr) > 0 {
+				text = e.MsgStr[0]
+			}
+			return po.AddCredit(text, c.CreditName, c.CreditEmail, time.Now().Year())
+		},
 		"pluralLabel": func(lang string, idx, n int) string {
 			if n == 2 {
 				if idx == 0 {
@@ -141,12 +170,20 @@ func funcMap() template.FuncMap {
 			}
 			return i18n.T(lang, "editor.plural_form", idx+1)
 		},
-		"languages":   po.Languages,
-		"uiLanguages": func() any { return i18n.Languages },
-		"isPlural":    func(e *models.Entry) bool { return e.IsPlural() },
+		"languages":      po.Languages,
+		"languageNames":  po.LanguageNames,
+		"nativeLanguage": po.NativeLanguageName,
+		"uiLanguages":    func() any { return i18n.Languages },
+		"isPlural":       func(e *models.Entry) bool { return e.IsPlural() },
 		"errText": func(lang, s string) string {
-			if i18n.Has(s) {
-				return i18n.T(lang, s)
+			// stored errors are an i18n key, optionally with arguments: "key|arg|arg"
+			parts := strings.Split(s, "|")
+			if i18n.Has(parts[0]) {
+				args := make([]any, 0, len(parts)-1)
+				for _, a := range parts[1:] {
+					args = append(args, a)
+				}
+				return i18n.T(lang, parts[0], args...)
 			}
 			return s
 		},
@@ -385,34 +422,58 @@ func redirect(w http.ResponseWriter, r *http.Request, url string) {
 func isHTMX(r *http.Request) bool { return r.Header.Get("HX-Request") == "true" }
 
 // sourceWS renders a source/translation string as HTML and, when it begins or
-// ends with whitespace (spaces or tabs) that is easy to lose, appends a small
-// inline label at that end — e.g. "␣ spasi di akhir" right after the sentence.
-// The real whitespace stays in the text; the labels are decoration, so copy and
-// the live hint read the raw string from the element's data-text attribute.
+// ends with whitespace that is easy to lose, adds a small inline label at that
+// end: "␣ spasi di akhir" for spaces/tabs, "↵ baris baru di akhir" for line
+// breaks (a trailing line break would otherwise only show as an empty line).
+// Spaces stay in the text; line breaks at the ends are shown by their label
+// only. The labels are decoration: copy reads the raw string from data-text.
 func sourceWS(lang, s string) template.HTML {
 	if s == "" {
 		return ""
 	}
-	runes := []rune(s)
-	n := len(runes)
-	isBlank := func(r rune) bool { return r == ' ' || r == '\t' }
-	lead := 0
-	for lead < n && isBlank(runes[lead]) {
-		lead++
+	isNL := func(r rune) bool { return r == '\n' || r == '\r' }
+	countNL := func(t string) int {
+		return strings.Count(t, "\n") + strings.Count(strings.ReplaceAll(t, "\r\n", ""), "\r")
 	}
-	trail := 0
-	for trail < n-lead && isBlank(runes[n-1-trail]) {
-		trail++
+	// line breaks at the very ends (spaces between them and the text are handled below)
+	core := strings.TrimLeftFunc(s, func(r rune) bool { return isNL(r) || r == ' ' || r == '\t' })
+	leadRun := s[:len(s)-len(core)]
+	core = strings.TrimRightFunc(core, func(r rune) bool { return isNL(r) || r == ' ' || r == '\t' })
+	trailRun := s[len(leadRun)+len(core):]
+	leadNL, trailNL := countNL(leadRun), countNL(trailRun)
+	if core == "" { // only whitespace: show it as is
+		leadNL, trailNL, core, leadRun, trailRun = 0, 0, s, "", ""
+	}
+	// spaces/tabs that touch the text, kept visible in the text itself
+	leadSp := strings.TrimLeftFunc(leadRun, func(r rune) bool { return isNL(r) })
+	leadSp = leadSp[strings.LastIndexAny(leadSp, "\r\n")+1:]
+	trailSp := strings.TrimRightFunc(trailRun, func(r rune) bool { return isNL(r) })
+	if i := strings.IndexAny(trailSp, "\r\n"); i >= 0 {
+		trailSp = trailSp[:i]
 	}
 	var b strings.Builder
-	if lead > 0 {
-		b.WriteString(wsLabel(i18n.T(lang, "editor.ws_start"), lead, "ws-tag-start"))
+	if leadNL > 0 {
+		b.WriteString(nlLabel(i18n.T(lang, "editor.nl_start"), leadNL, "ws-tag-start"))
 	}
-	b.WriteString(template.HTMLEscapeString(s))
-	if trail > 0 {
-		b.WriteString(wsLabel(i18n.T(lang, "editor.ws_end"), trail, "ws-tag-end"))
+	if n := len(leadSp); n > 0 {
+		b.WriteString(wsLabel(i18n.T(lang, "editor.ws_start"), n, "ws-tag-start"))
+	}
+	b.WriteString(template.HTMLEscapeString(leadSp + core + trailSp))
+	if n := len(trailSp); n > 0 {
+		b.WriteString(wsLabel(i18n.T(lang, "editor.ws_end"), n, "ws-tag-end"))
+	}
+	if trailNL > 0 {
+		b.WriteString(nlLabel(i18n.T(lang, "editor.nl_end"), trailNL, "ws-tag-end"))
 	}
 	return template.HTML(b.String())
+}
+
+// nlLabel is the inline label for line breaks at the start or end of a string
+func nlLabel(text string, count int, cls string) string {
+	if count > 1 {
+		text += " ×" + strconv.Itoa(count)
+	}
+	return `<span class="ws-tag ws-tag-nl ` + cls + `">↵ ` + template.HTMLEscapeString(text) + `</span>`
 }
 
 // wsLabel builds the inline whitespace label, with a ×N suffix when more than

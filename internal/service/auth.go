@@ -11,7 +11,9 @@ import (
 	"log"
 	"math/big"
 	"net/mail"
+	"pelokalan/internal/po"
 	"regexp"
+	"slices"
 	"strings"
 	"time"
 
@@ -32,6 +34,7 @@ type AuthService struct {
 	site      config.SiteConfig
 	jwtSecret []byte
 	jwtExpiry time.Duration
+	activity  *ActivityService
 }
 
 // Claims represents JWT claims
@@ -40,6 +43,9 @@ type Claims struct {
 	Email  string `json:"email"`
 	jwt.RegisteredClaims
 }
+
+// SetActivity makes the service record sign-ups in the activity log
+func (s *AuthService) SetActivity(a *ActivityService) { s.activity = a }
 
 // NewAuthService creates a new auth service
 func NewAuthService(users repository.UserRepository, otps repository.OTPRepository, mailer Mailer,
@@ -291,6 +297,7 @@ func (s *AuthService) Verify(ctx context.Context, email, purpose, code, lang str
 		if err := s.users.Create(ctx, user); err != nil {
 			return nil, err
 		}
+		s.activity.Record(ctx, &models.ActivityEvent{Kind: models.ActivityUserRegistered, UserID: &user.ID})
 	case errors.Is(err, repository.ErrNotFound):
 		return nil, ErrUserNotFound
 	default:
@@ -388,6 +395,22 @@ func (s *AuthService) UpdateIdentity(ctx context.Context, user *models.User, nam
 		return userErr("err.identity_invalid")
 	}
 	user.TranslatorName, user.TranslatorEmail, user.LanguageTeam = name, email, team
+	return s.users.Update(ctx, user)
+}
+
+// EditorStatuses are the statuses Validasi can show besides problem entries
+var EditorStatuses = []string{"untranslated", "fuzzy"}
+
+// UpdateEditorChecks stores which editor checks are on (issue codes from po.Checks and
+// EditorStatuses); everything not in on is switched off for every file of the account
+func (s *AuthService) UpdateEditorChecks(ctx context.Context, user *models.User, on []string) error {
+	var off []string
+	for _, code := range append(append([]string(nil), po.Checks...), EditorStatuses...) {
+		if !slices.Contains(on, code) {
+			off = append(off, code)
+		}
+	}
+	user.ChecksOff = off
 	return s.users.Update(ctx, user)
 }
 

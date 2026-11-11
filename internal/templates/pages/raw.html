@@ -23,7 +23,25 @@
     {{if .Error}}<div class="raw-error">{{.Error}}</div>{{end}}
     <p class="raw-hint muted small">{{if .Data.Catalog.IsDeleted}}{{t .Lang "editor.deleted_readonly"}}{{else if .Data.ReadOnly}}{{t .Lang "editor.others_readonly" .Data.Catalog.OwnerUsername}}{{else}}{{t .Lang "raw.hint"}}{{end}}</p>
     <input type="hidden" name="updated_at" value="{{.Data.UpdatedAt}}">
+    <input type="hidden" name="next" value="">
+    <div class="raw-wrap">
+        <pre class="raw-hl" aria-hidden="true"><code id="raw-hl"></code></pre>
     <textarea name="content" id="raw-text" class="raw-text" spellcheck="false" wrap="off" {{if .Data.ReadOnly}}readonly{{end}} aria-label="{{t .Lang "raw.title"}}">
 {{.Data.Text}}</textarea>
+    </div>
 </form>
+{{if not .Data.ReadOnly}}
+<dialog id="raw-leave-dialog" class="dialog raw-leave-dialog" data-more="{{t .Lang "raw.leave_more" 999999}}" data-stats="{{t .Lang "raw.leave_stats" 111111 222222}}">
+    <h2>{{t .Lang "raw.leave_title"}}</h2>
+    <p>{{t .Lang "raw.leave_text"}}</p>
+    <p class="muted small raw-diff-stats"></p>
+    <pre class="raw-diff"></pre>
+    <div class="dialog-actions">
+        <button type="button" class="btn" data-raw-stay>{{t .Lang "raw.leave_stay"}}</button>
+        <div class="spacer"></div>
+        <button type="button" class="btn btn-danger" data-raw-discard>{{t .Lang "raw.leave_discard"}}</button>
+        <button type="button" class="btn btn-primary" data-raw-save>{{t .Lang "raw.leave_save"}}</button>
+    </div>
+</dialog>
+{{end}}
 {{end}}

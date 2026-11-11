@@ -185,3 +185,10 @@ func subset(small, big []string) bool {
 	}
 	return true
 }
+
+// Checks lists every issue code an editor can report, in the order the settings show them
+var Checks = []string{
+	IssuePlaceholders, IssuePluralPlaceholders, IssuePluralCount, IssueMarkup, IssueControlChars,
+	IssueNewlineStart, IssueNewlineEnd, IssueSpaceStart, IssueSpaceEnd,
+	IssueCreditsMissing, IssueCreditsYear,
+}

@@ -656,3 +656,58 @@ func (r *glossaryRepository) GroupStats(ctx context.Context, versionID int64, la
 	}
 	return out, rows.Err()
 }
+
+func (r *glossaryRepository) UpstreamCandidates(ctx context.Context) ([]models.UpstreamCandidate, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT f.filename, f.language, p.language, v.name, v.version, v.glossary_url
+		  FROM project_files f
+		  JOIN project_versions v ON v.id = f.version_id
+		  JOIN projects p ON p.id = f.project_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []models.UpstreamCandidate
+	for rows.Next() {
+		var c models.UpstreamCandidate
+		if err := rows.Scan(&c.Filename, &c.FileLanguage, &c.ProjectLanguage, &c.VersionName, &c.Version, &c.GlossaryURL); err != nil {
+			return nil, err
+		}
+		out = append(out, c)
+	}
+	return out, rows.Err()
+}
+
+func (r *glossaryRepository) UpstreamStates(ctx context.Context, release, language string) (map[string]*models.UpstreamRecord, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT release, language, stem, listed, module, branch, domain, state, translated, fuzzy, untranslated, po_file, checked_at
+		  FROM upstream_states WHERE release = $1 AND language = $2`, release, language)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]*models.UpstreamRecord{}
+	for rows.Next() {
+		u := &models.UpstreamRecord{}
+		if err := rows.Scan(&u.Release, &u.Language, &u.Stem, &u.Listed, &u.Module, &u.Branch, &u.Domain, &u.State,
+			&u.Translated, &u.Fuzzy, &u.Untranslated, &u.POFile, &u.CheckedAt); err != nil {
+			return nil, err
+		}
+		out[u.Stem] = u
+	}
+	return out, rows.Err()
+}
+
+func (r *glossaryRepository) SaveUpstreamState(ctx context.Context, u *models.UpstreamRecord) error {
+	_, err := r.db.ExecContext(ctx, `
+		INSERT INTO upstream_states (release, language, stem, listed, module, branch, domain, state,
+		                             translated, fuzzy, untranslated, po_file, checked_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+		ON CONFLICT (release, language, stem) DO UPDATE SET listed = EXCLUDED.listed, module = EXCLUDED.module,
+		    branch = EXCLUDED.branch, domain = EXCLUDED.domain, state = EXCLUDED.state,
+		    translated = EXCLUDED.translated, fuzzy = EXCLUDED.fuzzy, untranslated = EXCLUDED.untranslated,
+		    po_file = EXCLUDED.po_file, checked_at = EXCLUDED.checked_at`,
+		u.Release, u.Language, u.Stem, u.Listed, u.Module, u.Branch, u.Domain, u.State,
+		u.Translated, u.Fuzzy, u.Untranslated, u.POFile, u.CheckedAt)
+	return err
+}

@@ -4,51 +4,58 @@
 {{if not .User}}
 <div class="alert alert-warn">{{t .Lang "files.guest_prefix"}} <a href="/login?next={{$p.Path}}/files">{{t .Lang "files.guest_login"}}</a> {{t .Lang "files.guest_or"}} <a href="/register?next={{$p.Path}}/files">{{t .Lang "files.guest_register"}}</a> {{t .Lang "files.guest_suffix"}}</div>
 {{end}}
-{{with .Data.GroupChart}}
-<h2 class="section-title">{{t $.Lang "chart.title"}}</h2>
-{{template "group_chart" .}}
-{{end}}
 {{with .Data.ProjectFiles}}{{if .Files}}
-<h2 class="section-title">{{t $.Lang "files.project"}} <span class="muted small">({{.Total}})</span></h2>
-{{if .HasFeed}}<p class="pf-synced small muted">{{t $.Lang "files.synced_label"}}
-    {{with .LastSync}}<time data-local datetime="{{.Format "2006-01-02T15:04:05Z07:00"}}">{{.Format "02-01-2006 15:04"}}</time> (<span class="pf-synced-ago">{{timeAgo $.Lang .}}</span>){{else}}<time data-local></time> (<span class="pf-synced-ago">{{t $.Lang "files.never_synced"}}</span>){{end}}
-    · {{if eq .SyncHours 1}}{{t $.Lang "files.sync_hourly"}}{{else}}{{t $.Lang "files.sync_every" .SyncHours}}{{end}}</p>{{end}}
+<div class="files-section" data-sticky-section data-collapse-key="files:{{$p.Slug}}:project">
+<h2 class="section-title" data-stick><button type="button" class="section-toggle" aria-expanded="true"><svg class="st-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span>{{t $.Lang "files.project"}}</span> <span class="muted small">({{.Total}})</span></button></h2>
 <section class="card">
-    <div class="context-search pf-toolbar">
-        <form id="pf-filter" class="pf-filter" hx-get="{{.Project.Path}}/project-files" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change, submit" hx-target="#project-file-rows" hx-swap="innerHTML">
-        <input type="search" name="q" placeholder="{{t $.Lang "files.project_search"}}" aria-label="{{t $.Lang "files.project_search"}}" autocomplete="off">
-        {{if .Versions}}{{template "group_filter" (dict "Lang" $.Lang "Groups" .Versions "NoGroup" false)}}{{end}}
-        </form>
-        {{if .CanManage}}<form method="post" action="{{.Project.Path}}/project-files/sync" data-sync data-syncing="{{t $.Lang "files.syncing"}}">
+    {{if or .HasFeed (and .CanManage .Upstream)}}<div class="card-head pf-head" data-stick>
+        <div class="pf-head-info">{{if .HasFeed}}<p class="pf-synced small muted">{{t $.Lang "files.synced_label"}}
+    {{with .LastSync}}<time data-local datetime="{{.Format "2006-01-02T15:04:05Z07:00"}}">{{.Format "02-01-2006 15:04"}}</time> (<span class="pf-synced-ago">{{timeAgo $.Lang .}}</span>){{else}}<time data-local></time> (<span class="pf-synced-ago">{{t $.Lang "files.never_synced"}}</span>){{end}}
+    · {{if eq .SyncHours 1}}{{t $.Lang "files.sync_hourly"}}{{else}}{{t $.Lang "files.sync_every" .SyncHours}}{{end}}</p>{{end}}</div>
+        <div class="row-actions">
+            {{if and .CanManage (or .HasFeed .Upstream)}}<form method="post" action="{{.Project.Path}}/project-files/sync" data-sync data-syncing="{{t $.Lang "files.syncing"}}">
             <button class="btn" title="{{t $.Lang "files.sync_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync"}}</span></button>
         </form>{{end}}
+        </div>
+    </div>{{end}}
+    <div class="context-search pf-toolbar" data-stick>
+        <form id="pf-filter" class="pf-filter" hx-get="{{.Project.Path}}/project-files" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change[target.type!='search'], submit" hx-target="#project-file-rows" hx-swap="innerHTML">
+        <input type="search" name="q" placeholder="{{t $.Lang "files.project_search"}}" aria-label="{{t $.Lang "files.project_search"}}" autocomplete="off">
+        {{if .Versions}}{{template "group_filter" (dict "Lang" $.Lang "Groups" .Versions "NoGroup" false)}}{{end}}
+        {{if .Upstream}}{{template "upstream_filter" (dict "Lang" $.Lang)}}{{end}}
+        </form>
     </div>
     <p class="pf-sync-msg small" role="status" hidden></p>
     <table class="table files-table project-files">
-        <thead><tr><th>{{t $.Lang "project.col_file"}}</th><th class="w-progress">{{t $.Lang "project.col_progress"}}</th><th>{{t $.Lang "files.module_group"}}</th><th></th></tr></thead>
+        <thead data-stick><tr><th>{{t $.Lang "project.col_file"}}</th><th class="w-progress">{{t $.Lang "project.col_progress"}}</th><th>{{t $.Lang "files.module_group"}}</th><th></th></tr></thead>
         <tbody id="project-file-rows">{{template "project_file_rows" .}}</tbody>
     </table>
 </section>
+</div>
 {{end}}{{end}}
 
 {{if $canManage}}
-<h2 class="section-title">{{t .Lang "files.mine"}} <span class="muted small">({{.Data.MyFiles.All}})</span></h2>
+<div class="files-section" data-sticky-section data-collapse-key="files:{{$p.Slug}}:mine">
+<h2 class="section-title" data-stick><button type="button" class="section-toggle" aria-expanded="true"><svg class="st-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span>{{t $.Lang "files.mine"}}</span> <span class="muted small">({{.Data.MyFiles.All}})</span></button></h2>
 <section class="card">
-    <div class="card-head">
+    <div class="card-head" data-stick>
         <h2>{{t .Lang "project.translations"}}</h2>
         {{if $canManage}}
         <div class="row-actions">
             {{if .Data.Template}}<button type="button" class="btn btn-primary" data-open-dialog="new-translation">+ {{t .Lang "project.new_translation"}}</button>{{end}}
             <button type="button" class="btn" data-open-dialog="upload">{{t .Lang "project.upload"}}</button>
+            {{with .Data.ProjectFiles}}{{if and .CanManage (or .HasFeed .Upstream)}}<form method="post" action="{{.Project.Path}}/project-files/sync" data-sync data-syncing="{{t $.Lang "files.syncing"}}">
+                <button class="btn" title="{{t $.Lang "files.sync_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync"}}</span></button>
+            </form>{{end}}{{end}}
         </div>
         {{end}}
     </div>
 
     {{with .Data.MyFiles}}
     {{if .All}}
-    {{template "file_filter" (dict "Lang" $.Lang "ID" "my" "URL" (printf "%s/my-files" .Project.Path) "Groups" .Groups)}}
+    {{template "file_filter" (dict "Lang" $.Lang "ID" "my" "URL" (printf "%s/my-files" .Project.Path) "Groups" .Groups "Upstream" .Upstream)}}
     <table class="table files-table">
-        <thead><tr>
+        <thead data-stick><tr>
             <th>{{t $.Lang "project.col_file"}}</th>
             <th class="w-progress">{{t $.Lang "project.col_progress"}}</th>
             <th class="num">{{t $.Lang "stats.translated"}}</th>
@@ -94,16 +101,18 @@
     <p class="muted">{{t .Lang "project.no_template"}}</p>
     {{end}}
 </section>
+</div>
 
 {{end}}
 
 {{with .Data.MemberFiles}}
-<h2 class="section-title">{{t $.Lang "files.others"}} <span class="muted small">({{.All}})</span></h2>
+<div class="files-section" data-sticky-section data-collapse-key="files:{{$p.Slug}}:others">
+<h2 class="section-title" data-stick><button type="button" class="section-toggle" aria-expanded="true"><svg class="st-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span>{{t $.Lang "files.others"}}</span> <span class="muted small">({{.All}})</span></button></h2>
 {{if .All}}
 <section class="card">
-    {{template "file_filter" (dict "Lang" $.Lang "ID" "member" "URL" (printf "%s/member-files" .Project.Path) "Groups" .Groups)}}
+    {{template "file_filter" (dict "Lang" $.Lang "ID" "member" "URL" (printf "%s/member-files" .Project.Path) "Groups" .Groups "Upstream" .Upstream)}}
     <table class="table files-table">
-        <thead><tr>
+        <thead data-stick><tr>
             <th>{{t $.Lang "project.col_file"}}</th>
             <th class="w-progress">{{t $.Lang "project.col_progress"}}</th>
             <th class="num">{{t $.Lang "stats.translated"}}</th>
@@ -118,6 +127,7 @@
 {{else}}
 <p class="muted">{{t $.Lang "files.others_none"}}</p>
 {{end}}
+</div>
 {{end}}
 
 {{if $canManage}}
@@ -136,6 +146,22 @@
         <div class="dialog-actions">
             <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
             <button type="submit" class="btn btn-primary">{{t .Lang "project.upload_submit"}}</button>
+        </div>
+    </form>
+</dialog>
+<dialog id="replace-dialog" class="dialog">
+    <form method="post" action="" enctype="multipart/form-data" class="form" data-busy="{{t .Lang "upload.busy"}}">
+        <h2>{{t .Lang "replace.title"}} <span class="replace-name"></span></h2>
+        <p class="muted small">{{t .Lang "replace.help"}}</p>
+        <label for="r-url">{{t .Lang "upload.url"}}</label>
+        <input id="r-url" type="url" name="url" placeholder="https://l10n.gnome.org/POT/tecla.master/tecla.master.id.po" inputmode="url" spellcheck="false">
+        <p class="muted small field-help replace-saved" hidden>{{t .Lang "replace.saved_url"}}</p>
+        <div class="or-sep small muted"><span>{{t .Lang "upload.or"}}</span></div>
+        <label for="r-file">{{t .Lang "field.file"}}</label>
+        <input id="r-file" type="file" name="file" accept=".po">
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "replace.submit"}}</button>
         </div>
     </form>
 </dialog>

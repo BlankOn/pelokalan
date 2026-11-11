@@ -10,12 +10,15 @@ type User struct {
 	Name     string `json:"name"`
 	Lang     string `json:"lang"`
 	// Translator identity written to PO headers; empty values fall back to Name/Email
-	TranslatorName  string     `json:"translator_name"`
-	TranslatorEmail string     `json:"translator_email"`
-	LanguageTeam    string     `json:"language_team"`
-	LastLoginAt     *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt       time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	TranslatorName  string `json:"translator_name"`
+	TranslatorEmail string `json:"translator_email"`
+	LanguageTeam    string `json:"language_team"`
+	// ChecksOff: editor checks the user switched off (issue codes, "untranslated", "fuzzy");
+	// they apply to every file the user opens
+	ChecksOff   []string   `json:"checks_off,omitempty"`
+	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt   time.Time  `json:"created_at"`
+	UpdatedAt   time.Time  `json:"updated_at"`
 }
 
 // DisplayName returns the name, or the email when the name is empty
@@ -56,4 +59,17 @@ func (u *User) Initial() string {
 		return string(r)
 	}
 	return "?"
+}
+
+// CheckOn reports whether an editor check is on for the user (everything is on by default)
+func (u *User) CheckOn(code string) bool {
+	if u == nil {
+		return true
+	}
+	for _, c := range u.ChecksOff {
+		if c == code {
+			return false
+		}
+	}
+	return true
 }

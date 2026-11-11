@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/repository"
@@ -18,12 +19,16 @@ func NewUserRepository(db *sql.DB) repository.UserRepository {
 	return &userRepository{db: db}
 }
 
-const userColumns = `id, email, username, name, lang, translator_name, translator_email, language_team, last_login_at, created_at, updated_at`
+const userColumns = `id, email, username, name, lang, translator_name, translator_email, language_team, editor_checks_off, last_login_at, created_at, updated_at`
 
 func scanUser(row interface{ Scan(...any) error }) (*models.User, error) {
 	u := &models.User{}
+	var off string
 	err := row.Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Lang, &u.TranslatorName, &u.TranslatorEmail, &u.LanguageTeam,
-		&u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
+		&off, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
+	if off != "" {
+		u.ChecksOff = strings.Split(off, ",")
+	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -53,8 +58,8 @@ func (r *userRepository) GetByUsername(ctx context.Context, username string) (*m
 func (r *userRepository) Update(ctx context.Context, u *models.User) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE users SET name = $2, lang = $3, translator_name = $4, translator_email = $5, language_team = $6,
-		        username = $7, updated_at = NOW() WHERE id = $1`,
-		u.ID, u.Name, u.Lang, u.TranslatorName, u.TranslatorEmail, u.LanguageTeam, u.Username)
+		        username = $7, editor_checks_off = $8, updated_at = NOW() WHERE id = $1`,
+		u.ID, u.Name, u.Lang, u.TranslatorName, u.TranslatorEmail, u.LanguageTeam, u.Username, strings.Join(u.ChecksOff, ","))
 	return err
 }
 

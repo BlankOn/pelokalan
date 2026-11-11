@@ -209,3 +209,18 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	http.SetCookie(w, &http.Cookie{Name: middleware.LangCookie, Value: user.Lang, Path: "/", MaxAge: 365 * 24 * 3600, SameSite: http.SameSiteLaxMode})
 	http.Redirect(w, r, "/profile?flash=profile_saved", http.StatusSeeOther)
 }
+
+// UpdateEditorSettings saves the editor settings (which checks Validasi uses) for the whole
+// account and goes back to the page the dialog was opened on
+func (h *Handler) UpdateEditorSettings(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUser(r.Context())
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+	if err := h.authService.UpdateEditorChecks(r.Context(), user, r.Form["check"]); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, safeNext(r.FormValue("next"), "/projects"), http.StatusSeeOther)
+}

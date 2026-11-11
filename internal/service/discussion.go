@@ -57,6 +57,7 @@ type DiscussionService struct {
 	mailer   Mailer
 	site     config.SiteConfig
 	notifs   repository.NotificationRepository // members' email choices (nil: email everyone)
+	activity *ActivityService
 }
 
 // SetNotifications connects the members' notification settings
@@ -96,6 +97,9 @@ func (s *DiscussionService) SaveNotificationSettings(ctx context.Context, user *
 	}
 	return s.notifs.Save(ctx, user.ID, p.ID, n)
 }
+
+// SetActivity makes the service record comments in the activity log
+func (s *DiscussionService) SetActivity(a *ActivityService) { s.activity = a }
 
 // NewDiscussionService creates the discussion service
 func NewDiscussionService(repo repository.DiscussionRepository, projects repository.ProjectRepository,
@@ -402,6 +406,8 @@ func (s *DiscussionService) post(ctx context.Context, user *models.User, p *mode
 	if err := s.repo.AddComment(ctx, c, ids(mentioned), attachments); err != nil {
 		return nil, err
 	}
+	s.activity.Record(ctx, &models.ActivityEvent{Kind: models.ActivityCommentPosted, UserID: &user.ID, ProjectID: &p.ID,
+		Data: map[string]any{"subject": subj.Type, "mentions": len(mentioned)}})
 	// emails go out in the background so posting stays fast
 	go s.notify(context.Background(), user, p, subj, d, c, mentioned, members)
 	return c, nil

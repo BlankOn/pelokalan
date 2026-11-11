@@ -12,7 +12,7 @@
     </div>
     {{if .Data.Languages}}
     <form id="glossary-form" class="glossary-search" hx-get="{{$p.Path}}/glossary/search" hx-target="#glossary-results"
-          hx-trigger="input changed delay:300ms from:#gl-q, change, submit">
+          hx-trigger="input changed delay:300ms from:#gl-q, change[target.type!='search'], submit">
         <input type="hidden" name="f" value="1">
         <input type="search" id="gl-q" name="q" value="{{$r.Search.Query}}" autofocus
                placeholder="{{t .Lang "glossary.search_placeholder"}}" aria-label="{{t .Lang "glossary.search_placeholder"}}">

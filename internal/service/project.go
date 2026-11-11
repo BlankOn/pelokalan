@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"pelokalan/internal/po"
 	"regexp"
 	"strconv"
 	"strings"
@@ -39,6 +40,8 @@ type ProjectInput struct {
 	Slug           string // empty: derived from the name
 	Description    string
 	SourceLanguage string
+	Language       string // what the project translates into ("" = not chosen)
+	Open           bool   // anyone signed in may join (as translator)
 }
 
 // slugRe allows 3-50 lowercase letters, digits and dashes, not at the ends
@@ -128,7 +131,24 @@ func (in *ProjectInput) clean() error {
 	if !validLanguageCode(in.SourceLanguage) {
 		return ErrInvalidLanguage
 	}
+	in.Language = strings.TrimSpace(in.Language)
+	if in.Language != "" && !validLanguageCode(in.Language) {
+		return ErrInvalidLanguage
+	}
 	return nil
+}
+
+// LanguageMismatch is the error for a file or import in another language than the project's
+func LanguageMismatch(p *models.Project, got string) error {
+	return userErr("err.language_mismatch", got, p.Language)
+}
+
+// checkProjectLanguage refuses a language other than the project's (when it has one)
+func checkProjectLanguage(p *models.Project, language string) error {
+	if p == nil || p.Language == "" || language == "" || po.SameLanguage(p.Language, language) {
+		return nil
+	}
+	return LanguageMismatch(p, language)
 }
 
 // Create creates a project owned by the user
@@ -139,7 +159,7 @@ func (s *ProjectService) Create(ctx context.Context, user *models.User, in Proje
 	if err := s.resolveSlug(ctx, &in, 0); err != nil {
 		return nil, err
 	}
-	p := &models.Project{Name: in.Name, Slug: in.Slug, Description: in.Description, SourceLanguage: in.SourceLanguage, OwnerID: user.ID}
+	p := &models.Project{Name: in.Name, Slug: in.Slug, Description: in.Description, SourceLanguage: in.SourceLanguage, Language: in.Language, OwnerID: user.ID}
 	if err := s.projects.Create(ctx, p); err != nil {
 		return nil, err
 	}
@@ -223,7 +243,7 @@ func (s *ProjectService) Update(ctx context.Context, p *models.Project, in Proje
 	if err := s.resolveSlug(ctx, &in, p.ID); err != nil {
 		return err
 	}
-	p.Name, p.Slug, p.Description, p.SourceLanguage = in.Name, in.Slug, in.Description, in.SourceLanguage
+	p.Name, p.Slug, p.Description, p.SourceLanguage, p.Language, p.Open = in.Name, in.Slug, in.Description, in.SourceLanguage, in.Language, in.Open
 	return s.projects.Update(ctx, p)
 }
 
@@ -343,6 +363,35 @@ func (s *ProjectService) AcceptInvitation(ctx context.Context, user *models.User
 		return nil, err
 	}
 	return inv, s.projects.MarkInvitationAccepted(ctx, inv.ID)
+}
+
+// JoinOpen adds the user to an open project as translator. A pending email invitation to
+// the project is accepted instead, so its role is kept. Members are left as they are.
+func (s *ProjectService) JoinOpen(ctx context.Context, user *models.User, p *models.Project) error {
+	if p.Role.IsMember() {
+		return nil
+	}
+	invs, err := s.InvitationsForUser(ctx, user)
+	if err != nil {
+		return err
+	}
+	for _, inv := range invs {
+		if inv.ProjectID == p.ID && !inv.IsExpired() {
+			if _, err := s.AcceptInvitation(ctx, user, inv.ID); err != nil {
+				return err
+			}
+			p.Role = inv.Role
+			return nil
+		}
+	}
+	if !p.Open {
+		return ErrProjectPrivate
+	}
+	if err := s.projects.AddMember(ctx, p.ID, user.ID, models.RoleTranslator); err != nil {
+		return err
+	}
+	p.Role = models.RoleTranslator
+	return nil
 }
 
 // DeclineInvitation rejects an invitation

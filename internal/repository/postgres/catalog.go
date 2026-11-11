@@ -24,12 +24,12 @@ func NewCatalogRepository(db *sql.DB) repository.CatalogRepository {
 const catalogColumns = `id, project_id, owner_id, (SELECT username FROM users WHERE users.id = catalogs.owner_id),
 	(SELECT slug FROM projects WHERE projects.id = catalogs.project_id), is_template, language, filename, header, header_comments,
 	plural_forms, nplurals, created_by, created_at, updated_at, deleted_at, deleted_by,
-	COALESCE((SELECT COALESCE(NULLIF(u.name, ''), u.username) FROM users u WHERE u.id = catalogs.deleted_by), '')`
+	COALESCE((SELECT COALESCE(NULLIF(u.name, ''), u.username) FROM users u WHERE u.id = catalogs.deleted_by), ''), source_url`
 
 func scanCatalog(row interface{ Scan(...any) error }) (*models.Catalog, error) {
 	c := &models.Catalog{}
 	err := row.Scan(&c.ID, &c.ProjectID, &c.OwnerID, &c.OwnerUsername, &c.ProjectSlug, &c.IsTemplate, &c.Language, &c.Filename, &c.Header, &c.HeaderComments,
-		&c.PluralForms, &c.NPlurals, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName)
+		&c.PluralForms, &c.NPlurals, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName, &c.SourceURL)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -390,4 +390,9 @@ func (r *catalogRepository) PreTranslate(ctx context.Context, catalogID, userID 
 		_, _ = r.db.ExecContext(ctx, `UPDATE catalogs SET updated_at = NOW() WHERE id = $1`, catalogID)
 	}
 	return int(n), nil
+}
+
+func (r *catalogRepository) SetSourceURL(ctx context.Context, id int64, url string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE catalogs SET source_url = $2 WHERE id = $1`, id, url)
+	return err
 }

@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"io"
 	"log"
 	"regexp"
@@ -16,6 +17,7 @@ import (
 	"time"
 
 	"pelokalan/internal/glossary"
+	"pelokalan/internal/gnomel10n"
 	"pelokalan/internal/models"
 	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
@@ -26,11 +28,20 @@ type GlossaryService struct {
 	repo     repository.GlossaryRepository
 	fetcher  *glossary.Fetcher
 	matchers matcherCache
-	syncing  sync.Mutex // one download round at a time (hourly sync or the Sync button)
+	syncing  sync.Mutex                   // one download round at a time (hourly sync or the Sync button)
+	projects repository.ProjectRepository // for the project's language (imports in another one are refused)
+	upstream *gnomel10n.Client            // state of project files on the GNOME translation site (nil = off)
+	warming  sync.Mutex                   // one upstream state round at a time (start-up and sync rounds)
 
 	stateMu   sync.Mutex
 	syncState map[int64]*SyncStatus // per project: the latest Sync button run
 }
+
+// SetProjects lets imports and syncs check the project's language
+func (s *GlossaryService) SetProjects(r repository.ProjectRepository) { s.projects = r }
+
+// SetUpstream shows the state of project files on the GNOME translation site
+func (s *GlossaryService) SetUpstream(c *gnomel10n.Client) { s.upstream = c }
 
 // SyncStatus is the progress of a project's Sync button run
 type SyncStatus struct {
@@ -96,6 +107,19 @@ func (s *GlossaryService) Import(ctx context.Context, user *models.User, p *mode
 	if language != "" && !validLanguageCode(language) {
 		return nil, ErrInvalidLanguage
 	}
+	if err := checkProjectLanguage(p, language); err != nil {
+		return nil, err
+	}
+	// check the files' languages before a version is created for them
+	if p.Language != "" {
+		if files, err := glossary.ReadFiles(in.Filename, in.Data, glossary.Limits{}); err == nil {
+			for _, lang := range glossary.Build(files, language).Languages {
+				if err := checkProjectLanguage(p, lang); err != nil {
+					return nil, err
+				}
+			}
+		}
+	}
 	v, err := s.repo.GetOrCreateVersion(ctx, p.ID, name, version)
 	if err != nil {
 		return nil, err
@@ -119,6 +143,16 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ProjectVersi
 	built := glossary.Build(files, language)
 	if len(built.Terms) == 0 {
 		return nil, userErr("err.glossary_empty")
+	}
+	// every language in the upload or download must be the project's (manual imports and syncs)
+	if s.projects != nil {
+		if p, err := s.projects.GetByID(ctx, v.ProjectID); err == nil {
+			for _, lang := range built.Languages {
+				if err := checkProjectLanguage(p, lang); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 
 	byLang := map[string][]repository.GlossaryTerm{}
@@ -185,6 +219,9 @@ func (s *GlossaryService) SetFeed(ctx context.Context, user *models.User, p *mod
 	language := strings.TrimSpace(in.Language)
 	if language != "" && !validLanguageCode(language) {
 		return nil, nil, ErrInvalidLanguage
+	}
+	if err := checkProjectLanguage(p, language); err != nil {
+		return nil, nil, err
 	}
 	v, err := s.repo.GetOrCreateVersion(ctx, p.ID, name, version)
 	if err != nil {
@@ -263,7 +300,7 @@ func (s *GlossaryService) SyncAll(ctx context.Context, p *models.Project) error 
 			feeds = append(feeds, v)
 		}
 	}
-	if len(feeds) == 0 {
+	if len(feeds) == 0 && s.upstream == nil {
 		return ErrNoSyncLink
 	}
 	if !s.syncing.TryLock() {
@@ -289,6 +326,8 @@ func (s *GlossaryService) SyncAll(ctx context.Context, p *models.Project) error 
 			}
 			s.stateMu.Unlock()
 		}
+		// and the files' states on the translation site (one page per release)
+		s.RefreshUpstream(ctx)
 		s.stateMu.Lock()
 		st.Running = false
 		s.stateMu.Unlock()
@@ -381,7 +420,12 @@ func (s *GlossaryService) Fetch(ctx context.Context, v *models.ProjectVersion) *
 
 func fetchErrorText(err error) string {
 	if ue, ok := AsUserError(err); ok {
-		return ue.Key
+		// "key|arg|arg" keeps the message's details (shown with errText)
+		parts := []string{ue.Key}
+		for _, a := range ue.Args {
+			parts = append(parts, fmt.Sprint(a))
+		}
+		return strings.Join(parts, "|")
 	}
 	msg := err.Error()
 	if len(msg) > 300 {
@@ -408,6 +452,8 @@ func (s *GlossaryService) FetchDue(ctx context.Context, interval time.Duration) 
 			log.Printf("glossary: updated version %d from %s", v.ID, v.GlossaryURL)
 		}
 	}
+	// upstream states of project files, a few at a time (the site's API is rate limited)
+	s.WarmUpstream(ctx)
 }
 
 // countFiles reports how many files contributed to a language. With a single
@@ -614,15 +660,39 @@ func projectFiles(files []glossary.File, imp *models.GlossaryImport, language st
 // ProjectFilePageSize is how many project files are listed at a time
 const ProjectFilePageSize = 10
 
-// ProjectFiles lists the project's source PO files, newest first
-func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, query string, versionIDs []int64, offset int) ([]*models.ProjectFile, int, error) {
+// ProjectFiles lists the project's source PO files, least complete first, with their
+// upstream state. states (UpstreamFilters values, nil = all) keeps only files in those
+// upstream states; that filter needs every matching file, so it pages here.
+func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, query string, versionIDs []int64, states map[string]bool, offset int) ([]*models.ProjectFile, int, error) {
 	if offset < 0 {
 		offset = 0
 	}
 	if len(query) > 200 {
 		query = query[:200]
 	}
-	return s.repo.ListProjectFiles(ctx, p.ID, strings.TrimSpace(query), versionIDs, ProjectFilePageSize, offset)
+	query = strings.TrimSpace(query)
+	if len(states) == 0 {
+		files, total, err := s.repo.ListProjectFiles(ctx, p.ID, query, versionIDs, ProjectFilePageSize, offset)
+		if err == nil {
+			s.AttachUpstream(ctx, p, files)
+		}
+		return files, total, err
+	}
+	all, _, err := s.repo.ListProjectFiles(ctx, p.ID, query, versionIDs, 1<<30, 0)
+	if err != nil {
+		return nil, 0, err
+	}
+	s.AttachUpstream(ctx, p, all)
+	var kept []*models.ProjectFile
+	for _, f := range all {
+		if states[f.UpstreamClass()] {
+			kept = append(kept, f)
+		}
+	}
+	if offset > len(kept) {
+		offset = len(kept)
+	}
+	return kept[offset:min(offset+ProjectFilePageSize, len(kept))], len(kept), nil
 }
 
 // ProjectFileVersions lists the versions that have project files, newest first

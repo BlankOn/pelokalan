@@ -30,14 +30,18 @@ func (r ProjectRole) IsOwner() bool { return r == RoleOwner }
 
 // Project groups translation files of one piece of software
 type Project struct {
-	ID             int64     `json:"id"`
-	Name           string    `json:"name"`
-	Slug           string    `json:"slug"`
-	Description    string    `json:"description"`
-	SourceLanguage string    `json:"source_language"`
-	OwnerID        int64     `json:"owner_id"`
-	CreatedAt      time.Time `json:"created_at"`
-	UpdatedAt      time.Time `json:"updated_at"`
+	ID             int64  `json:"id"`
+	Name           string `json:"name"`
+	Slug           string `json:"slug"`
+	Description    string `json:"description"`
+	SourceLanguage string `json:"source_language"`
+	// Language is what the project translates into; files in other languages are refused ("" = not chosen)
+	Language string `json:"language"`
+	// Open projects can be joined by any signed-in user (as translator); private ones need an invitation
+	Open      bool      `json:"open"`
+	OwnerID   int64     `json:"owner_id"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 
 	// Filled by listing queries
 	Role         ProjectRole `json:"role,omitempty"`

@@ -1,0 +1,77 @@
+{{define "content"}}{{$p := .Data.Project}}{{$v := .Data.Insight}}
+{{template "project_header" .}}
+
+{{with .Data.WordsChart}}{{$w := .}}
+<h2 class="section-title">{{t $.Lang "insight.growth"}}</h2>
+<section class="card words-chart">
+    <div class="gc-legend"><span class="gc-key wc-key"><span class="gc-swatch"></span> {{t $.Lang "insight.growth_words"}} <strong>{{num .Words}}</strong> <span class="gc-change">({{t $.Lang "insight.growth_strings" (num .Strings)}})</span></span></div>
+    <div class="gc-area gc-has-y">
+    <div class="gc-ylabels">{{range .YLabels}}<span style="top: {{printf "%.2f" (pct .Y $w.H)}}%">{{num .Value}}</span>{{end}}</div>
+    <svg class="gc-svg" viewBox="0 0 {{.W}} {{.H}}" role="img" aria-label="{{t $.Lang "insight.growth"}}">
+        {{range .YLabels}}<line x1="0" x2="{{$w.W}}" y1="{{printf "%.1f" .Y}}" y2="{{printf "%.1f" .Y}}" class="grid"/>{{end}}
+        <polygon points="{{.Area}}" class="wc-area"/>
+        <polyline points="{{.Line}}" class="gc-line wc-line"/>
+        {{range .Points}}<circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .Y}}" r="6" class="wc-hit"><title>{{.Day.Format "02-01-2006"}}: {{t $.Lang "insight.growth_tip" (num .Words) (num .DayWords)}}</title></circle>{{end}}
+    </svg>
+    </div>
+    <div class="gc-xlabels" style="margin-left: 52px">{{range .XLabels}}<span style="left: {{printf "%.2f" (pct .X $w.W)}}%" data-t="{{.Time.Format "2006-01-02T15:04:05Z07:00"}}">{{.Label}}</span>{{end}}</div>
+    <p class="muted small">{{t $.Lang "insight.growth_note"}}</p>
+</section>
+{{end}}
+
+{{with .Data.GroupChart}}
+<h2 class="section-title">{{t $.Lang "chart.title"}}</h2>
+{{template "group_chart" .}}
+{{end}}
+
+<div class="insight-head">
+    <h2 class="section-title">{{t .Lang "insight.activity"}}</h2>
+    <nav class="seg insight-range" aria-label="{{t .Lang "insight.range"}}">
+        {{range $v.Ranges}}<a class="seg-opt{{if eq . $v.Range}} active{{end}}" href="{{$p.Path}}/insight?r={{.}}">{{t $.Lang (print "insight.range_" .)}}</a>{{end}}
+    </nav>
+</div>
+{{with $v.Since}}<p class="small muted insight-note">{{t $.Lang "insight.since"}} <time data-local datetime="{{.Format "2006-01-02T15:04:05Z07:00"}}">{{.Format "02-01-2006"}}</time>.</p>{{end}}
+<div class="insight-totals">
+    <div class="it-card"><div class="it-num">{{num $v.Total.Translated}}</div><div class="it-label">{{t .Lang "insight.translated"}}</div><div class="it-sub">{{t .Lang "insight.words" (num $v.Total.TranslatedWords)}}</div></div>
+    <div class="it-card"><div class="it-num">{{num $v.Total.Reviewed}}</div><div class="it-label">{{t .Lang "insight.reviewed"}}</div><div class="it-sub">{{t .Lang "insight.edited_n" (num $v.Total.Edited)}}</div></div>
+    <div class="it-card"><div class="it-num">{{num $v.Total.DraftsApproved}} / {{num $v.Total.DraftsFixed}}</div><div class="it-label">{{t .Lang "insight.drafts"}}</div><div class="it-sub">{{t .Lang "insight.drafts_sub"}}</div></div>
+    <div class="it-card"><div class="it-num">{{num $v.Total.Comments}}</div><div class="it-label">{{t .Lang "insight.comments"}}</div><div class="it-sub">{{t .Lang "insight.commits_n" (num $v.Total.Commits)}}</div></div>
+    <div class="it-card"><div class="it-num">{{$v.Active}}</div><div class="it-label">{{t .Lang "insight.active"}}</div></div>
+</div>
+<section class="card insight-card">
+    {{if $v.Rows}}
+    <div class="table-scroll">
+    <table class="table insight-table">
+        <thead><tr>
+            <th>{{t .Lang "insight.member"}}</th>
+            <th class="num" title="{{t .Lang "insight.translated_help"}}">{{t .Lang "insight.translated"}}</th>
+            <th class="num">{{t .Lang "insight.words_col"}}</th>
+            <th class="num" title="{{t .Lang "insight.reviewed_help"}}">{{t .Lang "insight.reviewed"}}</th>
+            <th class="num" title="{{t .Lang "insight.edited_help"}}">{{t .Lang "insight.edited"}}</th>
+            <th class="num" title="{{t .Lang "insight.drafts_help"}}">{{t .Lang "insight.drafts_short"}}</th>
+            <th class="num">{{t .Lang "insight.comments"}}</th>
+            <th class="num">{{t .Lang "insight.commits"}}</th>
+            <th>{{t .Lang "insight.last_active"}}</th>
+        </tr></thead>
+        <tbody>
+        {{range $v.Rows}}
+        <tr>
+            <td><strong>@{{.Username}}</strong>{{if .Name}} <span class="muted small">{{.Name}}</span>{{end}}</td>
+            <td class="num">{{num .Translated}}</td>
+            <td class="num">{{num .TranslatedWords}}</td>
+            <td class="num">{{num .Reviewed}}</td>
+            <td class="num">{{num .Edited}}</td>
+            <td class="num">{{num .DraftsApproved}} / {{num .DraftsFixed}}</td>
+            <td class="num">{{num .Comments}}</td>
+            <td class="num">{{num .Commits}}</td>
+            <td class="muted small">{{timeAgo $.Lang .LastActive}}</td>
+        </tr>
+        {{end}}
+        </tbody>
+    </table>
+    </div>
+    {{else}}
+    <p class="muted">{{t .Lang "insight.empty"}}</p>
+    {{end}}
+</section>
+{{end}}

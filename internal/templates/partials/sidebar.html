@@ -1,5 +1,6 @@
 {{define "sidebar"}}{{$e := .Entry}}
 <aside id="sidebar" class="sidebar" {{if .OOB}}hx-swap-oob="true"{{end}}>
+    {{if .Glossary}}<section class="sb-section sb-glossary">{{template "entry_glossary" .}}</section>{{end}}
     {{if not .ReadOnly}}
     <section class="sb-section">
         <h3>{{t .Lang "sidebar.suggestions"}}</h3>

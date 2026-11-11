@@ -37,6 +37,7 @@ var (
 	ErrInvalidToken       = errors.New("invalid token")
 
 	ErrForbidden            = userErr("err.forbidden")
+	ErrProjectPrivate       = userErr("err.project_private")
 	ErrNotFound             = userErr("err.not_found")
 	ErrProjectNameRequired  = userErr("err.project_name_required")
 	ErrSlugInvalid          = userErr("err.slug_invalid")

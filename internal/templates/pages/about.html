@@ -1,0 +1,26 @@
+{{define "content"}}
+<div class="page-head"><div><h1>{{t .Lang "title.about"}}</h1><p class="muted">{{t .Lang "about.lead"}}</p></div></div>
+<section class="card about">
+    <p>{{t .Lang "about.what"}}</p>
+    <h2>{{t .Lang "about.goal_title"}}</h2>
+    <h3>{{t .Lang "about.newcomers_title"}}</h3>
+    <p>{{t .Lang "about.newcomers"}}</p>
+    <ul>
+        <li>{{t .Lang "about.newcomers_1"}}</li>
+        <li>{{t .Lang "about.newcomers_2"}}</li>
+        <li>{{t .Lang "about.newcomers_3"}}</li>
+    </ul>
+    <h3>{{t .Lang "about.review_title"}}</h3>
+    <p>{{t .Lang "about.review"}}</p>
+    <ul>
+        <li>{{t .Lang "about.review_1"}}</li>
+        <li>{{t .Lang "about.review_2"}}</li>
+        <li>{{t .Lang "about.review_3"}}</li>
+    </ul>
+</section>
+<section class="card about">
+    <h2>{{t .Lang "about.funding_title"}}</h2>
+    <p>{{t .Lang "about.funding"}} <a href="https://blankon.id/en" rel="noopener" target="_blank">{{t .Lang "about.funding_name"}}</a>.</p>
+</section>
+<p class="muted small"><a href="/licenses">{{t .Lang "about.licenses_link"}}</a></p>
+{{end}}

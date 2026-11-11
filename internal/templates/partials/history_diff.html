@@ -1,11 +1,17 @@
 {{define "history_diff"}}{{$d := .Diff}}
 <div class="diff-head">
     {{with .Commit}}
-    <div>
-        <strong>{{commitMsg $.Lang .Message}}</strong>
+    <div class="cm-head">
+        <strong class="cm-title">{{commitMsg $.Lang .Message}}</strong>
+        {{if $.Owned}}<form class="cm-edit" hidden hx-post="/catalogs/{{$.Catalog.ID}}/history/{{.ID}}/message" hx-target="#history-diff" hx-swap="innerHTML">
+            <input type="text" name="message" value="{{commitMsg $.Lang .Message}}" maxlength="500" required aria-label="{{t $.Lang "history.message"}}">
+            <button class="btn btn-small btn-primary" type="submit">{{t $.Lang "action.save"}}</button>
+            <button class="btn btn-small" type="button" data-cm-cancel>{{t $.Lang "action.cancel"}}</button>
+        </form>{{end}}
         <div class="muted small">{{.ShortID}} · {{if .AuthorName}}{{.AuthorName}} · {{end}}{{date .CreatedAt}}</div>
     </div>
     <div class="row-actions">
+        {{if $.Owned}}<button class="btn btn-small" type="button" data-cm-edit>✎ {{t $.Lang "history.edit_message"}}</button>{{end}}
         <a class="btn btn-small" href="/catalogs/{{$.Catalog.ID}}/history/{{.ID}}/download">{{t $.Lang "action.download"}}</a>
         {{if $.Owned}}<form hx-post="/catalogs/{{$.Catalog.ID}}/history/{{.ID}}/restore" hx-swap="none" hx-confirm="{{t $.Lang "confirm.restore" .ShortID}}">
             <button class="btn btn-small btn-primary" type="submit">↺ {{t $.Lang "history.restore"}}</button>
@@ -25,15 +31,19 @@
     <span class="d-chg">~{{$d.Changed}} {{t .Lang "history.changed"}}</span>
     <span class="d-del">−{{$d.Removed}} {{t .Lang "history.removed"}}</span>
     {{if $d.Reviewed}}<span class="d-rev">✓{{$d.Reviewed}} {{t .Lang "history.reviewed"}}</span>{{end}}
+    {{if $d.Meta}}<span class="d-meta">◇{{$d.Meta}} {{t .Lang "history.meta"}}</span>{{end}}
     {{if $d.HeaderChanged}}<span class="muted">· {{t .Lang "history.header_changed"}}</span>{{end}}
 </div>
 {{if $d.Empty}}<p class="muted">{{t .Lang "history.no_changes"}}</p>{{end}}
+{{template "diff_header" (dict "Diff" $d "Lang" .Lang)}}
 <ul class="diff-list">
     {{range $d.Items}}
     <li class="diff-item diff-{{.Kind}}">
         <div class="diff-src">{{if .Context}}<span class="ctx-tag">{{.Context}}</span>{{end}}{{.Source}}</div>
         {{if eq .Kind "reviewed"}}
         <div class="diff-review small">{{template "origin_tag" (dict "O" .OldOrigin "Lang" $.Lang)}} <span class="arrow">→</span> <span class="approved">✓ {{t $.Lang "history.approved"}}</span>{{if and .OldFuzzy (not .NewFuzzy)}} · {{t $.Lang "history.fuzzy_cleared"}}{{end}}</div>
+        <div class="diff-same">{{range .New}}<span class="t">{{.}}</span>{{end}}</div>
+        {{else if eq .Kind "meta"}}
         <div class="diff-same">{{range .New}}<span class="t">{{.}}</span>{{end}}</div>
         {{else}}
         {{if .HasOld}}<div class="diff-old">{{if .OldFuzzy}}<span class="mark-fuzzy" title="{{t $.Lang "filter.fuzzy"}}"></span> {{end}}{{range .Old}}<span class="t">{{.}}</span>{{end}}</div>
@@ -42,6 +52,7 @@
         {{else if ne .Kind "removed"}}<div class="diff-none muted small">{{t $.Lang "history.now_empty"}}</div>{{end}}
         {{if or .OldOrigin .NewOrigin}}{{if ne .OldOrigin .NewOrigin}}<div class="diff-review small">{{template "origin_tag" (dict "O" .OldOrigin "Lang" $.Lang)}} <span class="arrow">→</span> {{template "origin_tag" (dict "O" .NewOrigin "Lang" $.Lang)}}</div>{{end}}{{end}}
         {{end}}
+        {{with .Meta}}<ul class="diff-fields small">{{range .}}{{template "diff_field" (dict "F" . "Lang" $.Lang)}}{{end}}</ul>{{end}}
     </li>
     {{end}}
 </ul>
@@ -49,3 +60,24 @@
 {{end}}
 
 {{define "origin_tag"}}{{if eq .O "ai"}}<span class="origin-tag origin-ai">{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}} AI</span>{{else if eq .O "glossary"}}<span class="origin-tag origin-glossary">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "origin.glossary"}}</span>{{else if eq .O "memory"}}<span class="origin-tag origin-memory">{{template "icon_memory" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "origin.memory"}}</span>{{else}}<span class="origin-tag">{{t .Lang "origin.human"}}</span>{{end}}{{end}}
+
+{{/* header fields and header comment lines that changed */}}
+{{define "diff_header"}}{{$lang := .Lang}}{{with .Diff.HeaderChanges}}
+<div class="diff-header">
+    <div class="diff-header-title small">{{t $lang "history.header_title"}}</div>
+    <ul class="diff-fields">
+        {{range .}}{{template "diff_field" (dict "F" . "Lang" $lang)}}{{end}}
+    </ul>
+</div>
+{{end}}{{end}}
+
+{{/* one changed piece of metadata: old → new */}}
+{{define "diff_field"}}{{$f := .F}}
+<li class="diff-field">
+    <span class="df-name">{{if $f.Header}}{{$f.Name}}{{else}}{{t .Lang (printf "history.field_%s" $f.Name)}}{{end}}</span>
+    {{if $f.Old}}<span class="df-old">{{$f.Old}}</span>{{end}}{{if and $f.Old $f.New}} <span class="arrow">→</span> {{end}}{{if $f.New}}<span class="df-new">{{$f.New}}</span>{{end}}
+    {{if and (not $f.Old) (not $f.New)}}<span class="muted">—</span>{{end}}
+</li>
+{{end}}
+
+{{define "tl_msg"}}<strong id="tl-msg-{{.C.ID}}" class="tl-msg"{{if .OOB}} hx-swap-oob="true"{{end}}>{{commitMsg .Lang .C.Message}}</strong>{{end}}

@@ -124,7 +124,10 @@ type Item struct {
 	Glossary []TermHint `json:"glossary,omitempty"`
 	// Current is the existing translation of an entry that needs review: a draft to improve
 	Current []string `json:"current,omitempty"`
-	Flags   []string `json:"-"`
+	// Alternative numbers the copies of one string when several alternative translations are
+	// asked for (1 = the best one); 0 = a normal request
+	Alternative int      `json:"alternative,omitempty"`
+	Flags       []string `json:"-"`
 }
 
 // Term is a preferred glossary translation
@@ -468,4 +471,16 @@ func Batch(items []Item, maxItems, maxChars int) [][]Item {
 // SortTerms orders terms for stable output (used by tests and listings)
 func SortTerms(t []TermHint) {
 	sort.Slice(t, func(i, j int) bool { return t[i].Term < t[j].Term })
+}
+
+// AlternativesNote is added to the system prompt when one string is sent several times to get
+// alternative translations to choose from
+func AlternativesNote(n int) string {
+	return fmt.Sprintf(`
+
+Alternatives: this request contains the same string %d times, numbered by "alternative" (1 to %d).
+Give each a different translation a translator could pick from: vary word choice or sentence
+structure, never just punctuation or capitalization. Every alternative must be correct and follow
+the glossary hints, the context and the format rules. Alternative 1 is the one you consider best;
+when it carries a "current" draft, the draft rules apply to alternative 1 only.`, n, n)
 }

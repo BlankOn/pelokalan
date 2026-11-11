@@ -24,6 +24,7 @@ import (
 	"pelokalan/internal/blobstore"
 	"pelokalan/internal/config"
 	"pelokalan/internal/glossary"
+	"pelokalan/internal/gnomel10n"
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/handler/web"
 	"pelokalan/internal/i18n"
@@ -79,6 +80,7 @@ func main() {
 		AI:       postgres.NewAIRepository(db),
 		Commit:   postgres.NewCommitRepository(db),
 		Discuss:  postgres.NewDiscussionRepository(db),
+		Activity: postgres.NewActivityRepository(db),
 	}
 
 	// Files (comment attachments) live in Postgres behind an S3-like interface
@@ -93,6 +95,15 @@ func main() {
 		cfg.Site.Name+" glossary fetcher (+"+cfg.Site.BaseURL+")")
 	glossaryService := service.NewGlossaryService(repos.Glossary, fetcher)
 	discussionService := service.NewDiscussionService(repos.Discuss, repos.Project, repos.Glossary, repos.Catalog, blobs, mailer, cfg.Site)
+	// activity log for the Insight tab
+	activityService := service.NewActivityService(repos.Activity)
+	authService.SetActivity(activityService)
+	glossaryService.SetProjects(repos.Project)
+	// state of project files on the GNOME translation site (read-only API, cached, rate limited)
+	glossaryService.SetUpstream(gnomel10n.New(gnomel10n.DefaultBase, false,
+		cfg.Site.Name+" upstream status (+"+cfg.Site.BaseURL+")"))
+	catalogService.SetActivity(activityService)
+	discussionService.SetActivity(activityService)
 	discussionService.SetNotifications(postgres.NewNotificationRepository(db))
 	wikiService := service.NewWikiService(postgres.NewWikiRepository(db), blobs)
 	contextService := service.NewContextService(postgres.NewContextRepository(db))
@@ -135,6 +146,7 @@ func main() {
 	}()
 	// PO files can also be created from a URL: same SSRF-safe transport, upload size limit
 	webHandler.SetSyncInterval(cfg.Glossary.FetchInterval)
+	webHandler.SetActivity(activityService)
 	webHandler.SetPOFetcher(glossary.NewFetcher(cfg.Server.MaxUploadMB<<20, cfg.Glossary.AllowPrivateHosts,
 		cfg.Site.Name+" PO fetcher (+"+cfg.Site.BaseURL+")"))
 	authMiddleware := middleware.NewAuth(authService)
@@ -175,9 +187,11 @@ func main() {
 		r.Get("/projects/{id}/glossary", webHandler.GlossaryPage)
 		r.Get("/projects/{id}/glossary/search", webHandler.GlossarySearch)
 		r.Get("/projects/{id}/members", webHandler.MembersPage)
+		r.Get("/projects/{id}/insight", webHandler.InsightPage)
 		r.Get("/join/{token}", webHandler.JoinPage)
 		r.Get("/projects/{id}/wiki", webHandler.WikiIndex)
 		r.Get("/licenses", webHandler.LicensesPage)
+		r.Get("/about", webHandler.AboutPage)
 		r.Get("/projects/{id}/contexts", webHandler.ContextsPage)
 		r.Get("/projects/{id}/project-files", webHandler.ProjectFilesMore)
 		r.Get("/projects/{id}/my-files", webHandler.MyFiles)
@@ -218,6 +232,7 @@ func main() {
 		r.Get("/profile", webHandler.ProfilePage)
 		r.Post("/profile", webHandler.UpdateProfile)
 		r.Post("/profile/identity", webHandler.UpdateIdentity)
+		r.Post("/editor-settings", webHandler.UpdateEditorSettings)
 
 		r.Get("/invitations", webHandler.InvitationsPage)
 		r.Post("/invitations/{iid}/accept", webHandler.AcceptInvitation)
@@ -236,6 +251,7 @@ func main() {
 		r.Post("/catalogs/{cid}/raw", webHandler.SaveRaw)
 		r.Post("/catalogs/{cid}/properties", webHandler.UpdateProperties)
 		r.Post("/catalogs/{cid}/history/{hid}/restore", webHandler.RestoreCommit)
+		r.Post("/catalogs/{cid}/history/{hid}/message", webHandler.EditCommitMessage)
 		r.Get("/catalogs/{cid}/commit/preview", webHandler.CommitPreview)
 		r.Post("/catalogs/{cid}/commit", webHandler.CommitCatalog)
 		r.Post("/catalogs/{cid}/history/discard", webHandler.DiscardChanges)
@@ -267,6 +283,7 @@ func main() {
 		r.Post("/projects/{id}/invite-links", webHandler.CreateInviteLink)
 		r.Post("/projects/{id}/invite-links/{lid}/delete", webHandler.DeleteInviteLink)
 		r.Post("/join/{token}", webHandler.Join)
+		r.Post("/projects/{id}/join", webHandler.JoinProject)
 		r.Get("/projects/{id}/wiki/new", webHandler.WikiNew)
 		r.Get("/projects/{id}/thesaurus", webHandler.ThesaurusLookup)
 		r.Post("/projects/{id}/project-files/{fid}/take", webHandler.ProjectFileTake)
@@ -294,6 +311,9 @@ func main() {
 	// Download glossary sources that are due (checked every 15 minutes, each URL once per interval)
 	// and record each module group's totals for the progress chart (at most hourly)
 	go func() {
+		// upstream states first (one release page per release and language, seconds), so a
+		// deploy shows them right away; FetchDue may spend minutes downloading archives
+		glossaryService.WarmUpstream(context.Background())
 		glossaryService.FetchDue(context.Background(), cfg.Glossary.FetchInterval)
 		glossaryService.RecordStats(context.Background())
 		t := time.NewTicker(15 * time.Minute)

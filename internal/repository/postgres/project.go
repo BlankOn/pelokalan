@@ -26,9 +26,9 @@ func (r *projectRepository) Create(ctx context.Context, p *models.Project) error
 	defer tx.Rollback()
 
 	err = tx.QueryRowContext(ctx,
-		`INSERT INTO projects (name, slug, description, source_language, owner_id)
-		 VALUES ($1, $2, $3, $4, $5) RETURNING id, created_at, updated_at`,
-		p.Name, p.Slug, p.Description, p.SourceLanguage, p.OwnerID,
+		`INSERT INTO projects (name, slug, description, source_language, language, owner_id)
+		 VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, created_at, updated_at`,
+		p.Name, p.Slug, p.Description, p.SourceLanguage, p.Language, p.OwnerID,
 	).Scan(&p.ID, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return err
@@ -44,10 +44,10 @@ func (r *projectRepository) Create(ctx context.Context, p *models.Project) error
 func (r *projectRepository) GetByID(ctx context.Context, id int64) (*models.Project, error) {
 	p := &models.Project{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, name, slug, description, source_language, owner_id, created_at, updated_at,
+		`SELECT id, name, slug, description, source_language, language, open, owner_id, created_at, updated_at,
 		        EXISTS (SELECT 1 FROM project_ai_settings s WHERE s.project_id = projects.id AND s.api_key_enc <> '')
 		 FROM projects WHERE id = $1`, id,
-	).Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.OwnerID, &p.CreatedAt, &p.UpdatedAt, &p.AIEnabled)
+	).Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.Language, &p.Open, &p.OwnerID, &p.CreatedAt, &p.UpdatedAt, &p.AIEnabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -67,7 +67,7 @@ func (r *projectRepository) GetBySlug(ctx context.Context, slug string) (*models
 
 func (r *projectRepository) ListForUser(ctx context.Context, userID int64) ([]*models.Project, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT p.id, p.name, p.slug, p.description, p.source_language, p.owner_id, p.created_at, p.updated_at, m.role,
+		`SELECT p.id, p.name, p.slug, p.description, p.source_language, p.language, p.owner_id, p.created_at, p.updated_at, m.role,
 		        (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = p.id),
 		        (SELECT COUNT(*) FROM catalogs c WHERE c.project_id = p.id AND NOT c.is_template AND c.deleted_at IS NULL)
 		 FROM projects p
@@ -81,7 +81,7 @@ func (r *projectRepository) ListForUser(ctx context.Context, userID int64) ([]*m
 	var out []*models.Project
 	for rows.Next() {
 		p := &models.Project{}
-		if err := rows.Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.OwnerID,
+		if err := rows.Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.Language, &p.OwnerID,
 			&p.CreatedAt, &p.UpdatedAt, &p.Role, &p.MemberCount, &p.CatalogCount); err != nil {
 			return nil, err
 		}
@@ -92,7 +92,7 @@ func (r *projectRepository) ListForUser(ctx context.Context, userID int64) ([]*m
 
 func (r *projectRepository) ListAll(ctx context.Context, userID int64) ([]*models.Project, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT p.id, p.name, p.slug, p.description, p.source_language, p.owner_id, p.created_at, p.updated_at,
+		`SELECT p.id, p.name, p.slug, p.description, p.source_language, p.language, p.open, p.owner_id, p.created_at, p.updated_at,
 		        COALESCE(m.role, ''),
 		        (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = p.id),
 		        (SELECT COUNT(DISTINCT i.version_id) FROM glossary_imports i WHERE i.project_id = p.id),
@@ -110,7 +110,7 @@ func (r *projectRepository) ListAll(ctx context.Context, userID int64) ([]*model
 	var out []*models.Project
 	for rows.Next() {
 		p := &models.Project{}
-		if err := rows.Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.OwnerID,
+		if err := rows.Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.Language, &p.Open, &p.OwnerID,
 			&p.CreatedAt, &p.UpdatedAt, &p.Role, &p.MemberCount, &p.VersionCount, &p.TermCount, &p.AIEnabled, &p.CatalogCount); err != nil {
 			return nil, err
 		}
@@ -121,8 +121,8 @@ func (r *projectRepository) ListAll(ctx context.Context, userID int64) ([]*model
 
 func (r *projectRepository) Update(ctx context.Context, p *models.Project) error {
 	_, err := r.db.ExecContext(ctx,
-		`UPDATE projects SET name = $2, description = $3, source_language = $4, slug = $5, updated_at = NOW() WHERE id = $1`,
-		p.ID, p.Name, p.Description, p.SourceLanguage, p.Slug)
+		`UPDATE projects SET name = $2, description = $3, source_language = $4, slug = $5, language = $6, open = $7, updated_at = NOW() WHERE id = $1`,
+		p.ID, p.Name, p.Description, p.SourceLanguage, p.Slug, p.Language, p.Open)
 	return err
 }
 

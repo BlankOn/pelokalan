@@ -710,12 +710,24 @@ type EntryAIResult struct {
 	Forms    []string `json:"forms"`
 	Flagged  bool     `json:"flagged"` // failed a check (glossary, placeholders): mark for review
 	Problems []string `json:"problems,omitempty"`
+	// Alternatives are all usable results, best first (Forms/Flagged are the first one)
+	Alternatives []EntryAIAlternative `json:"alternatives,omitempty"`
 }
+
+// EntryAIAlternative is one of several AI translations offered for an entry
+type EntryAIAlternative struct {
+	Forms   []string `json:"forms"`
+	Flagged bool     `json:"flagged"`
+}
+
+// MaxAIAlternatives is the most alternative translations one request may ask for
+const MaxAIAlternatives = 4
 
 // TranslateEntry asks the model to translate one entry for its owner, with the same glossary,
 // Konteks and draft rules as pre-translation. current is the text in the editor (a draft to
 // improve when not empty). Nothing is saved; the cost is recorded toward the monthly budget.
-func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, e *models.Entry, current []string) (*EntryAIResult, error) {
+func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, e *models.Entry, current []string, alternatives int) (*EntryAIResult, error) {
+	alternatives = min(max(alternatives, 1), MaxAIAlternatives)
 	if c.IsTemplate || !c.WritableBy(user.ID) {
 		return nil, ErrForbidden
 	}
@@ -745,9 +757,25 @@ func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *mo
 		}
 	}
 	contextWords := ai.ContextWords(st.ExtraContext + "\n" + fileContext)
-	it := buildItem(e, c, ai.NewGlossary(terms), contextWords, current)
+	gl := ai.NewGlossary(terms)
+	it := buildItem(e, c, gl, contextWords, current)
 	system := ai.SystemPrompt(languageLabel(p.SourceLanguage), languageLabel(c.Language), st.ExtraContext, fileContext)
 	batch := []ai.Item{it}
+	if alternatives > 1 {
+		// the same string several times, numbered; only the first carries the draft, the
+		// others are fresh translations (so their glossary hints are required again)
+		system += ai.AlternativesNote(alternatives)
+		batch = nil
+		for k := 1; k <= alternatives; k++ {
+			cur := current
+			if k > 1 {
+				cur = nil
+			}
+			x := buildItem(e, c, gl, contextWords, cur)
+			x.ID, x.Alternative = int64(k), k
+			batch = append(batch, x)
+		}
+	}
 
 	if st.MonthlyBudget > 0 {
 		u := ai.EstimateBatches([][]ai.Item{batch}, system)
@@ -766,7 +794,7 @@ func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *mo
 	// record the cost even when the answer is unusable
 	now := time.Now()
 	job := &models.AIJob{ProjectID: p.ID, CatalogID: c.ID, UserID: &user.ID, Status: models.AIJobDone, Model: st.Model,
-		Total: 1, Processed: 1, Single: true, PromptTokens: usage.PromptTokens, CompletionTokens: usage.CompletionTokens,
+		Total: len(batch), Processed: len(batch), Single: true, PromptTokens: usage.PromptTokens, CompletionTokens: usage.CompletionTokens,
 		Cost: st.Cost(usage.PromptTokens, usage.CompletionTokens), FinishedAt: &now}
 	if usage.PromptTokens+usage.CompletionTokens > 0 {
 		if err := s.repo.CreateJob(context.Background(), job); err == nil {
@@ -777,13 +805,33 @@ func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *mo
 		return nil, translateAIError(err)
 	}
 	results, err := ai.ParseResponse(content)
-	if err != nil || len(results[e.ID]) == 0 {
+	if err != nil {
 		return nil, userErr("err.ai_entry_empty")
 	}
-	forms := ai.FitForms(results[e.ID], e.IsPlural(), c.NPlurals)
-	problems := ai.Verify(it, forms, c.NPlurals, c.PluralForms)
-	if len(problems) > 0 && (problems[0] == ai.ProblemEmpty || problems[0] == ai.ProblemCorrupt) {
+	res := &EntryAIResult{}
+	seen := map[string]bool{}
+	for _, x := range batch {
+		got := results[x.ID]
+		if len(got) == 0 {
+			continue
+		}
+		forms := ai.FitForms(got, e.IsPlural(), c.NPlurals)
+		problems := ai.Verify(x, forms, c.NPlurals, c.PluralForms)
+		if len(problems) > 0 && (problems[0] == ai.ProblemEmpty || problems[0] == ai.ProblemCorrupt) {
+			continue // unusable
+		}
+		key := strings.Join(forms, "\x00")
+		if seen[key] {
+			continue // the same text twice is not an alternative
+		}
+		seen[key] = true
+		if len(res.Alternatives) == 0 {
+			res.Forms, res.Flagged, res.Problems = forms, len(problems) > 0, problems
+		}
+		res.Alternatives = append(res.Alternatives, EntryAIAlternative{Forms: forms, Flagged: len(problems) > 0})
+	}
+	if len(res.Alternatives) == 0 {
 		return nil, userErr("err.ai_entry_empty")
 	}
-	return &EntryAIResult{Forms: forms, Flagged: len(problems) > 0, Problems: problems}, nil
+	return res, nil
 }

@@ -18,9 +18,18 @@ type Catalog struct {
 	OwnerID       int64
 	OwnerUsername string
 	ProjectSlug   string
+	// state of the file's module on the GNOME translation site (set by the service, not stored)
+	UpstreamInfo
 	// Owned is true when the viewing user owns the file and may change it (set by the
 	// service, not stored; false for a deleted file)
 	Owned bool
+	// SourceURL is the link the file was downloaded from ("" = uploaded from disk)
+	SourceURL string
+	// CreditName/CreditEmail: the owner's credit identity, set by the service for the owner
+	// (not stored); used to check the translator credits entry
+	CreditName, CreditEmail string
+	// ChecksOff: the viewer's switched-off editor checks (models.User.ChecksOff), not stored
+	ChecksOff []string
 	// DeletedAt is set when the file was deleted: it stays readable, but nobody changes it
 	DeletedAt      *time.Time
 	DeletedBy      *int64

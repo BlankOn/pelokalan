@@ -1,0 +1,1 @@
+ALTER TABLE catalogs DROP COLUMN IF EXISTS source_url;

@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/i18n"
@@ -32,7 +33,8 @@ func (h *Handler) AITranslateEntry(w http.ResponseWriter, r *http.Request) {
 		current = append(current, v[0])
 	}
 	w.Header().Set("Content-Type", "application/json")
-	res, err := h.ai.TranslateEntry(r.Context(), middleware.GetUser(r.Context()), p, c, e, current)
+	n, _ := strconv.Atoi(r.PostForm.Get("n"))
+	res, err := h.ai.TranslateEntry(r.Context(), middleware.GetUser(r.Context()), p, c, e, current, max(n, 1))
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		_ = json.NewEncoder(w).Encode(map[string]string{"error": h.errorMessage(r, err)})
@@ -43,5 +45,6 @@ func (h *Handler) AITranslateEntry(w http.ResponseWriter, r *http.Request) {
 	if res.Flagged {
 		notice = i18n.T(lang, "ai.entry_flagged")
 	}
-	_ = json.NewEncoder(w).Encode(map[string]any{"forms": res.Forms, "flagged": res.Flagged, "notice": notice})
+	_ = json.NewEncoder(w).Encode(map[string]any{"forms": res.Forms, "flagged": res.Flagged, "notice": notice,
+		"alternatives": res.Alternatives})
 }

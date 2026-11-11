@@ -9,10 +9,10 @@
         <label class="check notify-muted"><input type="checkbox" name="muted" value="1" {{if $n.Muted}}checked{{end}} data-notify-mute> {{t $.Lang "notify.muted"}}</label>
         <div class="notify-kinds"{{if $n.Muted}} data-muted{{end}}>
             {{range $.Data.NotifyGroups}}
-            <fieldset class="notify-group">
-                <legend>{{t $.Lang .Title}}</legend>
+            <div class="notify-group" role="group" aria-label="{{t $.Lang .Title}}">
+                <h3 class="notify-group-title">{{t $.Lang .Title}}</h3>
                 {{range .Kinds}}<label class="check"><input type="checkbox" name="n_{{.}}" value="1" {{if $n.On .}}checked{{end}}> {{t $.Lang (printf "notify.%s" .)}}</label>{{end}}
-            </fieldset>
+            </div>
             {{end}}
         </div>
         <p class="muted small">{{t $.Lang "notify.always"}}</p>
@@ -38,6 +38,28 @@
             <select id="s-src" name="source_language">
                 {{range languages}}<option value="{{.Code}}" {{if eq .Code $p.SourceLanguage}}selected{{end}}>{{.Name}} ({{.Code}})</option>{{end}}
             </select>
+            <label id="s-lang-label">{{t .Lang "field.project_language"}}</label>
+            <div class="combo combo-field" data-combo>
+                <input type="hidden" name="language" value="{{$p.Language}}">
+                <button type="button" class="combo-btn{{if $p.Language}} combo-set{{end}}" aria-haspopup="listbox" aria-expanded="false" aria-labelledby="s-lang-label">
+                    <span class="combo-label">{{if $p.Language}}{{$p.Language}} - {{or (nativeLanguage $p.Language) $p.Language}}{{else}}{{t .Lang "field.project_language_none"}}{{end}}</span>
+                    <span class="combo-caret">▾</span>
+                </button>
+                <div class="combo-pop" hidden>
+                    <input type="search" class="combo-q" placeholder="{{t .Lang "field.project_language_search"}}" aria-label="{{t .Lang "field.project_language_search"}}" autocomplete="off">
+                    <ul class="combo-list" role="listbox">
+                        <li><button type="button" role="option" data-value="" data-label="{{t .Lang "field.project_language_none"}}" class="{{if not $p.Language}}selected{{end}}">{{t .Lang "field.project_language_none"}}</button></li>
+                        {{range languageNames}}<li><button type="button" role="option" data-value="{{.Code}}" data-label="{{.Code}} - {{.Name}}" class="{{if eq .Code $p.Language}}selected{{end}}"><span><code class="lang-code">{{.Code}}</code> - {{.Name}}</span></button></li>{{end}}
+                    </ul>
+                    <p class="combo-none muted small" hidden>{{t .Lang "field.project_language_nomatch"}}</p>
+                </div>
+            </div>
+            <p class="muted small field-help">{{t .Lang "field.project_language_help"}}</p>
+            <fieldset class="access-choice">
+                <legend>{{t .Lang "field.project_access"}}</legend>
+                <label class="check"><input type="radio" name="access" value="private" {{if not $p.Open}}checked{{end}}> <span><strong>{{t .Lang "project.private"}}</strong> <span class="muted small">{{t .Lang "field.access_private_help"}}</span></span></label>
+                <label class="check"><input type="radio" name="access" value="open" {{if $p.Open}}checked{{end}}> <span><strong>{{t .Lang "project.open"}}</strong> <span class="muted small">{{t .Lang "field.access_open_help"}}</span></span></label>
+            </fieldset>
             <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
         </fieldset>
     </form>

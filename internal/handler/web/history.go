@@ -109,6 +109,30 @@ func (h *Handler) HistoryDiff(w http.ResponseWriter, r *http.Request) {
 	h.renderPartials(w, partial{"history_diff", view})
 }
 
+// EditCommitMessage changes a version's message and re-renders its details, plus its
+// timeline label out of band (HTMX)
+func (h *Handler) EditCommitMessage(w http.ResponseWriter, r *http.Request) {
+	c, _, ok := h.loadOwnCatalog(w, r)
+	if !ok {
+		return
+	}
+	cm, err := h.catalogService.EditCommitMessage(r.Context(), middleware.GetUser(r.Context()), c, idParam(r, "hid"), r.FormValue("message"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	_, d, err := h.catalogService.CommitDiff(r.Context(), c, cm.ID)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	lang := middleware.GetLang(r.Context())
+	h.renderPartials(w,
+		partial{"history_diff", map[string]any{"Lang": lang, "Catalog": c, "Owned": c.Owned, "Commit": cm, "Diff": d}},
+		partial{"tl_msg", map[string]any{"Lang": lang, "C": cm, "OOB": true}},
+	)
+}
+
 // CommitPreview renders the pending changes as a table for review before committing (HTMX)
 func (h *Handler) CommitPreview(w http.ResponseWriter, r *http.Request) {
 	c, _, ok := h.loadOwnCatalog(w, r)

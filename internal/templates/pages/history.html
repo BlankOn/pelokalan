@@ -20,7 +20,6 @@
     <div>
         <div class="crumbs"><a href="{{$p.Path}}">{{$p.Name}}</a> / <a href="{{$p.Path}}/files">{{t .Lang "project.tab_files"}}</a> / <a href="{{$c.URL}}">{{if $c.IsTemplate}}{{$c.Filename}}{{else}}{{$c.LanguageName}}{{end}}</a></div>
         <h1>{{t .Lang "history.title"}}</h1>
-        <p class="muted small">{{t .Lang "history.intro"}}</p>
     </div>
     <div class="row-actions">
         {{with .Data.Original}}{{if and $.Data.Owned (gt (len $.Data.Commits) 1)}}
@@ -77,7 +76,7 @@
                 <span class="tl-node">{{if hasPrefix .Message "commit.after_ai"}}{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}}{{end}}</span>
                 <div class="tl-body">
                     <div class="tl-head">
-                        <strong class="tl-msg">{{commitMsg $.Lang .Message}}</strong>
+                        {{template "tl_msg" (dict "Lang" $.Lang "C" . "OOB" false)}}
                         <span class="tl-kind">{{if and $.Data.Original (eq .ID $.Data.Original.ID)}}<span class="original-badge">{{t $.Lang "history.original"}}</span> {{end}}{{t $.Lang (printf "history.kind_%s" .Kind)}}</span>
                     </div>
                     <div class="tl-meta small muted">{{.ShortID}} · {{if .AuthorName}}{{.AuthorName}} · {{end}}{{timeAgo $.Lang .CreatedAt}}</div>

@@ -99,3 +99,8 @@ func (r *commitRepository) Snapshot(ctx context.Context, id int64) ([]byte, erro
 	defer zr.Close()
 	return io.ReadAll(io.LimitReader(zr, 256<<20))
 }
+
+func (r *commitRepository) SetMessage(ctx context.Context, id int64, message string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE catalog_commits SET message = $2 WHERE id = $1`, id, message)
+	return err
+}

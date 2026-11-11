@@ -9,6 +9,7 @@ import (
 	"log"
 	"mime"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -152,18 +153,18 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Error = errMsg
 	data.Data["Project"] = p
 	data.Data["Template"] = template
-	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, 0)
-	data.Data["MemberFiles"] = h.fileList(r, p, catalogs, false, "", nil, 0)
+	h.glossary.AttachUpstreamToCatalogs(r.Context(), p, catalogs)
+	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, nil, 0)
+	data.Data["MemberFiles"] = h.fileList(r, p, catalogs, false, "", nil, nil, 0)
 	data.Data["Tab"] = "files"
-	if pf, total, err := h.glossary.ProjectFiles(r.Context(), p, "", nil, 0); err == nil {
+	if pf, total, err := h.glossary.ProjectFiles(r.Context(), p, "", nil, nil, 0); err == nil {
 		_ = h.catalogService.MatchOwnFiles(r.Context(), middleware.GetUser(r.Context()), p, pf)
 		view := projectFilesView{Lang: data.Lang, Project: p, Files: pf, Total: total,
 			Next: len(pf), CanTake: p.Role.IsMember(), CanManage: p.Role.CanManage(),
-			SyncHours: int(h.syncEvery / time.Hour)}
+			SyncHours: int(h.syncEvery / time.Hour), Upstream: h.glossary.HasUpstream(r.Context(), p)}
 		view.HasFeed, view.LastSync = h.lastSync(r, p)
 		view.Versions, _ = h.glossary.ProjectFileVersions(r.Context(), p)
 		data.Data["ProjectFiles"] = view
-		data.Data["GroupChart"] = h.groupChart(r, p, view.Versions)
 	}
 	if msg := r.URL.Query().Get("merged"); msg != "" {
 		data.Flash = i18n.T(data.Lang, "flash.merged", r.URL.Query().Get("added"), r.URL.Query().Get("obsolete"))
@@ -190,6 +191,9 @@ func (h *Handler) UploadCatalog(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.renderProject(w, r, p, h.errorMessage(r, err))
 		return
+	}
+	if u := uploadedURL(r); u != "" && res == nil && c != nil {
+		_ = h.catalogService.SetSourceURL(r.Context(), user, c, u)
 	}
 	if res != nil {
 		http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d&skipped=%d", res.Added, res.Obsolete, res.Skipped), http.StatusSeeOther)
@@ -225,6 +229,14 @@ func (h *Handler) readUpload(w http.ResponseWriter, r *http.Request) (string, []
 		return "", nil, &service.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
 	}
 	return hdr.Filename, body, nil
+}
+
+// uploadedURL is the link readUpload downloaded from ("" when a file was chosen)
+func uploadedURL(r *http.Request) string {
+	if r.MultipartForm != nil && len(r.MultipartForm.File["file"]) > 0 {
+		return ""
+	}
+	return strings.TrimSpace(r.FormValue("url"))
 }
 
 // CreateTranslation starts a new language from the template
@@ -389,12 +401,35 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		Slug:           r.FormValue("slug"),
 		Description:    r.FormValue("description"),
 		SourceLanguage: r.FormValue("source_language"),
+		Language:       r.FormValue("language"),
+		Open:           r.FormValue("access") == "open",
 	}
 	if err := h.projectService.Update(r.Context(), p, in); err != nil {
 		h.renderSettings(w, r, p, h.errorMessage(r, err), "")
 		return
 	}
 	http.Redirect(w, r, p.Path()+"/settings?flash=settings_saved", http.StatusSeeOther)
+}
+
+// JoinProject adds the signed-in user to an open project (or accepts their pending invitation)
+// and returns to the page the button was on
+func (h *Handler) JoinProject(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	if err := h.projectService.JoinOpen(r.Context(), middleware.GetUser(r.Context()), p); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	next := p.Path()
+	if u, err := url.Parse(safeNext(r.FormValue("next"), p.Path())); err == nil {
+		q := u.Query()
+		q.Set("flash", "joined")
+		u.RawQuery = q.Encode()
+		next = u.String()
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 // DeleteProject removes a project
@@ -558,6 +593,7 @@ type projectFilesView struct {
 	LastSync  *time.Time                   // newest download check of those versions
 	SyncHours int                          // automatic sync interval
 	Versions  []*models.ProjectFileVersion // filter options
+	Upstream  bool                         // some version is a release upstream: show the state filter
 }
 
 // ProjectFilesMore returns the next page of project files (htmx "Muat lagi")
@@ -570,7 +606,7 @@ func (h *Handler) ProjectFilesMore(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	var versionIDs []int64
 	versionIDs = groupParams(r)
-	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, versionIDs, offset)
+	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, versionIDs, models.UpstreamFilterSet(r.URL.Query()["u"]), offset)
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -608,6 +644,12 @@ func (h *Handler) ProjectFileTake(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := middleware.GetUser(r.Context())
+	label := f.VersionLabel
+	// the current PO file on the GNOME translation site when it has one (newer than the release
+	// archive); otherwise, or when the site cannot be reached, the copy saved at the last sync
+	if latest, from, err := h.glossary.UpstreamPO(r.Context(), p, f, h.serverConfig.MaxUploadMB<<20); err == nil {
+		data, label = latest, from
+	}
 	// "Perbarui": replace the member's own file of this module (confirmed in the browser)
 	if into, _ := strconv.ParseInt(r.FormValue("into"), 10, 64); into > 0 {
 		c, cp, err := h.catalogService.Get(r.Context(), user, into)
@@ -615,7 +657,7 @@ func (h *Handler) ProjectFileTake(w http.ResponseWriter, r *http.Request) {
 			err = service.ErrNotFound
 		}
 		if err == nil {
-			err = h.catalogService.UpdateFromUpstream(r.Context(), user, c, f.VersionLabel, data)
+			err = h.catalogService.UpdateFromUpstream(r.Context(), user, c, label, data)
 		}
 		if err != nil {
 			h.renderProject(w, r, p, h.errorMessage(r, err))
@@ -730,15 +772,18 @@ type fileListView struct {
 	CanManage   bool
 	HasTemplate bool
 	Groups      []*models.ProjectFileVersion // module group filter options
+	Upstream    bool                         // some version is a release upstream: show the state filter
 	Searched    bool
 }
 
 // fileList filters a project's PO files: the user's own (mine) or the other members'.
 // q: every word must appear in the file name, language or owner; groups: module groups
-// (glossary versions whose project files contain the file's module), 0 = no group.
-func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Catalog, mine bool, q string, groups []int64, offset int) fileListView {
+// (glossary versions whose project files contain the file's module), 0 = no group;
+// states: upstream states (models.UpstreamFilters, nil = all). all must carry their
+// upstream state (GlossaryService.AttachUpstreamToCatalogs).
+func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Catalog, mine bool, q string, groups []int64, states map[string]bool, offset int) fileListView {
 	v := fileListView{Lang: middleware.GetLang(r.Context()), Project: p, Mine: mine, CanManage: p.Role.IsMember(),
-		Searched: q != "" || len(groups) > 0}
+		Searched: q != "" || len(groups) > 0 || len(states) > 0, Upstream: h.glossary.HasUpstream(r.Context(), p)}
 	v.Groups, _ = h.glossary.ProjectFileVersions(r.Context(), p)
 	moduleGroups, _ := h.glossary.ModuleGroups(r.Context(), p)
 	want := map[int64]bool{}
@@ -777,13 +822,27 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 				}
 			}
 		}
+		if ok && len(states) > 0 {
+			ok = states[c.UpstreamClass()]
+		}
 		if ok {
 			list = append(list, c)
 		}
 	}
-	if !mine {
-		sort.SliceStable(list, func(i, j int) bool { return list[i].OwnerUsername < list[j].OwnerUsername })
-	}
+	// most recently edited first (entry saves bump catalogs.updated_at), so the order is stable
+	// between pages and the file someone just worked on is on top. The user's own files whose
+	// upstream state needs them come first: requested rework, proofreading, translating.
+	sort.SliceStable(list, func(i, j int) bool {
+		if mine {
+			if a, b := ownFileRank(list[i]), ownFileRank(list[j]); a != b {
+				return a < b
+			}
+		}
+		if !list[i].UpdatedAt.Equal(list[j].UpdatedAt) {
+			return list[i].UpdatedAt.After(list[j].UpdatedAt)
+		}
+		return list[i].ID > list[j].ID
+	})
 	v.Total = len(list)
 	if offset < 0 || offset > len(list) {
 		offset = 0
@@ -792,6 +851,16 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 	v.Files = list[offset:end]
 	v.Next = end
 	return v
+}
+
+// ownFileRanks orders "Berkas Anda" by upstream state first; other states follow (ownFileRank 3)
+var ownFileRanks = map[string]int{"to_review": 0, "proofreading": 1, "translating": 2}
+
+func ownFileRank(c *models.Catalog) int {
+	if r, ok := ownFileRanks[c.UpstreamClass()]; ok {
+		return r
+	}
+	return len(ownFileRanks)
 }
 
 func groupParams(r *http.Request) []int64 {
@@ -819,7 +888,9 @@ func (h *Handler) fileRows(w http.ResponseWriter, r *http.Request, mine bool) {
 		return
 	}
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
-	h.renderPartials(w, partial{"file_rows", h.fileList(r, p, all, mine, strings.TrimSpace(r.URL.Query().Get("q")), groupParams(r), offset)})
+	h.glossary.AttachUpstreamToCatalogs(r.Context(), p, all)
+	h.renderPartials(w, partial{"file_rows", h.fileList(r, p, all, mine, strings.TrimSpace(r.URL.Query().Get("q")), groupParams(r),
+		models.UpstreamFilterSet(r.URL.Query()["u"]), offset)})
 }
 
 // SaveNotifications stores the member's email notification choices for the project

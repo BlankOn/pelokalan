@@ -24,16 +24,17 @@
 {{range .Files}}
 <tr>
     <td><strong class="pf-name">{{.Filename}}</strong><div class="muted small">{{langName .Language}} · {{.Language}}</div>
+        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}
         {{with .Mine}}<div class="small pf-mine">{{t $v.Lang "files.mine_copy"}} <a href="{{.URL}}">{{.Filename}}</a></div>{{end}}</td>
     <td>{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · <span class="c-fuzzy">{{t $v.Lang "files.fuzzy_count" .Fuzzy}}</span>{{end}}</span></td>
     <td class="small"><span class="version-badge">{{.VersionLabel}}</span></td>
-    <td class="actions">
+    <td class="actions"><div class="pf-actions">
         {{if $v.CanTake}}{{if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .VersionLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
             <input type="hidden" name="into" value="{{.Mine.ID}}">
             <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
         {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"><button class="btn btn-small btn-primary" title="{{t $v.Lang "files.take_help"}}">{{t $v.Lang "files.take"}}</button></form>{{end}}{{end}}
         <a class="btn btn-small btn-icon" href="{{$v.Project.Path}}/project-files/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
-    </td>
+    </div></td>
 </tr>
 {{end}}
 {{if and .Searched (not .Files) (eq .Next 0)}}<tr class="pf-more"><td colspan="4" class="muted">{{t .Lang "files.project_none"}}</td></tr>{{end}}
@@ -58,12 +59,32 @@
 </details>
 {{end}}
 
+{{/* upstream state badge (U: *models.UpstreamStats, may be nil) */}}
+{{define "upstream_badge"}}{{if and (not .U) .L}}<a class="up-badge up-unknown" href="{{.L}}" target="_blank" rel="noopener" title="{{t .Lang "upstream.unknown_help"}}">{{t .Lang "upstream.unknown"}} <svg class="up-ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>{{end}}{{with .U}}<a class="up-badge up-{{.StateClass}}" href="{{.PageURL}}" target="_blank" rel="noopener" title="{{t $.Lang "upstream.help"}}: {{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · {{t $.Lang "files.fuzzy_count" .Fuzzy}}{{end}}{{if .Untranslated}} · {{t $.Lang "upstream.untranslated" .Untranslated}}{{end}}">{{if .StateKey}}{{t $.Lang .StateKey}}{{else}}{{.State}}{{end}}</a>{{end}}{{end}}
+
+{{/* upstream state checkbox dropdown (name u); none ticked = all */}}
+{{define "upstream_filter"}}
+<details class="multi-filter" data-multi-filter>
+    <summary class="mf-btn" title="{{t .Lang "upstream.filter"}}">
+        <svg class="mf-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>
+        <span class="mf-label" data-all="{{t .Lang "upstream.filter_all"}}" data-many="{{t .Lang "upstream.filter_many"}}">{{t .Lang "upstream.filter_all"}}</span>
+        <span class="combo-caret">▾</span>
+    </summary>
+    <div class="mf-pop">
+        {{range upstreamFilters}}<label class="mf-opt"><input type="checkbox" name="u" value="{{.}}"> <span class="mf-text">{{t $.Lang (printf "upstream.state_%s" .)}}</span></label>{{end}}
+        <p class="mf-note muted small">{{t .Lang "upstream.filter_note"}}</p>
+        <button type="button" class="linklike small mf-clear mf-none">{{t .Lang "filter.clear"}}</button>
+    </div>
+</details>
+{{end}}
+
 {{/* search + module group filter above a file list (Berkas Anda, Berkas anggota lain) */}}
 {{define "file_filter"}}
-<div class="context-search pf-toolbar">
-    <form id="{{.ID}}-filter" class="pf-filter" hx-get="{{.URL}}" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change, submit" hx-target="#{{.ID}}-file-rows" hx-swap="innerHTML">
+<div class="context-search pf-toolbar" data-stick>
+    <form id="{{.ID}}-filter" class="pf-filter" hx-get="{{.URL}}" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change[target.type!='search'], submit" hx-target="#{{.ID}}-file-rows" hx-swap="innerHTML">
         <input type="search" name="q" placeholder="{{t .Lang "files.search"}}" aria-label="{{t .Lang "files.search"}}" autocomplete="off">
         {{if .Groups}}{{template "group_filter" (dict "Lang" .Lang "Groups" .Groups "NoGroup" true)}}{{end}}
+        {{if .Upstream}}{{template "upstream_filter" (dict "Lang" .Lang)}}{{end}}
     </form>
 </div>
 {{end}}
@@ -73,7 +94,8 @@
 {{range .Files}}
 <tr>
     <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a>
-        <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div></td>
+        <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div>
+        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}</td>
     <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>{{end}}</td>
     <td class="num">{{if not .IsTemplate}}{{.Stats.Translated}}{{end}}</td>
     <td class="num">{{if not .IsTemplate}}{{.Stats.Fuzzy}}{{end}}</td>
@@ -90,9 +112,7 @@
                 {{if $v.HasTemplate}}
                 <form method="post" action="/catalogs/{{.ID}}/update"><button class="linklike">{{t $v.Lang "action.update_from_template"}}</button></form>
                 {{end}}
-                <form method="post" action="/catalogs/{{.ID}}/replace" enctype="multipart/form-data" class="inline-upload">
-                    <label class="linklike">{{t $v.Lang "action.upload_new_version"}}<input type="file" name="file" accept=".po" data-autosubmit hidden></label>
-                </form>
+                <button type="button" class="linklike" data-replace="/catalogs/{{.ID}}/replace" data-replace-name="{{.Filename}}" data-replace-url="{{.SourceURL}}">{{t $v.Lang "action.update_file"}}</button>
                 <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $v.Lang "confirm.delete_file"}}"><button class="linklike danger">{{t $v.Lang "action.delete"}}</button></form>
             </div>
         </details>

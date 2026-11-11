@@ -27,6 +27,7 @@ internal/
   i18n/              # UI strings (id = primary, en); T(lang, key, args...)
   ai/                # LLM client (OpenAI-compatible), glossary matching, prompts, verification, estimates
   netsafe/           # HTTP transport refusing private/local addresses (SSRF protection)
+  gnomel10n/         # Read-only client of the GNOME translation site API (cached, rate limited)
   glossary/          # Read PO archives in memory and aggregate source/translation pairs
   po/                # PO/POT parser & writer, MO compiler, validation, plural rules
   models/            # User, OTP, Project, Invitation, Catalog, Entry
@@ -75,6 +76,9 @@ make test
   editor; `loadCatalog` resolves either that path or `/catalogs/{cid}`. Old `/catalogs/{cid}`
   page links redirect there (`CatalogRedirect`); API calls (list, entries, save, AI) still use
   `/catalogs/{cid}/...`. Use `Catalog.URL()` for links. File names are unique per owner and
+  An uploaded file whose name only names the language or nothing ("id.po", "pt_BR.po", "messages.pot";
+  `genericFilename`, known languages via `po.IsKnownLanguage`) is renamed from Project-Id-Version
+  (`uploadFilename`: "Constrict main" → "constrict.main.id.po"), so its module is the program's name.
   project (`uniqueFilename`).
 - **Several PO files per member and language are allowed** (one per module); only file names
   are unique per member and project, plus one template per member (migration 016).
@@ -92,6 +96,13 @@ make test
   `c.OwnerID == user.ID`. Read routes live in the public route group, writes in the signed-in one.
   `Build` stamps the translator identity only when the owner exports their own file.
 - **Settings** (`/projects/{id}/settings`) are for owners and managers only.
+- **Project language** (`projects.language`, migration 034, backfilled from the most common file/import language;
+  "" = not chosen): picked in Settings with a searchable `[data-combo]` of `po.LanguageNames` (code + native
+  name, "id - Bahasa Indonesia"; plural rules stay in `po.languages`). `checkProjectLanguage` (`po.SameLanguage`:
+  case and -/_ ignored, "pt" ≠ "pt_BR") refuses with `err.language_mismatch`: file uploads (`CatalogService.Upload`,
+  also by link and "Ambil"), glossary imports (checked before a version is created), sync links with a chosen
+  language, and every downloaded language in `importInto` (so scheduled syncs fail with the message; stored sync
+  errors are "key|arg|arg", shown by `errText`). Templates (no language) are always accepted.
 - **Personal files (historical note):** catalogs have `owner_id`; `CatalogService.Get` returns
   ErrNotFound for other users. Any member can upload into their own workspace
   ("Berkas Anda", `/projects/{id}/files`). Translation memory uses the user's own files.
@@ -105,11 +116,18 @@ make test
   (= glossary version with project files, e.g. gnome-51; `group_filter` partial, checkbox dropdown
   `[data-multi-filter]` with "Tampilkan semua" like the editor filter, shown when there is a group; `g` params).
   Search and filter live in `#pf-filter`; "Muat lagi" includes it (`hx-include`).
+- Each of the three sections (`.files-section[data-sticky-section]`) keeps its title, card head, filter bar and
+  column row on top while it scrolls (`[data-stick]`, position: sticky); app.js stacks them via `--stick-top` from
+  the heights above (re-measured on resize and htmx swaps). They let go when the section ends; off on phones.
+  Section titles are buttons (`.section-toggle`, chevron down / right) that fold the section; the state is kept in
+  localStorage per project and section (`data-collapse-key` "files:<slug>:project|mine|others").
 - "Berkas Anda" and "Berkas anggota lain" (one list, owner under each file) show 5 files at a time
   (`FileListPageSize`, `GET /projects/{id}/my-files|member-files?q=&g=&offset=`, `Handler.fileList`, partial
-  `file_rows`) with search and the same module group filter: a file is in a group when its module
+  `file_rows`) sorted by last edit (`catalogs.updated_at`, newest first) with search and the same module group filter: a file is in a group when its module
   (`service.ModuleOf`) is among that group's project files (`GlossaryService.ModuleGroups`); `g=0` = no group.
-  Managers get "Sinkronkan" (`POST /projects/{id}/project-files/sync` → `GlossaryService.SyncAll`):
+  Managers get "Sinkronkan dengan upstream" (in Berkas proyek and beside "Tambah berkas" in Berkas Anda;
+  `POST /projects/{id}/project-files/sync` → `GlossaryService.SyncAll`, which ends with `RefreshUpstream`: every
+  file state is read again from the release pages, however recent; it also runs for projects without a sync link):
   fetches every version with a sync link in a background goroutine (requests time out after 30 s);
   `GlossaryService.syncing` makes it and the hourly `FetchDue` run one at a time. app.js (`form[data-sync]`)
   spins the button and polls `GET .../project-files/sync` (`SyncState`, per project, in memory) until it is
@@ -127,6 +145,11 @@ make test
   other modules and reports how many it skipped (`MergeResult.Skipped`).
 - **Invitations:** stored by email; accepted from `/invitations` after signing in
   with that email (no tokens in links).
+- **Open or private projects** (`projects.open`, migration 037; private by default): chosen under "Keanggotaan" in
+  Settings → Umum (`access` = open|private). Signed-in non-members see "Gabung" in the project header on open projects
+  (`POST /projects/{id}/join` → `ProjectService.JoinOpen`, joins as translator and returns to the same page) and
+  "🔒 Privat" on private ones; a pending email invitation to the project is accepted instead (its role wins), so it also
+  works on private projects. Private projects refuse with `err.project_private`.
 - **Invite links** (`project_invite_links`, migration 018): owners/managers create shareable
   links on the members page with a role, expiry (1/7/30 days or none) and a use limit
   (`service.InviteLinkDays/Uses`). `/join/{token}` is public: visitors are sent to
@@ -226,7 +249,19 @@ make test
   `ai.ContextWords`/`ai.Mentioned`; plain sentences and examples do not count) are sent as `optional` hints (not enforced by `ai.Verify`), and
   whole-string glossary matches containing such a word go to the model instead of being applied.
 - Project tabs carry monochrome line icons (`tab_icon` in project_header.html).
-- Module group progress chart above Berkas proyek (`group_chart` partial, `groupchart.go`): `group_stats`
+- Wawasan / Insight tab (`/projects/{id}/insight`, before Anggota, `InsightPage` in insight.go, pages/insight.html):
+  the module group chart (moved here from Penerjemahan) and "Aktivitas anggota" (public, like the rest of the
+  project): totals and a per-member table. Above the module chart, "Pertumbuhan terjemahan" (`wordschart.go`,
+  `buildWordsChart` from `ActivityRepository.DailyTranslated`): translated source words added up day by day from
+  the first recorded translation to today, flat on days without any. for 7/30/90 days or all time (`?r=`, `service.ActivityRanges`).
+- Activity log (`activity_events`, migration 033, append-only, no FK on catalog/entry so history survives):
+  `ActivityService.Record` (errors only logged, nil-safe) is called from `CatalogService.SaveEntry` (`EntrySaved`:
+  status before/after, machine origin before, text changed, source word count), manual commits, comments
+  (`DiscussionService.post`) and sign-ups. Services get it via `SetActivity`. Counting rules (same in the view
+  `activity_daily` and `ActivityRepository.Summary`): translated = untranslated → anything, reviewed = fuzzy →
+  translated, edited = translated with text changed, drafts approved/fixed = origin set and text unchanged/changed.
+  Add a `models.Activity*` kind and a Record call to log something new.
+- Module group progress chart (Wawasan tab; `group_chart` partial, `groupchart.go`): `group_stats`
   (migration 031) records each group's project file totals per language at every 15-minute check when they
   changed, and at least hourly (`GlossaryService.RecordStats`, `StatsInterval`), plus after uploads. Groups are
   chosen with the same `group_filter` dropdown (none = all; several are added up per hour, `sumByHour`);
@@ -245,6 +280,12 @@ make test
 - `LookupForms` falls back to meN-/di-/-nya verb forms ("Tampilkan" → "menampilkan").
 - Editor: selecting text in the translation box shows a popup (app.js); clicking replaces the
   selection, keeping a leading capital. The /licenses page credits the source.
+
+## About page
+
+`/about` (footer link "Tentang", before Lisensi; `AboutPage`, pages/about.html, `about.*` strings) explains the
+goals (easy upstream contributions for newcomers, letting contributors focus on reviewing) and that the
+project is funded by the BlankOn Foundation.
 
 ## Licenses page
 
@@ -276,6 +317,66 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   them `.wiki-file` with `download`; served as octet-stream attachments under a sandbox CSP). Blob GC keeps
   blobs referenced by `wiki_files`. Images in `.wiki-body` open in the lightbox.
 
+## Upstream state (GNOME translation site)
+
+- `internal/gnomel10n` reads the public read-only API of l10n.gnome.org (`/api/v1/releases/`,
+  `/releases/{release}/languages/{lang}`, `/modules/{m}/branches/{b}/domains/{d}/languages/{lang}`) over
+  `netsafe`. Write actions (reserving, uploading) need a signed-in session there and are out of scope.
+- The site throttles anonymous API clients (~100 requests/hour per address, then a 429 for most of an hour), and
+  the API has no endpoint returning many modules' states at once. So **pages never ask the site for states**: they
+  are stored in `upstream_states` (migration 035; shared by all projects, key release + language + file name stem;
+  `listed = false` = the release has no such file) and read from there.
+- `GlossaryService.WarmUpstream` (service/upstream.go; at start-up before the first `FetchDue`, then at the end of
+  every `FetchDue` round, i.e. every 15 min; one round at a time) refreshes states older than `UpstreamFresh` (2 h).
+  Because the API has no bulk endpoint, it reads the site's **HTML release page** per release and language
+  (`/languages/{lang}/{release}/ui/`, plus `/doc/` when a due file is documentation, "…-help.<branch>"):
+  `gnomel10n.ParseReleasePage` takes, per `<tr>`, the `/vertimus/{module}/{branch}/{domain}/{lang}/` link, the
+  counts in `pre.statistics_workflow` (blank = 0), the state badge (English labels mapped to the API names: "To
+  Review" → ToReview; none = "None") and `<time datetime>`. The page is untrusted text: regexes only, nothing
+  executed. One request stores every module of the page; due files it does not list become "missing". The page
+  has no PO file address, so `po_file` from an earlier API answer is kept, and `UpstreamPO` asks the API when none
+  is stored.
+- **The API is the fallback**: when a page cannot be read (HTTP error, throttled, or `ErrLayout` = the layout no
+  longer parses; logged once per round), that release's due files are checked one API request each (never
+  checked first, then the oldest). Page and API requests share the client's hourly budget
+  (`gnomel10n.DefaultBudget` 40, minus `upstreamReserve` 8 left for people). The client also caches API answers in
+  memory (stats 1 h, release lists 12 h, 404s too) and obeys the site's wait time. Pages may only ask for the
+  release list (once per 12 h) for versions named after a release (`upstreamWait` 3 s).
+- Fixtures: `internal/gnomel10n/testdata` has recorded API JSON and a saved release page
+  (`page_gnome-51_id_ui.html`); if the site changes its markup, save a new copy and adjust the regexes in page.go.
+- Mapping (`upstreamLookup`): release = the version's sync link on the site
+  (`…/languages/id/gnome-51/ui.tar.gz`), else the version label when the site lists a release of that name;
+  language = `projects.language`, else the file's. A project file matches a release entry by file name stem
+  (`gnomel10n.FileStem` vs `Entry.Stem`): `<module>.<branch>` for the "po" domain, `<module>-help.<branch>` for
+  "help", `<domain>.<branch>` otherwise ("locations.main.id.po"), case-insensitive. This avoids one request per
+  module just to learn its file name. Members' files (`AttachUpstreamToCatalogs`) use the project file with the
+  same name, else the same module (newest version first).
+- `models.UpstreamInfo` (embedded in `ProjectFile` and `Catalog`): `Upstream` + `UpstreamChecked`;
+  `UpstreamClass()` is a state class, "missing" (not on the site) or "unknown" (not checked yet / no release).
+- State filter (`upstream_filter` partial, checkbox dropdown `[data-multi-filter]`, param `u`, values
+  `models.UpstreamFilters`, none ticked = all, with a note that states are checked gradually): next to the module
+  group filter in "Berkas proyek" (`#pf-filter`, so "Muat lagi" keeps it; with a state filter
+  `GlossaryService.ProjectFiles` loads all matching rows and pages in Go) and in "Berkas Anda" / "Berkas anggota
+  lain" (`file_filter`, `fileList`). Shown when a version is a release upstream (`HasUpstream`). Both lists show the
+  badge (`upstream_badge` partial) under the file name.
+- "Berkas Anda" order (`fileList`, `ownFileRank`): upstream state "ToReview" (labelled "Requested rework" /
+  "Diminta perbaikan"), then Proofreading, then Translating, then everything else; last edit (newest first)
+  within each group, also across "Muat lagi" pages and with search/filters. "Berkas anggota lain" sorts by last
+  edit only.
+- No assignee is shown: the API does not say who reserved a file (only the site's HTML workflow page does).
+- "Berkas proyek" rows (`AttachUpstream`, from the stored states) show the upstream state as a coloured badge under
+  the file name (`.up-badge.up-<UpstreamStats.StateClass>`, grey for "None" = no activity and unknown states), linking
+  to the site's page with the upstream % and counts in its tooltip; labels are `upstream.state_*`
+  (`UpstreamStats.StateKey`; unknown states are shown as sent). The progress column shows only Pelokalan's copy. There is one button per row: "Ambil" / "Perbarui" (and the editor's
+  "Tarik upstream", same take route) first download the current `po_file` from the site (`GlossaryService.UpstreamPO`: the stored `po_file`, looked up
+  live only when the file was never checked;
+  upload size limit; history label "l10n.gnome.org module/branch") and fall back to the copy saved at the last sync
+  when the site has no entry or cannot be reached (throttled, down).
+- A file with a release but no stored state shows a grey dashed "Status belum ada ↗" label (`.up-unknown`) linking
+  to the page built from its stem (`GlossaryService.guessPageURL`, `UpstreamInfo.UpstreamLink`), to check by hand.
+  Colours: Translating orange, Requested rework (ToReview) red, None/unknown grey.
+- Tests use API JSON and the release page recorded from the site (`internal/gnomel10n/testdata`); never call the site from tests.
+
 ## Versions and automatic downloads
 
 - `project_versions` (name + version, label "gnome-51") group glossary imports; sorted
@@ -290,9 +391,23 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - `/catalogs/{cid}/raw`: the file built by `CatalogService.Build` in a textarea; saving
   (`SaveRaw`) re-parses it and replaces header + entries. The form carries the catalog's
   `updated_at` (UnixNano); a newer change is refused (`err.raw_conflict`).
+  Leaving with unsaved changes (Penyunting, any link, browser Back via an extra history entry) opens
+  `#raw-leave-dialog` with a line diff (app.js, LCS on the changed middle, 2 lines of context, at most 300 lines):
+  Batal stays, "Abaikan perubahan" leaves, "Simpan dulu" saves with `next` and then goes there (`SaveRaw`).
+  Syntax highlighting: `#raw-hl` (a `<pre>` behind the transparent textarea in `.raw-wrap.hl-on`) is rebuilt from the
+  text on input (one frame), with the textarea's font metrics copied and its scroll mirrored by a transform.
+  Keywords, msgid vs msgstr strings, escapes, format placeholders, markup tags and each comment kind
+  (`#:` `#.` `#,` with fuzzy in bold, `#|`, `#~`) get their own `.po-*` colour. Skipped for files over 3 MB.
 - Users have `translator_name/email` and `language_team` (profile page). `Build` sets
-  `Last-Translator`, appends/updates the contributor line with `po.AddContributor`, and
+  `Last-Translator`, adds/updates the contributor line with `po.AddContributor` (placed right after the
+  last existing "Name <email>, year." credit, never after the trailing bare `#`; a credit an earlier export
+  put there is moved back; years merge via `po.AddYear`: 2025 + 2026 → "2025-2026", 2024 + 2026 → "2024, 2026"), and
   fills `Language-Team` only when the file has none (file properties win).
+- Translator credits entry (`po.IsCreditsEntry`: translator-credits / translator_credits / translator-credit):
+  for the file owner, validation (`validateEntry` in service/catalog.go, `po.CheckCredits`) adds
+  `credits_missing` when their name/email is not in it and `credits_year` when their line lists years but
+  not this one (lines without years are fine). The editor alert offers "Tambahkan identitas saya" / "Tambahkan
+  tahun ini" (`creditFix` → `po.AddCredit`, same year rule), which fills the box (undoable, not saved).
 - `/catalogs/{cid}/properties` edits Project-Id-Version, Report-Msgid-Bugs-To,
   Language-Team and the header comment lines.
 
@@ -319,7 +434,12 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   are not applied directly, so a person's word choice outranks the glossary.
 - Items are built by `buildItem` (shared by jobs and the editor button), so glossary/Konteks/draft
   rules are identical everywhere.
-- Editor "Terjemahkan AI" button (Ctrl+Shift+A, owner only, project with an AI key):
+- Editor "Terjemahkan dengan AI" button (Ctrl+Shift+A, owner only, project with an AI key), with a count
+  selector beside it (1–4 alternatives, default 2, remembered in localStorage `aiAltCount`). With n > 1 the
+  entry is sent n times in one call, numbered by `Item.Alternative`, plus `ai.AlternativesNote`; only
+  alternative 1 carries the draft. Unusable and duplicate answers are dropped; the editor shows the rest side
+  by side (`#ai-alts`); clicking a box (or Enter/Space on it) puts it in the translation box (undoable). With one result it goes straight in.
+- Per-entry AI details:
   `POST /catalogs/{cid}/entries/{eid}/ai` → `AIService.TranslateEntry` translates one entry with the
   editor's current text as draft and returns it unsaved; cost is recorded as an `ai_jobs` row with
   `single = true` (migration 025), which counts toward the budget but is not shown as the file's job.
@@ -342,7 +462,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 
 ## Editor glossary section
 
-Above the source text the editor lists glossary terms found in the entry (`GlossaryService.ForEntry`,
+At the top of the right sidebar (`entry_glossary` partial in editor.html, rendered by sidebar.html; below
+1000px, where the sidebar is hidden, the copy in the editor pane above the source text shows instead) the editor lists glossary terms found in the entry (`GlossaryService.ForEntry`,
 all versions, preferred translation + share). Chips insert the translation at the cursor; ↗ opens
 the term page. Orange text when nothing matches or the language has no glossary. Chips the project AI
 context or the file's Konteks talks about (`ai.Mentioned`, same rule as pre-translation) are orange
@@ -365,12 +486,19 @@ by a person (`SaveEntry` clears it). The editor marks 'ai' with an orange bot, '
   every step can be undone. `Discard` = restore latest commit.
 - The Commit button badge (`commit_badge`/`commit_status` partials) is refreshed out-of-band after
   every entry save, so needs-work and origin changes show up immediately.
+- The owner can change a version's message: select it on the history page, "Ubah pesan" (before Unduh) turns the
+  title into a field (`POST /catalogs/{cid}/history/{hid}/message`, `CatalogService.EditCommitMessage`, same
+  limits as Commit, no "|"); the response re-renders the details and the timeline label (`tl_msg`, out of band).
 - History page `/catalogs/{cid}/history`: timeline, progress chart (SVG), diff panel (HTMX). It is a full
   page with the editor-style toolbar (back to the editor, PO download); the content scrolls below it.
 - The editor's Commit button is disabled while the badge shows no changes (app.js follows the badge,
   which is refreshed out-of-band after saves and commits).
 - Diffs compare text, needs-work flag and origin; an AI/glossary/memory translation saved by a
   person without text changes is a "reviewed" item (counted in `catalog_commits.reviewed`).
+- Diffs also report metadata: `Diff.HeaderChanges` (each changed header field "Name: old → new", and
+  header comment lines added/removed, e.g. translator credits) and entries where only comments,
+  references, flags, `#|` lines or the plural source changed (kind "meta", `Diff.Meta`, `DiffItem.Meta`;
+  counted in `Total`, so they enable Commit). Shown by `diff_header`/`diff_field` in the commit dialog and history.
 
 ## Pre-translation
 
@@ -411,6 +539,10 @@ deploys never run stale JS/CSS.
   `GET|POST /catalogs/{cid}/entries/{eid}` editor pane. Responses return the editor
   plus out-of-band swaps for the sidebar, the edited row and the status bar.
 - Client behaviour (selection, shortcuts, dirty tracking, splitter) is in `static/js/app.js`.
+- The sidebar is resizable: drag `#side-splitter` (220px to 60% of the width; arrow keys too). Dragging it under
+  140px or clicking the small `#side-toggle` handle in the middle of the divider hides it (`.workspace.sidebar-hidden`);
+  the same handle, then at the right edge, brings it back. Width and state live in localStorage (`sidebarWidth`,
+  `sidebarHidden`). While hidden, the glossary shows in the editor pane (`.ed-glossary-narrow`).
 - Plain Up/Down move between entries, also from the translation box (Left/Right stay there);
   in multi-line text they only leave the entry from the first/last line (`arrowNavigates`).
 - While a pre-translation job runs (`#ai-job.ai-running`), the editor is read-only (`applyLock` in
@@ -423,13 +555,31 @@ deploys never run stale JS/CSS.
   form used for at most one number, in a file with several forms, may drop a placeholder. With one form
   (Indonesian) `msgstr[0]` must have the placeholders of `msgid_plural` (issue `plural_placeholders`).
   Downloading PO/MO from the editor while the file has problem entries asks first ("Lihat masalah" filters them).
+- Source text marks easy-to-lose whitespace at its ends (`sourceWS`, template func `srcWS`): "␣ spasi di
+  akhir/awal" for spaces/tabs and a blue "↵ baris baru di akhir/awal" for line breaks (×N for several);
+  line breaks at the ends are shown only by their label. Copy uses the raw `data-text`.
+- Search boxes in htmx filter forms must not reload on their own `change` (fired on blur): triggers use
+  `change[target.type!='search']`, otherwise the rows are swapped under the user's next click.
+- Problem warnings (`ed-alert-warn`) sit right below the translation box, before the save buttons. In the
+  Terjemahan label row, Bandingkan / "Terjemahkan dengan AI" + count sit on the right, just before Perlu ditinjau.
+  English calls Perlu ditinjau "Fuzzy".
 - Validation flags `control_chars` and `markup` (tags such as <gui>, <key> differing from the source);
   `ai.UserPrompt` sends markup unescaped, and AI results with control characters are never saved.
+- Toolbar order: Proyek | Tarik upstream, Riwayat, Commit | Konteks, Praterjemah, Validasi | Teks, Metadata |
+  PO, MO, Bantuan, Pengaturan.
+- Editor settings ("Pengaturan" after Bantuan, `#editor-settings-dialog`, signed-in users) are per account and
+  apply to every file: `users.editor_checks_off` (migration 032, `User.ChecksOff`/`CheckOn`, everything on by
+  default so new checks start on). Users untick validation rules (`po.Checks`; switched-off issues are dropped in
+  `validateEntry` via `Catalog.ChecksOff`, so they are not marked or counted) and the statuses Validasi ticks
+  (`service.EditorStatuses`; `#btn-validate[data-statuses]`). Saved with `POST /editor-settings` (back to `next`).
 - The editor's Bantuan button (and `?` outside text fields) opens `#help-dialog` with all shortcuts;
   update it when adding shortcuts.
 - Save buttons: the main one is green with a check and is what Ctrl+Enter presses: "Lepas pratinjau,
   simpan & lanjut" (`#btn-unfuzzy-save`) while the entry needs work, else "Simpan & lanjut" (CSS
   `:has(#btn-unfuzzy-save[hidden])`). Ctrl+Shift+Enter always saves keeping the flag.
+- Files downloaded by link keep it in `catalogs.source_url` (migration 036, `uploadedURL`). The file menu's
+  "Perbarui berkas…" opens `#replace-dialog` (project.html, filled by app.js from `[data-replace]`) with that link
+  pre-filled: download again, or pick a file. A re-download keeps the file's name (links often end in "id.po").
 - "Unggah berkas" accepts a file or a URL; URLs are fetched server-side with an SSRF-safe
   `glossary.Fetcher` (`Handler.SetPOFetcher`, upload size limit) and then handled like uploads.
 - The status filter is a dropdown of checkboxes (`#filter-status`, `EntryFilter.Statuses`): an entry

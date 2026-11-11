@@ -106,6 +106,8 @@ type CatalogRepository interface {
 	// from the user's other catalogs of the same language (without saving it)
 	MemoryMatches(ctx context.Context, catalogID, userID int64, language string) (map[int64]string, error)
 	Suggestions(ctx context.Context, userID int64, language string, msgid string, excludeEntryID int64, limit int) ([]Suggestion, error)
+	// SetSourceURL remembers the link a file was downloaded from
+	SetSourceURL(ctx context.Context, id int64, url string) error
 }
 
 // Suggestion is a translation memory match
@@ -144,6 +146,12 @@ type GlossaryRepository interface {
 	// ListProjectFiles pages the project files matching query, limited to versionIDs when given
 	ListProjectFiles(ctx context.Context, projectID int64, query string, versionIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error)
 	ProjectFileVersions(ctx context.Context, projectID int64) ([]*models.ProjectFileVersion, error)
+	// UpstreamCandidates lists every distinct project file with what is needed to find it upstream
+	UpstreamCandidates(ctx context.Context) ([]models.UpstreamCandidate, error)
+	// UpstreamStates returns the stored upstream states of a release and language, by stem
+	UpstreamStates(ctx context.Context, release, language string) (map[string]*models.UpstreamRecord, error)
+	// SaveUpstreamState stores one upstream state (insert or replace)
+	SaveUpstreamState(ctx context.Context, rec *models.UpstreamRecord) error
 	// ProjectFileNames lists (version id, file name) of the project files, for module groups
 	ProjectFileNames(ctx context.Context, projectID int64) (map[int64][]string, error)
 	// RecordGroupStats stores the current totals of a version's project files per language
@@ -217,6 +225,8 @@ type CommitRepository interface {
 	List(ctx context.Context, catalogID int64) ([]*models.Commit, error)
 	Get(ctx context.Context, id int64) (*models.Commit, error)
 	Latest(ctx context.Context, catalogID int64) (*models.Commit, error)
+	// SetMessage changes the message of a commit
+	SetMessage(ctx context.Context, id int64, message string) error
 	// Snapshot returns the uncompressed PO text of a commit
 	Snapshot(ctx context.Context, id int64) ([]byte, error)
 }
@@ -261,6 +271,19 @@ type Repositories struct {
 	AI       AIRepository
 	Commit   CommitRepository
 	Discuss  DiscussionRepository
+	Activity ActivityRepository
+}
+
+// ActivityRepository stores the activity log (activity_events)
+type ActivityRepository interface {
+	Record(ctx context.Context, e *models.ActivityEvent) error
+	// Summary adds up each user's activity in a project since the given time (nil = all time),
+	// most active first
+	Summary(ctx context.Context, projectID int64, since *time.Time) ([]*models.ActivitySummary, error)
+	// DailyTranslated returns the strings and source words translated per day in a project, oldest first
+	DailyTranslated(ctx context.Context, projectID int64) ([]models.ActivityDay, error)
+	// Since returns the time of the project's first recorded event (nil when there is none)
+	Since(ctx context.Context, projectID int64) (*time.Time, error)
 }
 
 // WikiRepository stores wiki pages and their files

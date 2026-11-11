@@ -1,6 +1,9 @@
 package po
 
-import "sort"
+import (
+	"sort"
+	"strings"
+)
 
 // Language describes a target language and its default plural rule
 type Language struct {
@@ -92,6 +95,19 @@ func LookupLanguage(code string) Language {
 		}
 	}
 	return Language{Code: code, Name: code, PluralForms: pluralTwo}
+}
+
+// IsKnownLanguage reports whether code is a language in the table, also with a region or
+// variant ("pt_BR", "sr@latin")
+func IsKnownLanguage(code string) bool {
+	if _, ok := languageByCode[code]; ok {
+		return true
+	}
+	if i := strings.IndexAny(code, "_-@"); i > 0 {
+		_, ok := languageByCode[strings.ToLower(code[:i])]
+		return ok
+	}
+	return false
 }
 
 // LanguageName returns a display name for a language code

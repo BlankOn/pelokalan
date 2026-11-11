@@ -191,15 +191,15 @@ func TestAddContributor(t *testing.T) {
 		t.Fatalf("placeholder not replaced: %q", got)
 	}
 	got = AddContributor(got, "Ani", "ANI@example.id", 2027)
-	if got[2] != "Ani <ani@example.id>, 2026, 2027." {
+	if got[2] != "Ani <ani@example.id>, 2026-2027." {
 		t.Fatalf("year not appended: %q", got[2])
 	}
 	if again := AddContributor(got, "Ani", "ani@example.id", 2027); len(again) != len(got) || again[2] != got[2] {
 		t.Fatal("not idempotent")
 	}
 	got = AddContributor(got, "Budi", "budi@example.id", 2027)
-	if got[len(got)-1] != "Budi <budi@example.id>, 2027." {
-		t.Fatalf("not appended: %q", got)
+	if got[3] != "Budi <budi@example.id>, 2027." || got[len(got)-1] != "" {
+		t.Fatalf("not added after the last translator: %q", got)
 	}
 }
 
@@ -231,4 +231,119 @@ func contains(list []string, v string) bool {
 		}
 	}
 	return false
+}
+
+// A new credit goes right after the existing translators, not after the trailing bare "#".
+func TestAddContributorAfterLastTranslator(t *testing.T) {
+	src := "# Indonesian translation for AudioSharing.\n" +
+		"# Copyright (C) 2022 AudioSharing's COPYRIGHT HOLDER\n" +
+		"# This file is distributed under the same license as the AudioSharing package.\n" +
+		"# Kukuh Syafaat <kukuhsyafaat@gnome.org>, 2022.\n" +
+		"#\n" +
+		"msgid \"\"\nmsgstr \"\"\n\"Language: id\\n\"\n\"Plural-Forms: nplurals=1; plural=0;\\n\"\n\n" +
+		"msgid \"Open\"\nmsgstr \"Buka\"\n"
+	cat, err := ParseBytes([]byte(src))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := AddContributor(cat.HeaderComments, "herpiko", "herpiko@gmail.com", 2026)
+	want := []string{"Kukuh Syafaat <kukuhsyafaat@gnome.org>, 2022.", "herpiko <herpiko@gmail.com>, 2026."}
+	i := -1
+	for k, line := range got {
+		if strings.Contains(line, "Kukuh Syafaat") {
+			i = k
+		}
+	}
+	if i < 0 || i+1 >= len(got) || strings.TrimSpace(got[i]) != want[0] || strings.TrimSpace(got[i+1]) != want[1] {
+		t.Fatalf("credit not right after the last translator: %q", got)
+	}
+	if strings.TrimSpace(got[len(got)-1]) != "" {
+		t.Errorf("the trailing bare # should stay last: %q", got)
+	}
+	// without any translator line the credit goes before the trailing empty line
+	got = AddContributor([]string{"Title.", ""}, "Ani", "ani@example.id", 2026)
+	if len(got) != 3 || got[1] != "Ani <ani@example.id>, 2026." || got[2] != "" {
+		t.Errorf("no translators: %q", got)
+	}
+}
+
+// A credit an earlier export put below the bare "#" moves back next to the other translators.
+func TestAddContributorMovesMisplacedCredit(t *testing.T) {
+	in := []string{"Indonesian translation for AudioSharing.", "Kukuh Syafaat <kukuhsyafaat@gnome.org>, 2022.", "", "herpiko <herpiko@gmail.com>, 2026."}
+	got := AddContributor(in, "herpiko", "herpiko@gmail.com", 2026)
+	want := []string{"Indonesian translation for AudioSharing.", "Kukuh Syafaat <kukuhsyafaat@gnome.org>, 2022.", "herpiko <herpiko@gmail.com>, 2026.", ""}
+	if strings.Join(got, "|") != strings.Join(want, "|") {
+		t.Fatalf("got %q, want %q", got, want)
+	}
+	// a credit already in place stays where it is
+	if again := AddContributor(want, "herpiko", "herpiko@gmail.com", 2026); strings.Join(again, "|") != strings.Join(want, "|") {
+		t.Errorf("moved a credit that was in place: %q", again)
+	}
+}
+
+func TestAddYear(t *testing.T) {
+	cases := []struct {
+		in   string
+		year int
+		want string
+	}{
+		{"", 2026, "2026"},
+		{"2026", 2026, "2026"},
+		{"2025", 2026, "2025-2026"},
+		{"2024", 2026, "2024, 2026"},
+		{"2022, 2025", 2026, "2022, 2025-2026"},
+		{"2024-2025", 2026, "2024-2026"},
+		{"2020–2027", 2026, "2020–2027"},
+		{"2019, 2021", 2026, "2019, 2021, 2026"},
+	}
+	for _, c := range cases {
+		if got := AddYear(c.in, c.year); got != c.want {
+			t.Errorf("AddYear(%q, %d) = %q, want %q", c.in, c.year, got, c.want)
+		}
+	}
+}
+
+func TestContributorYears(t *testing.T) {
+	got := AddContributor([]string{"Kukuh <k@x.org>, 2022.", "Ani <ani@x.id>, 2025."}, "Ani", "ani@x.id", 2026)
+	if got[1] != "Ani <ani@x.id>, 2025-2026." {
+		t.Fatalf("range: %q", got[1])
+	}
+	got = AddContributor([]string{"Ani <ani@x.id>, 2024."}, "Ani", "ani@x.id", 2026)
+	if got[0] != "Ani <ani@x.id>, 2024, 2026." {
+		t.Fatalf("list: %q", got[0])
+	}
+}
+
+func TestCredits(t *testing.T) {
+	for _, id := range []string{"translator-credits", "translator_credits", "translator-credit", "Translator Credits"} {
+		if !IsCreditsEntry(id) {
+			t.Errorf("%q not recognized", id)
+		}
+	}
+	e := &Entry{ID: "translator-credits", Translation: []string{"Kukuh <k@x.org>, 2022."}}
+	if got := CheckCredits(e, "Ani", "ani@x.id", 2026); got != IssueCreditsMissing {
+		t.Fatalf("missing: %q", got)
+	}
+	fixed := AddCredit(e.Translation[0], "Ani", "ani@x.id", 2026)
+	if fixed != "Kukuh <k@x.org>, 2022.\nAni <ani@x.id>, 2026." {
+		t.Fatalf("add: %q", fixed)
+	}
+	e.Translation[0] = "Kukuh <k@x.org>, 2022.\nAni <ani@x.id>, 2025."
+	if got := CheckCredits(e, "Ani", "ani@x.id", 2026); got != IssueCreditsYear {
+		t.Fatalf("year: %q", got)
+	}
+	if got := AddCredit(e.Translation[0], "Ani", "ani@x.id", 2026); got != "Kukuh <k@x.org>, 2022.\nAni <ani@x.id>, 2025-2026." {
+		t.Fatalf("extend: %q", got)
+	}
+	// GNOME style without years: present is enough
+	e.Translation[0] = "Kukuh <k@x.org>\nAni <ani@x.id>"
+	if got := CheckCredits(e, "Ani", "ani@x.id", 2026); got != "" {
+		t.Fatalf("no years: %q", got)
+	}
+	if got := AddCredit("", "Ani", "ani@x.id", 2026); got != "Ani <ani@x.id>, 2026" {
+		t.Fatalf("empty: %q", got)
+	}
+	if got := CheckCredits(&Entry{ID: "translator-credits", Translation: []string{""}}, "Ani", "ani@x.id", 2026); got != IssueCreditsMissing {
+		t.Fatalf("untranslated: %q", got)
+	}
 }

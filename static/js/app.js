@@ -151,7 +151,8 @@
         if (form.classList.contains("is-syncing")) return;
         var btn = form.querySelector("button");
         var label = form.querySelector(".sync-label");
-        var msg = document.querySelector(".pf-sync-msg");
+        var sec = form.closest("[data-sticky-section]");
+        var msg = (sec && sec.querySelector(".pf-sync-msg")) || document.querySelector(".pf-sync-msg");
         var oldLabel = label.textContent;
         var show = function (text, isError) {
             if (!msg) return;
@@ -191,11 +192,12 @@
                             }
                             var text = [st.message, st.error].filter(Boolean).join(" ");
                             show(text, !!st.error);
-                            var rows = document.getElementById("project-file-rows");
-                            if (st.changed && rows && window.htmx) {
-                                var q = document.querySelector(".pf-toolbar input[name=q]");
-                                htmx.ajax("GET", form.action.replace(/\/sync$/, "") + "?q=" + encodeURIComponent(q ? q.value : ""),
-                                    { target: rows, swap: "innerHTML" });
+                            // states and files may have changed: reload both lists with their current filters
+                            if (window.htmx) {
+                                ["pf-filter", "my-filter"].forEach(function (id) {
+                                    var f = document.getElementById(id);
+                                    if (f) htmx.trigger(f, "submit");
+                                });
                             }
                         })
                         .catch(function () { setTimeout(poll, 4000); });
@@ -478,14 +480,113 @@
     document.body.addEventListener("htmx:load", function () { setTimeout(applyLock, 0); });
     setInterval(function () { if (editorLocked() !== wasLocked) applyLock(); }, 1000);
 
-    // AI translation of the current entry: the result goes into the translation box (unsaved)
+    // AI translation of the current entry: the result goes into the translation box (unsaved).
+    // With several alternatives (count selector beside the button, remembered per browser) they
+    // are shown side by side above the box and the chosen one goes in.
     var aiBusy = false;
+    function aiAltCount() {
+        var sel = form() && form().querySelector("#ai-alt-count");
+        return sel ? parseInt(sel.value, 10) || 1 : 1;
+    }
+    function restoreAltCount() {
+        var sel = form() && form().querySelector("#ai-alt-count");
+        if (!sel) return;
+        try { var v = localStorage.getItem("aiAltCount"); if (v) sel.value = v; } catch (e) {}
+    }
+    document.addEventListener("change", function (ev) {
+        if (ev.target.id === "ai-alt-count") { try { localStorage.setItem("aiAltCount", ev.target.value); } catch (e) {} }
+    });
+    document.body.addEventListener("htmx:load", restoreAltCount);
+    restoreAltCount();
+
+    // put one AI result (forms + flagged) into the translation box
+    function applyAIResult(f, res, notice) {
+        var boxes = Array.prototype.slice.call(f.querySelectorAll(".tr-input"));
+        pushUndo();
+        var beforeForms = boxes.map(function (ta) { return ta.value; });
+        boxes.forEach(function (ta) {
+            var i = parseInt(ta.dataset.panel, 10);
+            if (res.forms && res.forms[i] !== undefined) ta.value = res.forms[i];
+        });
+        setDirty(true);
+        var cb = f.querySelector("input[name=fuzzy]");
+        if (cb) {
+            if (res.flagged) cb.checked = true;
+            else clearFuzzyOnEdit();
+            cb.dataset.touched = res.flagged ? "1" : cb.dataset.touched || "";
+        }
+        syncUnfuzzyButton();
+        var n = f.querySelector(".ed-notice");
+        if (n) n.textContent = notice || "";
+        var changed = boxes.some(function (ta, i) { return ta.value !== beforeForms[i]; });
+        if (changed && beforeForms.some(function (v) { return v.trim() !== ""; })) {
+            setReplaced(beforeForms);
+            showCompare();
+        }
+        focusTranslation();
+    }
+
+    function showAlternatives(f, res) {
+        var box = f.querySelector("#ai-alts");
+        if (!box) { applyAIResult(f, res.alternatives[0], res.notice); return; }
+        box.textContent = "";
+        var head = document.createElement("div");
+        head.className = "ai-alts-head";
+        var title = document.createElement("span");
+        title.textContent = box.dataset.title;
+        var close = document.createElement("button");
+        close.type = "button";
+        close.className = "linklike small";
+        close.textContent = box.dataset.close;
+        close.addEventListener("click", function () { box.hidden = true; });
+        head.appendChild(title); head.appendChild(close);
+        box.appendChild(head);
+        var grid = document.createElement("div");
+        grid.className = "ai-alts-grid";
+        grid.style.gridTemplateColumns = "repeat(" + res.alternatives.length + ", minmax(0, 1fr))";
+        res.alternatives.forEach(function (alt, i) {
+            var card = document.createElement("div");
+            card.className = "ai-alt" + (alt.flagged ? " ai-alt-flagged" : "");
+            var num = document.createElement("div");
+            num.className = "ai-alt-num";
+            num.textContent = "#" + (i + 1) + (alt.flagged ? " · " + box.dataset.flagged : "");
+            card.appendChild(num);
+            alt.forms.forEach(function (form) {
+                var t = document.createElement("div");
+                t.className = "ai-alt-text";
+                t.textContent = form;
+                card.appendChild(t);
+            });
+            // the whole box is the choice: click (or Enter/Space) puts it in the translation box
+            card.tabIndex = 0;
+            card.setAttribute("role", "button");
+            card.title = box.dataset.use;
+            var choose = function () {
+                applyAIResult(f, alt, res.notice);
+                grid.querySelectorAll(".ai-alt").forEach(function (c) {
+                    c.classList.toggle("ai-alt-chosen", c === card);
+                    c.setAttribute("aria-pressed", c === card ? "true" : "false");
+                });
+            };
+            card.addEventListener("click", choose);
+            card.addEventListener("keydown", function (ev) {
+                if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); ev.stopPropagation(); choose(); }
+            });
+            grid.appendChild(card);
+        });
+        box.appendChild(grid);
+        box.hidden = false;
+    }
+
     function aiTranslateEntry() {
         var f = form(), btn = f && f.querySelector("#btn-ai-entry");
         if (!btn || readOnly || aiBusy || editorLocked()) return;
         var body = new URLSearchParams();
         var boxes = Array.prototype.slice.call(f.querySelectorAll(".tr-input"));
         boxes.forEach(function (ta) { body.set("msgstr" + ta.dataset.panel, ta.value); });
+        body.set("n", aiAltCount());
+        var alts = f.querySelector("#ai-alts");
+        if (alts) alts.hidden = true;
         var label = btn.querySelector("span"), old = label.textContent;
         aiBusy = true;
         btn.classList.add("working");
@@ -499,28 +600,8 @@
             .then(function (res) {
                 if (currentId !== entryId) return; // the user moved on meanwhile
                 if (res.error) { toast(res.error, true); return; }
-                pushUndo();
-                var beforeForms = boxes.map(function (ta) { return ta.value; });
-                boxes.forEach(function (ta) {
-                    var i = parseInt(ta.dataset.panel, 10);
-                    if (res.forms && res.forms[i] !== undefined) ta.value = res.forms[i];
-                });
-                setDirty(true);
-                var cb = f.querySelector("input[name=fuzzy]");
-                if (cb) {
-                    if (res.flagged) cb.checked = true;
-                    else clearFuzzyOnEdit();
-                    cb.dataset.touched = res.flagged ? "1" : cb.dataset.touched || "";
-                }
-                syncUnfuzzyButton();
-                var notice = f.querySelector(".ed-notice");
-                if (notice) notice.textContent = res.notice || "";
-                var changed = boxes.some(function (ta, i) { return ta.value !== beforeForms[i]; });
-                if (changed && beforeForms.some(function (v) { return v.trim() !== ""; })) {
-                    setReplaced(beforeForms);
-                    showCompare();
-                }
-                focusTranslation();
+                if (res.alternatives && res.alternatives.length > 1) showAlternatives(f, res);
+                else applyAIResult(f, res, res.notice);
             })
             .catch(function () { toast(app.dataset.msgError || "Error", true); })
             .finally(function () {
@@ -689,7 +770,7 @@
 
     // Glossary chips insert their translation at the cursor of the translation box
     document.addEventListener("click", function (ev) {
-        var btn = ev.target.closest && ev.target.closest("#entry-form .gl-insert[data-insert]");
+        var btn = ev.target.closest && ev.target.closest(".gl-insert[data-insert]");
         if (!btn || readOnly) return;
         var ta = activePanel();
         if (!ta || ta.readOnly) return;
@@ -698,6 +779,23 @@
         ta.focus();
         clearFuzzyOnEdit();
         setDirty(true);
+    });
+
+    // Translator credits: put the owner's name (or this year) into the credits text
+    document.addEventListener("click", function (ev) {
+        var btn = ev.target.closest && ev.target.closest("#entry-form .credit-fix[data-credit-fix]");
+        if (!btn || readOnly) return;
+        var ta = form().querySelector(".tr-input");
+        if (!ta || ta.readOnly) return;
+        pushUndo();
+        ta.value = btn.getAttribute("data-credit-fix");
+        ta.focus();
+        clearFuzzyOnEdit();
+        setDirty(true);
+        // the identity is in the text now: drop this warning (and the box when it was the only one)
+        var line = btn.parentNode, box = line.closest(".ed-alert");
+        line.remove();
+        if (box && !box.children.length) box.remove();
     });
 
     function clearFuzzyOnEdit() {
@@ -817,7 +915,11 @@
     });
 
     var validate = document.getElementById("btn-validate");
-    if (validate) validate.addEventListener("click", function () { setFilter(["issues", "untranslated", "fuzzy"]); });
+    // Validasi ticks the statuses the user's editor settings keep on (data-statuses)
+    if (validate) validate.addEventListener("click", function () {
+        var st = (validate.dataset.statuses || "issues,untranslated,fuzzy").split(",").filter(Boolean);
+        setFilter(st.length ? st : ["issues"]);
+    });
 
     document.addEventListener("input", function (ev) {
         if (ev.target.closest("#entry-form") || ev.target.matches(".comment-input")) {
@@ -993,6 +1095,68 @@
         saveListHeight();
     });
 
+    // Sidebar: drag the divider to resize it (dragging it almost shut hides it); the handle in
+    // the middle hides and shows it. Width and visibility are remembered per browser.
+    var sideSplit = document.getElementById("side-splitter");
+    var sideToggle = document.getElementById("side-toggle");
+    var workspace = sideSplit && sideSplit.parentNode;
+    function setSideWidth(px) {
+        px = Math.round(Math.min(Math.max(220, px), workspace.clientWidth * 0.6));
+        document.documentElement.style.setProperty("--sidebar-width", px + "px");
+        return px;
+    }
+    function setSideHidden(hidden) {
+        workspace.classList.toggle("sidebar-hidden", hidden);
+        var label = hidden ? sideToggle.dataset.show : sideToggle.dataset.hide;
+        sideToggle.title = label;
+        sideToggle.setAttribute("aria-label", label);
+        try { localStorage.setItem("sidebarHidden", hidden ? "1" : ""); } catch (e) { /* storage unavailable */ }
+    }
+    if (sideSplit) {
+        try {
+            var sw = parseInt(localStorage.getItem("sidebarWidth"), 10);
+            if (sw) setSideWidth(sw);
+            if (localStorage.getItem("sidebarHidden") === "1") setSideHidden(true);
+        } catch (e) { /* storage unavailable */ }
+        sideToggle.addEventListener("click", function (ev) {
+            ev.stopPropagation();
+            setSideHidden(!workspace.classList.contains("sidebar-hidden"));
+        });
+        sideToggle.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
+        sideSplit.addEventListener("pointerdown", function (ev) {
+            if (ev.button !== 0 || workspace.classList.contains("sidebar-hidden")) return;
+            ev.preventDefault();
+            try { sideSplit.setPointerCapture(ev.pointerId); } catch (e) { /* not capturable */ }
+            sideSplit.classList.add("dragging");
+            var right = workspace.getBoundingClientRect().right, width = null;
+            function move(e) {
+                var w = right - e.clientX;
+                sideSplit.classList.toggle("will-hide", w < 140);
+                width = w < 140 ? null : setSideWidth(w);
+            }
+            function up(e) {
+                sideSplit.classList.remove("dragging", "will-hide");
+                document.removeEventListener("pointermove", move);
+                document.removeEventListener("pointerup", up);
+                document.removeEventListener("pointercancel", up);
+                if (right - e.clientX < 140) { setSideHidden(true); return; }
+                try { if (width) localStorage.setItem("sidebarWidth", width); } catch (err) { /* storage unavailable */ }
+            }
+            document.addEventListener("pointermove", move);
+            document.addEventListener("pointerup", up);
+            document.addEventListener("pointercancel", up);
+        });
+        sideSplit.addEventListener("keydown", function (ev) {
+            if (ev.key !== "ArrowLeft" && ev.key !== "ArrowRight") return;
+            ev.preventDefault();
+            ev.stopPropagation();
+            if (workspace.classList.contains("sidebar-hidden")) { if (ev.key === "ArrowLeft") setSideHidden(false); return; }
+            var cur = document.getElementById("sidebar").offsetWidth;
+            var w = setSideWidth(cur + (ev.key === "ArrowLeft" ? 24 : -24));
+            try { localStorage.setItem("sidebarWidth", w); } catch (e) { /* storage unavailable */ }
+        });
+    }
+
         // open the entry named in the URL (?entry=…), otherwise the first one
     var initial = app.dataset.initialEntry;
     if (initial && initial !== "0") {
@@ -1095,7 +1259,7 @@ document.addEventListener("submit", function (ev) {
         if (ev.key === "Tab" && !ev.ctrlKey && !ev.metaKey) {
             ev.preventDefault();
             ta.setRangeText("\t", ta.selectionStart, ta.selectionEnd, "end");
-            dirty = true;
+            ta.dispatchEvent(new Event("input")); // marks it dirty and refreshes the highlighting
         }
     });
     document.addEventListener("keydown", function (ev) {
@@ -1107,8 +1271,174 @@ document.addEventListener("submit", function (ev) {
     });
     form.addEventListener("submit", function () { dirty = false; });
     window.addEventListener("beforeunload", function (ev) {
-        if (dirty) { ev.preventDefault(); ev.returnValue = form.dataset.msgUnsaved; }
+        if (isDirty()) { ev.preventDefault(); ev.returnValue = form.dataset.msgUnsaved; }
     });
+
+    // Leaving with changes (back button, links, browser Back) opens a popup with the line diff:
+    // stay, discard, or save first and then go on
+    var original = ta.value;
+    var leave = document.getElementById("raw-leave-dialog");
+    function isDirty() { return dirty && ta.value !== original; }
+    function lineDiff(a, b) {
+        var x = a.split("\n"), y = b.split("\n");
+        var pre = 0;
+        while (pre < x.length && pre < y.length && x[pre] === y[pre]) pre++;
+        var suf = 0;
+        while (suf < x.length - pre && suf < y.length - pre && x[x.length - 1 - suf] === y[y.length - 1 - suf]) suf++;
+        var xm = x.slice(pre, x.length - suf), ym = y.slice(pre, y.length - suf), ops = [];
+        if (xm.length * ym.length <= 4000000) {
+            var n = xm.length, m = ym.length, L = new Array(n + 1);
+            for (var i = 0; i <= n; i++) L[i] = new Uint32Array(m + 1);
+            for (i = n - 1; i >= 0; i--) for (var j = m - 1; j >= 0; j--)
+                L[i][j] = xm[i] === ym[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+            i = 0; j = 0;
+            while (i < n && j < m) {
+                if (xm[i] === ym[j]) { ops.push([" ", xm[i], pre + i + 1]); i++; j++; }
+                else if (L[i + 1][j] >= L[i][j + 1]) ops.push(["-", xm[i], pre + i + 1]), i++;
+                else ops.push(["+", ym[j], pre + j + 1]), j++;
+            }
+            while (i < n) ops.push(["-", xm[i], pre + i + 1]), i++;
+            while (j < m) ops.push(["+", ym[j], pre + j + 1]), j++;
+        } else { // too big to align: everything in between counts as replaced
+            xm.forEach(function (l, k) { ops.push(["-", l, pre + k + 1]); });
+            ym.forEach(function (l, k) { ops.push(["+", l, pre + k + 1]); });
+        }
+        // context: up to 2 unchanged lines around each change
+        var before = x.slice(Math.max(0, pre - 2), pre).map(function (l, k) { return [" ", l, Math.max(0, pre - 2) + k + 1]; });
+        var after = x.slice(x.length - suf, Math.min(x.length, x.length - suf + 2)).map(function (l, k) { return [" ", l, 0]; });
+        return before.concat(ops, after);
+    }
+    function showDiff() {
+        var ops = lineDiff(original, ta.value), pre = leave.querySelector(".raw-diff");
+        var keep = ops.map(function (op, k) {
+            if (op[0] !== " ") return true;
+            for (var d = -2; d <= 2; d++) { var o = ops[k + d]; if (o && o[0] !== " ") return true; }
+            return false;
+        });
+        var added = 0, removed = 0, shown = 0, hidden = 0, gap = false;
+        pre.textContent = "";
+        ops.forEach(function (op, k) {
+            if (op[0] === "+") added++;
+            if (op[0] === "-") removed++;
+            if (!keep[k]) { gap = true; return; }
+            if (shown >= 300) { if (op[0] !== " ") hidden++; return; }
+            if (gap && shown) { var g = document.createElement("span"); g.className = "rd-gap"; g.textContent = "⋯\n"; pre.appendChild(g); }
+            gap = false;
+            var s = document.createElement("span");
+            s.className = op[0] === "+" ? "rd-add" : op[0] === "-" ? "rd-del" : "rd-ctx";
+            s.textContent = op[0] + " " + op[1] + "\n";
+            pre.appendChild(s);
+            shown++;
+        });
+        if (hidden) {
+            var more = document.createElement("span");
+            more.className = "rd-gap";
+            more.textContent = leave.dataset.more.replace("999999", hidden);
+            pre.appendChild(more);
+        }
+        leave.querySelector(".raw-diff-stats").textContent = leave.dataset.stats.replace("111111", added).replace("222222", removed);
+    }
+    var pendingHref = null;
+    function askLeave(href) {
+        if (!leave) return false;
+        pendingHref = href;
+        showDiff();
+        leave.showModal();
+        leave.querySelector("[data-raw-stay]").focus();
+        return true;
+    }
+    if (leave) {
+        leave.querySelector("[data-raw-stay]").addEventListener("click", function () { pendingHref = null; leave.close(); });
+        leave.querySelector("[data-raw-discard]").addEventListener("click", function () {
+            dirty = false;
+            leave.close();
+            if (pendingHref === "back") history.go(-2); else location.href = pendingHref;
+        });
+        leave.querySelector("[data-raw-save]").addEventListener("click", function () {
+            form.querySelector("input[name=next]").value = pendingHref === "back" ? "" : pendingHref.replace(location.origin, "");
+            dirty = false;
+            leave.close();
+            form.requestSubmit ? form.requestSubmit() : form.submit();
+        });
+        document.addEventListener("click", function (ev) {
+            var a = ev.target.closest && ev.target.closest("a[href]");
+            if (!a || !isDirty() || ev.defaultPrevented || ev.ctrlKey || ev.metaKey || ev.shiftKey || a.target === "_blank") return;
+            if (/\/download/.test(a.getAttribute("href"))) return; // downloads do not leave the page
+            ev.preventDefault();
+            askLeave(a.href);
+        });
+        // browser Back: an extra history entry catches it while there are changes
+        var guarded = false;
+        ta.addEventListener("input", function () {
+            if (!guarded) { history.pushState({ rawGuard: true }, ""); guarded = true; }
+        });
+        window.addEventListener("popstate", function () {
+            if (!guarded) return;
+            if (isDirty()) { history.pushState({ rawGuard: true }, ""); askLeave("back"); }
+            else { guarded = false; history.back(); }
+        });
+    }
+    // Syntax highlighting: keywords, strings with escapes and placeholders, and each kind of comment
+    var hl = document.getElementById("raw-hl");
+    function esc(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+    function hlString(s) { // s is a quoted PO string, quotes included
+        var out = "", re = /\\.|%(?:\d+\$)?[-+ 0#']*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|h|ll|l|L|q|j|z|t)?[diouxXeEfFgGaAcspn%]|%\([A-Za-z0-9_]+\)[-+ 0#]*\d*(?:\.\d+)?[diouxXeEfFgGcrsa]|\{[A-Za-z0-9_.]*\}|<\/?[A-Za-z][\w:.-]*(?:\s[^<>"]*)?\/?>/g, last = 0, m;
+        while ((m = re.exec(s))) {
+            out += esc(s.slice(last, m.index));
+            var cls = m[0][0] === "\\" ? "po-esc" : m[0][0] === "<" ? "po-tag" : "po-fmt";
+            out += '<span class="' + cls + '">' + esc(m[0]) + "</span>";
+            last = re.lastIndex;
+        }
+        return '<span class="po-str">' + out + esc(s.slice(last)) + "</span>";
+    }
+    function hlRest(rest) { // keyword line or continuation: highlight the quoted part
+        var q = rest.indexOf('"');
+        return q < 0 ? esc(rest) : esc(rest.slice(0, q)) + hlString(rest.slice(q));
+    }
+    var inId = false;
+    function hlLine(line) {
+        if (line[0] === "#") {
+            var k = line.slice(0, 2), cls = "po-cm";
+            if (k === "#:") cls = "po-ref";
+            else if (k === "#.") cls = "po-dev";
+            else if (k === "#|") cls = "po-prev";
+            else if (k === "#~") cls = "po-obs";
+            else if (k === "#,") {
+                return '<span class="po-flag">' + esc(line).replace(/\bfuzzy\b/, '<span class="po-fuzzy">fuzzy</span>') + "</span>";
+            }
+            return '<span class="' + cls + '">' + esc(line) + "</span>";
+        }
+        var m = /^(\s*)(msgctxt|msgid_plural|msgid|msgstr(?:\[\d+\])?)\b(.*)$/.exec(line);
+        if (m) {
+            inId = m[2] !== "msgstr" && m[2].indexOf("msgstr") !== 0;
+            return esc(m[1]) + '<span class="po-kw">' + m[2] + "</span>" + (inId ? '<span class="po-id">' + hlRest(m[3]) + "</span>" : hlRest(m[3]));
+        }
+        if (/^\s*"/.test(line)) return inId ? '<span class="po-id">' + hlRest(line) + "</span>" : hlRest(line);
+        inId = false;
+        return esc(line);
+    }
+    var hlFrame = 0;
+    function highlight() {
+        hlFrame = 0;
+        inId = false;
+        // the trailing newline keeps the last line's height when the text ends with a line break
+        hl.innerHTML = ta.value.split("\n").map(hlLine).join("\n") + "\n";
+        syncScroll();
+    }
+    function syncScroll() { hl.style.transform = "translate(" + -ta.scrollLeft + "px," + -ta.scrollTop + "px)"; }
+    function copyMetrics() {
+        var cs = getComputedStyle(ta), pre = hl.parentNode;
+        ["fontSize", "lineHeight", "paddingTop", "paddingRight", "paddingBottom", "paddingLeft", "letterSpacing"].forEach(function (k) { pre.style[k] = cs[k]; });
+    }
+    if (hl && ta.value.length < 3000000) {
+        copyMetrics();
+        highlight();
+        hl.parentNode.parentNode.classList.add("hl-on");
+        ta.addEventListener("input", function () { if (!hlFrame) hlFrame = requestAnimationFrame(highlight); });
+        ta.addEventListener("scroll", syncScroll);
+        window.addEventListener("resize", function () { copyMetrics(); syncScroll(); });
+    }
+
     // jump to the line reported in a parse error ("baris 12" / "line 12")
     var err = document.querySelector(".raw-error");
     var m = err && /(?:baris|line) (\d+)/.exec(err.textContent);
@@ -2211,3 +2541,103 @@ document.addEventListener("keydown", function (ev) {
     var dlg = document.getElementById("help-dialog");
     if (dlg && !dlg.open && !document.querySelector("dialog[open]")) { ev.preventDefault(); dlg.showModal(); }
 });
+
+// Editor settings: "check all" ticks every rule of the dialog
+document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest && ev.target.closest("[data-check-all]");
+    if (!btn) return;
+    var f = btn.closest("form");
+    if (f) f.querySelectorAll("input[type=checkbox]").forEach(function (cb) { cb.checked = true; });
+});
+
+// History: "Ubah pesan" turns the version title into an input (saved with htmx)
+document.addEventListener("click", function (ev) {
+    var edit = ev.target.closest && ev.target.closest("[data-cm-edit]");
+    var cancel = ev.target.closest && ev.target.closest("[data-cm-cancel]");
+    var head = (edit || cancel) && (edit || cancel).closest(".diff-head");
+    if (!head) return;
+    var form = head.querySelector(".cm-edit"), title = head.querySelector(".cm-title");
+    if (!form || !title) return;
+    var actions = head.querySelector(".row-actions");
+    form.hidden = !!cancel;
+    title.hidden = !cancel;
+    if (actions) actions.hidden = !cancel; // the field gets the whole row while editing
+    if (edit) { var inp = form.querySelector("input"); inp.focus(); inp.select(); }
+    else form.reset();
+});
+document.addEventListener("keydown", function (ev) {
+    if (ev.key !== "Escape") return;
+    var form = ev.target.closest && ev.target.closest(".cm-edit");
+    if (!form) return;
+    ev.preventDefault();
+    ev.stopPropagation();
+    var c = form.querySelector("[data-cm-cancel]");
+    if (c) c.click();
+}, true);
+
+// "Perbarui berkas…" in a file's menu: one popup for every file, filled from the button
+// (download again from the saved link, or pick a file)
+document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest && ev.target.closest("[data-replace]");
+    var dlg = document.getElementById("replace-dialog");
+    if (!btn || !dlg) return;
+    ev.preventDefault();
+    var form = dlg.querySelector("form");
+    form.reset();
+    form.action = btn.dataset.replace;
+    dlg.querySelector(".replace-name").textContent = btn.dataset.replaceName || "";
+    var url = btn.dataset.replaceUrl || "";
+    dlg.querySelector("#r-url").value = url;
+    dlg.querySelector(".replace-saved").hidden = !url;
+    var menu = btn.closest("details");
+    if (menu) menu.open = false;
+    dlg.showModal();
+    (url ? dlg.querySelector("button[type=submit]") : dlg.querySelector("#r-url")).focus();
+});
+
+// Penerjemahan: stack each section's sticky parts (title, card head, filters, column row):
+// every part sticks right below the ones before it in the same section
+(function () {
+    function layout() {
+        document.querySelectorAll("[data-sticky-section]").forEach(function (sec) {
+            var top = 0;
+            sec.querySelectorAll("[data-stick]").forEach(function (el) {
+                el.style.setProperty("--stick-top", top + "px");
+                if (getComputedStyle(el.tagName === "THEAD" ? el.querySelector("th") || el : el).position === "sticky") {
+                    // exact (fractional) height, minus a pixel of overlap: rounded heights leave
+                    // hairline gaps where the rows underneath show through
+                    top += Math.max(0, el.getBoundingClientRect().height - 1);
+                }
+            });
+        });
+    }
+    if (!document.querySelector("[data-sticky-section]")) return;
+    // section titles collapse their section; the state is remembered in this browser
+    function store(key, collapsed) {
+        try { if (collapsed) localStorage.setItem(key, "1"); else localStorage.removeItem(key); } catch (e) { /* storage unavailable */ }
+    }
+    function setCollapsed(sec, collapsed) {
+        sec.classList.toggle("collapsed", collapsed);
+        var btn = sec.querySelector(".section-toggle");
+        if (btn) btn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    }
+    document.querySelectorAll("[data-collapse-key]").forEach(function (sec) {
+        var on = false;
+        try { on = localStorage.getItem(sec.dataset.collapseKey) === "1"; } catch (e) { /* storage unavailable */ }
+        if (on) setCollapsed(sec, true);
+    });
+    document.addEventListener("click", function (ev) {
+        var btn = ev.target.closest && ev.target.closest(".section-toggle");
+        var sec = btn && btn.closest("[data-collapse-key]");
+        if (!sec) return;
+        var collapsed = !sec.classList.contains("collapsed");
+        setCollapsed(sec, collapsed);
+        store(sec.dataset.collapseKey, collapsed);
+        layout();
+    });
+    layout();
+    window.addEventListener("resize", layout);
+    window.addEventListener("load", layout);
+    document.addEventListener("htmx:afterSettle", layout); // filters and rows can change height
+})();
+

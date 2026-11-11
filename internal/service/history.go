@@ -123,6 +123,30 @@ func (s *CatalogService) Commit(ctx context.Context, user *models.User, c *model
 	if !created {
 		return nil, userErr("err.nothing_to_commit")
 	}
+	s.activity.Record(ctx, &models.ActivityEvent{Kind: models.ActivityCommitCreated, UserID: &user.ID,
+		ProjectID: &c.ProjectID, CatalogID: &c.ID, Language: c.Language,
+		Data: map[string]any{"added": cm.Added, "changed": cm.Changed, "removed": cm.Removed, "reviewed": cm.Reviewed}})
+	return cm, nil
+}
+
+// EditCommitMessage changes the message of a version of the file (owner only); the content
+// and the rest of the history stay as they are
+func (s *CatalogService) EditCommitMessage(ctx context.Context, user *models.User, c *models.Catalog, id int64, message string) (*models.Commit, error) {
+	if !c.WritableBy(user.ID) {
+		return nil, ErrForbidden
+	}
+	cm, err := s.commits.Get(ctx, id)
+	if err != nil || cm.CatalogID != c.ID {
+		return nil, ErrNotFound
+	}
+	message = strings.TrimSpace(message)
+	if message == "" || len([]rune(message)) > 500 || strings.Contains(message, "|") {
+		return nil, userErr("err.commit_message")
+	}
+	if err := s.commits.SetMessage(ctx, cm.ID, message); err != nil {
+		return nil, err
+	}
+	cm.Message = message
 	return cm, nil
 }
 
@@ -303,6 +327,18 @@ type DiffItem struct {
 	// OldOrigin and NewOrigin are "ai", "glossary", "memory" or "" (typed by a person)
 	OldOrigin string
 	NewOrigin string
+	// Meta lists changes outside the translation (comments, references, flags, #| lines)
+	Meta []FieldChange
+}
+
+// FieldChange is one changed piece of metadata: a header field, a header comment line or an
+// entry's comments/references/flags. Name is an i18n key suffix ("history.field_*") or, for
+// header fields, the field name itself (Header true).
+type FieldChange struct {
+	Name   string
+	Header bool
+	Old    string
+	New    string
 }
 
 // HasOld reports whether the previous version had a translation
@@ -324,16 +360,18 @@ func anyText(s []string) bool {
 type Diff struct {
 	Added, Changed, Removed int
 	Reviewed                int // machine translations approved without text changes
+	Meta                    int // entries whose comments, references, flags or #| lines changed
 	Items                   []DiffItem
 	Truncated               bool
 	HeaderChanged           bool
+	HeaderChanges           []FieldChange // header fields and header comment lines
 }
 
 // Empty reports whether nothing changed
 func (d *Diff) Empty() bool { return d.Total() == 0 && !d.HeaderChanged }
 
 // Total counts every changed string
-func (d *Diff) Total() int { return d.Added + d.Changed + d.Removed + d.Reviewed }
+func (d *Diff) Total() int { return d.Added + d.Changed + d.Removed + d.Reviewed + d.Meta }
 
 // maxDiffItems caps the items kept for display
 const maxDiffItems = 500
@@ -367,6 +405,9 @@ func DiffSnapshots(oldData, newData []byte) *Diff {
 	oc, om, _ := parse(oldData)
 	nc, nm, norder := parse(newData)
 	d.HeaderChanged = oldData != nil && (oc.Header != nc.Header || strings.Join(oc.HeaderComments, "\n") != strings.Join(nc.HeaderComments, "\n"))
+	if d.HeaderChanged {
+		d.HeaderChanges = headerChanges(oc, nc)
+	}
 
 	add := func(it DiffItem) {
 		if len(d.Items) < maxDiffItems {
@@ -391,7 +432,7 @@ func DiffSnapshots(oldData, newData []byte) *Diff {
 		oo, no := origin(oe), origin(ne)
 		textChanged := !equalStrings(oe.Translation, ne.Translation)
 		it := DiffItem{Context: ne.Context, Source: ne.ID, Old: oe.Translation, New: ne.Translation,
-			OldFuzzy: oe.Fuzzy, NewFuzzy: ne.Fuzzy, OldOrigin: oo, NewOrigin: no}
+			OldFuzzy: oe.Fuzzy, NewFuzzy: ne.Fuzzy, OldOrigin: oo, NewOrigin: no, Meta: entryMetaChanges(oe, ne)}
 		switch {
 		case !textChanged && oo != "" && no == "":
 			// a machine translation approved by a person (text kept)
@@ -401,6 +442,11 @@ func DiffSnapshots(oldData, newData []byte) *Diff {
 		case textChanged || oe.Fuzzy != ne.Fuzzy || oo != no:
 			d.Changed++
 			it.Kind = "changed"
+			add(it)
+		case len(it.Meta) > 0:
+			// only comments, references, flags or #| lines changed
+			d.Meta++
+			it.Kind = "meta"
 			add(it)
 		}
 	}
@@ -424,4 +470,106 @@ func equalStrings(a, b []string) bool {
 		}
 	}
 	return true
+}
+
+// headerChanges lists the header fields (Last-Translator, Project-Id-Version…) and header
+// comment lines (translator credits…) that differ between two versions
+func headerChanges(oc, nc *po.Catalog) []FieldChange {
+	var out []FieldChange
+	of, nf := headerFields(oc.Header), headerFields(nc.Header)
+	var names []string
+	seen := map[string]bool{}
+	for _, f := range append(of.order, nf.order...) {
+		if !seen[f] {
+			seen[f] = true
+			names = append(names, f)
+		}
+	}
+	for _, n := range names {
+		if of.values[n] != nf.values[n] {
+			out = append(out, FieldChange{Name: n, Header: true, Old: of.values[n], New: nf.values[n]})
+		}
+	}
+	removed, added := lineChanges(oc.HeaderComments, nc.HeaderComments)
+	for _, l := range removed {
+		out = append(out, FieldChange{Name: "header_comment", Old: l})
+	}
+	for _, l := range added {
+		out = append(out, FieldChange{Name: "header_comment", New: l})
+	}
+	return out
+}
+
+type fieldList struct {
+	order  []string
+	values map[string]string
+}
+
+// headerFields splits a PO header ("Name: value\n" lines) into its fields
+func headerFields(h string) fieldList {
+	f := fieldList{values: map[string]string{}}
+	for _, line := range strings.Split(h, "\n") {
+		name, value, ok := strings.Cut(line, ":")
+		if !ok || strings.TrimSpace(name) == "" {
+			continue
+		}
+		name = strings.TrimSpace(name)
+		if _, dup := f.values[name]; !dup {
+			f.order = append(f.order, name)
+		}
+		f.values[name] = strings.TrimSpace(value)
+	}
+	return f
+}
+
+// lineChanges returns the lines only in a (removed) and only in b (added), keeping order
+// and counting repeats
+func lineChanges(a, b []string) (removed, added []string) {
+	count := map[string]int{}
+	for _, l := range b {
+		count[strings.TrimSpace(l)]++
+	}
+	for _, l := range a {
+		k := strings.TrimSpace(l)
+		if count[k] > 0 {
+			count[k]--
+		} else if k != "" {
+			removed = append(removed, k)
+		}
+	}
+	count = map[string]int{}
+	for _, l := range a {
+		count[strings.TrimSpace(l)]++
+	}
+	for _, l := range b {
+		k := strings.TrimSpace(l)
+		if count[k] > 0 {
+			count[k]--
+		} else if k != "" {
+			added = append(added, k)
+		}
+	}
+	return removed, added
+}
+
+// entryMetaChanges lists what changed outside an entry's translation: translator and
+// developer comments, source references, flags (without fuzzy and origin) and #| lines
+func entryMetaChanges(o, n *po.Entry) []FieldChange {
+	var out []FieldChange
+	cmp := func(name string, a, b []string) {
+		if !equalStrings(a, b) {
+			out = append(out, FieldChange{Name: name, Old: strings.Join(a, "\n"), New: strings.Join(b, "\n")})
+		}
+	}
+	cmp("translator_comments", o.TranslatorComments, n.TranslatorComments)
+	cmp("extracted_comments", o.ExtractedComments, n.ExtractedComments)
+	cmp("references", o.References, n.References)
+	of, _ := splitOriginFlag(o.Flags)
+	nf, _ := splitOriginFlag(n.Flags)
+	cmp("flags", of, nf)
+	cmp("previous", o.Previous, n.Previous)
+	if o.IDPlural != n.IDPlural {
+		out = append(out, FieldChange{Name: "plural_source", Old: o.IDPlural, New: n.IDPlural})
+	}
+	return out
 }

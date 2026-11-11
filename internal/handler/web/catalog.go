@@ -445,13 +445,21 @@ func (h *Handler) ReplaceCatalog(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	user := middleware.GetUser(r.Context())
 	name, body, err := h.readUpload(w, r)
+	u := uploadedURL(r)
+	if u != "" {
+		name = "" // downloaded again: keep the file's name (links often end in a bare "id.po")
+	}
 	if err == nil {
-		err = h.catalogService.Replace(r.Context(), middleware.GetUser(r.Context()), p, c, name, body)
+		err = h.catalogService.Replace(r.Context(), user, p, c, name, body)
 	}
 	if err != nil {
 		h.renderProject(w, r, p, h.errorMessage(r, err))
 		return
+	}
+	if u != "" && u != c.SourceURL {
+		_ = h.catalogService.SetSourceURL(r.Context(), user, c, u)
 	}
 	http.Redirect(w, r, c.URL()+"?flash=replaced", http.StatusSeeOther)
 }
@@ -509,7 +517,8 @@ func (h *Handler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 		h.renderRaw(w, r, c, p, text, h.errorMessage(r, err))
 		return
 	}
-	http.Redirect(w, r, c.URL()+"?flash=raw_saved", http.StatusSeeOther)
+	// "Simpan dulu" in the leave popup continues to where the user was going
+	http.Redirect(w, r, safeNext(r.FormValue("next"), c.URL()+"?flash=raw_saved"), http.StatusSeeOther)
 }
 
 // UpdateProperties saves the catalog header values

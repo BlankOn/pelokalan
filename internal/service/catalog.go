@@ -5,6 +5,7 @@ import (
 	"errors"
 	"path"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -22,7 +23,11 @@ type CatalogService struct {
 	catalogs repository.CatalogRepository
 	commits  repository.CommitRepository
 	projects *ProjectService
+	activity *ActivityService
 }
+
+// SetActivity makes the service record entry saves and commits in the activity log
+func (s *CatalogService) SetActivity(a *ActivityService) { s.activity = a }
 
 // NewCatalogService creates a new catalog service
 func NewCatalogService(catalogs repository.CatalogRepository, commits repository.CommitRepository, projects *ProjectService) *CatalogService {
@@ -81,6 +86,12 @@ func (s *CatalogService) Get(ctx context.Context, user *models.User, id int64) (
 		return nil, nil, err
 	}
 	c.Owned = user != nil && c.WritableBy(user.ID)
+	if c.Owned {
+		c.CreditName, c.CreditEmail = user.CreditName(), user.CreditEmail()
+	}
+	if user != nil {
+		c.ChecksOff = user.ChecksOff
+	}
 	p, err := s.projects.GetPublic(ctx, user, c.ProjectID)
 	if err != nil {
 		return nil, nil, err
@@ -106,6 +117,58 @@ func cleanFilename(name, fallback string) string {
 		return fallback
 	}
 	return name
+}
+
+// uploadFilename names an uploaded file. A name that says nothing about the program, such as
+// "id.po", "pt_BR.po" or "messages.pot", is replaced by one built from Project-Id-Version:
+// "Constrict main" becomes "constrict.main.id.po" (or "constrict.main.pot" for a template), so the
+// module (the part before the first dot) is the program's name.
+func uploadFilename(filename, projectVersion, language string, isTemplate bool) string {
+	name := cleanFilename(filename, "messages.po")
+	if !genericFilename(name, language) {
+		return name
+	}
+	pv := strings.ToLower(strings.TrimSpace(projectVersion))
+	if pv == "" || strings.HasPrefix(pv, "package") { // the template placeholder "PACKAGE VERSION"
+		return name
+	}
+	var parts []string
+	for _, w := range strings.Fields(pv) {
+		w = strings.Map(func(r rune) rune {
+			switch {
+			case r >= 'a' && r <= 'z', r >= '0' && r <= '9', r == '-', r == '_', r == '.':
+				return r
+			}
+			return -1
+		}, w)
+		if w = strings.Trim(w, "."); w != "" {
+			parts = append(parts, w)
+		}
+	}
+	if len(parts) == 0 {
+		return name
+	}
+	if isTemplate {
+		return strings.Join(parts, ".") + ".pot"
+	}
+	return strings.Join(append(parts, language), ".") + ".po"
+}
+
+// genericFilename reports whether a file name only names the language (or nothing at all):
+// "id.po", "id_ID.po", "pt-BR.po", "messages.po", "template.pot"
+func genericFilename(name, language string) bool {
+	base := strings.ToLower(name)
+	for _, ext := range []string{".pot", ".po"} {
+		base = strings.TrimSuffix(base, ext)
+	}
+	switch base {
+	case "", "messages", "message", "template", "translation", "untitled":
+		return true
+	}
+	if language != "" && strings.EqualFold(strings.ReplaceAll(base, "-", "_"), strings.ReplaceAll(language, "-", "_")) {
+		return true
+	}
+	return po.IsKnownLanguage(base)
 }
 
 // Upload imports a PO or POT file. A POT file (or a file without a language)
@@ -136,6 +199,8 @@ func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *model
 		language = ""
 	} else if !validLanguageCode(language) {
 		return nil, nil, ErrInvalidLanguage
+	} else if err := checkProjectLanguage(p, language); err != nil {
+		return nil, nil, err
 	}
 
 	c := &models.Catalog{
@@ -145,7 +210,7 @@ func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *model
 		Language:       language,
 		OwnerUsername:  user.Username,
 		ProjectSlug:    p.Slug,
-		Filename:       cleanFilename(filename, "messages.po"),
+		Filename:       uploadFilename(filename, pc.HeaderField("Project-Id-Version"), language, isTemplate),
 		Header:         pc.Header,
 		HeaderComments: strings.Join(pc.HeaderComments, "\n"),
 		CreatedBy:      &user.ID,
@@ -520,7 +585,7 @@ func (s *CatalogService) Entries(ctx context.Context, c *models.Catalog, f Entry
 	l := &EntryListing{}
 	q := strings.ToLower(strings.TrimSpace(f.Query))
 	for _, e := range all {
-		e.Issues = po.ValidateWith(e.ToPO(), po.PluralFor(c.PluralForms, c.NPlurals))
+		e.Issues = validateEntry(c, e)
 		l.Stats.Total++
 		switch e.Status() {
 		case "translated":
@@ -629,7 +694,7 @@ func (s *CatalogService) Entry(ctx context.Context, c *models.Catalog, id int64)
 	if err != nil || e.CatalogID != c.ID || e.Obsolete {
 		return nil, ErrNotFound
 	}
-	e.Issues = po.ValidateWith(e.ToPO(), po.PluralFor(c.PluralForms, c.NPlurals))
+	e.Issues = validateEntry(c, e)
 	return e, nil
 }
 
@@ -651,6 +716,8 @@ func (s *CatalogService) SaveEntry(ctx context.Context, user *models.User, c *mo
 	if err != nil {
 		return nil, err
 	}
+	before := *e
+	before.MsgStr = append([]string(nil), e.MsgStr...)
 	forms := fitForms(in.Translation, e.IsPlural(), c.NPlurals)
 	for i := range forms {
 		// browsers submit CRLF line endings
@@ -668,7 +735,11 @@ func (s *CatalogService) SaveEntry(ctx context.Context, user *models.User, c *mo
 		}
 		return nil, err
 	}
-	return s.Entry(ctx, c, id)
+	saved, err := s.Entry(ctx, c, id)
+	if err == nil {
+		s.activity.EntrySaved(ctx, user, c, &before, saved)
+	}
+	return saved, err
 }
 
 // Suggestions returns translation memory matches for an entry
@@ -885,4 +956,39 @@ func (s *CatalogService) UpdateFromUpstream(ctx context.Context, user *models.Us
 	}
 	s.SafetyCommit(ctx, user.ID, c, CommitMsgFromUpstream+"|"+label)
 	return nil
+}
+
+// validateEntry checks an entry; for the owner the translator credits entry is also checked
+// for their name and this year (po.CheckCredits)
+func validateEntry(c *models.Catalog, e *models.Entry) []string {
+	pe := e.ToPO()
+	issues := po.ValidateWith(pe, po.PluralFor(c.PluralForms, c.NPlurals))
+	if c.Owned && !e.Obsolete {
+		if code := po.CheckCredits(pe, c.CreditName, c.CreditEmail, time.Now().Year()); code != "" {
+			issues = append(issues, code)
+		}
+	}
+	if len(c.ChecksOff) == 0 || len(issues) == 0 {
+		return issues
+	}
+	// checks the viewer switched off in the editor settings
+	kept := issues[:0]
+	for _, code := range issues {
+		if !slices.Contains(c.ChecksOff, code) {
+			kept = append(kept, code)
+		}
+	}
+	if len(kept) == 0 {
+		return nil
+	}
+	return kept
+}
+
+// SetSourceURL remembers the link a file was downloaded from, so it can be downloaded again
+func (s *CatalogService) SetSourceURL(ctx context.Context, user *models.User, c *models.Catalog, url string) error {
+	if !c.WritableBy(user.ID) {
+		return ErrForbidden
+	}
+	c.SourceURL = url
+	return s.catalogs.SetSourceURL(ctx, c.ID, url)
 }
