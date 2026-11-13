@@ -8,7 +8,7 @@
     </div>
     {{if $p.Description}}<p class="muted project-desc">{{linkify $p.Description}}</p>{{end}}
     <div class="project-meta muted small">
-        <span>{{t .Lang "project.n_versions" $p.VersionCount}}</span>
+        <span>{{t .Lang "project.n_groups" $p.GroupCount}}</span>
         {{if $p.TermCount}}<span>{{t .Lang "project.n_terms" $p.TermCount}}</span>{{end}}
         <span>{{t .Lang "project.n_po_files" $p.CatalogCount}}</span>
         <span>{{t .Lang "project.n_members" $p.MemberCount}}</span>
@@ -27,9 +27,9 @@
         {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}
         {{with .Mine}}<div class="small pf-mine">{{t $v.Lang "files.mine_copy"}} <a href="{{.URL}}">{{.Filename}}</a></div>{{end}}</td>
     <td>{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · <span class="c-fuzzy">{{t $v.Lang "files.fuzzy_count" .Fuzzy}}</span>{{end}}</span></td>
-    <td class="small"><span class="version-badge">{{.VersionLabel}}</span></td>
+    <td class="small"><span class="version-badge">{{.GroupLabel}}</span></td>
     <td class="actions"><div class="pf-actions">
-        {{if $v.CanTake}}{{if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .VersionLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
+        {{if $v.CanTake}}{{if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .GroupLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
             <input type="hidden" name="into" value="{{.Mine.ID}}">
             <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
         {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"><button class="btn btn-small btn-primary" title="{{t $v.Lang "files.take_help"}}">{{t $v.Lang "files.take"}}</button></form>{{end}}{{end}}
@@ -112,7 +112,7 @@
                 {{if $v.HasTemplate}}
                 <form method="post" action="/catalogs/{{.ID}}/update"><button class="linklike">{{t $v.Lang "action.update_from_template"}}</button></form>
                 {{end}}
-                <button type="button" class="linklike" data-replace="/catalogs/{{.ID}}/replace" data-replace-name="{{.Filename}}" data-replace-url="{{.SourceURL}}">{{t $v.Lang "action.update_file"}}</button>
+                <button type="button" class="linklike" data-replace="/catalogs/{{.ID}}/replace" data-replace-name="{{.Filename}}" data-replace-url="{{.SourceURL}}" data-replace-page="{{.UpstreamPage}}">{{t $v.Lang "action.update_file"}}</button>
                 <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $v.Lang "confirm.delete_file"}}"><button class="linklike danger">{{t $v.Lang "action.delete"}}</button></form>
             </div>
         </details>

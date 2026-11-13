@@ -42,9 +42,14 @@ type ActivitySummary struct {
 	LastActive      time.Time
 }
 
-// ActivityDay is one day of translation output in a project
+// ActivityDay is one period (an hour for the growth chart) of translation work in a project: strings
+// people saved with a translation, split by where the text came from. Strings is the total.
 type ActivityDay struct {
 	Day     time.Time
-	Strings int // strings translated (untranslated → translated)
-	Words   int // their source words
+	Strings int // Manual + AIKept + AIEdited + Edited
+
+	Manual   int // typed by hand: an empty string saved with a translation
+	AIKept   int // an AI draft saved unchanged
+	AIEdited int // an AI draft changed before saving
+	Edited   int // a translated string (no machine draft) whose text was changed
 }

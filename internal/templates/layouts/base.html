@@ -10,7 +10,7 @@
     <script src="/static/js/htmx.min.js"></script>
     <script src="/static/js/app.js?v={{.Asset}}" defer></script>
 </head>
-<body class="{{if .Data.FullPage}}full{{end}}" data-lang="{{.Lang}}">
+<body class="{{if .Data.FullPage}}full{{end}}" data-lang="{{.Lang}}" data-loading="{{t .Lang "common.loading"}}">
     {{template "nav" .}}
     <div id="toast" class="toast-area" aria-live="polite"></div>
     {{if .Data.FullPage}}

@@ -1167,6 +1167,64 @@
     }
 })();
 
+// htmx requests that take longer than a second cover the page with a half transparent layer and
+// a spinner, so nothing is clicked while the answer is on its way. Background polling (hx-trigger
+// "every …") and elements inside [data-no-busy] never show it. The layer is a manual popover, so it
+// also covers open dialogs; it gives up after 30 s so a hung request cannot lock the page for good.
+(function () {
+    var pending = new Set(), timer = null, failsafe = null, layer = null;
+    function quiet(elt) {
+        if (!elt || !elt.closest) return false;
+        var trig = elt.getAttribute("hx-trigger") || "";
+        return /(^|,)\s*every\s/.test(trig) || !!elt.closest("[data-no-busy]");
+    }
+    function build() {
+        if (layer) return layer;
+        layer = document.createElement("div");
+        layer.className = "busy-overlay";
+        layer.setAttribute("role", "status");
+        layer.setAttribute("aria-live", "polite");
+        layer.innerHTML = '<span class="busy-spinner" aria-hidden="true"></span><span class="sr-only"></span>';
+        layer.querySelector(".sr-only").textContent = document.body.dataset.loading || "Loading…";
+        if (layer.showPopover) layer.setAttribute("popover", "manual");
+        document.body.appendChild(layer);
+        return layer;
+    }
+    function show() {
+        timer = null;
+        if (!pending.size) return;
+        var l = build();
+        if (l.showPopover) {
+            // shown again so it lands above a dialog opened since
+            try { if (l.matches(":popover-open")) l.hidePopover(); l.showPopover(); } catch (e) { }
+        }
+        l.classList.add("on");
+        failsafe = setTimeout(hide, 30000);
+    }
+    function hide() {
+        clearTimeout(timer); timer = null;
+        clearTimeout(failsafe); failsafe = null;
+        if (!layer) return;
+        layer.classList.remove("on");
+        if (layer.hidePopover) { try { layer.hidePopover(); } catch (e) { } }
+    }
+    document.addEventListener("htmx:beforeSend", function (ev) {
+        var xhr = ev.detail && ev.detail.xhr;
+        if (!xhr || quiet(ev.detail.elt)) return;
+        pending.add(xhr);
+        if (!timer && !(layer && layer.classList.contains("on"))) timer = setTimeout(show, 1000);
+    });
+    function done(ev) {
+        var xhr = ev.detail && ev.detail.xhr;
+        if (!xhr || !pending.delete(xhr)) return;
+        if (!pending.size) hide();
+    }
+    ["htmx:afterRequest", "htmx:sendError", "htmx:timeout", "htmx:xhr:abort"].forEach(function (name) {
+        document.addEventListener(name, done);
+    });
+    window.addEventListener("pageshow", function () { pending.clear(); hide(); });
+})();
+
 // Disable upload buttons while a (possibly large) file is processed
 document.addEventListener("submit", function (ev) {
     var busy = ev.target.getAttribute && ev.target.getAttribute("data-busy");
@@ -1179,19 +1237,19 @@ document.addEventListener("submit", function (ev) {
 // Suggest the release name and version from an uploaded file name such as
 // "gnome-51.ui.id.2026-11-08.tar.gz" -> "gnome" + "51"
 (function () {
-    var file = document.getElementById("gl-file");
+    var file = document.getElementById("mg-file");
     if (!file) return;
     file.addEventListener("change", function () {
         var f = file.files && file.files[0];
         if (!f) return;
         var m = /^([A-Za-z0-9][A-Za-z0-9._]*?)-([A-Za-z0-9][A-Za-z0-9+~]*)(?:[._]|$)/.exec(f.name);
         if (!m) return;
-        var name = document.getElementById("gl-name");
-        var version = document.getElementById("gl-version");
+        var name = document.getElementById("mg-name");
+        var version = document.getElementById("mg-version");
         if (!version.value) version.value = m[2];
         if (!name.value || name.value !== m[1].toLowerCase() && !name.dataset.touched) name.value = m[1].toLowerCase();
     });
-    document.getElementById("gl-name").addEventListener("input", function (ev) { ev.target.dataset.touched = "1"; });
+    document.getElementById("mg-name").addEventListener("input", function (ev) { ev.target.dataset.touched = "1"; });
 })();
 
 // Tabs inside dialogs: buttons with data-tab show the matching data-panel
@@ -1217,25 +1275,25 @@ document.addEventListener("submit", function (ev) {
         }
     });
 
-    // Glossary source: switch between file upload and download link
-    var form = document.getElementById("glossary-source-form");
+    // Module group source: switch between file upload and sync link
+    var form = document.getElementById("group-source-form");
     if (!form) return;
     function sync() {
         var mode = form.querySelector("input[name=source]:checked").value;
         form.querySelectorAll("[data-source]").forEach(function (el) { el.hidden = el.dataset.source !== mode; });
-        document.getElementById("gl-file").required = mode === "file";
-        document.getElementById("gl-url").required = mode === "url";
+        document.getElementById("mg-file").required = mode === "file";
+        document.getElementById("mg-url").required = mode === "url";
     }
     form.addEventListener("change", function (ev) { if (ev.target.name === "source") sync(); });
     sync();
 
     // Suggest name + version from a download link such as .../gnome-51/ui.tar.gz
-    document.getElementById("gl-url").addEventListener("change", function (ev) {
+    document.getElementById("mg-url").addEventListener("change", function (ev) {
         var m = /\/([a-z0-9][a-z0-9._]*?)-([0-9][A-Za-z0-9.+~]*)(?:\/|$)/i.exec(ev.target.value);
-        var version = document.getElementById("gl-version");
+        var version = document.getElementById("mg-version");
         if (m && !version.value) {
             version.value = m[2];
-            var name = document.getElementById("gl-name");
+            var name = document.getElementById("mg-name");
             if (!name.dataset.touched) name.value = m[1].toLowerCase();
         }
     });
@@ -2261,7 +2319,7 @@ document.addEventListener("change", function (ev) {
         head.className = "gc-tip-date";
         head.textContent = pad(d.getDate()) + "-" + pad(d.getMonth() + 1) + "-" + d.getFullYear() + " " + pad(d.getHours()) + ":" + pad(d.getMinutes());
         tip.appendChild(head);
-        ["translated", "fuzzy", "untranslated"].forEach(function (k) {
+        (tip.dataset.rows || "translated fuzzy untranslated").split(" ").forEach(function (k) {
             var row = document.createElement("div");
             row.className = "gc-tip-row gc-" + k;
             var sw = document.createElement("span");
@@ -2285,7 +2343,7 @@ document.addEventListener("change", function (ev) {
     }
     document.addEventListener("mousemove", function (ev) {
         var svg = ev.target.closest && ev.target.closest(".gc-svg");
-        document.querySelectorAll(".group-chart").forEach(function (chart) {
+        document.querySelectorAll(".group-chart, .words-chart").forEach(function (chart) {
             if (svg && chart.contains(svg)) show(chart, svg, ev);
             else hide(chart);
         });
@@ -2294,7 +2352,7 @@ document.addEventListener("change", function (ev) {
         var svg = ev.target.closest && ev.target.closest(".gc-svg");
         if (!svg) return;
         var t = ev.touches[0];
-        show(svg.closest(".group-chart"), svg, { clientX: t.clientX, clientY: t.clientY });
+        show(svg.closest(".group-chart, .words-chart"), svg, { clientX: t.clientX, clientY: t.clientY });
     }, { passive: true });
 })();
 
@@ -2589,6 +2647,7 @@ document.addEventListener("click", function (ev) {
     var url = btn.dataset.replaceUrl || "";
     dlg.querySelector("#r-url").value = url;
     dlg.querySelector(".replace-saved").hidden = !url;
+    dlg.querySelector("#r-page").value = btn.dataset.replacePage || "";
     var menu = btn.closest("details");
     if (menu) menu.open = false;
     dlg.showModal();

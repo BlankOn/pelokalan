@@ -11,9 +11,9 @@
         </a>
         <div class="tb-sep"></div>
         {{with .Data.Upstream}}
-        <form method="post" action="{{$p.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $.Lang "files.update_confirm" $c.Filename .VersionLabel}}" data-confirm-ok="{{t $.Lang "files.update"}}">
+        <form method="post" action="{{$p.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $.Lang "files.update_confirm" $c.Filename .GroupLabel}}" data-confirm-ok="{{t $.Lang "files.update"}}">
             <input type="hidden" name="into" value="{{$c.ID}}">
-            <button type="submit" class="tb-btn" title="{{t $.Lang "editor.pull_upstream_help" .Filename .VersionLabel}}">
+            <button type="submit" class="tb-btn" title="{{t $.Lang "editor.pull_upstream_help" .Filename .GroupLabel}}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17H6.5a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 17.6 8a4 4 0 0 1-.1 9H17"/><path d="M12 11v9"/><path d="M9 17l3 3 3-3"/></svg>
                 <span>{{t $.Lang "editor.pull_upstream"}}</span>
             </button>
@@ -305,9 +305,9 @@
             </li>
             <li>
                 <label for="ai-gl">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} <strong>{{t .Lang "pre.glossary"}}</strong></label>
-                <select id="ai-gl" name="glossary_version">
-                    {{range .Data.GlossaryVersions}}<option value="{{.ID}}">{{.Label}}</option>{{end}}
-                    {{if .Data.GlossaryVersions}}<option value="all">{{t .Lang "glossary.all_versions"}}</option>{{end}}
+                <select id="ai-gl" name="glossary_group">
+                    {{range .Data.GlossaryGroups}}<option value="{{.ID}}">{{.Label}}</option>{{end}}
+                    {{if .Data.GlossaryGroups}}<option value="all">{{t .Lang "glossary.all_groups"}}</option>{{end}}
                     <option value="none">{{t .Lang "ai.no_glossary"}}</option>
                 </select>
                 <span class="muted small">{{t .Lang "pre.glossary_help"}}</span>

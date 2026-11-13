@@ -1,6 +1,7 @@
 package web
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -163,7 +164,7 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 			Next: len(pf), CanTake: p.Role.IsMember(), CanManage: p.Role.CanManage(),
 			SyncHours: int(h.syncEvery / time.Hour), Upstream: h.glossary.HasUpstream(r.Context(), p)}
 		view.HasFeed, view.LastSync = h.lastSync(r, p)
-		view.Versions, _ = h.glossary.ProjectFileVersions(r.Context(), p)
+		view.Groups, _ = h.glossary.GroupsWithFiles(r.Context(), p)
 		data.Data["ProjectFiles"] = view
 	}
 	if msg := r.URL.Query().Get("merged"); msg != "" {
@@ -183,6 +184,10 @@ func (h *Handler) UploadCatalog(w http.ResponseWriter, r *http.Request) {
 	}
 	user := middleware.GetUser(r.Context())
 	name, body, err := h.readUpload(w, r)
+	var page string
+	if err == nil {
+		page, err = h.glossary.UpstreamPageURL(r.FormValue("upstream_page"))
+	}
 	if err != nil {
 		h.renderProject(w, r, p, h.errorMessage(r, err))
 		return
@@ -194,6 +199,9 @@ func (h *Handler) UploadCatalog(w http.ResponseWriter, r *http.Request) {
 	}
 	if u := uploadedURL(r); u != "" && res == nil && c != nil {
 		_ = h.catalogService.SetSourceURL(r.Context(), user, c, u)
+	}
+	if page != "" && res == nil && c != nil && !c.IsTemplate {
+		h.setUpstreamPage(r, c, page)
 	}
 	if res != nil {
 		http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d&skipped=%d", res.Added, res.Obsolete, res.Skipped), http.StatusSeeOther)
@@ -229,6 +237,19 @@ func (h *Handler) readUpload(w http.ResponseWriter, r *http.Request) (string, []
 		return "", nil, &service.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
 	}
 	return hdr.Filename, body, nil
+}
+
+// setUpstreamPage stores a file's page on the GNOME translation site and fetches its state in
+// the background (one request), so the badge is there when the file list is next shown
+func (h *Handler) setUpstreamPage(r *http.Request, c *models.Catalog, page string) {
+	if err := h.catalogService.SetUpstreamPage(r.Context(), middleware.GetUser(r.Context()), c, page); err != nil || page == "" {
+		return
+	}
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+		defer cancel()
+		h.glossary.CheckUpstreamPage(ctx, page)
+	}()
 }
 
 // uploadedURL is the link readUpload downloaded from ("" when a file was chosen)
@@ -586,14 +607,14 @@ type projectFilesView struct {
 	Total     int
 	Next      int // offset of the next page
 	CanTake   bool
-	Query     string                       // search words (kept by "Muat lagi")
-	Searched  bool                         // a search result: say so when nothing matches
-	CanManage bool                         // may start a sync
-	HasFeed   bool                         // some version has a sync link
-	LastSync  *time.Time                   // newest download check of those versions
-	SyncHours int                          // automatic sync interval
-	Versions  []*models.ProjectFileVersion // filter options
-	Upstream  bool                         // some version is a release upstream: show the state filter
+	Query     string                      // search words (kept by "Muat lagi")
+	Searched  bool                        // a search result: say so when nothing matches
+	CanManage bool                        // may start a sync
+	HasFeed   bool                        // some module group has a sync link
+	LastSync  *time.Time                  // newest download check of those module groups
+	SyncHours int                         // automatic sync interval
+	Groups    []*models.ModuleGroupOption // filter options
+	Upstream  bool                        // some module group is a release upstream: show the state filter
 }
 
 // ProjectFilesMore returns the next page of project files (htmx "Muat lagi")
@@ -604,9 +625,9 @@ func (h *Handler) ProjectFilesMore(w http.ResponseWriter, r *http.Request) {
 	}
 	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
 	q := r.URL.Query().Get("q")
-	var versionIDs []int64
-	versionIDs = groupParams(r)
-	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, versionIDs, models.UpstreamFilterSet(r.URL.Query()["u"]), offset)
+	var groupIDs []int64
+	groupIDs = groupParams(r)
+	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, groupIDs, models.UpstreamFilterSet(r.URL.Query()["u"]), offset)
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -644,7 +665,7 @@ func (h *Handler) ProjectFileTake(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := middleware.GetUser(r.Context())
-	label := f.VersionLabel
+	label := f.GroupLabel
 	// the current PO file on the GNOME translation site when it has one (newer than the release
 	// archive); otherwise, or when the site cannot be reached, the copy saved at the last sync
 	if latest, from, err := h.glossary.UpstreamPO(r.Context(), p, f, h.serverConfig.MaxUploadMB<<20); err == nil {
@@ -720,7 +741,7 @@ func (h *Handler) ProjectFilesSyncStatus(w http.ResponseWriter, r *http.Request)
 		resp["changed"] = len(st.Changed)
 		switch {
 		case st.Running:
-			resp["message"] = i18n.T(lang, "files.sync_progress", st.Done, st.Versions)
+			resp["message"] = i18n.T(lang, "files.sync_progress", st.Done, st.Groups)
 		case len(st.Failed) > 0:
 			resp["error"] = i18n.T(lang, "files.sync_failed", strings.Join(st.Failed, "; "))
 			if len(st.Changed) > 0 {
@@ -728,24 +749,22 @@ func (h *Handler) ProjectFilesSyncStatus(w http.ResponseWriter, r *http.Request)
 			}
 		case len(st.Changed) > 0:
 			resp["message"] = i18n.T(lang, "files.sync_updated", strings.Join(st.Changed, ", "))
-		default:
-			resp["message"] = i18n.T(lang, "files.sync_unchanged")
-		}
+		} // nothing changed: no message (the refreshed rows and sync time say enough)
 	}
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Cache-Control", "no-store")
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// lastSync reports whether any glossary version has a sync link and when one was last checked
+// lastSync reports whether any module group has a sync link and when one was last checked
 func (h *Handler) lastSync(r *http.Request, p *models.Project) (bool, *time.Time) {
-	versions, err := h.glossary.Versions(r.Context(), p)
+	groups, err := h.glossary.Groups(r.Context(), p)
 	if err != nil {
 		return false, nil
 	}
 	has := false
 	var last *time.Time
-	for _, v := range versions {
+	for _, v := range groups {
 		if !v.HasFeed() {
 			continue
 		}
@@ -771,20 +790,26 @@ type fileListView struct {
 	Next        int // offset of the next page
 	CanManage   bool
 	HasTemplate bool
-	Groups      []*models.ProjectFileVersion // module group filter options
-	Upstream    bool                         // some version is a release upstream: show the state filter
+	Groups      []*models.ModuleGroupOption // module group filter options
+	Upstream    bool                        // some module group is a release upstream: show the state filter
 	Searched    bool
 }
 
 // fileList filters a project's PO files: the user's own (mine) or the other members'.
 // q: every word must appear in the file name, language or owner; groups: module groups
-// (glossary versions whose project files contain the file's module), 0 = no group;
+// (module groups whose project files contain the file's module), 0 = no group;
 // states: upstream states (models.UpstreamFilters, nil = all). all must carry their
 // upstream state (GlossaryService.AttachUpstreamToCatalogs).
 func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Catalog, mine bool, q string, groups []int64, states map[string]bool, offset int) fileListView {
 	v := fileListView{Lang: middleware.GetLang(r.Context()), Project: p, Mine: mine, CanManage: p.Role.IsMember(),
 		Searched: q != "" || len(groups) > 0 || len(states) > 0, Upstream: h.glossary.HasUpstream(r.Context(), p)}
-	v.Groups, _ = h.glossary.ProjectFileVersions(r.Context(), p)
+	for _, c := range all { // a file with its own upstream page has a state too
+		if c.UpstreamPage != "" {
+			v.Upstream = true
+			break
+		}
+	}
+	v.Groups, _ = h.glossary.GroupsWithFiles(r.Context(), p)
 	moduleGroups, _ := h.glossary.ModuleGroups(r.Context(), p)
 	want := map[int64]bool{}
 	for _, g := range groups {

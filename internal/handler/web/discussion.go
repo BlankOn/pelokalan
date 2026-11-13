@@ -167,27 +167,27 @@ func firstLanguage(t *models.GlossaryTerm) string {
 	return ""
 }
 
-// termVariant is one translation of a term summed over versions
+// termVariant is one translation of a term summed over groups
 type termVariant struct {
 	Language    string
 	Translation string
 	Count       int
 	Share       int
-	Versions    []string
+	Groups      []string
 }
 
-// termVersion lists the translations used in one version
-type termVersion struct {
+// termGroup lists the translations used in one module group
+type termGroup struct {
 	Label        string
 	Language     string
 	Translations []string
-	Changed      bool // differs from the previous (older) version
+	Changed      bool // differs from the previous (older) module group
 }
 
 type termSummary struct {
 	Total    int
 	Variants []termVariant
-	Versions []termVersion
+	Groups   []termGroup
 	Modules  []string
 	Contexts []string
 }
@@ -195,7 +195,7 @@ type termSummary struct {
 func summarizeTerm(t *models.GlossaryTerm) termSummary {
 	var s termSummary
 	idx := map[string]int{}
-	byVersion := map[string]*termVersion{}
+	byGroup := map[string]*termGroup{}
 	var versionOrder []string
 	modSeen, ctxSeen := map[string]bool{}, map[string]bool{}
 	for _, row := range t.Rows {
@@ -208,12 +208,12 @@ func summarizeTerm(t *models.GlossaryTerm) termSummary {
 			s.Variants = append(s.Variants, termVariant{Language: row.Language, Translation: row.Translation})
 		}
 		s.Variants[i].Count += row.Count
-		s.Variants[i].Versions = append(s.Variants[i].Versions, row.VersionLabel)
-		vk := row.VersionLabel + "\x00" + row.Language
-		tv, ok := byVersion[vk]
+		s.Variants[i].Groups = append(s.Variants[i].Groups, row.GroupLabel)
+		vk := row.GroupLabel + "\x00" + row.Language
+		tv, ok := byGroup[vk]
 		if !ok {
-			tv = &termVersion{Label: row.VersionLabel, Language: row.Language}
-			byVersion[vk] = tv
+			tv = &termGroup{Label: row.GroupLabel, Language: row.Language}
+			byGroup[vk] = tv
 			versionOrder = append(versionOrder, vk)
 		}
 		tv.Translations = append(tv.Translations, row.Translation)
@@ -236,25 +236,25 @@ func summarizeTerm(t *models.GlossaryTerm) termSummary {
 			s.Variants[i].Share = s.Variants[i].Count * 100 / s.Total
 		}
 	}
-	// versions newest first (natural order), marking where the translation changed
-	versions := make([]*models.ProjectVersion, 0, len(versionOrder))
-	lookup := map[*models.ProjectVersion]*termVersion{}
+	// groups newest first (natural order), marking where the translation changed
+	groups := make([]*models.ModuleGroup, 0, len(versionOrder))
+	lookup := map[*models.ModuleGroup]*termGroup{}
 	for _, vk := range versionOrder {
-		tv := byVersion[vk]
+		tv := byGroup[vk]
 		name, ver := splitLabel(tv.Label)
-		pv := &models.ProjectVersion{Name: name + "\x00" + tv.Language, Version: ver}
-		versions = append(versions, pv)
+		pv := &models.ModuleGroup{Name: name + "\x00" + tv.Language, Version: ver}
+		groups = append(groups, pv)
 		lookup[pv] = tv
 	}
-	service.SortVersions(versions)
-	for i, pv := range versions {
+	service.SortGroups(groups)
+	for i, pv := range groups {
 		tv := lookup[pv]
 		sort.Strings(tv.Translations)
-		if i+1 < len(versions) {
-			older := lookup[versions[i+1]]
+		if i+1 < len(groups) {
+			older := lookup[groups[i+1]]
 			tv.Changed = older.Language == tv.Language && strings.Join(older.Translations, "|") != strings.Join(tv.Translations, "|")
 		}
-		s.Versions = append(s.Versions, *tv)
+		s.Groups = append(s.Groups, *tv)
 	}
 	sort.Strings(s.Modules)
 	return s

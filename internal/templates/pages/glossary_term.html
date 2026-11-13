@@ -12,14 +12,14 @@
         <section class="card">
             <h2>{{t .Lang "term.translations"}}</h2>
             <table class="table term-table">
-                <thead><tr><th>{{t .Lang "editor.translation"}}</th><th class="w-share">{{t .Lang "term.share"}}</th><th class="num">{{t .Lang "glossary.uses"}}</th><th>{{t .Lang "glossary.versions"}}</th></tr></thead>
+                <thead><tr><th>{{t .Lang "editor.translation"}}</th><th class="w-share">{{t .Lang "term.share"}}</th><th class="num">{{t .Lang "glossary.uses"}}</th><th>{{t .Lang "glossary.groups"}}</th></tr></thead>
                 <tbody>
                 {{range $i, $v := $sum.Variants}}
                 <tr>
                     <td><strong class="term-tr{{if eq $i 0}} term-main{{end}}">{{$v.Translation}}</strong> <span class="muted small">{{langName $v.Language}}</span></td>
                     <td><span class="share-bar"><span style="width: {{$v.Share}}%"></span></span> <span class="small">{{$v.Share}}%</span></td>
                     <td class="num">{{$v.Count}}</td>
-                    <td>{{range $v.Versions}}<span class="version-badge">{{.}}</span> {{end}}</td>
+                    <td>{{range $v.Groups}}<span class="version-badge">{{.}}</span> {{end}}</td>
                 </tr>
                 {{end}}
                 </tbody>

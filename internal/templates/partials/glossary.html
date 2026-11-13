@@ -23,13 +23,13 @@
         <p class="small"><a href="{{$.ProjectPath}}/glossary/{{.Hash}}">{{t $.Lang "term.open_page"}} →</a></p>
         {{if .IsInconsistent}}<p class="gl-warn small">{{t $.Lang "glossary.variants" (len .Translations)}}</p>{{end}}
         <table class="table gl-table">
-            <thead><tr><th>{{t $.Lang "editor.translation"}}</th><th class="num">{{t $.Lang "glossary.uses"}}</th>{{if eq $.Version "all"}}<th>{{t $.Lang "glossary.versions"}}</th>{{end}}<th>{{t $.Lang "glossary.modules"}}</th></tr></thead>
+            <thead><tr><th>{{t $.Lang "editor.translation"}}</th><th class="num">{{t $.Lang "glossary.uses"}}</th>{{if eq $.Group "all"}}<th>{{t $.Lang "glossary.groups"}}</th>{{end}}<th>{{t $.Lang "glossary.modules"}}</th></tr></thead>
             <tbody>
             {{range .Translations}}
             <tr>
                 <td><strong>{{.Text}}</strong>{{if .Contexts}}<div class="muted small">{{t $.Lang "editor.context"}}: {{join .Contexts ", "}}</div>{{end}}</td>
                 <td class="num">{{.Count}}</td>
-                {{if eq $.Version "all"}}<td>{{range .Versions}}<span class="version-badge">{{.}}</span> {{end}}</td>{{end}}
+                {{if eq $.Group "all"}}<td>{{range .Groups}}<span class="version-badge">{{.}}</span> {{end}}</td>{{end}}
                 <td class="small gl-modules">{{range .Modules}}<code>{{.}}</code> {{end}}</td>
             </tr>
             {{end}}

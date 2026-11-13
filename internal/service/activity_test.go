@@ -18,7 +18,7 @@ func (f *fakeActivityRepo) Summary(context.Context, int64, *time.Time) ([]*model
 	return nil, nil
 }
 func (f *fakeActivityRepo) Since(context.Context, int64) (*time.Time, error) { return nil, nil }
-func (f *fakeActivityRepo) DailyTranslated(context.Context, int64) ([]models.ActivityDay, error) {
+func (f *fakeActivityRepo) HourlyTranslated(context.Context, int64) ([]models.ActivityDay, error) {
 	return nil, nil
 }
 

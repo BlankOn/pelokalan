@@ -47,7 +47,7 @@ type Project struct {
 	Role         ProjectRole `json:"role,omitempty"`
 	MemberCount  int         `json:"member_count,omitempty"`
 	CatalogCount int         `json:"catalog_count,omitempty"`
-	VersionCount int         `json:"version_count,omitempty"`
+	GroupCount   int         `json:"group_count,omitempty"`
 	TermCount    int         `json:"term_count,omitempty"`
 	AIEnabled    bool        `json:"ai_enabled,omitempty"` // an LLM API key is configured
 }

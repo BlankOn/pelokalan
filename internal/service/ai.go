@@ -216,7 +216,7 @@ type AIOptions struct {
 	UseMemory    bool  // fill exact matches from the user's other files first
 	UseAI        bool  // send what is left to the language model
 	IncludeFuzzy bool  // also redo entries marked as needing work
-	VersionID    int64 // glossary version; 0 = all versions, -1 = no glossary
+	GroupID      int64 // glossary version; 0 = all versions, -1 = no glossary
 	MarkFuzzy    bool  // mark every result as needing review
 }
 
@@ -258,8 +258,8 @@ func (s *AIService) plan(ctx context.Context, p *models.Project, c *models.Catal
 		return nil, err
 	}
 	var g *ai.Glossary
-	if opts.VersionID >= 0 {
-		pref, err := s.glossary.PreferredTerms(ctx, p.ID, c.Language, opts.VersionID)
+	if opts.GroupID >= 0 {
+		pref, err := s.glossary.PreferredTerms(ctx, p.ID, c.Language, opts.GroupID)
 		if err != nil {
 			return nil, err
 		}

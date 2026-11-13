@@ -51,7 +51,7 @@ type gcLabel struct {
 type groupChart struct {
 	Lang     string
 	Project  *models.Project
-	Groups   []*models.ProjectFileVersion
+	Groups   []*models.ModuleGroupOption
 	Selected map[int64]bool // ticked groups (none = all)
 	Range    string
 	Ranges   []service.StatsRange
@@ -67,7 +67,7 @@ type groupChart struct {
 	HasPoint bool
 }
 
-func (h *Handler) groupChart(r *http.Request, p *models.Project, groups []*models.ProjectFileVersion) *groupChart {
+func (h *Handler) groupChart(r *http.Request, p *models.Project, groups []*models.ModuleGroupOption) *groupChart {
 	if len(groups) == 0 {
 		return nil
 	}
@@ -196,7 +196,7 @@ func (h *Handler) GroupChart(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	groups, err := h.glossary.ProjectFileVersions(r.Context(), p)
+	groups, err := h.glossary.GroupsWithFiles(r.Context(), p)
 	if err != nil {
 		h.fail(w, r, err)
 		return

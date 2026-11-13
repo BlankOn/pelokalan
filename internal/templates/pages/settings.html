@@ -66,6 +66,17 @@
 </section>
 
 {{if $p.Role.CanManage}}
+<section class="card" id="module-groups">
+    <h2>{{t .Lang "groups.title"}}</h2>
+    <p class="muted small">{{t .Lang "groups.help"}}</p>
+    {{with .Data.Sources}}<p class="group-chips">{{range .}}<span class="version-badge">{{.Group.Label}}</span> {{end}}</p>{{end}}
+    <div class="row-actions">
+        <button type="button" class="btn" data-open-dialog="module-groups-dialog" data-tab-open="list">{{t .Lang "groups.manage"}}</button>
+        <button type="button" class="btn btn-primary" data-open-dialog="module-groups-dialog" data-tab-open="add">+ {{t .Lang "groups.add_source"}}</button>
+    </div>
+</section>
+{{template "module_groups" .}}
+
 <section class="card" id="ai">
     <h2>{{t .Lang "ai.settings_title"}}</h2>
     <p class="muted small">{{t .Lang "ai.settings_help"}}</p>

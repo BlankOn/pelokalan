@@ -4,17 +4,23 @@
 {{with .Data.WordsChart}}{{$w := .}}
 <h2 class="section-title">{{t $.Lang "insight.growth"}}</h2>
 <section class="card words-chart">
-    <div class="gc-legend"><span class="gc-key wc-key"><span class="gc-swatch"></span> {{t $.Lang "insight.growth_words"}} <strong>{{num .Words}}</strong> <span class="gc-change">({{t $.Lang "insight.growth_strings" (num .Strings)}})</span></span></div>
+    <div class="gc-plot">
+    <div class="gc-legend"><span class="gc-key gc-words"><span class="gc-swatch"></span> {{t $.Lang "insight.growth_total"}} <strong>{{num .Strings}}</strong></span>
+        {{range .Series}}<span class="gc-key gc-{{.Kind}}"><span class="gc-swatch"></span> {{t $.Lang (printf "insight.growth_%s" .Kind)}} <strong>{{num .Total}}</strong></span>{{end}}</div>
     <div class="gc-area gc-has-y">
     <div class="gc-ylabels">{{range .YLabels}}<span style="top: {{printf "%.2f" (pct .Y $w.H)}}%">{{num .Value}}</span>{{end}}</div>
     <svg class="gc-svg" viewBox="0 0 {{.W}} {{.H}}" role="img" aria-label="{{t $.Lang "insight.growth"}}">
         {{range .YLabels}}<line x1="0" x2="{{$w.W}}" y1="{{printf "%.1f" .Y}}" y2="{{printf "%.1f" .Y}}" class="grid"/>{{end}}
         <polygon points="{{.Area}}" class="wc-area"/>
-        <polyline points="{{.Line}}" class="gc-line wc-line"/>
-        {{range .Points}}<circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .Y}}" r="6" class="wc-hit"><title>{{.Day.Format "02-01-2006"}}: {{t $.Lang "insight.growth_tip" (num .Words) (num .DayWords)}}</title></circle>{{end}}
+        {{range .Series}}<polyline points="{{.Line}}" class="gc-line gc-{{.Kind}}"/>{{end}}
+        <polyline points="{{.Line}}" class="gc-line gc-words"/>
+        <line class="gc-guide" x1="0" x2="0" y1="{{.PlotTop}}" y2="{{.PlotBot}}" hidden/>
+        {{range .Points}}<g class="gc-pt" data-x="{{printf "%.1f" .X}}" data-t="{{.Hour.Format "2006-01-02T15:04:05Z07:00"}}" data-words="{{num .Strings}}" data-manual="{{num .Manual}}" data-ai_kept="{{num .AIKept}}" data-ai_edited="{{num .AIEdited}}" data-edited="{{num .Edited}}" data-added="+{{num .HourStrings}}"><circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .YManual}}" r="3" class="gc-dot gc-manual"/><circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .YAIKept}}" r="3" class="gc-dot gc-ai_kept"/><circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .YAIEdited}}" r="3" class="gc-dot gc-ai_edited"/><circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .YEdit}}" r="3" class="gc-dot gc-edited"/><circle cx="{{printf "%.1f" .X}}" cy="{{printf "%.1f" .Y}}" r="3" class="gc-dot gc-words"/></g>{{end}}
     </svg>
     </div>
-    <div class="gc-xlabels" style="margin-left: 52px">{{range .XLabels}}<span style="left: {{printf "%.2f" (pct .X $w.W)}}%" data-t="{{.Time.Format "2006-01-02T15:04:05Z07:00"}}">{{.Label}}</span>{{end}}</div>
+    <div class="gc-tip" role="tooltip" hidden data-rows="words manual ai_kept ai_edited edited added" data-l-words="{{t $.Lang "insight.growth_total"}}" data-l-manual="{{t $.Lang "insight.growth_manual"}}" data-l-ai_kept="{{t $.Lang "insight.growth_ai_kept"}}" data-l-ai_edited="{{t $.Lang "insight.growth_ai_edited"}}" data-l-edited="{{t $.Lang "insight.growth_edited"}}" data-l-added="{{t $.Lang "insight.growth_hour"}}"></div>
+    <div class="gc-xlabels">{{range .XLabels}}<span style="left: {{printf "%.2f" (pct .X $w.W)}}%" data-t="{{.Time.Format "2006-01-02T15:04:05Z07:00"}}"{{if .WithTime}} data-with-time{{end}}>{{.Label}}</span>{{end}}</div>
+    </div>
     <p class="muted small">{{t $.Lang "insight.growth_note"}}</p>
 </section>
 {{end}}

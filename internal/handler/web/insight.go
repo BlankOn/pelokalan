@@ -32,8 +32,8 @@ func (h *Handler) InsightPage(w http.ResponseWriter, r *http.Request) {
 	data.Title = i18n.T(data.Lang, "project.tab_insight") + " · " + p.Name
 	data.Data["Project"] = p
 	data.Data["Tab"] = "insight"
-	if versions, err := h.glossary.ProjectFileVersions(r.Context(), p); err == nil {
-		data.Data["GroupChart"] = h.groupChart(r, p, versions)
+	if groups, err := h.glossary.GroupsWithFiles(r.Context(), p); err == nil {
+		data.Data["GroupChart"] = h.groupChart(r, p, groups)
 	}
 	v := insightView{Range: "30"}
 	for _, rg := range service.ActivityRanges {
@@ -62,7 +62,7 @@ func (h *Handler) InsightPage(w http.ResponseWriter, r *http.Request) {
 		v.Active = len(rows)
 	}
 	if h.activity != nil {
-		if days, err := h.activity.DailyTranslated(r.Context(), p); err == nil {
+		if days, err := h.activity.HourlyTranslated(r.Context(), p); err == nil {
 			data.Data["WordsChart"] = buildWordsChart(data.Lang, days, time.Now())
 		}
 	}

@@ -95,8 +95,8 @@ func (r *projectRepository) ListAll(ctx context.Context, userID int64) ([]*model
 		`SELECT p.id, p.name, p.slug, p.description, p.source_language, p.language, p.open, p.owner_id, p.created_at, p.updated_at,
 		        COALESCE(m.role, ''),
 		        (SELECT COUNT(*) FROM project_members pm WHERE pm.project_id = p.id),
-		        (SELECT COUNT(DISTINCT i.version_id) FROM glossary_imports i WHERE i.project_id = p.id),
-		        (SELECT COALESCE(MAX(i.term_count), 0) FROM glossary_imports i WHERE i.project_id = p.id),
+		        (SELECT COUNT(DISTINCT i.group_id) FROM module_group_imports i WHERE i.project_id = p.id),
+		        (SELECT COALESCE(MAX(i.term_count), 0) FROM module_group_imports i WHERE i.project_id = p.id),
 		        EXISTS (SELECT 1 FROM project_ai_settings s WHERE s.project_id = p.id AND s.api_key_enc <> ''),
 		        (SELECT COUNT(*) FROM catalogs c WHERE c.project_id = p.id AND NOT c.is_template AND c.deleted_at IS NULL)
 		 FROM projects p
@@ -111,7 +111,7 @@ func (r *projectRepository) ListAll(ctx context.Context, userID int64) ([]*model
 	for rows.Next() {
 		p := &models.Project{}
 		if err := rows.Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.Language, &p.Open, &p.OwnerID,
-			&p.CreatedAt, &p.UpdatedAt, &p.Role, &p.MemberCount, &p.VersionCount, &p.TermCount, &p.AIEnabled, &p.CatalogCount); err != nil {
+			&p.CreatedAt, &p.UpdatedAt, &p.Role, &p.MemberCount, &p.GroupCount, &p.TermCount, &p.AIEnabled, &p.CatalogCount); err != nil {
 			return nil, err
 		}
 		out = append(out, p)

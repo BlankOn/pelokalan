@@ -15,25 +15,28 @@ import (
 	"pelokalan/internal/repository"
 )
 
-// upstreamRepo keeps versions, project files and stored upstream states in memory;
+// upstreamRepo keeps groups, project files and stored upstream states in memory;
 // other calls are not used by these tests
 type upstreamRepo struct {
 	repository.GlossaryRepository
-	versions []*models.ProjectVersion
-	files    []*models.ProjectFile
-	states   map[string]*models.UpstreamRecord // release/lang/stem
+	groups []*models.ModuleGroup
+	files  []*models.ProjectFile
+	states map[string]*models.UpstreamRecord // release/lang/stem
+	pages  []string                          // upstream pages entered on files
 }
 
-func (r *upstreamRepo) ListVersions(context.Context, int64) ([]*models.ProjectVersion, error) {
-	return r.versions, nil
+func (r *upstreamRepo) LinkedUpstreamPages(context.Context) ([]string, error) { return r.pages, nil }
+
+func (r *upstreamRepo) ListGroups(context.Context, int64) ([]*models.ModuleGroup, error) {
+	return r.groups, nil
 }
 
-func (r *upstreamRepo) ListProjectFiles(_ context.Context, _ int64, _ string, versionIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error) {
+func (r *upstreamRepo) ListProjectFiles(_ context.Context, _ int64, _ string, groupIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error) {
 	var out []*models.ProjectFile
 	for _, f := range r.files {
-		ok := len(versionIDs) == 0
-		for _, v := range versionIDs {
-			ok = ok || v == f.VersionID
+		ok := len(groupIDs) == 0
+		for _, v := range groupIDs {
+			ok = ok || v == f.GroupID
 		}
 		if ok {
 			cp := *f
@@ -48,7 +51,7 @@ func (r *upstreamRepo) ListProjectFiles(_ context.Context, _ int64, _ string, ve
 func (r *upstreamRepo) ProjectFileNames(context.Context, int64) (map[int64][]string, error) {
 	out := map[int64][]string{}
 	for _, f := range r.files {
-		out[f.VersionID] = append(out[f.VersionID], f.Filename)
+		out[f.GroupID] = append(out[f.GroupID], f.Filename)
 	}
 	return out, nil
 }
@@ -56,10 +59,10 @@ func (r *upstreamRepo) ProjectFileNames(context.Context, int64) (map[int64][]str
 func (r *upstreamRepo) UpstreamCandidates(context.Context) ([]models.UpstreamCandidate, error) {
 	var out []models.UpstreamCandidate
 	for _, f := range r.files {
-		for _, v := range r.versions {
-			if v.ID == f.VersionID {
+		for _, v := range r.groups {
+			if v.ID == f.GroupID {
 				out = append(out, models.UpstreamCandidate{Filename: f.Filename, FileLanguage: f.Language,
-					ProjectLanguage: "id", VersionName: v.Name, Version: v.Version, GlossaryURL: v.GlossaryURL})
+					ProjectLanguage: "id", GroupName: v.Name, GroupVersion: v.Version, SyncURL: v.SyncURL})
 			}
 		}
 	}
@@ -116,15 +119,15 @@ func upstreamSite(t *testing.T) (*httptest.Server, *int) {
 func TestUpstreamWarmAndFilter(t *testing.T) {
 	srv, calls := upstreamSite(t)
 	ctx := context.Background()
-	repo := &upstreamRepo{states: map[string]*models.UpstreamRecord{}, versions: []*models.ProjectVersion{
-		{ID: 1, Name: "gnome", Version: "51", GlossaryURL: srv.URL + "/languages/id/gnome-51/ui.tar.gz"},
+	repo := &upstreamRepo{states: map[string]*models.UpstreamRecord{}, groups: []*models.ModuleGroup{
+		{ID: 1, Name: "gnome", Version: "51", SyncURL: srv.URL + "/languages/id/gnome-51/ui.tar.gz"},
 		{ID: 2, Name: "gnome", Version: "51"}, // no sync link: the label names a release
 		{ID: 3, Name: "kde", Version: "6"},    // not a release upstream
 	}, files: []*models.ProjectFile{
-		{ID: 11, VersionID: 1, Filename: "gnome-maps.gnome-51.id.po", Language: "id"},
-		{ID: 12, VersionID: 2, Filename: "glib.glib-2-90.id.po", Language: "id"},
-		{ID: 13, VersionID: 3, Filename: "konsole.id.po", Language: "id"},
-		{ID: 14, VersionID: 1, Filename: "gone.main.id.po", Language: "id"},
+		{ID: 11, GroupID: 1, Filename: "gnome-maps.gnome-51.id.po", Language: "id"},
+		{ID: 12, GroupID: 2, Filename: "glib.glib-2-90.id.po", Language: "id"},
+		{ID: 13, GroupID: 3, Filename: "konsole.id.po", Language: "id"},
+		{ID: 14, GroupID: 1, Filename: "gone.main.id.po", Language: "id"},
 	}}
 	s := NewGlossaryService(repo, nil)
 	client := gnomel10n.New(srv.URL, true, "test")
@@ -206,11 +209,11 @@ func TestUpstreamWarmAndFilter(t *testing.T) {
 func TestUpstreamWarmBudget(t *testing.T) {
 	srv, calls := upstreamSite(t)
 	ctx := context.Background()
-	repo := &upstreamRepo{states: map[string]*models.UpstreamRecord{}, versions: []*models.ProjectVersion{
-		{ID: 1, Name: "gnome", Version: "51", GlossaryURL: srv.URL + "/languages/id/gnome-51/ui.tar.gz"},
+	repo := &upstreamRepo{states: map[string]*models.UpstreamRecord{}, groups: []*models.ModuleGroup{
+		{ID: 1, Name: "gnome", Version: "51", SyncURL: srv.URL + "/languages/id/gnome-51/ui.tar.gz"},
 	}, files: []*models.ProjectFile{
-		{ID: 11, VersionID: 1, Filename: "gnome-maps.gnome-51.id.po", Language: "id"},
-		{ID: 12, VersionID: 1, Filename: "glib.glib-2-90.id.po", Language: "id"},
+		{ID: 11, GroupID: 1, Filename: "gnome-maps.gnome-51.id.po", Language: "id"},
+		{ID: 12, GroupID: 1, Filename: "glib.glib-2-90.id.po", Language: "id"},
 	}}
 	s := NewGlossaryService(repo, nil)
 	client := gnomel10n.New(srv.URL, true, "test")
@@ -272,12 +275,12 @@ func TestUpstreamWarmFromPage(t *testing.T) {
 	repo := &upstreamRepo{states: map[string]*models.UpstreamRecord{
 		"gnome-51/id/orca.main": {Release: "gnome-51", Language: "id", Stem: "orca.main", Listed: true,
 			State: "None", POFile: "/POT/orca.main/orca.main.id.po", CheckedAt: time.Now().Add(-3 * time.Hour)},
-	}, versions: []*models.ProjectVersion{
-		{ID: 1, Name: "gnome", Version: "51", GlossaryURL: srv.URL + "/languages/id/gnome-51/ui.tar.gz"},
+	}, groups: []*models.ModuleGroup{
+		{ID: 1, Name: "gnome", Version: "51", SyncURL: srv.URL + "/languages/id/gnome-51/ui.tar.gz"},
 	}, files: []*models.ProjectFile{
-		{ID: 1, VersionID: 1, Filename: "orca.main.id.po", Language: "id"},
-		{ID: 2, VersionID: 1, Filename: "gtk.gtk-4-24.id.po", Language: "id"},
-		{ID: 3, VersionID: 1, Filename: "gone.main.id.po", Language: "id"},
+		{ID: 1, GroupID: 1, Filename: "orca.main.id.po", Language: "id"},
+		{ID: 2, GroupID: 1, Filename: "gtk.gtk-4-24.id.po", Language: "id"},
+		{ID: 3, GroupID: 1, Filename: "gone.main.id.po", Language: "id"},
 	}}
 	s := NewGlossaryService(repo, nil)
 	s.SetUpstream(gnomel10n.New(srv.URL, true, "test"))
@@ -308,7 +311,7 @@ func TestUpstreamWarmFromPage(t *testing.T) {
 	}
 	// a documentation file needs the doc page too; it fails here, so the API is the fallback
 	repo.states["gnome-51/id/orca.main"].CheckedAt = time.Now().Add(-time.Hour) // still fresh, but rewritten from the page
-	repo.files = append(repo.files, &models.ProjectFile{ID: 4, VersionID: 1, Filename: "gnome-boxes-help.gnome-50.id.po", Language: "id"})
+	repo.files = append(repo.files, &models.ProjectFile{ID: 4, GroupID: 1, Filename: "gnome-boxes-help.gnome-50.id.po", Language: "id"})
 	asked = nil
 	s.WarmUpstream(ctx)
 	if len(asked) < 2 || asked[0] != "/languages/id/gnome-51/ui/" || asked[1] != "/languages/id/gnome-51/doc/" ||
@@ -332,6 +335,71 @@ func TestGuessUpstreamPage(t *testing.T) {
 	for stem, want := range cases {
 		if got := s.guessPageURL(upstreamKey{release: "gnome-51", lang: "id", stem: stem}); got != want {
 			t.Errorf("%s: %q, want %q", stem, got, want)
+		}
+	}
+}
+
+// A file's own page (entered when adding or updating it by hand) is checked directly and its
+// state shown, also in a project without any release
+func TestUpstreamLinkedPage(t *testing.T) {
+	srv, calls := upstreamSite(t)
+	repo := &upstreamRepo{states: map[string]*models.UpstreamRecord{}}
+	s := NewGlossaryService(repo, nil)
+	s.SetUpstream(gnomel10n.New(srv.URL, true, "test"))
+
+	for _, bad := range []string{"https://example.com/vertimus/a/b/po/id/", srv.URL + "/module/gnome-maps/",
+		srv.URL + "/vertimus/gnome-maps/gnome-51/po/", "javascript:alert(1)", srv.URL + "/vertimus/../b/po/id/"} {
+		if _, err := s.UpstreamPageURL(bad); err == nil {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+	page, err := s.UpstreamPageURL("  " + srv.URL + "/vertimus/gnome-maps/gnome-51/po/id  ")
+	if err != nil || page != srv.URL+"/vertimus/gnome-maps/gnome-51/po/id/" {
+		t.Fatalf("canonical page %q, %v", page, err)
+	}
+	if p, err := s.UpstreamPageURL(""); p != "" || err != nil {
+		t.Error("empty page refused")
+	}
+
+	p := &models.Project{ID: 1, Language: "id"}
+	c := &models.Catalog{ID: 3, Filename: "maps.id.po", Language: "id", UpstreamPage: page}
+	s.AttachUpstreamToCatalogs(context.Background(), p, []*models.Catalog{c})
+	if c.Upstream != nil || c.UpstreamLink != page {
+		t.Errorf("before the check: %+v", c.UpstreamInfo)
+	}
+
+	s.CheckUpstreamPage(context.Background(), page)
+	c.UpstreamInfo = models.UpstreamInfo{}
+	s.AttachUpstreamToCatalogs(context.Background(), p, []*models.Catalog{c})
+	if c.Upstream == nil || c.Upstream.State == "" || c.Upstream.PageURL != page {
+		t.Fatalf("after the check: %+v", c.UpstreamInfo)
+	}
+
+	// the background round refreshes it when stale, directly through the API
+	repo.pages = []string{page}
+	for _, rec := range repo.states {
+		rec.CheckedAt = time.Now().Add(-3 * time.Hour)
+	}
+	before := *calls
+	s.WarmUpstream(context.Background())
+	if *calls > before+1 { // the client may answer from its cache
+		t.Errorf("%d requests to refresh one linked page", *calls-before)
+	}
+	for _, rec := range repo.states {
+		if time.Since(rec.CheckedAt) > time.Minute {
+			t.Error("linked page not refreshed")
+		}
+	}
+
+	// the Sync button waits for nothing and refreshes it again (the client bypasses its cache
+	// for answers older than a minute: TestPageURLAndMaxAge)
+	for _, rec := range repo.states {
+		rec.CheckedAt = time.Now().Add(-10 * time.Minute)
+	}
+	s.RefreshUpstream(context.Background())
+	for _, rec := range repo.states {
+		if time.Since(rec.CheckedAt) > time.Minute {
+			t.Error("sync button did not refresh the linked page")
 		}
 	}
 }

@@ -22,11 +22,11 @@ func TestProjectFileRowsUpstream(t *testing.T) {
 	up := &models.UpstreamStats{State: "Translating", Translated: 10, Fuzzy: 2, Untranslated: 3,
 		PageURL: "https://l10n.gnome.org/vertimus/glib/main/po/id/", POFileURL: "https://l10n.gnome.org/POT/glib.main/glib.main.id.po"}
 	files := []*models.ProjectFile{
-		{ID: 7, Filename: "glib.main.id.po", Language: "id", Total: 15, Translated: 9, VersionLabel: "gnome-51", UpstreamInfo: models.UpstreamInfo{Upstream: up}},
-		{ID: 8, Filename: "gtk.main.id.po", Language: "id", Total: 5, VersionLabel: "gnome-51",
+		{ID: 7, Filename: "glib.main.id.po", Language: "id", Total: 15, Translated: 9, GroupLabel: "gnome-51", UpstreamInfo: models.UpstreamInfo{Upstream: up}},
+		{ID: 8, Filename: "gtk.main.id.po", Language: "id", Total: 5, GroupLabel: "gnome-51",
 			UpstreamInfo: models.UpstreamInfo{Upstream: &models.UpstreamStats{State: "Odd", Translated: 5, PageURL: "https://l10n.gnome.org/x"}},
 			Mine:         &models.Catalog{ID: 3, Filename: "gtk.main.id.po"}},
-		{ID: 9, Filename: "vte.main.id.po", Language: "id", Total: 5, VersionLabel: "gnome-51",
+		{ID: 9, Filename: "vte.main.id.po", Language: "id", Total: 5, GroupLabel: "gnome-51",
 			UpstreamInfo: models.UpstreamInfo{UpstreamLink: "https://l10n.gnome.org/vertimus/vte/main/po/id/"}},
 	}
 	view := projectFilesView{Lang: "en", Project: &models.Project{Slug: "gnome-id"}, Files: files, Total: 3, Next: 3, CanTake: true}
@@ -84,7 +84,7 @@ func TestFileRowsUpstream(t *testing.T) {
 		t.Fatal(err)
 	}
 	out := buf.String()
-	for _, want := range []string{`name="u" value="translating"`, `name="u" value="unknown"`, `name="u" value="missing"`, "Not checked yet", "All upstream states"} {
+	for _, want := range []string{`name="u" value="translating"`, `name="u" value="unknown"`, `name="u" value="missing"`, "Not checked yet", "All statuses"} {
 		if !strings.Contains(out, want) {
 			t.Errorf("filter missing %q", want)
 		}
@@ -99,7 +99,7 @@ func TestFileRowsUpstream(t *testing.T) {
 // emptyGlossaryRepo has no versions or project files
 type emptyGlossaryRepo struct{ repository.GlossaryRepository }
 
-func (emptyGlossaryRepo) ProjectFileVersions(context.Context, int64) ([]*models.ProjectFileVersion, error) {
+func (emptyGlossaryRepo) GroupsWithFiles(context.Context, int64) ([]*models.ModuleGroupOption, error) {
 	return nil, nil
 }
 func (emptyGlossaryRepo) ProjectFileNames(context.Context, int64) (map[int64][]string, error) {

@@ -32,6 +32,12 @@ func (h *Handler) aiSettingsData(r *http.Request, p *models.Project, data PageDa
 }
 
 func (h *Handler) renderSettings(w http.ResponseWriter, r *http.Request, p *models.Project, errMsg, flash string) {
+	h.renderSettingsWith(w, r, p, errMsg, flash, nil)
+}
+
+// renderSettingsWith renders the settings page; groups fills the module groups popup (nil = the
+// default: closed, or opened by ?groups=list|add)
+func (h *Handler) renderSettingsWith(w http.ResponseWriter, r *http.Request, p *models.Project, errMsg, flash string, groups func(*PageData)) {
 	data := h.page(r, "")
 	data.Title = i18n.T(data.Lang, "title.settings") + " · " + p.Name
 	data.Error = errMsg
@@ -50,6 +56,10 @@ func (h *Handler) renderSettings(w http.ResponseWriter, r *http.Request, p *mode
 	}
 	if p.Role.CanManage() {
 		h.aiSettingsData(r, p, data)
+		if groups == nil {
+			groups = func(d *PageData) { h.moduleGroupsData(r, p, d, "", "") }
+		}
+		groups(&data)
 	}
 	h.render(w, "settings", data)
 }
@@ -109,13 +119,13 @@ func aiOptionsFromRequest(r *http.Request) service.AIOptions {
 		IncludeFuzzy: r.FormValue("include_fuzzy") == "1",
 		MarkFuzzy:    r.FormValue("mark_fuzzy") == "1",
 	}
-	switch v := r.FormValue("glossary_version"); v {
+	switch v := r.FormValue("glossary_group"); v {
 	case "none":
-		opts.VersionID = -1
+		opts.GroupID = -1
 	case "", "all":
-		opts.VersionID = 0
+		opts.GroupID = 0
 	default:
-		opts.VersionID, _ = strconv.ParseInt(v, 10, 64)
+		opts.GroupID, _ = strconv.ParseInt(v, 10, 64)
 	}
 	return opts
 }
@@ -188,14 +198,14 @@ func (h *Handler) editorAIData(r *http.Request, p *models.Project, c *models.Cat
 	if st, err := h.ai.Settings(r.Context(), p); err == nil {
 		data.Data["AIConfigured"] = st != nil
 	}
-	if versions, err := h.glossary.Versions(r.Context(), p); err == nil {
-		var withData []*models.ProjectVersion
-		for _, v := range versions {
+	if groups, err := h.glossary.Groups(r.Context(), p); err == nil {
+		var withData []*models.ModuleGroup
+		for _, v := range groups {
 			if v.ImportCount > 0 {
 				withData = append(withData, v)
 			}
 		}
-		data.Data["GlossaryVersions"] = withData
+		data.Data["GlossaryGroups"] = withData
 	}
 	// show the latest job while it runs, or when the page was opened for it
 	if job, err := h.ai.LatestJob(r.Context(), c); err == nil && job != nil {

@@ -8,7 +8,6 @@
             {{else if .HasFeed}}<span class="sync-dot sync-pending"></span>{{t $.Lang "glossary.sync_pending" .Label}}
             {{else if .LastImport}}<span class="sync-dot sync-manual"></span>{{t $.Lang "glossary.no_upstream" .Label (timeAgo $.Lang .LastImport)}}{{end}}
         {{end}}</span>
-        {{if $p.Role.CanManage}}<button type="button" class="btn" data-open-dialog="manage-glossary" data-tab-open="list">⚙ {{t .Lang "glossary.manage"}}</button>{{end}}
     </div>
     {{if .Data.Languages}}
     <form id="glossary-form" class="glossary-search" hx-get="{{$p.Path}}/glossary/search" hx-target="#glossary-results"
@@ -25,9 +24,9 @@
             <input type="hidden" name="lang" value="{{$r.Search.Language}}">
             <span class="muted small">{{langName $r.Search.Language}}</span>
             {{end}}
-            <select name="version" aria-label="{{t .Lang "glossary.version"}}">
-                {{range $r.Versions}}{{if .ImportCount}}<option value="{{.ID}}" {{if eq (printf "%d" .ID) $r.Version}}selected{{end}}>{{.Label}}</option>{{end}}{{end}}
-                <option value="all" {{if eq $r.Version "all"}}selected{{end}}>{{t .Lang "glossary.all_versions"}}</option>
+            <select name="group" aria-label="{{t .Lang "glossary.group"}}">
+                {{range $r.Groups}}{{if .ImportCount}}<option value="{{.ID}}" {{if eq (printf "%d" .ID) $r.Group}}selected{{end}}>{{.Label}}</option>{{end}}{{end}}
+                <option value="all" {{if eq $r.Group "all"}}selected{{end}}>{{t .Lang "glossary.all_groups"}}</option>
             </select>
             {{if $r.Modules}}
             <div class="combo" data-combo>
@@ -68,10 +67,9 @@
     <div class="empty-state">
         <h2>{{t .Lang "glossary.empty_title"}}</h2>
         <p class="muted">{{t .Lang "glossary.empty_text"}}</p>
-        {{if $p.Role.CanManage}}<button type="button" class="btn btn-primary" data-open-dialog="manage-glossary" data-tab-open="add">+ {{t .Lang "glossary.add_source"}}</button>{{end}}
+        {{if $p.Role.CanManage}}<a class="btn btn-primary" href="{{$p.Path}}/settings?groups=add#module-groups">+ {{t .Lang "groups.add_source"}}</a>{{end}}
     </div>
     {{end}}
 </section>
 
-{{if $p.Role.CanManage}}{{template "glossary_manage" .}}{{end}}
 {{end}}

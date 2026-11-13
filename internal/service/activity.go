@@ -72,7 +72,7 @@ func (s *ActivityService) Summary(ctx context.Context, p *models.Project, rangeK
 	return rows, first, err
 }
 
-// DailyTranslated returns the project's translation output per day, oldest first
-func (s *ActivityService) DailyTranslated(ctx context.Context, p *models.Project) ([]models.ActivityDay, error) {
-	return s.repo.DailyTranslated(ctx, p.ID)
+// HourlyTranslated returns the project's translation output per hour, oldest first
+func (s *ActivityService) HourlyTranslated(ctx context.Context, p *models.Project) ([]models.ActivityDay, error) {
+	return s.repo.HourlyTranslated(ctx, p.ID)
 }

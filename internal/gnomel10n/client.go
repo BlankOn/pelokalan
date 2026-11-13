@@ -169,6 +169,30 @@ func (c *Client) ReleaseFromURL(raw string) string {
 	return ""
 }
 
+// ParsePageURL reads the address of a translation's page on the site
+// (https://l10n.gnome.org/vertimus/gnome-calculator/main/po/id/) into its entry and language;
+// ok is false for any other address
+func (c *Client) ParsePageURL(raw string) (e Entry, lang string, ok bool) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || (u.Scheme != "https" && u.Scheme != "http") || !strings.EqualFold(u.Host, c.Host()) {
+		return Entry{}, "", false
+	}
+	parts := strings.Split(strings.Trim(u.Path, "/"), "/")
+	if len(parts) != 5 || parts[0] != "vertimus" {
+		return Entry{}, "", false
+	}
+	for _, p := range parts[1:] {
+		if p == "" || p == "." || p == ".." || strings.ContainsAny(p, "?#\\") {
+			return Entry{}, "", false
+		}
+	}
+	e = Entry{Module: parts[1], Branch: parts[2], Domain: parts[3]}
+	lang = parts[4]
+	e.StatsPath = "/api/v1/modules/" + seg(e.Module) + "/branches/" + seg(e.Branch) + "/domains/" + seg(e.Domain) +
+		"/languages/" + seg(Locale(lang))
+	return e, lang, true
+}
+
 // Locale converts a language code to the site's form ("pt-BR" → "pt_BR")
 func Locale(lang string) string { return strings.ReplaceAll(strings.TrimSpace(lang), "-", "_") }
 
@@ -223,9 +247,15 @@ func (c *Client) Release(ctx context.Context, release, lang string) ([]Entry, er
 	return out, nil
 }
 
-// Stats returns the state of one entry
+// Stats returns the state of one entry (cached for StatsTTL)
 func (c *Client) Stats(ctx context.Context, e Entry) (*Stats, error) {
-	body, err := c.get(ctx, e.StatsPath, StatsTTL)
+	return c.StatsMaxAge(ctx, e, StatsTTL)
+}
+
+// StatsMaxAge is Stats with an answer from the cache only when it is younger than maxAge
+// (the "Sinkronkan dengan upstream" button asks for a fresh one)
+func (c *Client) StatsMaxAge(ctx context.Context, e Entry, maxAge time.Duration) (*Stats, error) {
+	body, err := c.get(ctx, e.StatsPath, maxAge)
 	if err != nil {
 		return nil, err
 	}

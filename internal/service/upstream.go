@@ -32,10 +32,77 @@ const (
 
 type upstreamKey struct{ release, lang, stem string }
 
+// linkedRelease is the release of states fetched for a file's own page (Catalog.UpstreamPage):
+// they belong to no release, so they are stored apart from the release pages' rows
+const linkedRelease = ""
+
 // upstreamDue is a file state to refresh
 type upstreamDue struct {
 	k       upstreamKey
-	checked time.Time // zero = never
+	checked time.Time        // zero = never
+	page    *gnomel10n.Entry // set for a file's own page: asked directly, not through a release
+}
+
+// UpstreamPageURL checks a file's page on the GNOME translation site as entered by a person and
+// returns it in its canonical form ("" stays ""); anything else is refused with err.upstream_page
+func (s *GlossaryService) UpstreamPageURL(raw string) (string, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", nil
+	}
+	if s.upstream == nil {
+		return "", userErr("err.upstream_page")
+	}
+	e, lang, ok := s.upstream.ParsePageURL(raw)
+	if !ok {
+		return "", userErr("err.upstream_page")
+	}
+	return s.upstream.PageURL(&gnomel10n.Stats{Module: e.Module, Branch: e.Branch, Domain: e.Domain, Language: lang}), nil
+}
+
+// pageKey is the stored state's key of a file's own page
+func (s *GlossaryService) pageKey(page string) (upstreamKey, gnomel10n.Entry, bool) {
+	if s.upstream == nil || page == "" {
+		return upstreamKey{}, gnomel10n.Entry{}, false
+	}
+	e, lang, ok := s.upstream.ParsePageURL(page)
+	if !ok {
+		return upstreamKey{}, gnomel10n.Entry{}, false
+	}
+	return upstreamKey{linkedRelease, lang, e.Stem()}, e, true
+}
+
+// CheckUpstreamPage fetches and stores the state of a file's own page now (one request), so the
+// badge shows right after the page was entered. Errors are only logged: the background round retries.
+func (s *GlossaryService) CheckUpstreamPage(ctx context.Context, page string) {
+	k, e, ok := s.pageKey(page)
+	if !ok || s.upstream.Remaining() <= 0 {
+		return
+	}
+	if _, err := s.checkPage(ctx, k, e, time.Minute); err != nil {
+		log.Printf("upstream: check page %s: %v", page, err)
+	}
+}
+
+// checkPage asks the site for the state of one entry given by its page and stores it
+// (not found = stored as not listed); the client's cached answer is used when younger than
+// maxAge. An error means the site could not be asked.
+func (s *GlossaryService) checkPage(ctx context.Context, k upstreamKey, e gnomel10n.Entry, maxAge time.Duration) (*models.UpstreamRecord, error) {
+	rec := &models.UpstreamRecord{Release: k.release, Language: k.lang, Stem: k.stem, CheckedAt: time.Now()}
+	st, err := s.upstream.StatsMaxAge(ctx, e, maxAge)
+	switch {
+	case errors.Is(err, gnomel10n.ErrNotFound):
+	case err != nil:
+		return nil, err
+	default:
+		rec.Listed = true
+		rec.Module, rec.Branch, rec.Domain, rec.State = st.Module, st.Branch, st.Domain, st.State
+		rec.Translated, rec.Fuzzy, rec.Untranslated, rec.POFile = st.Translated, st.Fuzzy, st.Untranslated, st.POFile
+	}
+	if err := s.repo.SaveUpstreamState(ctx, rec); err != nil {
+		return nil, err
+	}
+	return rec, nil
 }
 
 // upstreamLang is the language looked up upstream: the project's, else the file's
@@ -46,7 +113,7 @@ func upstreamLang(projectLang, fileLang string) string {
 	return fileLang
 }
 
-// releaseOf is the site's release of a version: from its sync link on the site
+// releaseOf is the site's release of a module group: from its sync link on the site
 // (…/languages/id/gnome-51/ui.tar.gz), else its label when the site lists a release of
 // that name (known is asked lazily, it may cost a request every 12 hours)
 func (s *GlossaryService) releaseOf(glossaryURL, label string, known func() map[string]bool) string {
@@ -72,49 +139,49 @@ func (s *GlossaryService) knownReleases(ctx context.Context) func() map[string]b
 	}
 }
 
-// upstreamLookup reads stored states for one project: versions → releases, and the
+// upstreamLookup reads stored states for one project: groups → releases, and the
 // stored rows per release and language (loaded once each)
 type upstreamLookup struct {
-	s        *GlossaryService
-	ctx      context.Context
-	p        *models.Project
-	versions []*models.ProjectVersion // newest first
-	release  map[int64]string
-	rows     map[[2]string]map[string]*models.UpstreamRecord
+	s       *GlossaryService
+	ctx     context.Context
+	p       *models.Project
+	groups  []*models.ModuleGroup // newest first
+	release map[int64]string
+	rows    map[[2]string]map[string]*models.UpstreamRecord
 }
 
 func (s *GlossaryService) newUpstreamLookup(ctx context.Context, p *models.Project) *upstreamLookup {
 	if s.upstream == nil {
 		return nil
 	}
-	versions, err := s.repo.ListVersions(ctx, p.ID)
+	groups, err := s.repo.ListGroups(ctx, p.ID)
 	if err != nil {
 		return nil
 	}
-	SortVersions(versions)
+	SortGroups(groups)
 	wait, cancel := context.WithTimeout(ctx, upstreamWait)
 	defer cancel()
 	known := s.knownReleases(wait)
-	l := &upstreamLookup{s: s, ctx: ctx, p: p, versions: versions, release: map[int64]string{},
+	l := &upstreamLookup{s: s, ctx: ctx, p: p, groups: groups, release: map[int64]string{},
 		rows: map[[2]string]map[string]*models.UpstreamRecord{}}
-	for _, v := range versions {
-		if r := s.releaseOf(v.GlossaryURL, v.Label(), known); r != "" {
+	for _, v := range groups {
+		if r := s.releaseOf(v.SyncURL, v.Label(), known); r != "" {
 			l.release[v.ID] = r
 		}
 	}
 	return l
 }
 
-// HasUpstream reports whether some version of the project is a release on the GNOME
+// HasUpstream reports whether some module group of the project is a release on the GNOME
 // translation site (the upstream state filter is shown then)
 func (s *GlossaryService) HasUpstream(ctx context.Context, p *models.Project) bool {
 	l := s.newUpstreamLookup(ctx, p)
 	return l != nil && len(l.release) > 0
 }
 
-// key finds the upstream key of a project file name in a version (ok false = no release upstream)
-func (l *upstreamLookup) key(versionID int64, filename, fileLang string) (upstreamKey, bool) {
-	r := l.release[versionID]
+// key finds the upstream key of a project file name in a module group (ok false = no release upstream)
+func (l *upstreamLookup) key(groupID int64, filename, fileLang string) (upstreamKey, bool) {
+	r := l.release[groupID]
 	lang := upstreamLang(l.p.Language, fileLang)
 	stem := gnomel10n.FileStem(filename, lang)
 	if r == "" || lang == "" || stem == "" {
@@ -152,33 +219,49 @@ func (s *GlossaryService) info(k upstreamKey, rec *models.UpstreamRecord) models
 }
 
 // AttachUpstream fills each project file's upstream state from the stored states (no
-// request to the site, except the release list every 12 hours for versions named after a release)
+// request to the site, except the release list every 12 hours for groups named after a release)
 func (s *GlossaryService) AttachUpstream(ctx context.Context, p *models.Project, files []*models.ProjectFile) {
 	l := s.newUpstreamLookup(ctx, p)
 	if l == nil {
 		return
 	}
 	for _, f := range files {
-		if k, ok := l.key(f.VersionID, f.Filename, f.Language); ok {
+		if k, ok := l.key(f.GroupID, f.Filename, f.Language); ok {
 			f.UpstreamInfo = s.info(k, l.record(k))
 		}
 	}
 }
 
-// AttachUpstreamToCatalogs fills the upstream state of members' PO files through the project
-// file they come from: the same file name, else the same module (newest version first)
+// AttachUpstreamToCatalogs fills the upstream state of members' PO files: from the file's own page
+// when one was entered (Catalog.UpstreamPage), else through the project file they come from: the
+// same file name, else the same module (newest module group first)
 func (s *GlossaryService) AttachUpstreamToCatalogs(ctx context.Context, p *models.Project, catalogs []*models.Catalog) {
 	l := s.newUpstreamLookup(ctx, p)
-	if l == nil || len(l.release) == 0 {
+	if l == nil {
 		return
 	}
-	names, err := s.repo.ProjectFileNames(ctx, p.ID)
-	if err != nil {
-		return
-	}
+	var names map[int64][]string
+	loaded := false
 	for _, c := range catalogs {
 		if c.IsTemplate {
 			continue
+		}
+		if k, _, ok := s.pageKey(c.UpstreamPage); ok {
+			c.UpstreamInfo = s.info(k, l.record(k))
+			if c.Upstream == nil {
+				c.UpstreamLink = c.UpstreamPage // not checked yet, or the site does not know it
+			}
+			continue
+		}
+		if len(l.release) == 0 {
+			continue
+		}
+		if !loaded {
+			loaded = true
+			var err error
+			if names, err = s.repo.ProjectFileNames(ctx, p.ID); err != nil {
+				return
+			}
 		}
 		vid, name := l.projectFileFor(names, c.Filename)
 		if name == "" {
@@ -190,9 +273,9 @@ func (s *GlossaryService) AttachUpstreamToCatalogs(ctx context.Context, p *model
 	}
 }
 
-// projectFileFor finds the project file a member's file belongs to (version id, file name; "" = none)
+// projectFileFor finds the project file a member's file belongs to (module group id, file name; "" = none)
 func (l *upstreamLookup) projectFileFor(names map[int64][]string, filename string) (int64, string) {
-	for _, v := range l.versions {
+	for _, v := range l.groups {
 		if l.release[v.ID] == "" {
 			continue
 		}
@@ -203,7 +286,7 @@ func (l *upstreamLookup) projectFileFor(names map[int64][]string, filename strin
 		}
 	}
 	mod := moduleKey(filename)
-	for _, v := range l.versions {
+	for _, v := range l.groups {
 		if l.release[v.ID] == "" {
 			continue
 		}
@@ -227,7 +310,7 @@ func (s *GlossaryService) UpstreamPO(ctx context.Context, p *models.Project, f *
 	if l == nil {
 		return nil, "", unavailable
 	}
-	k, ok := l.key(f.VersionID, f.Filename, f.Language)
+	k, ok := l.key(f.GroupID, f.Filename, f.Language)
 	if !ok {
 		return nil, "", unavailable
 	}
@@ -297,8 +380,14 @@ func (s *GlossaryService) WarmUpstream(ctx context.Context) {
 
 // RefreshUpstream checks every file state again now, however recently it was checked (the
 // "Sinkronkan dengan upstream" button); with the release pages this is one request per release
+// (it waits for a background round that is running, instead of skipping)
 func (s *GlossaryService) RefreshUpstream(ctx context.Context) {
-	s.warmUpstream(ctx, time.Minute)
+	if s.upstream == nil {
+		return
+	}
+	s.warming.Lock()
+	defer s.warming.Unlock()
+	s.warmLocked(ctx, time.Minute)
 }
 
 func (s *GlossaryService) warmUpstream(ctx context.Context, fresh time.Duration) {
@@ -306,6 +395,11 @@ func (s *GlossaryService) warmUpstream(ctx context.Context, fresh time.Duration)
 		return
 	}
 	defer s.warming.Unlock()
+	s.warmLocked(ctx, fresh)
+}
+
+// warmLocked is one round of WarmUpstream / RefreshUpstream; the caller holds s.warming
+func (s *GlossaryService) warmLocked(ctx context.Context, fresh time.Duration) {
 	cands, err := s.repo.UpstreamCandidates(ctx)
 	if err != nil {
 		log.Printf("upstream: list project files: %v", err)
@@ -314,7 +408,7 @@ func (s *GlossaryService) warmUpstream(ctx context.Context, fresh time.Duration)
 	known := s.knownReleases(ctx)
 	keys := map[upstreamKey]bool{}
 	for _, c := range cands {
-		r := s.releaseOf(c.GlossaryURL, models.VersionLabel(c.VersionName, c.Version), known)
+		r := s.releaseOf(c.SyncURL, models.GroupLabelOf(c.GroupName, c.GroupVersion), known)
 		lang := upstreamLang(c.ProjectLanguage, c.FileLanguage)
 		stem := gnomel10n.FileStem(c.Filename, lang)
 		if r != "" && lang != "" && stem != "" {
@@ -337,12 +431,39 @@ func (s *GlossaryService) warmUpstream(ctx context.Context, fresh time.Duration)
 			checked = rec.CheckedAt
 		}
 		if checked.IsZero() || now.Sub(checked) >= fresh {
-			byRelease[rk] = append(byRelease[rk], due{k, checked})
+			byRelease[rk] = append(byRelease[rk], due{k: k, checked: checked})
+		}
+	}
+
+	// files with their own page: asked directly (there is no release page for them)
+	var list []due // files checked one by one through the API
+	if pages, err := s.repo.LinkedUpstreamPages(ctx); err != nil {
+		log.Printf("upstream: list file pages: %v", err)
+	} else {
+		seen := map[upstreamKey]bool{}
+		for _, pg := range pages {
+			k, e, ok := s.pageKey(pg)
+			if !ok || seen[k] {
+				continue
+			}
+			seen[k] = true
+			rk := [2]string{k.release, k.lang}
+			rows, ok := stored[rk]
+			if !ok {
+				rows, _ = s.repo.UpstreamStates(ctx, k.release, k.lang)
+				stored[rk] = rows
+			}
+			var checked time.Time
+			if rec := rows[k.stem]; rec != nil {
+				checked = rec.CheckedAt
+			}
+			if checked.IsZero() || now.Sub(checked) >= fresh {
+				list = append(list, due{k: k, checked: checked, page: &e})
+			}
 		}
 	}
 
 	// one release page per release and language
-	var list []due // files whose page could not be read
 	pageFailed := false
 	for rk, files := range byRelease {
 		n, fallback, err := s.warmFromPages(ctx, rk[0], rk[1], files, stored[rk])
@@ -375,7 +496,13 @@ func (s *GlossaryService) warmUpstream(ctx context.Context, fresh time.Duration)
 		if ctx.Err() != nil || s.upstream.Remaining() <= upstreamReserve {
 			break
 		}
-		if _, err := s.checkUpstream(ctx, d.k, listings); err != nil {
+		var err error
+		if d.page != nil {
+			_, err = s.checkPage(ctx, d.k, *d.page, min(fresh, gnomel10n.StatsTTL))
+		} else {
+			_, err = s.checkUpstream(ctx, d.k, listings)
+		}
+		if err != nil {
 			log.Printf("upstream: check %s/%s/%s: %v (stopping this round)", d.k.release, d.k.lang, d.k.stem, err)
 			break
 		}

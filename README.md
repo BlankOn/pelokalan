@@ -84,3 +84,9 @@ See `.env.example`. The important settings:
 | Ctrl+B | Copy source text to translation |
 | Ctrl+1…5 | Use a translation suggestion |
 | Ctrl+F | Search |
+
+## License
+
+Pelokalan is open source software under the [MIT License](LICENSE). Its source code is available at
+[github.com/BlankOn/pelokalan](https://github.com/BlankOn/pelokalan). Bug reports, suggestions and code
+contributions are very welcome.

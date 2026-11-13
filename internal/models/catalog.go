@@ -25,6 +25,9 @@ type Catalog struct {
 	Owned bool
 	// SourceURL is the link the file was downloaded from ("" = uploaded from disk)
 	SourceURL string
+	// UpstreamPage is the file's page on the GNOME translation site, entered by hand; its state is
+	// fetched for this file ("" = found through the project files instead)
+	UpstreamPage string
 	// CreditName/CreditEmail: the owner's credit identity, set by the service for the owner
 	// (not stored); used to check the translator credits entry
 	CreditName, CreditEmail string

@@ -76,8 +76,10 @@ make test
   editor; `loadCatalog` resolves either that path or `/catalogs/{cid}`. Old `/catalogs/{cid}`
   page links redirect there (`CatalogRedirect`); API calls (list, entries, save, AI) still use
   `/catalogs/{cid}/...`. Use `Catalog.URL()` for links. File names are unique per owner and
-  An uploaded file whose name only names the language or nothing ("id.po", "pt_BR.po", "messages.pot";
-  `genericFilename`, known languages via `po.IsKnownLanguage`) is renamed from Project-Id-Version
+  An uploaded file whose name says nothing about the program (every dot-separated part is a language, a
+  placeholder, a domain or branch word such as ui/main/master, or a number: "id.po", "pt_BR.po", "messages.pot",
+  "ui.main.id.po", "main.id.po"; `genericFilename`, `genericNameWords`, known languages via `po.IsKnownLanguage`)
+  is renamed from Project-Id-Version (unless that name would be just as generic)
   (`uploadFilename`: "Constrict main" → "constrict.main.id.po"), so its module is the program's name.
   project (`uniqueFilename`).
 - **Several PO files per member and language are allowed** (one per module); only file names
@@ -100,7 +102,7 @@ make test
   "" = not chosen): picked in Settings with a searchable `[data-combo]` of `po.LanguageNames` (code + native
   name, "id - Bahasa Indonesia"; plural rules stay in `po.languages`). `checkProjectLanguage` (`po.SameLanguage`:
   case and -/_ ignored, "pt" ≠ "pt_BR") refuses with `err.language_mismatch`: file uploads (`CatalogService.Upload`,
-  also by link and "Ambil"), glossary imports (checked before a version is created), sync links with a chosen
+  also by link and "Ambil"), module group imports (checked before a group is created), sync links with a chosen
   language, and every downloaded language in `importInto` (so scheduled syncs fail with the message; stored sync
   errors are "key|arg|arg", shown by `errText`). Templates (no language) are always accepted.
 - **Personal files (historical note):** catalogs have `owner_id`; `CatalogService.Get` returns
@@ -110,10 +112,10 @@ make test
   stores its PO files (gzip) with stats, so the Penerjemahan tab has three sections: project files,
   your files, other members' files. Listed least complete first, 10 at a time (`ProjectFilePageSize`,
   "Muat lagi" via `GET /projects/{id}/project-files?offset=`); download, or "Ambil" copies one into
-  the member's own files (`catalogService.Upload`). Synced versions imported before 027 count as due
-  (`DueFeeds`) and are re-fetched to fill them in; versions uploaded by hand need a re-upload.
+  the member's own files (`catalogService.Upload`). Synced module groups imported before 027 count as due
+  (`DueGroupSyncs`) and are re-fetched to fill them in; groups uploaded by hand need a re-upload.
   Searchable (every word in file name, language or group label) and filterable by **module group**
-  (= glossary version with project files, e.g. gnome-51; `group_filter` partial, checkbox dropdown
+  (= `ModuleGroup` with project files, e.g. gnome-51; `group_filter` partial, checkbox dropdown
   `[data-multi-filter]` with "Tampilkan semua" like the editor filter, shown when there is a group; `g` params).
   Search and filter live in `#pf-filter`; "Muat lagi" includes it (`hx-include`).
 - Each of the three sections (`.files-section[data-sticky-section]`) keeps its title, card head, filter bar and
@@ -128,17 +130,17 @@ make test
   Managers get "Sinkronkan dengan upstream" (in Berkas proyek and beside "Tambah berkas" in Berkas Anda;
   `POST /projects/{id}/project-files/sync` → `GlossaryService.SyncAll`, which ends with `RefreshUpstream`: every
   file state is read again from the release pages, however recent; it also runs for projects without a sync link):
-  fetches every version with a sync link in a background goroutine (requests time out after 30 s);
+  fetches every module group with a sync link in a background goroutine (requests time out after 30 s);
   `GlossaryService.syncing` makes it and the hourly `FetchDue` run one at a time. app.js (`form[data-sync]`)
   spins the button and polls `GET .../project-files/sync` (`SyncState`, per project, in memory) until it is
-  done, then shows the result and refreshes the rows.
+  done, then shows what changed (nothing when no file changed) and refreshes the rows.
   A project file the member already has (`CatalogService.MatchOwnFiles`: same language and same file name,
   else same module = name before the first dot) shows "Perbarui" instead of "Ambil": after a confirm it
   replaces that file (`UpdateFromUpstream`: commit before, replace, commit "commit.from_upstream|label"),
   so the history continues. The editor shows "Tarik upstream" before Riwayat when `GlossaryService.UpstreamFor`
-  finds a project file for the open file (same name, else same module from the newest version); it posts to
+  finds a project file for the open file (same name, else same module from the newest module group); it posts to
   the same take route with `into` and the same confirm popup.
-  Under the "Berkas proyek" heading: last sync time (newest `last_fetched_at` of versions with a sync link,
+  Under the "Berkas proyek" heading: last sync time (newest `last_fetched_at` of module groups with a sync link,
   in the reader's time zone) and the automatic interval (`Handler.SetSyncInterval`).
 - **Template merge only touches files of the same module:** `templateFits` requires at least half of
   a file's strings to be in the template; "Perbarui semua terjemahan" (and template re-upload) skips
@@ -165,7 +167,7 @@ make test
 
 ## Glossary
 
-- Upload (`POST /projects/{id}/glossary/import`, managers) accepts .po, .tar(.gz)/.tgz, .zip.
+- Glossary data comes from module groups (below). Uploads accept .po, .tar(.gz)/.tgz, .zip.
   Archives are read in memory with size/file-count limits (`glossary.Limits`); only `.po` entries are used.
 - `glossary.Build` skips fuzzy/untranslated/obsolete entries, placeholder-only strings and
   translator credits; `CleanPair` strips keyboard accelerators (also when moved in the
@@ -193,7 +195,7 @@ make test
 - The glossary can be filtered by module (PO file, `GlossaryQuery.Module`); the term still shows
   all its translations. The module list (`GlossaryRepository.Modules`) feeds a searchable dropdown
   (`[data-combo]` in app.js).
-- The sync status above the glossary always describes the newest version with data.
+- The sync status above the glossary always describes the newest module group with data.
 - New comments email other project members in the background, filtered by each member's
   notification settings (`notification_settings`, migration 030; Pengaturan tab, visible to every member,
   `POST /projects/{id}/notifications`). A member gets at most one email per comment, sent when any reason that
@@ -249,11 +251,17 @@ make test
   `ai.ContextWords`/`ai.Mentioned`; plain sentences and examples do not count) are sent as `optional` hints (not enforced by `ai.Verify`), and
   whole-string glossary matches containing such a word go to the model instead of being applied.
 - Project tabs carry monochrome line icons (`tab_icon` in project_header.html).
-- Wawasan / Insight tab (`/projects/{id}/insight`, before Anggota, `InsightPage` in insight.go, pages/insight.html):
+- Statistik / Stats tab (`/projects/{id}/insight`, before Anggota, `InsightPage` in insight.go, pages/insight.html):
   the module group chart (moved here from Penerjemahan) and "Aktivitas anggota" (public, like the rest of the
   project): totals and a per-member table. Above the module chart, "Pertumbuhan terjemahan" (`wordschart.go`,
-  `buildWordsChart` from `ActivityRepository.DailyTranslated`): translated source words added up day by day from
-  the first recorded translation to today, flat on days without any. for 7/30/90 days or all time (`?r=`, `service.ActivityRanges`).
+  `buildWordsChart` from `ActivityRepository.HourlyTranslated`): **strings** people saved with a translation, added up
+  hour by hour (one point per hour from the first recorded one to now, flat in hours without any; axis labels show times
+  when the span is 3 days or less). Four lines on one scale, all counted in the green total: typed by hand (blue; empty →
+  translated, no machine origin), AI drafts saved unchanged (purple; origin ai, text unchanged), AI drafts edited before
+  saving (orange), existing translations edited (teal; translated, no machine origin, text changed, every such save
+  counts). Glossary/memory drafts are not counted, and AI drafts nobody saved are not logged. Hovering shows the nearest
+  hour in the same floating card as the module chart
+  (app.js handles `.group-chart` and `.words-chart`; the card's rows come from `.gc-tip[data-rows]`).
 - Activity log (`activity_events`, migration 033, append-only, no FK on catalog/entry so history survives):
   `ActivityService.Record` (errors only logged, nil-safe) is called from `CatalogService.SaveEntry` (`EntrySaved`:
   status before/after, machine origin before, text changed, source word count), manual commits, comments
@@ -261,7 +269,7 @@ make test
   `activity_daily` and `ActivityRepository.Summary`): translated = untranslated → anything, reviewed = fuzzy →
   translated, edited = translated with text changed, drafts approved/fixed = origin set and text unchanged/changed.
   Add a `models.Activity*` kind and a Record call to log something new.
-- Module group progress chart (Wawasan tab; `group_chart` partial, `groupchart.go`): `group_stats`
+- Module group progress chart (Statistik tab; `group_chart` partial, `groupchart.go`): `group_stats`
   (migration 031) records each group's project file totals per language at every 15-minute check when they
   changed, and at least hourly (`GlossaryService.RecordStats`, `StatsInterval`), plus after uploads. Groups are
   chosen with the same `group_filter` dropdown (none = all; several are added up per hour, `sumByHour`);
@@ -341,28 +349,38 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   checked first, then the oldest). Page and API requests share the client's hourly budget
   (`gnomel10n.DefaultBudget` 40, minus `upstreamReserve` 8 left for people). The client also caches API answers in
   memory (stats 1 h, release lists 12 h, 404s too) and obeys the site's wait time. Pages may only ask for the
-  release list (once per 12 h) for versions named after a release (`upstreamWait` 3 s).
+  release list (once per 12 h) for module groups named after a release (`upstreamWait` 3 s).
 - Fixtures: `internal/gnomel10n/testdata` has recorded API JSON and a saved release page
   (`page_gnome-51_id_ui.html`); if the site changes its markup, save a new copy and adjust the regexes in page.go.
-- Mapping (`upstreamLookup`): release = the version's sync link on the site
-  (`…/languages/id/gnome-51/ui.tar.gz`), else the version label when the site lists a release of that name;
+- Mapping (`upstreamLookup`): release = the module group's sync link on the site
+  (`…/languages/id/gnome-51/ui.tar.gz`), else the group label when the site lists a release of that name;
   language = `projects.language`, else the file's. A project file matches a release entry by file name stem
   (`gnomel10n.FileStem` vs `Entry.Stem`): `<module>.<branch>` for the "po" domain, `<module>-help.<branch>` for
   "help", `<domain>.<branch>` otherwise ("locations.main.id.po"), case-insensitive. This avoids one request per
   module just to learn its file name. Members' files (`AttachUpstreamToCatalogs`) use the project file with the
-  same name, else the same module (newest version first).
+  same name, else the same module (newest module group first).
 - `models.UpstreamInfo` (embedded in `ProjectFile` and `Catalog`): `Upstream` + `UpstreamChecked`;
   `UpstreamClass()` is a state class, "missing" (not on the site) or "unknown" (not checked yet / no release).
 - State filter (`upstream_filter` partial, checkbox dropdown `[data-multi-filter]`, param `u`, values
   `models.UpstreamFilters`, none ticked = all, with a note that states are checked gradually): next to the module
   group filter in "Berkas proyek" (`#pf-filter`, so "Muat lagi" keeps it; with a state filter
   `GlossaryService.ProjectFiles` loads all matching rows and pages in Go) and in "Berkas Anda" / "Berkas anggota
-  lain" (`file_filter`, `fileList`). Shown when a version is a release upstream (`HasUpstream`). Both lists show the
+  lain" (`file_filter`, `fileList`). Shown when a module group is a release upstream (`HasUpstream`). Both lists show the
   badge (`upstream_badge` partial) under the file name.
 - "Berkas Anda" order (`fileList`, `ownFileRank`): upstream state "ToReview" (labelled "Requested rework" /
   "Diminta perbaikan"), then Proofreading, then Translating, then everything else; last edit (newest first)
   within each group, also across "Muat lagi" pages and with search/filters. "Berkas anggota lain" sorts by last
   edit only.
+- **A file's own upstream page** (`catalogs.upstream_page`, migration 038): "Tambah berkas manual" and "Perbarui berkas…"
+  have an optional "Halaman modul upstream" field (`upstream_page`, e.g. `…/vertimus/gnome-calculator/main/po/id/`;
+  checked and made canonical by `GlossaryService.UpstreamPageURL` via `gnomel10n.ParsePageURL`, else
+  `err.upstream_page`; the update dialog is pre-filled, so emptying it removes the link). Such a file takes its state
+  from that page instead of the project file match (`AttachUpstreamToCatalogs`), also in projects without a release.
+  The state is fetched right after saving (`CheckUpstreamPage`, one API request, in the background) and refreshed by
+  `WarmUpstream` straight through the API (no release page), stored in `upstream_states` with release ""
+  (`linkedRelease`). The Sync button (`RefreshUpstream`, which waits for a running background round instead of
+  skipping) asks for these fresh (`StatsMaxAge`, skipping the client's 1 h cache). Sync never changes the contents of
+  members' files; only "Perbarui berkas…" does. A linked file also turns on the state filter in the file lists.
 - No assignee is shown: the API does not say who reserved a file (only the site's HTML workflow page does).
 - "Berkas proyek" rows (`AttachUpstream`, from the stored states) show the upstream state as a coloured badge under
   the file name (`.up-badge.up-<UpstreamStats.StateClass>`, grey for "None" = no activity and unknown states), linking
@@ -377,11 +395,15 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   Colours: Translating orange, Requested rework (ToReview) red, None/unknown grey.
 - Tests use API JSON and the release page recorded from the site (`internal/gnomel10n/testdata`); never call the site from tests.
 
-## Versions and automatic downloads
+## Module groups ("Kelompok modul") and automatic downloads
 
-- `project_versions` (name + version, label "gnome-51") group glossary imports; sorted
-  naturally (`service.SortVersions`), newest first. Re-importing a version+language replaces it.
-- A version may have `glossary_url`; `GlossaryService.FetchDue` runs every 15 minutes from main.go and
+- Formerly "glossary versions"; renamed everywhere in migration 039 (tables `module_groups`, `module_group_imports`;
+  columns `group_id`, `sync_url`, `sync_language`) and in code (`models.ModuleGroup`, `ModuleGroupImport`,
+  `ModuleGroupOption`; `GroupID`/`GroupLabel` fields; `ListGroups`, `ImportGroup`, `SetGroupSync`, `FetchGroup`…).
+  A module group (name + version, label "gnome-51") holds the PO archives imported per language; they feed the
+  glossary terms and the project files. Sorted naturally (`service.SortGroups`), newest first. Re-importing a
+  group + language replaces it.
+- A group may have a `sync_url`; `GlossaryService.FetchDue` runs every 15 minutes from main.go and
   fetches URLs older than `GLOSSARY_FETCH_INTERVAL_HOURS` (default 1), using ETag/Last-Modified and a
   content hash to skip unchanged archives. `glossary.Fetcher` refuses private/local
   addresses at dial time (SSRF protection) unless `GLOSSARY_ALLOW_PRIVATE_HOSTS=true`.
@@ -411,11 +433,15 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - `/catalogs/{cid}/properties` edits Project-Id-Version, Report-Msgid-Bugs-To,
   Language-Team and the header comment lines.
 
-## Glossary management UI
+## Module groups UI
 
-- Managers get a "Kelola glosarium" dialog (`partials/glossary_manage.html`) with tabs:
-  list (versions, imports, sync link actions) and add (one form: file or URL,
-  `POST /projects/{id}/glossary/sources`). `?manage=list|add` reopens it after redirects.
+- Settings has a "Kelompok modul" section (`#module-groups`, owners and managers) with the group labels and buttons
+  that open the `#module-groups-dialog` popup (`partials/module_groups.html`, handlers in `module_group.go`) with
+  tabs: list (groups, imports, sync link actions) and add (one form: file or URL). Routes live under
+  `/projects/{id}/module-groups/…` (`sources`, `import`, `sync`, `{gid}/delete|fetch|unsync`,
+  `imports/{iid}/delete`); they redirect to `/settings?groups=list|add#module-groups`, which reopens the popup
+  (`moduleGroupsData`). The glossary page no longer manages groups; its empty state links to that popup.
+  The glossary's group filter uses `?group=` (old `?version=` links still work); the AI dialog sends `glossary_group`.
 
 ## AI pre-translation
 
@@ -589,6 +615,14 @@ deploys never run stale JS/CSS.
   requests time out after 20 s, navigation during a save waits for it, and a failed save asks
   before moving on. htmx's per-element request queue could otherwise freeze the editor after
   one stalled request. The entry list filter still uses htmx.
+
+## Slow requests
+
+An htmx request still waiting after 1 s covers the page with a half transparent layer and a centred spinner
+(`.busy-overlay`, app.js; a manual popover so it also covers open dialogs; label `common.loading` from
+`body[data-loading]`). Polling (`hx-trigger="every …"`) and anything inside `[data-no-busy]` never show it; it hides
+when the last request ends and after 30 s at most. The editor's entry load/save use `fetch`, not htmx, so they do not
+show it.
 
 ## Conventions
 

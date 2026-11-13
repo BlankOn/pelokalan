@@ -114,6 +114,7 @@ code, kbd, pre { font-family: var(--mono); font-size: 12px; }
 .card.narrow { max-width: 480px; }
 .card-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
 .card-head h2 { margin: 0; }
+.card-head-end { justify-content: flex-end; }
 .row-actions { display: flex; gap: 8px; align-items: center; }
 .row-actions form { margin: 0; }
 
@@ -457,11 +458,18 @@ h1 .ai-badge { font-size: 12px; }
 .it-label { font-size: 13px; font-weight: 600; margin-top: 2px; }
 .it-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .table-scroll { overflow-x: auto; }
-.wc-line { stroke: #e8590c; stroke-width: 3; }
-.wc-area { fill: #e8590c; opacity: .08; }
-.wc-key .gc-swatch { background: #e8590c; }
-.wc-hit { fill: transparent; cursor: default; }
-.wc-hit:hover { fill: #e8590c; }
+.gc-words.gc-line { stroke: #2f9e44; } .gc-words .gc-swatch { background: #2f9e44; }
+.wc-area { fill: #2f9e44; opacity: .1; }
+/* one point per hour: dots only show for the hovered one */
+.gc-manual.gc-line { stroke: #1c7ed6; } .gc-manual .gc-swatch, .gc-manual.gc-dot { background: #1c7ed6; fill: #1c7ed6; stroke: #1c7ed6; }
+.gc-ai_kept.gc-line { stroke: #7a3fd1; } .gc-ai_kept .gc-swatch, .gc-ai_kept.gc-dot { background: #7a3fd1; fill: #7a3fd1; stroke: #7a3fd1; }
+.gc-ai_edited.gc-line { stroke: #e8590c; } .gc-ai_edited .gc-swatch, .gc-ai_edited.gc-dot { background: #e8590c; fill: #e8590c; stroke: #e8590c; }
+.gc-edited.gc-line { stroke: #0c8599; } .gc-edited .gc-swatch, .gc-edited.gc-dot { background: #0c8599; fill: #0c8599; stroke: #0c8599; }
+.words-chart .gc-line:not(.gc-words) { stroke-width: 2; }
+.words-chart .gc-dot.gc-words { fill: #2f9e44; stroke: #2f9e44; }
+.words-chart .gc-dot { opacity: 0; }
+.words-chart .gc-pt.on .gc-dot { opacity: 1; r: 5; }
+.words-chart .gc-tip-row.gc-added .gc-swatch { visibility: hidden; }
 .insight-table th.num, .insight-table td.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .insight-table td { vertical-align: middle; }
 
@@ -1410,6 +1418,14 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 form[data-sync] .sync-icon { display: inline-block; }
 form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 @keyframes pf-spin { to { transform: rotate(360deg); } }
+/* htmx request taking over a second: a layer over everything (also open dialogs) with a spinner */
+.busy-overlay { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center;
+    width: auto; height: auto; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;
+    background: rgba(255, 255, 255, .55); color: inherit; cursor: progress; }
+.busy-overlay.on { display: flex; animation: busy-in .15s ease-out; }
+.busy-spinner { width: 44px; height: 44px; border-radius: 50%; border: 4px solid rgba(0, 0, 0, .12);
+    border-top-color: var(--accent); animation: pf-spin .8s linear infinite; }
+@keyframes busy-in { from { opacity: 0; } }
 .pf-mine { margin-top: 2px; color: var(--muted); overflow-wrap: anywhere; }
 /* upstream state on l10n.gnome.org: a badge under the file name, one colour per state */
 .up-badge { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600;

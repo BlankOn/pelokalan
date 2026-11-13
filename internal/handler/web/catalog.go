@@ -451,6 +451,10 @@ func (h *Handler) ReplaceCatalog(w http.ResponseWriter, r *http.Request) {
 	if u != "" {
 		name = "" // downloaded again: keep the file's name (links often end in a bare "id.po")
 	}
+	var page string
+	if err == nil {
+		page, err = h.glossary.UpstreamPageURL(r.FormValue("upstream_page"))
+	}
 	if err == nil {
 		err = h.catalogService.Replace(r.Context(), user, p, c, name, body)
 	}
@@ -460,6 +464,9 @@ func (h *Handler) ReplaceCatalog(w http.ResponseWriter, r *http.Request) {
 	}
 	if u != "" && u != c.SourceURL {
 		_ = h.catalogService.SetSourceURL(r.Context(), user, c, u)
+	}
+	if page != c.UpstreamPage { // the dialog always sends it (pre-filled): empty removes it
+		h.setUpstreamPage(r, c, page)
 	}
 	http.Redirect(w, r, c.URL()+"?flash=replaced", http.StatusSeeOther)
 }

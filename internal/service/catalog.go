@@ -148,27 +148,44 @@ func uploadFilename(filename, projectVersion, language string, isTemplate bool) 
 	if len(parts) == 0 {
 		return name
 	}
+	out := strings.Join(append(parts, language), ".") + ".po"
 	if isTemplate {
-		return strings.Join(parts, ".") + ".pot"
+		out = strings.Join(parts, ".") + ".pot"
 	}
-	return strings.Join(append(parts, language), ".") + ".po"
+	if genericFilename(out, language) { // "ui main" says no more than the file name did
+		return name
+	}
+	return out
 }
 
-// genericFilename reports whether a file name only names the language (or nothing at all):
-// "id.po", "id_ID.po", "pt-BR.po", "messages.po", "template.pot"
+// genericNameWords are file name parts that say nothing about the program: placeholders,
+// interface/documentation domains and branch names ("ui.main.id.po", "master.po")
+var genericNameWords = map[string]bool{
+	"messages": true, "message": true, "template": true, "translation": true, "translations": true,
+	"untitled": true, "default": true, "po": true, "pot": true, "ui": true, "gui": true, "doc": true,
+	"docs": true, "main": true, "master": true, "trunk": true, "devel": true, "stable": true, "latest": true,
+}
+
+// genericFilename reports whether a file name names nothing but the language, placeholders, a
+// domain or a branch, in any combination: "id.po", "id_ID.po", "pt-BR.po", "messages.po",
+// "template.pot", "ui.main.id.po", "main.id.po", "ui.id.po". Version numbers count as generic
+// too ("1.2.id.po"); any other part names the program ("gnome-maps.main.id.po").
 func genericFilename(name, language string) bool {
 	base := strings.ToLower(name)
 	for _, ext := range []string{".pot", ".po"} {
 		base = strings.TrimSuffix(base, ext)
 	}
-	switch base {
-	case "", "messages", "message", "template", "translation", "untitled":
-		return true
+	lang := strings.ReplaceAll(strings.ToLower(language), "-", "_")
+	for _, part := range strings.Split(base, ".") {
+		switch {
+		case part == "", genericNameWords[part], strings.Trim(part, "0123456789") == "":
+		case lang != "" && strings.ReplaceAll(part, "-", "_") == lang:
+		case po.IsKnownLanguage(part):
+		default:
+			return false
+		}
 	}
-	if language != "" && strings.EqualFold(strings.ReplaceAll(base, "-", "_"), strings.ReplaceAll(language, "-", "_")) {
-		return true
-	}
-	return po.IsKnownLanguage(base)
+	return true
 }
 
 // Upload imports a PO or POT file. A POT file (or a file without a language)
@@ -982,6 +999,15 @@ func validateEntry(c *models.Catalog, e *models.Entry) []string {
 		return nil
 	}
 	return kept
+}
+
+// SetUpstreamPage stores the file's page on the GNOME translation site (checked by the caller; "" = none)
+func (s *CatalogService) SetUpstreamPage(ctx context.Context, user *models.User, c *models.Catalog, page string) error {
+	if !c.WritableBy(user.ID) {
+		return ErrForbidden
+	}
+	c.UpstreamPage = page
+	return s.catalogs.SetUpstreamPage(ctx, c.ID, page)
 }
 
 // SetSourceURL remembers the link a file was downloaded from, so it can be downloaded again

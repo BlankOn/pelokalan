@@ -1,0 +1,30 @@
+ALTER TABLE group_stats RENAME CONSTRAINT group_stats_group_id_fkey TO group_stats_version_id_fkey;
+ALTER TABLE group_stats RENAME COLUMN group_id TO version_id;
+
+ALTER INDEX idx_project_files_group RENAME TO idx_project_files_version;
+ALTER TABLE project_files RENAME CONSTRAINT project_files_group_id_fkey TO project_files_version_id_fkey;
+ALTER TABLE project_files RENAME COLUMN group_id TO version_id;
+
+ALTER INDEX idx_glossary_terms_group RENAME TO idx_glossary_terms_version;
+ALTER TABLE glossary_terms RENAME CONSTRAINT glossary_terms_group_id_fkey TO glossary_terms_version_id_fkey;
+ALTER TABLE glossary_terms RENAME COLUMN group_id TO version_id;
+
+ALTER INDEX idx_module_group_imports_group RENAME TO idx_glossary_imports_version;
+ALTER INDEX idx_module_group_imports_project RENAME TO idx_glossary_imports_project;
+ALTER TABLE module_group_imports RENAME CONSTRAINT module_group_imports_group_id_fkey TO glossary_imports_version_id_fkey;
+ALTER TABLE module_group_imports RENAME CONSTRAINT module_group_imports_uploaded_by_fkey TO glossary_imports_uploaded_by_fkey;
+ALTER TABLE module_group_imports RENAME CONSTRAINT module_group_imports_project_id_fkey TO glossary_imports_project_id_fkey;
+ALTER TABLE module_group_imports RENAME CONSTRAINT module_group_imports_pkey TO glossary_imports_pkey;
+ALTER SEQUENCE module_group_imports_id_seq RENAME TO glossary_imports_id_seq;
+ALTER TABLE module_group_imports RENAME COLUMN group_id TO version_id;
+ALTER TABLE module_group_imports RENAME TO glossary_imports;
+
+ALTER INDEX idx_module_groups_feed RENAME TO idx_project_versions_feed;
+ALTER TABLE module_groups RENAME CONSTRAINT module_groups_feed_created_by_fkey TO project_versions_feed_created_by_fkey;
+ALTER TABLE module_groups RENAME CONSTRAINT module_groups_project_id_fkey TO project_versions_project_id_fkey;
+ALTER TABLE module_groups RENAME CONSTRAINT module_groups_project_id_name_version_key TO project_versions_project_id_name_version_key;
+ALTER TABLE module_groups RENAME CONSTRAINT module_groups_pkey TO project_versions_pkey;
+ALTER SEQUENCE module_groups_id_seq RENAME TO project_versions_id_seq;
+ALTER TABLE module_groups RENAME COLUMN sync_language TO glossary_language;
+ALTER TABLE module_groups RENAME COLUMN sync_url TO glossary_url;
+ALTER TABLE module_groups RENAME TO project_versions;

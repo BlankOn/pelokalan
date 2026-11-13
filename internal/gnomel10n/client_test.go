@@ -224,3 +224,31 @@ func TestDownload(t *testing.T) {
 		t.Error("absolute address accepted")
 	}
 }
+
+// A page address entered by hand is read into its entry; StatsMaxAge skips a cached answer
+// older than asked (the Sync button), Stats keeps it for an hour
+func TestPageURLAndMaxAge(t *testing.T) {
+	c, site, now := newTest(t)
+	e, lang, ok := c.ParsePageURL(c.Base() + "/vertimus/glib/glib-2-90/po/id/")
+	path := "/api/v1/modules/glib/branches/glib-2-90/domains/po/languages/id"
+	if !ok || lang != "id" || e.Stem() != "glib.glib-2-90" || e.StatsPath != path {
+		t.Fatalf("parsed %+v %q %v", e, lang, ok)
+	}
+	for _, bad := range []string{"https://elsewhere.test/vertimus/glib/glib-2-90/po/id/", c.Base() + "/vertimus/glib/po/id/", c.Base() + "/module/glib/"} {
+		if _, _, ok := c.ParsePageURL(bad); ok {
+			t.Errorf("%q accepted", bad)
+		}
+	}
+	if _, err := c.Stats(context.Background(), e); err != nil {
+		t.Fatal(err)
+	}
+	*now = now.Add(10 * time.Minute)
+	_, _ = c.Stats(context.Background(), e)
+	if n := site.count(path); n != 1 {
+		t.Errorf("cached stats fetched %d times", n)
+	}
+	_, _ = c.StatsMaxAge(context.Background(), e, time.Minute)
+	if n := site.count(path); n != 2 {
+		t.Errorf("a 10 minute old answer with max age 1 minute: fetched %d times, want 2", n)
+	}
+}

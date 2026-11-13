@@ -263,13 +263,14 @@ func main() {
 		r.Post("/projects/{id}/update-all", webHandler.UpdateAllFromTemplate)
 
 		// Glossary management
-		r.Post("/projects/{id}/glossary/sources", webHandler.GlossaryAddSource)
-		r.Post("/projects/{id}/glossary/versions/{vid}/delete", webHandler.GlossaryDeleteVersion)
-		r.Post("/projects/{id}/glossary/import", webHandler.GlossaryImport)
-		r.Post("/projects/{id}/glossary/imports/{gid}/delete", webHandler.GlossaryDeleteImport)
-		r.Post("/projects/{id}/glossary/feeds", webHandler.GlossarySetFeed)
-		r.Post("/projects/{id}/glossary/versions/{vid}/fetch", webHandler.GlossaryFetchNow)
-		r.Post("/projects/{id}/glossary/versions/{vid}/unfeed", webHandler.GlossaryRemoveFeed)
+		// Module groups (Settings → Kelompok modul)
+		r.Post("/projects/{id}/module-groups/sources", webHandler.AddModuleGroupSource)
+		r.Post("/projects/{id}/module-groups/import", webHandler.ImportModuleGroup)
+		r.Post("/projects/{id}/module-groups/sync", webHandler.SetModuleGroupSync)
+		r.Post("/projects/{id}/module-groups/imports/{iid}/delete", webHandler.DeleteModuleGroupImport)
+		r.Post("/projects/{id}/module-groups/{gid}/delete", webHandler.DeleteModuleGroup)
+		r.Post("/projects/{id}/module-groups/{gid}/fetch", webHandler.FetchModuleGroup)
+		r.Post("/projects/{id}/module-groups/{gid}/unsync", webHandler.RemoveModuleGroupSync)
 
 		// Members and settings
 		r.Post("/projects/{id}/discussions/{type}/{key}/comments", webHandler.PostComment)

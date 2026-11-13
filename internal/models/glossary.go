@@ -5,12 +5,12 @@ import (
 	"time"
 )
 
-// GlossaryImport is one uploaded set of existing translations
-type GlossaryImport struct {
+// ModuleGroupImport is one uploaded set of existing translations
+type ModuleGroupImport struct {
 	ID           int64
 	ProjectID    int64
-	VersionID    int64
-	VersionLabel string
+	GroupID      int64
+	GroupLabel   string
 	Filename     string
 	Language     string
 	FileCount    int
@@ -39,7 +39,7 @@ type GlossaryTranslation struct {
 	Count    int
 	Modules  []string
 	Contexts []string
-	Versions []string // version labels using this translation
+	Groups   []string // module group labels using this translation
 }
 
 // Share returns the percentage of occurrences using this translation
@@ -50,8 +50,8 @@ func (t GlossaryTranslation) Share(total int) int {
 	return t.Count * 100 / total
 }
 
-// ProjectVersion is one release of a project, e.g. name "gnome", version "51"
-type ProjectVersion struct {
+// ModuleGroup ("Kelompok modul") is one release of a project's modules, e.g. name "gnome", version "51"
+type ModuleGroup struct {
 	ID        int64
 	ProjectID int64
 	Name      string
@@ -59,8 +59,8 @@ type ProjectVersion struct {
 	CreatedAt time.Time
 
 	// Automatic download of the glossary source
-	GlossaryURL       string
-	GlossaryLanguage  string
+	SyncURL           string
+	SyncLanguage      string
 	FeedCreatedBy     *int64
 	LastFetchedAt     *time.Time
 	LastChangedAt     *time.Time
@@ -73,29 +73,29 @@ type ProjectVersion struct {
 	ImportCount int
 }
 
-// HasFeed reports whether the version is downloaded automatically
-func (v *ProjectVersion) HasFeed() bool { return v.GlossaryURL != "" }
+// HasFeed reports whether the module group is downloaded automatically
+func (v *ModuleGroup) HasFeed() bool { return v.SyncURL != "" }
 
 // Label returns the display form, e.g. "gnome-51"
-func (v *ProjectVersion) Label() string { return VersionLabel(v.Name, v.Version) }
+func (v *ModuleGroup) Label() string { return GroupLabelOf(v.Name, v.Version) }
 
-// VersionLabel joins a name and version, e.g. "gnome-51"
-func VersionLabel(name, version string) string {
+// GroupLabelOf joins a name and version, e.g. "gnome-51"
+func GroupLabelOf(name, version string) string {
 	if version == "" {
 		return name
 	}
 	return name + "-" + version
 }
 
-// GlossaryTermRow is one translation of a term in one version and language
+// GlossaryTermRow is one translation of a term in one module group and language
 type GlossaryTermRow struct {
-	VersionID    int64
-	VersionLabel string
-	Language     string
-	Translation  string
-	Count        int
-	Modules      []string
-	Contexts     []string
+	GroupID     int64
+	GroupLabel  string
+	Language    string
+	Translation string
+	Count       int
+	Modules     []string
+	Contexts    []string
 }
 
 // GlossaryTerm is everything known about one glossary string
@@ -111,8 +111,8 @@ type ProjectFile struct {
 	ID           int64
 	ImportID     int64
 	ProjectID    int64
-	VersionID    int64
-	VersionLabel string
+	GroupID      int64
+	GroupLabel   string
 	Filename     string
 	Language     string
 	Total        int
@@ -128,7 +128,7 @@ type ProjectFile struct {
 // Percent is the share of translated entries
 // GroupStat is a recorded total of a module group's project files at one moment
 type GroupStat struct {
-	VersionID  int64
+	GroupID    int64
 	Language   string
 	Total      int
 	Translated int
@@ -139,8 +139,8 @@ type GroupStat struct {
 // Untranslated is what is neither translated nor fuzzy
 func (g GroupStat) Untranslated() int { return g.Total - g.Translated - g.Fuzzy }
 
-// ProjectFileVersion is a glossary version that has project files (filter option)
-type ProjectFileVersion struct {
+// ModuleGroupOption is a module group that has project files (filter option)
+type ModuleGroupOption struct {
 	ID      int64
 	Name    string
 	Version string
@@ -148,7 +148,7 @@ type ProjectFileVersion struct {
 }
 
 // Label is "name-version", e.g. "gnome-51"
-func (v *ProjectFileVersion) Label() string { return VersionLabel(v.Name, v.Version) }
+func (v *ModuleGroupOption) Label() string { return GroupLabelOf(v.Name, v.Version) }
 
 // Stats returns the file's progress in the shape the progress bar expects
 func (f *ProjectFile) Stats() CatalogStats {
@@ -251,9 +251,9 @@ type UpstreamCandidate struct {
 	Filename        string
 	FileLanguage    string
 	ProjectLanguage string
-	VersionName     string
-	Version         string
-	GlossaryURL     string
+	GroupName       string
+	GroupVersion    string
+	SyncURL         string
 }
 
 // UpstreamRecord is a stored upstream state (table upstream_states)

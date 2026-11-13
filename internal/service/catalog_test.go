@@ -57,11 +57,11 @@ func TestMergeEntries(t *testing.T) {
 }
 
 func TestSortVersions(t *testing.T) {
-	vs := []*models.ProjectVersion{
+	vs := []*models.ModuleGroup{
 		{Name: "gnome", Version: "50"}, {Name: "gnome", Version: "100"}, {Name: "gnome", Version: "51"},
 		{Name: "blankon", Version: "13"}, {Name: "gnome", Version: "9.1"},
 	}
-	SortVersions(vs)
+	SortGroups(vs)
 	var got []string
 	for _, v := range vs {
 		got = append(got, v.Label())

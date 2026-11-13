@@ -76,11 +76,19 @@ func (r *activityRepository) Since(ctx context.Context, projectID int64) (*time.
 	return &t.Time, nil
 }
 
-func (r *activityRepository) DailyTranslated(ctx context.Context, projectID int64) ([]models.ActivityDay, error) {
+func (r *activityRepository) HourlyTranslated(ctx context.Context, projectID int64) ([]models.ActivityDay, error) {
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT date_trunc('day', created_at), COUNT(*), COALESCE(SUM(words), 0)
-		FROM activity_events
-		WHERE project_id = $1 AND kind = 'entry.saved' AND status_before = 'untranslated' AND status_after <> 'untranslated'
+		WITH saves AS (
+			SELECT date_trunc('hour', created_at) AS hour,
+			       (origin = '' AND status_before = 'untranslated' AND status_after <> 'untranslated') AS manual,
+			       (origin = 'ai' AND NOT text_changed) AS ai_kept,
+			       (origin = 'ai' AND text_changed) AS ai_edited,
+			       (origin = '' AND status_before = 'translated' AND text_changed) AS edited
+			FROM activity_events
+			WHERE project_id = $1 AND kind = 'entry.saved')
+		SELECT hour, COUNT(*) FILTER (WHERE manual), COUNT(*) FILTER (WHERE ai_kept),
+		       COUNT(*) FILTER (WHERE ai_edited), COUNT(*) FILTER (WHERE edited)
+		FROM saves WHERE manual OR ai_kept OR ai_edited OR edited
 		GROUP BY 1 ORDER BY 1`, projectID)
 	if err != nil {
 		return nil, err
@@ -89,9 +97,10 @@ func (r *activityRepository) DailyTranslated(ctx context.Context, projectID int6
 	var out []models.ActivityDay
 	for rows.Next() {
 		var d models.ActivityDay
-		if err := rows.Scan(&d.Day, &d.Strings, &d.Words); err != nil {
+		if err := rows.Scan(&d.Day, &d.Manual, &d.AIKept, &d.AIEdited, &d.Edited); err != nil {
 			return nil, err
 		}
+		d.Strings = d.Manual + d.AIKept + d.AIEdited + d.Edited
 		out = append(out, d)
 	}
 	return out, rows.Err()

@@ -21,7 +21,7 @@
     <div class="context-search pf-toolbar" data-stick>
         <form id="pf-filter" class="pf-filter" hx-get="{{.Project.Path}}/project-files" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change[target.type!='search'], submit" hx-target="#project-file-rows" hx-swap="innerHTML">
         <input type="search" name="q" placeholder="{{t $.Lang "files.project_search"}}" aria-label="{{t $.Lang "files.project_search"}}" autocomplete="off">
-        {{if .Versions}}{{template "group_filter" (dict "Lang" $.Lang "Groups" .Versions "NoGroup" false)}}{{end}}
+        {{if .Groups}}{{template "group_filter" (dict "Lang" $.Lang "Groups" .Groups "NoGroup" false)}}{{end}}
         {{if .Upstream}}{{template "upstream_filter" (dict "Lang" $.Lang)}}{{end}}
         </form>
     </div>
@@ -38,9 +38,8 @@
 <div class="files-section" data-sticky-section data-collapse-key="files:{{$p.Slug}}:mine">
 <h2 class="section-title" data-stick><button type="button" class="section-toggle" aria-expanded="true"><svg class="st-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span>{{t $.Lang "files.mine"}}</span> <span class="muted small">({{.Data.MyFiles.All}})</span></button></h2>
 <section class="card">
-    <div class="card-head" data-stick>
-        <h2>{{t .Lang "project.translations"}}</h2>
-        {{if $canManage}}
+    {{if $canManage}}
+    <div class="card-head card-head-end" data-stick>
         <div class="row-actions">
             {{if .Data.Template}}<button type="button" class="btn btn-primary" data-open-dialog="new-translation">+ {{t .Lang "project.new_translation"}}</button>{{end}}
             <button type="button" class="btn" data-open-dialog="upload">{{t .Lang "project.upload"}}</button>
@@ -48,8 +47,8 @@
                 <button class="btn" title="{{t $.Lang "files.sync_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync"}}</span></button>
             </form>{{end}}{{end}}
         </div>
-        {{end}}
     </div>
+    {{end}}
 
     {{with .Data.MyFiles}}
     {{if .All}}
@@ -143,6 +142,9 @@
         <p class="muted small field-help">{{t .Lang "upload.url_help"}}</p>
         <label for="u-lang">{{t .Lang "field.language_optional"}}</label>
         <input id="u-lang" name="language" list="lang-codes" placeholder="id, en, pt_BR…" maxlength="12">
+        <label for="u-page">{{t .Lang "upload.upstream_page"}}</label>
+        <input id="u-page" type="url" name="upstream_page" placeholder="https://l10n.gnome.org/vertimus/gnome-calculator/main/po/id/" inputmode="url" spellcheck="false">
+        <p class="muted small field-help">{{t .Lang "upload.upstream_page_help"}}</p>
         <div class="dialog-actions">
             <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
             <button type="submit" class="btn btn-primary">{{t .Lang "project.upload_submit"}}</button>
@@ -159,6 +161,9 @@
         <div class="or-sep small muted"><span>{{t .Lang "upload.or"}}</span></div>
         <label for="r-file">{{t .Lang "field.file"}}</label>
         <input id="r-file" type="file" name="file" accept=".po">
+        <label for="r-page">{{t .Lang "upload.upstream_page"}}</label>
+        <input id="r-page" type="url" name="upstream_page" placeholder="https://l10n.gnome.org/vertimus/gnome-calculator/main/po/id/" inputmode="url" spellcheck="false">
+        <p class="muted small field-help">{{t .Lang "upload.upstream_page_help"}}</p>
         <div class="dialog-actions">
             <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
             <button type="submit" class="btn btn-primary">{{t .Lang "replace.submit"}}</button>
