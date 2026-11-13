@@ -48,10 +48,20 @@ func (s *ActivityService) EntrySaved(ctx context.Context, user *models.User, c *
 	}
 	s.Record(ctx, &models.ActivityEvent{
 		Kind: models.ActivityEntrySaved, UserID: &user.ID, ProjectID: &c.ProjectID, CatalogID: &c.ID, EntryID: &before.ID,
-		Language: c.Language, StatusBefore: before.Status(), StatusAfter: after.Status(), Origin: before.Origin,
+		Language: c.Language, StatusBefore: logStatus(before), StatusAfter: logStatus(after), Origin: before.Origin,
 		TextChanged: strings.Join(before.MsgStr, "\x00") != strings.Join(after.MsgStr, "\x00"),
 		Words:       len(strings.Fields(src)),
 	})
+}
+
+// logStatus is the status recorded in the activity log: an AI draft ("ai") is logged as "fuzzy", as it
+// was before AI drafts got their own status, so the counting rules (reviewed = fuzzy → translated) hold;
+// the origin column says it came from AI
+func logStatus(e *models.Entry) string {
+	if st := e.Status(); st != "ai" {
+		return st
+	}
+	return "fuzzy"
 }
 
 // Summary returns each member's activity in the project over the range (ActivityRanges key)

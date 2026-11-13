@@ -24,6 +24,45 @@ const (
 	DefaultAIPriceOutput = 0.60
 )
 
+// AIPrice is a model's price in USD per 1M tokens (standard tier, short context)
+type AIPrice struct{ Input, Output float64 }
+
+// AIModels are the OpenAI chat models offered in the Settings dropdown (the default first, then
+// cheapest to dearest); "Lainnya…" takes any other name, e.g. for another compatible provider.
+// AIPrices holds their prices, used for estimates, cost tracking and the monthly budget instead of
+// prices typed by managers. Taken from https://developers.openai.com/api/docs/pricing on 2026-11-14;
+// update both by hand when OpenAI changes them.
+var AIModels = []string{
+	"gpt-4o-mini", "gpt-5-nano", "gpt-6-luna", "gpt-5.6-luna", "gpt-5.4-nano", "gpt-5-mini", "gpt-4.1-mini",
+	"gpt-5.4-mini", "gpt-6.1-terra", "gpt-5", "gpt-5.1", "gpt-4.1", "o3", "gpt-6.1-sol", "gpt-4o",
+}
+
+var AIPrices = map[string]AIPrice{
+	"gpt-4o-mini":   {0.15, 0.60},
+	"gpt-5-nano":    {0.05, 0.40},
+	"gpt-6-luna":    {0.10, 0.50},
+	"gpt-5.6-luna":  {0.20, 1.20},
+	"gpt-5.4-nano":  {0.20, 1.25},
+	"gpt-5-mini":    {0.25, 2.00},
+	"gpt-4.1-mini":  {0.40, 1.60},
+	"gpt-5.4-mini":  {0.75, 4.50},
+	"gpt-6.1-terra": {1.00, 5.00},
+	"gpt-5":         {1.25, 10.00},
+	"gpt-5.1":       {1.25, 10.00},
+	"gpt-4.1":       {2.00, 8.00},
+	"o3":            {2.00, 8.00},
+	"gpt-6.1-sol":   {2.00, 10.00},
+	"gpt-4o":        {2.50, 10.00},
+}
+
+// applyModelPrice replaces the stored prices with the built-in ones for a known model (stored prices
+// only matter for other models, entered by hand)
+func applyModelPrice(st *models.AISettings) {
+	if pr, ok := AIPrices[st.Model]; ok {
+		st.PriceInput, st.PriceOutput = pr.Input, pr.Output
+	}
+}
+
 // Batch limits for model requests
 const (
 	aiBatchItems = 25
@@ -83,6 +122,9 @@ func (s *AIService) Settings(ctx context.Context, p *models.Project) (*models.AI
 	if errors.Is(err, repository.ErrNotFound) {
 		return nil, nil
 	}
+	if st != nil {
+		applyModelPrice(st)
+	}
 	return st, err
 }
 
@@ -127,9 +169,13 @@ func (s *AIService) SaveSettings(ctx context.Context, user *models.User, p *mode
 	if st.Model == "" || len(st.Model) > 100 || strings.ContainsAny(st.Model, " /?#") {
 		return userErr("err.ai_model")
 	}
-	var ok1, ok2, ok3 bool
-	st.PriceInput, ok1 = parseMoney(in.PriceInput)
-	st.PriceOutput, ok2 = parseMoney(in.PriceOutput)
+	ok1, ok2, ok3 := true, true, true
+	if _, known := AIPrices[st.Model]; known {
+		applyModelPrice(st) // the form has no price fields for known models
+	} else {
+		st.PriceInput, ok1 = parseMoney(in.PriceInput)
+		st.PriceOutput, ok2 = parseMoney(in.PriceOutput)
+	}
 	st.MonthlyBudget, ok3 = parseMoney(in.MonthlyBudget)
 	if !ok1 || !ok2 || !ok3 {
 		return userErr("err.ai_price")
@@ -216,8 +262,8 @@ type AIOptions struct {
 	UseMemory    bool  // fill exact matches from the user's other files first
 	UseAI        bool  // send what is left to the language model
 	IncludeFuzzy bool  // also redo entries marked as needing work
-	GroupID      int64 // glossary version; 0 = all versions, -1 = no glossary
-	MarkFuzzy    bool  // mark every result as needing review
+	GroupID      int64 // module group of the glossary; 0 = all groups, -1 = no glossary
+	MarkFuzzy    bool  // mark memory and glossary results as needing review (AI results get the "ai" status)
 }
 
 // aiPlan is the work prepared for a run
@@ -296,7 +342,7 @@ func (s *AIService) plan(ctx context.Context, p *models.Project, c *models.Catal
 		switch e.Status() {
 		case "translated":
 			continue
-		case "fuzzy":
+		case "fuzzy", "ai":
 			if !opts.IncludeFuzzy {
 				continue
 			}
@@ -585,7 +631,9 @@ func (s *AIService) run(job *models.AIJob, st *models.AISettings, cl chatClient,
 				job.Processed++
 				continue
 			}
-			switch s.apply(ctx, c, it.ID, pl.versions[it.ID], forms, opts.MarkFuzzy || len(problems) > 0, userID, models.OriginAI) {
+			// AI drafts are not flagged fuzzy: their own status ("AI perlu ditinjau") marks them until a
+			// person saves them, and downloads mark them fuzzy (CatalogService.Build)
+			switch s.apply(ctx, c, it.ID, pl.versions[it.ID], forms, false, userID, models.OriginAI) {
 			case applyOK:
 				job.Translated++
 				if len(problems) > 0 {

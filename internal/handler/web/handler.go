@@ -138,6 +138,8 @@ func funcMap() template.FuncMap {
 		// editor settings: every check, and the statuses Validasi ticks for the user
 		"editorChecks":   func() []string { return po.Checks },
 		"editorStatuses": func() []string { return service.EditorStatuses },
+		"aiModels":       func() []string { return service.AIModels },
+		"aiPrice":        func(model string) service.AIPrice { return service.AIPrices[model] },
 		"validateStatuses": func(u *models.User) string {
 			var out []string
 			for _, c := range po.Checks {

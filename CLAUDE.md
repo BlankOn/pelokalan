@@ -127,7 +127,8 @@ make test
   (`FileListPageSize`, `GET /projects/{id}/my-files|member-files?q=&g=&offset=`, `Handler.fileList`, partial
   `file_rows`) sorted by last edit (`catalogs.updated_at`, newest first) with search and the same module group filter: a file is in a group when its module
   (`service.ModuleOf`) is among that group's project files (`GlossaryService.ModuleGroups`); `g=0` = no group.
-  Managers get "Sinkronkan dengan upstream" (in Berkas proyek and beside "Tambah berkas" in Berkas Anda;
+  Managers get "Sinkronkan dengan upstream" (in Berkas proyek; beside "Tambah berkas manual" in Berkas Anda the same
+  button is labelled "Sinkronkan status upstream" / "Sync upstream status", `files.sync_status`, since there it only shows new states;
   `POST /projects/{id}/project-files/sync` → `GlossaryService.SyncAll`, which ends with `RefreshUpstream`: every
   file state is read again from the release pages, however recent; it also runs for projects without a sync link):
   fetches every module group with a sync link in a background goroutine (requests time out after 30 s);
@@ -445,7 +446,11 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 
 ## AI pre-translation
 
-- Settings per project in `project_ai_settings` (owner/manager): base URL, model, API key
+- Settings per project in `project_ai_settings` (owner/manager): base URL, model (a dropdown of
+  `service.AIModels`, OpenAI chat models, plus "Lainnya…" for any other name; `[data-model-pick]` in app.js). Prices of
+  those models are built in (`service.AIPrices`, USD per 1M tokens from OpenAI's pricing page, updated by hand; shown
+  under the dropdown) and replace stored prices on load and save (`applyModelPrice`); the price fields only appear for
+  "Lainnya…". API key
   encrypted with `ai.Box` (AES-GCM, key from `AI_SECRET_KEY`), prices per 1M tokens, monthly budget,
   and `extra_context` (migration 023): project-wide guidance sent as `<project_context>` before the
   file's `<file_context>` (the file note is more specific and wins). Words in either can make
@@ -499,7 +504,18 @@ cached per project+language and rebuilt only when `GlossaryRepository.Stamp` (im
 ## Entry origin
 
 `entries.origin` is '', 'ai', 'glossary' or 'memory' for machine translations not yet saved
-by a person (`SaveEntry` clears it). The editor marks 'ai' with an orange bot, 'glossary' with a green book and
+by a person (`SaveEntry` clears it).
+
+**"AI perlu ditinjau" / "AI needs review"** (`Entry.Status()` = "ai", ahead of fuzzy): an AI draft no person has
+saved. AI results are stored without the fuzzy flag (migration 040 cleared it on existing drafts) and
+`CatalogService.Build` exports them as `#, fuzzy`, so unreviewed AI text never leaves as final. Counted as "needs
+review" in `CatalogStats.Fuzzy` (progress bars, SQL `Stats`, history), but the editor status bar shows plain fuzzy
+(`EntryListing.FuzzyOnly`) and AI drafts (`AI`) apart; purple rows (`.st-ai`), filter/status value "ai", on by default
+in Validasi (`service.EditorStatuses`). In the editor the review box is ticked and labelled "AI perlu ditinjau", so
+"Lepas pratinjau, simpan & lanjut" approves it (clears fuzzy and origin). Translation memory skips AI drafts
+(`origin <> 'ai'`). Diffs compare "needs review" (fuzzy or AI) so older snapshots with the flag show no change. The
+activity log records an AI draft's status as "fuzzy" (`logStatus`) so its counting rules stay as before. The
+pre-translation checkbox `mark_fuzzy` now only applies to memory and glossary results. The editor marks 'ai' with an orange bot, 'glossary' with a green book and
 'memory' with blue cards (`icon_origin` in entry_list.html), with status-bar counts and filters for each. Snapshots keep it as an `x-origin-*` flag, stripped from downloads.
 
 ## Version history

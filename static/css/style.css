@@ -337,6 +337,7 @@ h1 .ai-badge { font-size: 12px; }
 .entry-row .cell-icon { padding: 4px 0 4px 6px; display: flex; align-items: center; }
 .entry-row.st-untranslated .cell-src { font-weight: 600; }
 .entry-row.st-fuzzy .cell-tr { color: var(--fuzzy); font-style: italic; }
+.entry-row.st-ai .cell-tr { color: #7a3fd1; font-style: italic; } /* AI perlu ditinjau */
 .entry-row.has-issues .cell-tr { color: var(--error); }
 .entry-row.selected, .entry-row.selected:nth-child(even) { background: var(--selected); color: var(--selected-text); }
 .entry-row.selected .cell-tr, .entry-row.selected .ctx-tag { color: var(--selected-text); }

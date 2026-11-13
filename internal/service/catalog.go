@@ -48,10 +48,13 @@ type EntryListing struct {
 	Entries  []*models.Entry
 	Stats    models.CatalogStats
 	Issues   int
-	AI       int // entries translated by a language model, not yet saved by a person
+	AI       int // AI drafts not yet saved by a person (status "ai", "AI perlu ditinjau")
 	Glossary int // entries pre-translated from the glossary, not yet saved by a person
 	Memory   int // entries pre-translated from translation memory, not yet saved by a person
 }
+
+// FuzzyOnly is the fuzzy entries without the AI drafts (Stats.Fuzzy counts both as needing review)
+func (l *EntryListing) FuzzyOnly() int { return l.Stats.Fuzzy - l.AI }
 
 // MergeResult summarizes an update from the template
 type MergeResult struct {
@@ -607,7 +610,7 @@ func (s *CatalogService) Entries(ctx context.Context, c *models.Catalog, f Entry
 		switch e.Status() {
 		case "translated":
 			l.Stats.Translated++
-		case "fuzzy":
+		case "fuzzy", "ai": // AI drafts need review too; the status bar shows them apart (l.AI)
 			l.Stats.Fuzzy++
 		default:
 			l.Stats.Untranslated++
@@ -648,12 +651,10 @@ func matchStatus(e *models.Entry, status string) bool {
 	switch status {
 	case "todo":
 		return e.Status() != "translated"
-	case "untranslated", "fuzzy", "translated":
+	case "untranslated", "fuzzy", "translated", "ai":
 		return e.Status() == status
 	case "issues":
 		return e.HasIssues()
-	case "ai":
-		return e.IsAI()
 	case "glossary":
 		return e.Origin == models.OriginGlossary
 	case "memory":
@@ -696,7 +697,7 @@ func sortEntries(entries []*models.Entry, order string) {
 				return 0
 			case e.Status() == "untranslated":
 				return 1
-			case e.Status() == "fuzzy":
+			case e.Status() == "fuzzy", e.Status() == "ai":
 				return 2
 			}
 			return 3
@@ -808,7 +809,11 @@ func (s *CatalogService) Build(ctx context.Context, user *models.User, c *models
 		pc.Header = po.SetHeaderField(pc.Header, "X-Generator", "pelokalan.blankon.id")
 	}
 	for _, e := range entries {
-		pc.Entries = append(pc.Entries, e.ToPO())
+		pe := e.ToPO()
+		if e.IsAI() {
+			pe.Fuzzy = true // an AI draft no person has saved never leaves as a final translation
+		}
+		pc.Entries = append(pc.Entries, pe)
 	}
 	return pc, nil
 }

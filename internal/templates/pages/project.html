@@ -44,7 +44,7 @@
             {{if .Data.Template}}<button type="button" class="btn btn-primary" data-open-dialog="new-translation">+ {{t .Lang "project.new_translation"}}</button>{{end}}
             <button type="button" class="btn" data-open-dialog="upload">{{t .Lang "project.upload"}}</button>
             {{with .Data.ProjectFiles}}{{if and .CanManage (or .HasFeed .Upstream)}}<form method="post" action="{{.Project.Path}}/project-files/sync" data-sync data-syncing="{{t $.Lang "files.syncing"}}">
-                <button class="btn" title="{{t $.Lang "files.sync_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync"}}</span></button>
+                <button class="btn" title="{{t $.Lang "files.sync_status_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync_status"}}</span></button>
             </form>{{end}}{{end}}
         </div>
     </div>

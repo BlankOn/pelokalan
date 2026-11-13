@@ -399,7 +399,7 @@ func (s *AuthService) UpdateIdentity(ctx context.Context, user *models.User, nam
 }
 
 // EditorStatuses are the statuses Validasi can show besides problem entries
-var EditorStatuses = []string{"untranslated", "fuzzy"}
+var EditorStatuses = []string{"untranslated", "fuzzy", "ai"}
 
 // UpdateEditorChecks stores which editor checks are on (issue codes from po.Checks and
 // EditorStatuses); everything not in on is switched off for every file of the account

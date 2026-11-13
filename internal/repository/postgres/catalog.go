@@ -303,8 +303,8 @@ func (r *catalogRepository) Stats(ctx context.Context, catalogID int64) (models.
 	var s models.CatalogStats
 	err := r.db.QueryRowContext(ctx,
 		`SELECT COUNT(*),
-		        COUNT(*) FILTER (WHERE NOT fuzzy AND NOT `+untranslatedExpr+`),
-		        COUNT(*) FILTER (WHERE fuzzy AND NOT `+untranslatedExpr+`)
+		        COUNT(*) FILTER (WHERE NOT fuzzy AND origin <> 'ai' AND NOT `+untranslatedExpr+`),
+		        COUNT(*) FILTER (WHERE (fuzzy OR origin = 'ai') AND NOT `+untranslatedExpr+`)
 		 FROM entries WHERE catalog_id = $1 AND NOT obsolete`, catalogID,
 	).Scan(&s.Total, &s.Translated, &s.Fuzzy)
 	s.Untranslated = s.Total - s.Translated - s.Fuzzy
@@ -318,7 +318,7 @@ func (r *catalogRepository) Suggestions(ctx context.Context, userID int64, langu
 		 JOIN catalogs c ON c.id = e.catalog_id
 		 JOIN projects p ON p.id = c.project_id
 		 WHERE c.owner_id = $1 AND c.language = $2 AND c.deleted_at IS NULL AND md5(e.msgid) = md5($3) AND e.msgid = $3 AND e.id <> $4
-		   AND NOT e.fuzzy AND NOT e.obsolete AND e.msgid_plural = '' AND COALESCE(e.msgstr->>0, '') <> ''
+		   AND NOT e.fuzzy AND e.origin <> 'ai' AND NOT e.obsolete AND e.msgid_plural = '' AND COALESCE(e.msgstr->>0, '') <> ''
 		 GROUP BY t ORDER BY COUNT(*) DESC, t LIMIT $5`,
 		userID, language, msgid, excludeEntryID, limit)
 	if err != nil {
@@ -344,7 +344,7 @@ func (r *catalogRepository) MemoryMatches(ctx context.Context, catalogID, userID
 		     SELECT DISTINCT ON (e.msgid) e.msgid, e.msgstr->>0 AS txt
 		     FROM entries e
 		     JOIN catalogs c ON c.id = e.catalog_id
-		     WHERE c.owner_id = $2 AND c.language = $3 AND c.deleted_at IS NULL AND e.catalog_id <> $1 AND NOT e.fuzzy AND NOT e.obsolete
+		     WHERE c.owner_id = $2 AND c.language = $3 AND c.deleted_at IS NULL AND e.catalog_id <> $1 AND NOT e.fuzzy AND e.origin <> 'ai' AND NOT e.obsolete
 		       AND e.msgid_plural = '' AND COALESCE(e.msgstr->>0, '') <> ''
 		     ORDER BY e.msgid, e.updated_at DESC
 		 ) src ON src.msgid = t.msgid
@@ -375,7 +375,7 @@ func (r *catalogRepository) PreTranslate(ctx context.Context, catalogID, userID 
 		     SELECT DISTINCT ON (e.msgid) e.msgid, e.msgstr->>0 AS txt
 		     FROM entries e
 		     JOIN catalogs c ON c.id = e.catalog_id
-		     WHERE c.owner_id = $2 AND c.language = $3 AND c.deleted_at IS NULL AND e.catalog_id <> $1 AND NOT e.fuzzy AND NOT e.obsolete
+		     WHERE c.owner_id = $2 AND c.language = $3 AND c.deleted_at IS NULL AND e.catalog_id <> $1 AND NOT e.fuzzy AND e.origin <> 'ai' AND NOT e.obsolete
 		       AND e.msgid_plural = '' AND COALESCE(e.msgstr->>0, '') <> ''
 		     ORDER BY e.msgid, e.updated_at DESC
 		 ) src

@@ -59,7 +59,7 @@ func (s *CatalogService) snapshot(ctx context.Context, c *models.Catalog) ([]byt
 		switch e.Status() {
 		case "translated":
 			stats.Translated++
-		case "fuzzy":
+		case "fuzzy", "ai":
 			stats.Fuzzy++
 		}
 	}
@@ -420,26 +420,29 @@ func DiffSnapshots(oldData, newData []byte) *Diff {
 		_, o := splitOriginFlag(e.Flags)
 		return o
 	}
+	// needs review: the fuzzy flag, or an AI draft (stored without the flag since migration 040, flagged in
+	// older snapshots); comparing this keeps the unflagging from showing up as a change
+	review := func(e *po.Entry) bool { return e.Fuzzy || origin(e) == models.OriginAI }
 	for _, k := range norder {
 		ne := nm[k]
 		oe, ok := om[k]
 		if !ok {
 			d.Added++
-			add(DiffItem{Kind: "added", Context: ne.Context, Source: ne.ID, New: ne.Translation, NewFuzzy: ne.Fuzzy,
+			add(DiffItem{Kind: "added", Context: ne.Context, Source: ne.ID, New: ne.Translation, NewFuzzy: review(ne),
 				NewOrigin: origin(ne)})
 			continue
 		}
 		oo, no := origin(oe), origin(ne)
 		textChanged := !equalStrings(oe.Translation, ne.Translation)
 		it := DiffItem{Context: ne.Context, Source: ne.ID, Old: oe.Translation, New: ne.Translation,
-			OldFuzzy: oe.Fuzzy, NewFuzzy: ne.Fuzzy, OldOrigin: oo, NewOrigin: no, Meta: entryMetaChanges(oe, ne)}
+			OldFuzzy: review(oe), NewFuzzy: review(ne), OldOrigin: oo, NewOrigin: no, Meta: entryMetaChanges(oe, ne)}
 		switch {
 		case !textChanged && oo != "" && no == "":
 			// a machine translation approved by a person (text kept)
 			d.Reviewed++
 			it.Kind = "reviewed"
 			add(it)
-		case textChanged || oe.Fuzzy != ne.Fuzzy || oo != no:
+		case textChanged || review(oe) != review(ne) || oo != no:
 			d.Changed++
 			it.Kind = "changed"
 			add(it)
@@ -453,7 +456,7 @@ func DiffSnapshots(oldData, newData []byte) *Diff {
 	for k, oe := range om {
 		if _, ok := nm[k]; !ok {
 			d.Removed++
-			add(DiffItem{Kind: "removed", Context: oe.Context, Source: oe.ID, Old: oe.Translation, OldFuzzy: oe.Fuzzy,
+			add(DiffItem{Kind: "removed", Context: oe.Context, Source: oe.ID, Old: oe.Translation, OldFuzzy: review(oe),
 				OldOrigin: origin(oe)})
 		}
 	}

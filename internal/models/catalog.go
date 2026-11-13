@@ -86,7 +86,7 @@ func (c *Catalog) LanguageName() string { return po.LanguageName(c.Language) }
 type CatalogStats struct {
 	Total        int
 	Translated   int
-	Fuzzy        int
+	Fuzzy        int // needs review: fuzzy entries and AI drafts no person has saved
 	Untranslated int
 }
 
@@ -143,11 +143,15 @@ func (e *Entry) IsPlural() bool { return e.MsgIDPlural != "" }
 // IsTranslated reports whether every form has a translation
 func (e *Entry) IsTranslated() bool { return e.ToPO().IsTranslated() }
 
-// Status returns one of "untranslated", "fuzzy", "translated"
+// Status returns one of "untranslated", "ai", "fuzzy", "translated". "ai" ("AI perlu ditinjau") is an
+// AI draft no person has saved yet: it needs review like fuzzy, but is told apart from it. AI drafts
+// are stored without the fuzzy flag and exported with it (CatalogService.Build).
 func (e *Entry) Status() string {
 	switch {
 	case !e.IsTranslated():
 		return "untranslated"
+	case e.IsAI():
+		return "ai"
 	case e.Fuzzy:
 		return "fuzzy"
 	default:

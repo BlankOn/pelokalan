@@ -1225,6 +1225,22 @@
     window.addEventListener("pageshow", function () { pending.clear(); hide(); });
 })();
 
+// AI settings: the model dropdown fills the hidden model field; "Lainnya…" shows it for any other name
+document.addEventListener("change", function (ev) {
+    var pick = ev.target.closest && ev.target.closest("[data-model-pick]");
+    if (!pick) return;
+    var input = pick.parentNode.querySelector("input[name=model]");
+    if (!input) return;
+    input.hidden = pick.value !== "";
+    if (pick.value) input.value = pick.value;
+    else { input.value = ""; input.focus(); }
+    // known models have built-in prices; only another model needs them typed in
+    var form = pick.closest("form");
+    if (form) form.querySelectorAll("[data-custom-price]").forEach(function (el) { el.hidden = pick.value !== ""; });
+    var price = form && form.querySelector("[data-model-price]");
+    if (price) price.textContent = pick.value ? (pick.selectedOptions[0].dataset.price || "") : "";
+});
+
 // Disable upload buttons while a (possibly large) file is processed
 document.addEventListener("submit", function (ev) {
     var busy = ev.target.getAttribute && ev.target.getAttribute("data-busy");

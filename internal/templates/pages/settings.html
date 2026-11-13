@@ -96,10 +96,16 @@
         <label for="ai-key">{{t .Lang "ai.api_key"}}</label>
         <input id="ai-key" type="password" name="api_key" autocomplete="new-password" spellcheck="false"
                placeholder="{{if $s}}{{t .Lang "ai.key_keep"}}{{else}}sk-…{{end}}" {{if not $s}}required{{end}}>
+        {{$m := index $d "Model"}}{{if $s}}{{$m = $s.Model}}{{end}}{{$known := has aiModels $m}}
         <div class="grid-2">
             <div>
-                <label for="ai-model">{{t .Lang "ai.model"}}</label>
-                <input id="ai-model" name="model" required maxlength="100" value="{{if $s}}{{$s.Model}}{{else}}{{index $d "Model"}}{{end}}">
+                <label for="ai-model-pick">{{t .Lang "ai.model"}}</label>
+                <select id="ai-model-pick" data-model-pick>
+                    {{range aiModels}}{{$pr := aiPrice .}}<option value="{{.}}" data-price="{{t $.Lang "ai.model_price" (usd $pr.Input) (usd $pr.Output)}}"{{if eq . $m}} selected{{end}}>{{.}}</option>{{end}}
+                    <option value=""{{if not $known}} selected{{end}}>{{t .Lang "ai.model_other"}}</option>
+                </select>
+                <input id="ai-model" name="model" required maxlength="100" value="{{$m}}" placeholder="{{t .Lang "ai.model_other_placeholder"}}" aria-label="{{t .Lang "ai.model"}}" {{if $known}}hidden{{end}}>
+                <p class="muted small field-help" data-model-price>{{if $known}}{{$pr := aiPrice $m}}{{t .Lang "ai.model_price" (usd $pr.Input) (usd $pr.Output)}}{{end}}</p>
             </div>
             <div>
                 <label for="ai-base">{{t .Lang "ai.base_url"}}</label>
@@ -107,11 +113,11 @@
             </div>
         </div>
         <div class="grid-3">
-            <div>
+            <div data-custom-price {{if $known}}hidden{{end}}>
                 <label for="ai-pin">{{t .Lang "ai.price_input"}}</label>
                 <input id="ai-pin" name="price_input" inputmode="decimal" value="{{if $s}}{{$s.PriceInput}}{{else}}{{index $d "PriceInput"}}{{end}}">
             </div>
-            <div>
+            <div data-custom-price {{if $known}}hidden{{end}}>
                 <label for="ai-pout">{{t .Lang "ai.price_output"}}</label>
                 <input id="ai-pout" name="price_output" inputmode="decimal" value="{{if $s}}{{$s.PriceOutput}}{{else}}{{index $d "PriceOutput"}}{{end}}">
             </div>
@@ -120,7 +126,7 @@
                 <input id="ai-budget" name="monthly_budget" inputmode="decimal" value="{{if $s}}{{$s.MonthlyBudget}}{{else}}0{{end}}">
             </div>
         </div>
-        <p class="muted small">{{t .Lang "ai.price_help"}}</p>
+        <p class="muted small" data-custom-price {{if $known}}hidden{{end}}>{{t .Lang "ai.price_help"}}</p>
         <label for="ai-context">{{t .Lang "ai.extra_context"}}</label>
         <textarea id="ai-context" name="extra_context" rows="6" maxlength="4000" placeholder="{{t .Lang "ai.extra_context_placeholder"}}">{{if $s}}{{$s.ExtraContext}}{{end}}</textarea>
         <p class="muted small field-help">{{t .Lang "ai.extra_context_help"}}</p>
