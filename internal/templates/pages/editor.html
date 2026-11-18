@@ -1,5 +1,6 @@
 {{define "content"}}{{$c := .Data.Catalog}}{{$p := .Data.Project}}{{$f := .Data.Filter}}
 <div class="editor-app" id="editor-app" data-catalog="{{$c.ID}}" data-readonly="{{.Data.ReadOnly}}" data-initial-entry="{{.Data.InitialEntry}}"
+     {{if .Data.Owned}}data-spell="/catalogs/{{$c.ID}}/spell" data-spell-suggest="{{$p.Path}}/spell/suggest" data-spell-dict="{{$p.Path}}/dictionary" data-sp-title="{{t .Lang "spelling.popup_title"}}" data-sp-add="{{t .Lang "spelling.add"}}" data-sp-none="{{t .Lang "spelling.no_suggestions"}}"{{end}}
      {{if .Data.Owned}}data-thesaurus="{{$p.Path}}/thesaurus?v={{.Asset}}" data-th-title="{{t .Lang "thesaurus.synonyms"}}" data-th-antonyms="{{t .Lang "thesaurus.antonyms"}}" data-th-none="{{t .Lang "thesaurus.none"}}" data-th-source="{{t .Lang "thesaurus.source"}}" data-th-tags="{{t .Lang "thesaurus.tags"}}" data-th-as-form="{{t .Lang "thesaurus.as_form"}}" data-ai-working="{{t .Lang "ai.entry_working"}}" data-locked-msg="{{t .Lang "ai.editor_locked"}}"{{end}}
      data-msg-unsaved="{{t .Lang "editor.unsaved_changes"}}"
      data-msg-error="{{t .Lang "editor.request_failed"}}"
@@ -74,13 +75,13 @@
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
             <span>{{if $c.IsTemplate}}POT{{else}}PO{{end}}</span>
         </a>
-        {{if not $c.IsTemplate}}
-        <a class="tb-btn" href="/catalogs/{{$c.ID}}/download.mo" title="{{t .Lang "action.download_mo"}}" data-check-issues="{{t .Lang "editor.download_issues"}}" data-check-ok="{{t .Lang "editor.download_anyway"}}" data-check-show="{{t .Lang "editor.show_issues"}}">
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h9l4 4v14H6z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>
-            <span>MO</span>
+        {{with .Data.ModulePage}}
+        <a class="tb-btn" href="{{.}}" target="_blank" rel="noopener" title="{{t $.Lang "editor.module_page_help"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+            <span>{{t $.Lang "editor.module_page"}}</span>
         </a>
         {{end}}
-
+        <div class="tb-sep"></div>
         <button type="button" class="tb-btn" data-open-dialog="help-dialog" title="{{t .Lang "help.title"}} (?)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.3a2.5 2.5 0 1 1 3.4 2.3c-.7.3-1 .8-1 1.5v.6"/><circle cx="12" cy="16.9" r=".6"/></svg>
             <span>{{t .Lang "help.button"}}</span>

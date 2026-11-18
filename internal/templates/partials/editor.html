@@ -50,11 +50,11 @@
             {{range $i, $s := $e.MsgStr}}<button type="button" role="tab" class="ptab{{if eq $i 0}} active{{end}}" data-tab="{{$i}}">{{pluralLabel $.Lang $i (len $e.MsgStr)}}</button>{{end}}
         </div>
         {{range $i, $s := $e.MsgStr}}
-        <textarea name="msgstr{{$i}}" class="tr-input" data-panel="{{$i}}" {{if ne $i 0}}hidden{{end}} spellcheck="true" lang="{{$c.Language}}" aria-label="{{pluralLabel $.Lang $i (len $e.MsgStr)}}">
+        <textarea name="msgstr{{$i}}" class="tr-input" data-panel="{{$i}}" {{if ne $i 0}}hidden{{end}} spellcheck="false" lang="{{$c.Language}}" aria-label="{{pluralLabel $.Lang $i (len $e.MsgStr)}}">
 {{$s}}</textarea>
         {{end}}
         {{else}}
-        <textarea name="msgstr0" class="tr-input" data-panel="0" spellcheck="true" lang="{{$c.Language}}" aria-label="{{t .Lang "editor.translation"}}">
+        <textarea name="msgstr0" class="tr-input" data-panel="0" spellcheck="false" lang="{{$c.Language}}" aria-label="{{t .Lang "editor.translation"}}">
 {{index $e.MsgStr 0}}</textarea>
         {{end}}
     </section>

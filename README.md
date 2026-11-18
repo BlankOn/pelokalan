@@ -85,6 +85,25 @@ See `.env.example`. The important settings:
 | Ctrl+1…5 | Use a translation suggestion |
 | Ctrl+F | Search |
 
+## Public API
+
+Read-only JSON, no key or sign-in needed, callable from any site (CORS `*`, cached for 60 s).
+
+`GET /api/projects/{slug}/members` lists a project's members (owners first, then managers and translators)
+with their sign-in email addresses.
+
+```json
+{
+  "project": { "slug": "gnome-id", "name": "GNOME ID", "url": "https://pelokalan.blankon.id/projects/gnome-id" },
+  "total": 1,
+  "members": [
+    { "username": "admin", "name": "Admin", "email": "admin@example.org", "role": "owner", "joined_at": "2026-11-08T12:09:18Z" }
+  ]
+}
+```
+
+An unknown project gives `404` with `{"error": "project not found"}`.
+
 ## License
 
 Pelokalan is open source software under the [MIT License](LICENSE). Its source code is available at

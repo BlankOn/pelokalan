@@ -290,6 +290,36 @@ make test
 - Editor: selecting text in the translation box shows a popup (app.js); clicking replaces the
   selection, keeping a leading capital. The /licenses page credits the source.
 
+## Spelling check (Indonesian)
+
+- `internal/spelling`: `Parse` reads the KBBI v6.1.0 CSV extract (`SPELLING_URL`, default the aryakdaniswara/kbbi-v6-full-csv
+  repo; columns kata, turunan, varian, gabungan_kata) into ~119k single words; only words are kept, never meanings.
+  `Dict.Known` adds the forms KBBI leaves out: passive di- and bare imperatives from the meN- forms it lists
+  ("ditampilkan", "Tampilkan"), clitics (-nya -lah -kah -pun -ku -mu, ku-/kau-), root + -kan/-i/-an, doubled and
+  hyphenated words. `Words` skips placeholders, markup, entities, URLs/addresses, mnemonics (`_Berkas`), digits,
+  acronyms and words with inner capitals; `Misspelled` also leaves words that appear in the source alone.
+  `Suggest` = edit distance ≤ 2 (swaps count once), longest shared start first.
+- Tables (migration 041): `spelling_words` (filled once on start when empty, like the thesaurus; `SpellingService.Load`)
+  and `spelling_extra` (a project's own words: "Kamus proyek"). The source has **no licence**: checks are for project
+  members only (never public), and /licenses credits the source.
+- Only Indonesian files (`service.Indonesian`) of signed-in members: `CatalogService.Get` sets `Catalog.Spelling`
+  (a `models.SpellChecker`), and `validateEntry` adds `po.IssueSpelling` ("spelling", switchable in the editor's
+  Pengaturan like the other checks; skipped for translator-credits entries).
+- Editor (owner's files): the browser's spellcheck is off (`spellcheck="false"`). app.js posts the boxes' text to
+  `POST /catalogs/{cid}/spell` (debounced) and draws `.spell-layer` behind each transparent `.tr-input` (metrics
+  copied, scroll mirrored) with unknown words in `.typo` (red wavy underline). Clicking inside one opens `.spell-pop`
+  (`GET /projects/{id}/spell/suggest?w=`): suggestions replace the word keeping its case (undoable), and
+  "Tambahkan ke kamus proyek" posts `POST /projects/{id}/dictionary` (any member). Settings lists the words
+  (`#dictionary`, every member); owners/managers remove them (`/dictionary/delete`).
+
+## Public API
+
+`internal/handler/web/api.go`, routes under `/api/` in the public group: read-only JSON, no key, the same answer
+signed in or not, `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=60` (`apiJSON`).
+`GET /api/projects/{id}/members` (slug or numeric id; `APIMembers`): project slug, name, URL (`SITE_BASE_URL`), and
+members with username, name, **sign-in email** (the operator chose to publish it here, although the members page
+shows it only to members), role, joined_at. Documented in README.md.
+
 ## About page
 
 `/about` (footer link "Tentang", before Lisensi; `AboutPage`, pages/about.html, `about.*` strings) explains the
@@ -313,7 +343,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   copy it, reload the latest version, edit again. It never overwrites. Tree moves are
   last-write-wins.
 - Every create/save is recorded in `wiki_edits` (migration 021, backfilled from created/updated);
-  the article lists the latest 50 as "@username · time", converted to the reader's time zone
+  the article lists the latest 50 as "@username · time" in a collapsed `<details>`, converted to the reader's time zone
   (`time[data-local]` in app.js). Moves are not edits.
 - The tree is reorganized only by drag and drop in the sidebar (`WikiService.Move`, modes
   before/after/inside, depth checked for the whole subtree; `Reorder` does not touch updated_at).
@@ -608,7 +638,9 @@ deploys never run stale JS/CSS.
 - Validation flags `control_chars` and `markup` (tags such as <gui>, <key> differing from the source);
   `ai.UserPrompt` sends markup unescaped, and AI results with control characters are never saved.
 - Toolbar order: Proyek | Tarik upstream, Riwayat, Commit | Konteks, Praterjemah, Validasi | Teks, Metadata |
-  PO, MO, Bantuan, Pengaturan.
+  PO, Modul | Bantuan, Pengaturan. "Modul" (`Data.ModulePage`) opens the file's module page on l10n.gnome.org (its
+  stored upstream state's page, else its own/guessed link; hidden when there is none). MO is downloaded from the
+  file menu on Penerjemahan only.
 - Editor settings ("Pengaturan" after Bantuan, `#editor-settings-dialog`, signed-in users) are per account and
   apply to every file: `users.editor_checks_off` (migration 032, `User.ChecksOff`/`CheckOn`, everything on by
   default so new checks start on). Users untick validation rules (`po.Checks`; switched-off issues are dropped in

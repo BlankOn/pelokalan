@@ -18,6 +18,11 @@
     <p class="small">{{t $.Lang "licenses.thesaurus_source"}} <a href="{{.URL}}" rel="noopener" target="_blank">{{.URL}}</a></p>
     <p class="muted small">{{t $.Lang "licenses.thesaurus_origin"}}</p>
     {{end}}
+    {{with .Data.Spelling}}
+    <p><strong>{{t $.Lang "licenses.spelling_title"}}</strong> — {{t $.Lang .Note}}</p>
+    <p class="small">{{t $.Lang "licenses.thesaurus_source"}} <a href="{{.URL}}" rel="noopener" target="_blank">{{.URL}}</a></p>
+    <p class="muted small">{{t $.Lang "licenses.spelling_origin"}}</p>
+    {{end}}
     <p class="muted small">{{t .Lang "licenses.glossary_data"}}</p>
 </section>
 {{end}}

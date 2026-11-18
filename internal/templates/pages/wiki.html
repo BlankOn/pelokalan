@@ -18,7 +18,7 @@
         <p class="muted small wiki-meta">{{t $.Lang "wiki.updated" (timeAgo $.Lang $pg.UpdatedAt) (or $pg.UpdaterName "—")}}</p>
         <div class="wiki-body">{{if $pg.Body}}{{wikiHTML $pg.Body}}{{else}}<p class="muted">{{t $.Lang "wiki.preview_empty"}}</p>{{end}}</div>
         {{if $.Data.Edits}}
-        <details class="wiki-history" open>
+        <details class="wiki-history">
             <summary>{{t $.Lang "wiki.history" (len $.Data.Edits)}}</summary>
             <ol>
                 {{range $.Data.Edits}}<li>{{if .Username}}<strong>@{{.Username}}</strong>{{else}}<span class="muted">—</span>{{end}} <span class="muted">· <time data-local datetime="{{.At.Format "2006-01-02T15:04:05Z07:00"}}" title="{{timeAgo $.Lang .At}}">{{.At.Format "02-01-2006 15:04"}}</time></span></li>{{end}}

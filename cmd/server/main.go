@@ -144,6 +144,20 @@ func main() {
 			time.Sleep(time.Hour)
 		}
 	}()
+	// Indonesian spelling check: the word list is stored on first start, then served from memory
+	spellingService := service.NewSpellingService(postgres.NewSpellingRepository(db), fetcher, cfg.Glossary.SpellingURL)
+	catalogService.SetSpelling(spellingService)
+	webHandler.SetSpelling(spellingService)
+	go func() {
+		for {
+			err := spellingService.Load(context.Background())
+			if err == nil {
+				return
+			}
+			log.Printf("spelling: %v (retrying in an hour)", err)
+			time.Sleep(time.Hour)
+		}
+	}()
 	// PO files can also be created from a URL: same SSRF-safe transport, upload size limit
 	webHandler.SetSyncInterval(cfg.Glossary.FetchInterval)
 	webHandler.SetActivity(activityService)
@@ -187,6 +201,7 @@ func main() {
 		r.Get("/projects/{id}/glossary", webHandler.GlossaryPage)
 		r.Get("/projects/{id}/glossary/search", webHandler.GlossarySearch)
 		r.Get("/projects/{id}/members", webHandler.MembersPage)
+		r.Get("/api/projects/{id}/members", webHandler.APIMembers) // public JSON, no key
 		r.Get("/projects/{id}/insight", webHandler.InsightPage)
 		r.Get("/join/{token}", webHandler.JoinPage)
 		r.Get("/projects/{id}/wiki", webHandler.WikiIndex)
@@ -287,6 +302,10 @@ func main() {
 		r.Post("/projects/{id}/join", webHandler.JoinProject)
 		r.Get("/projects/{id}/wiki/new", webHandler.WikiNew)
 		r.Get("/projects/{id}/thesaurus", webHandler.ThesaurusLookup)
+		r.Post("/catalogs/{cid}/spell", webHandler.SpellCheck)
+		r.Get("/projects/{id}/spell/suggest", webHandler.SpellSuggest)
+		r.Post("/projects/{id}/dictionary", webHandler.AddDictionaryWord)
+		r.Post("/projects/{id}/dictionary/delete", webHandler.DeleteDictionaryWord)
 		r.Post("/projects/{id}/project-files/{fid}/take", webHandler.ProjectFileTake)
 		r.Post("/projects/{id}/project-files/sync", webHandler.ProjectFilesSync)
 		r.Get("/projects/{id}/project-files/sync", webHandler.ProjectFilesSyncStatus)

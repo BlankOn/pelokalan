@@ -50,6 +50,9 @@ type GlossaryConfig struct {
 	// ThesaurusURL is where the Indonesian thesaurus JSON is downloaded from when the
 	// database has none yet; empty disables the thesaurus
 	ThesaurusURL string
+	// SpellingURL is where the Indonesian word list (KBBI CSV extract) is downloaded from when the
+	// spelling_words table is empty (SPELLING_URL; empty = no spelling check)
+	SpellingURL string
 }
 
 // ServerConfig holds HTTP server configuration
@@ -167,6 +170,8 @@ func Load() *Config {
 			AllowPrivateHosts: getEnv("GLOSSARY_ALLOW_PRIVATE_HOSTS", "false") == "true",
 			ThesaurusURL: getEnv("THESAURUS_URL",
 				"https://raw.githubusercontent.com/victoriasovereigne/tesaurus/refs/heads/master/dict.json"),
+			SpellingURL: getEnv("SPELLING_URL",
+				"https://raw.githubusercontent.com/aryakdaniswara/kbbi-v6-full-csv/main/kbbi_v6.1.0_full.csv"),
 		},
 	}
 }

@@ -47,6 +47,7 @@ type Handler struct {
 	poFetcher      *glossary.Fetcher // downloads PO files from a URL (SSRF-safe)
 	syncEvery      time.Duration     // automatic glossary/project file sync interval
 	thesaurus      *service.ThesaurusService
+	spelling       *service.SpellingService
 	activity       *service.ActivityService
 	assetVersion   string
 }

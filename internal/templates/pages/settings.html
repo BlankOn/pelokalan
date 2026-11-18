@@ -21,6 +21,17 @@
 </section>
 {{end}}
 
+<section class="card" id="dictionary">
+    <h2>{{t .Lang "spelling.title"}}</h2>
+    <p class="muted small">{{t .Lang "spelling.help"}}</p>
+    {{with .Data.DictionaryWords}}
+    <ul class="dict-words">
+        {{range .}}<li><span class="dict-word">{{.Word}}</span>{{if .AddedBy}} <span class="muted small">@{{.AddedBy}}</span>{{end}}
+            {{if $p.Role.CanManage}}<form method="post" action="{{$p.Path}}/dictionary/delete" data-confirm="{{t $.Lang "spelling.delete_confirm" .Word}}"><input type="hidden" name="word" value="{{.Word}}"><button class="linklike danger small" type="submit" aria-label="{{t $.Lang "action.delete"}} {{.Word}}">×</button></form>{{end}}</li>{{end}}
+    </ul>
+    {{else}}<p class="muted small">{{t .Lang "spelling.empty"}}</p>{{end}}
+</section>
+
 {{if $p.Role.CanManage}}
 <section class="card">
     <h2>{{t .Lang "settings.general"}}</h2>

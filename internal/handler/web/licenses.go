@@ -30,6 +30,10 @@ var licenseCredits = []credit{
 var thesaurusCredit = credit{"tesaurus (victoriasovereigne)",
 	"https://raw.githubusercontent.com/victoriasovereigne/tesaurus/refs/heads/master/dict.json", "", "licenses.use_thesaurus"}
 
+// spellingCredit is the data source of the Indonesian spelling check (no licence stated)
+var spellingCredit = credit{"kbbi-v6-full-csv (aryakdaniswara)",
+	"https://github.com/aryakdaniswara/kbbi-v6-full-csv", "", "licenses.use_spelling"}
+
 // AboutPage explains what Pelokalan is for and who funds it (public)
 func (h *Handler) AboutPage(w http.ResponseWriter, r *http.Request) {
 	h.render(w, "about", h.page(r, "title.about"))
@@ -40,5 +44,6 @@ func (h *Handler) LicensesPage(w http.ResponseWriter, r *http.Request) {
 	data := h.page(r, "title.licenses")
 	data.Data["Credits"] = licenseCredits
 	data.Data["Thesaurus"] = thesaurusCredit
+	data.Data["Spelling"] = spellingCredit
 	h.render(w, "licenses", data)
 }

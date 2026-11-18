@@ -1249,6 +1249,13 @@ h1 .ai-badge { font-size: 12px; }
 .ed-actions:has(#btn-unfuzzy-save[hidden]) #btn-save .ok-check { display: inline; }
 
 /* thesaurus popup in the editor */
+/* Indonesian spelling: a layer behind the (transparent) translation box repeats its text with
+   unknown words underlined; app.js copies the box's metrics and scroll position */
+.spell-layer { position: absolute; z-index: 0; box-sizing: border-box; margin: 0; overflow: hidden; pointer-events: none;
+    white-space: pre-wrap; overflow-wrap: break-word; word-break: normal; color: transparent; border-style: solid; border-color: transparent; background: var(--surface); }
+.spell-layer .typo { text-decoration: underline wavy #d1342f; text-decoration-skip-ink: none; text-underline-offset: 3px; }
+.tr-input.spell-on { position: relative; z-index: 1; background: transparent; }
+.spell-pop .spell-list { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 6px; }
 .th-pop { position: fixed; z-index: 60; max-width: min(380px, calc(100vw - 16px)); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: 0 8px 24px rgba(0,0,0,.14); padding: 8px 10px; font-size: 13px; }
 .th-pop.th-empty { padding: 6px 10px; color: var(--muted); }
 .th-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 4px; }
@@ -1419,6 +1426,11 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 form[data-sync] .sync-icon { display: inline-block; }
 form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 @keyframes pf-spin { to { transform: rotate(360deg); } }
+/* Settings → Kamus proyek */
+.dict-words { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.dict-words li { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 12px; padding: 2px 4px 2px 10px; }
+.dict-words form { margin: 0; display: inline; }
+.dict-words .linklike { padding: 0 4px; }
 /* htmx request taking over a second: a layer over everything (also open dialogs) with a spinner */
 .busy-overlay { position: fixed; inset: 0; z-index: 10000; display: none; align-items: center; justify-content: center;
     width: auto; height: auto; max-width: none; max-height: none; margin: 0; padding: 0; border: 0;

@@ -54,6 +54,11 @@ func (h *Handler) renderSettingsWith(w http.ResponseWriter, r *http.Request, p *
 		{"notify.group_follow", []string{models.NotifyStarted, models.NotifyParticipated}},
 		{"notify.group_project", []string{models.NotifyNewTopic, models.NotifyOtherTopic, models.NotifyOtherGlossary, models.NotifyOtherEntry}},
 	}
+	if h.spelling != nil {
+		if words, err := h.spelling.ExtraWords(r.Context(), p); err == nil {
+			data.Data["DictionaryWords"] = words
+		}
+	}
 	if p.Role.CanManage() {
 		h.aiSettingsData(r, p, data)
 		if groups == nil {

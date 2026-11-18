@@ -19,6 +19,9 @@ func IsCreditsEntry(msgid string) bool {
 const (
 	IssueCreditsMissing = "credits_missing" // the translator is not in the credits yet
 	IssueCreditsYear    = "credits_year"    // the translator's credit lists years, but not this one
+	// IssueSpelling: a word of the translation is not in the Indonesian word list (set by the service,
+	// which has the dictionary)
+	IssueSpelling = "spelling"
 )
 
 // yearsRe matches a list of years at the end of a credit: "2022", "2022, 2024", "2024-2026",

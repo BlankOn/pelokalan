@@ -313,6 +313,7 @@
         if (row) scrollToRow(row);
                 if (ed && !ed.querySelector(".ed-alert-error")) focusTranslation();
         if (window.loadThreads) window.loadThreads(document.getElementById("sidebar"));
+        if (window.spellInit) window.spellInit(ed);
     }
 
     // Handles a response; returns true when the editor was updated
@@ -1240,6 +1241,167 @@ document.addEventListener("change", function (ev) {
     var price = form && form.querySelector("[data-model-price]");
     if (price) price.textContent = pick.value ? (pick.selectedOptions[0].dataset.price || "") : "";
 });
+
+// Indonesian spelling check in the translation box (project members, own files; the browser's
+// own check is off). The server says which words are unknown (POST /catalogs/{cid}/spell); a layer
+// behind the transparent textarea repeats the text with those words underlined. Clicking an
+// underlined word offers suggestions and "Tambahkan ke kamus proyek".
+(function () {
+    var app = document.getElementById("editor-app");
+    if (!app || !app.dataset.spell) return;
+    var active = true, unknown = {}, timer = 0, seq = 0, pop = null;
+    var wordRe = /[\p{L}][\p{L}'’-]*[\p{L}]|[\p{L}]/gu;
+
+    function esc(s) { return s.replace(/[&<>"]/g, function (c) { return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]; }); }
+    function source() {
+        return Array.prototype.map.call(document.querySelectorAll("#editor .src-text[data-text]"), function (el) { return el.dataset.text; }).join("\n");
+    }
+    function boxes() { return Array.prototype.slice.call(document.querySelectorAll("#entry-form .tr-input")); }
+
+    function layerFor(ta) {
+        var l = ta.previousElementSibling;
+        if (l && l.classList.contains("spell-layer")) return l;
+        if (getComputedStyle(ta.parentNode).position === "static") ta.parentNode.style.position = "relative";
+        l = document.createElement("div");
+        l.className = "spell-layer";
+        l.setAttribute("aria-hidden", "true");
+        ta.parentNode.insertBefore(l, ta);
+        ta.classList.add("spell-on");
+        ta.addEventListener("scroll", function () { l.scrollTop = ta.scrollTop; });
+        if (window.ResizeObserver) new ResizeObserver(function () { place(ta, l); }).observe(ta);
+        return l;
+    }
+    // the layer copies the textarea's box and font so the text wraps at the same places
+    function place(ta, l) {
+        if (ta.hidden) { l.hidden = true; return; }
+        l.hidden = false;
+        var cs = getComputedStyle(ta);
+        ["fontFamily", "fontSize", "fontWeight", "lineHeight", "letterSpacing", "paddingTop", "paddingRight", "paddingBottom",
+            "paddingLeft", "borderTopWidth", "borderRightWidth", "borderBottomWidth", "borderLeftWidth", "borderRadius", "textIndent"].forEach(function (k) { l.style[k] = cs[k]; });
+        l.style.top = ta.offsetTop + "px";
+        l.style.left = ta.offsetLeft + "px";
+        l.style.width = ta.offsetWidth + "px";
+        l.style.height = ta.offsetHeight + "px";
+        l.style.backgroundColor = cs.backgroundColor === "rgba(0, 0, 0, 0)" ? "" : cs.backgroundColor;
+        l.scrollTop = ta.scrollTop;
+    }
+    function draw(ta) {
+        var l = layerFor(ta), text = ta.value, out = "", last = 0, m;
+        wordRe.lastIndex = 0;
+        while ((m = wordRe.exec(text))) {
+            if (!unknown[m[0].toLowerCase()]) continue;
+            out += esc(text.slice(last, m.index)) + '<span class="typo" data-w="' + esc(m[0]) + '">' + esc(m[0]) + "</span>";
+            last = m.index + m[0].length;
+        }
+        l.innerHTML = out + esc(text.slice(last)) + "\n";
+        place(ta, l);
+    }
+    function drawAll() { boxes().forEach(draw); }
+
+    function check() {
+        if (!active) return;
+        var list = boxes();
+        if (!list.length) return;
+        var mine = ++seq;
+        fetch(app.dataset.spell, {
+            method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: list.map(function (ta) { return ta.value; }).join("\n"), source: source() })
+        }).then(function (r) { return r.ok ? r.json() : null; }).then(function (res) {
+            if (!res || mine !== seq) return;
+            if (res.active === false) { active = false; return; }
+            unknown = {};
+            (res.unknown || []).forEach(function (w) { unknown[w] = true; });
+            drawAll();
+        }).catch(function () { });
+    }
+    function later() { clearTimeout(timer); timer = setTimeout(check, 350); }
+
+    window.spellInit = function () { close(); unknown = {}; drawAll(); check(); };
+    document.addEventListener("input", function (ev) {
+        if (!ev.target.matches || !ev.target.matches("#entry-form .tr-input")) return;
+        draw(ev.target); // marks stay on the words until the next answer
+        later();
+    });
+    document.addEventListener("click", function (ev) {
+        if (ev.target.closest && ev.target.closest(".ptab")) setTimeout(drawAll, 0); // plural tabs
+    });
+    window.addEventListener("resize", function () { boxes().forEach(function (ta) { place(ta, layerFor(ta)); }); });
+
+    // a click inside an underlined word opens its suggestions
+    function close() { if (pop) { pop.remove(); pop = null; } }
+    function wordAt(ta, pos) {
+        var m;
+        wordRe.lastIndex = 0;
+        while ((m = wordRe.exec(ta.value))) {
+            if (m.index <= pos && pos <= m.index + m[0].length) return { start: m.index, end: m.index + m[0].length, text: m[0] };
+            if (m.index > pos) break;
+        }
+        return null;
+    }
+    function matchCase(sugg, orig) {
+        if (orig === orig.toUpperCase() && orig.length > 1) return sugg.toUpperCase();
+        if (orig[0] === orig[0].toUpperCase()) return sugg.charAt(0).toUpperCase() + sugg.slice(1);
+        return sugg;
+    }
+    function replace(ta, w, text) {
+        if (window.trBeforeChange) window.trBeforeChange();
+        ta.value = ta.value.slice(0, w.start) + text + ta.value.slice(w.end);
+        ta.setSelectionRange(w.start + text.length, w.start + text.length);
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+        ta.focus();
+    }
+    function open(ta, w) {
+        close();
+        var layer = layerFor(ta), mark = null;
+        layer.querySelectorAll(".typo").forEach(function (s) { if (!mark && s.dataset.w === w.text) mark = s; });
+        pop = document.createElement("div");
+        pop.className = "th-pop spell-pop";
+        pop.setAttribute("role", "dialog");
+        pop.innerHTML = '<div class="th-head"><strong>' + esc(w.text) + '</strong><span class="th-tag">' + esc(app.dataset.spTitle) + '</span></div><div class="spell-list muted small">…</div>' +
+            '<button type="button" class="linklike small spell-add">+ ' + esc(app.dataset.spAdd) + '</button>';
+        document.body.appendChild(pop);
+        var r = (mark || ta).getBoundingClientRect();
+        pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - pop.offsetWidth - 8)) + "px";
+        pop.style.top = (r.bottom + 6 + pop.offsetHeight > window.innerHeight ? r.top - pop.offsetHeight - 6 : r.bottom + 6) + "px";
+        var current = pop;
+        fetch(app.dataset.spellSuggest + "?w=" + encodeURIComponent(w.text), { credentials: "same-origin" })
+            .then(function (r) { return r.json(); }).then(function (res) {
+                if (pop !== current) return;
+                var list = pop.querySelector(".spell-list");
+                list.textContent = "";
+                list.classList.remove("muted", "small");
+                if (!res.suggestions || !res.suggestions.length) { list.textContent = app.dataset.spNone; list.classList.add("muted", "small"); return; }
+                res.suggestions.forEach(function (s) {
+                    var b = document.createElement("button");
+                    b.type = "button";
+                    b.className = "th-word";
+                    b.textContent = matchCase(s, w.text);
+                    b.addEventListener("click", function () { close(); replace(ta, w, b.textContent); });
+                    list.appendChild(b);
+                });
+            }).catch(function () { });
+        pop.querySelector(".spell-add").addEventListener("click", function () {
+            fetch(app.dataset.spellDict, {
+                method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ word: w.text })
+            }).then(function (r) { return r.json(); }).then(function (res) {
+                close();
+                if (res.error) { window.showMessage(res.error); return; }
+                delete unknown[(res.word || w.text).toLowerCase()];
+                drawAll();
+            }).catch(function () { });
+        });
+    }
+    document.addEventListener("click", function (ev) {
+        if (pop && !pop.contains(ev.target)) close();
+        var ta = ev.target;
+        if (!ta.matches || !ta.matches("#entry-form .tr-input") || ta.readOnly || ta.selectionStart !== ta.selectionEnd) return;
+        var w = wordAt(ta, ta.selectionStart);
+        if (w && unknown[w.text.toLowerCase()]) open(ta, w);
+    });
+    document.addEventListener("keydown", function (ev) { if (ev.key === "Escape") close(); });
+    document.addEventListener("input", function (ev) { if (pop && ev.target.matches && ev.target.matches(".tr-input")) close(); });
+})();
 
 // Disable upload buttons while a (possibly large) file is processed
 document.addEventListener("submit", function (ev) {

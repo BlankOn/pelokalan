@@ -190,5 +190,5 @@ func subset(small, big []string) bool {
 var Checks = []string{
 	IssuePlaceholders, IssuePluralPlaceholders, IssuePluralCount, IssueMarkup, IssueControlChars,
 	IssueNewlineStart, IssueNewlineEnd, IssueSpaceStart, IssueSpaceEnd,
-	IssueCreditsMissing, IssueCreditsYear,
+	IssueCreditsMissing, IssueCreditsYear, IssueSpelling,
 }
