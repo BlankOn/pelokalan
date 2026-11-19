@@ -24,14 +24,10 @@ type CatalogService struct {
 	commits  repository.CommitRepository
 	projects *ProjectService
 	activity *ActivityService
-	spelling *SpellingService
 }
 
 // SetActivity makes the service record entry saves and commits in the activity log
 func (s *CatalogService) SetActivity(a *ActivityService) { s.activity = a }
-
-// SetSpelling makes validation check Indonesian spelling for project members
-func (s *CatalogService) SetSpelling(sp *SpellingService) { s.spelling = sp }
 
 // NewCatalogService creates a new catalog service
 func NewCatalogService(catalogs repository.CatalogRepository, commits repository.CommitRepository, projects *ProjectService) *CatalogService {
@@ -105,9 +101,6 @@ func (s *CatalogService) Get(ctx context.Context, user *models.User, id int64) (
 	}
 	if c.Stats, err = s.catalogs.Stats(ctx, c.ID); err != nil {
 		return nil, nil, err
-	}
-	if user != nil && p.Role.IsMember() && !c.IsTemplate {
-		c.Spelling = s.spelling.Checker(ctx, p, c.Language) // nil when not Indonesian or no word list
 	}
 	return c, p, nil
 }
@@ -996,10 +989,6 @@ func validateEntry(c *models.Catalog, e *models.Entry) []string {
 		if code := po.CheckCredits(pe, c.CreditName, c.CreditEmail, time.Now().Year()); code != "" {
 			issues = append(issues, code)
 		}
-	}
-	if c.Spelling != nil && !e.Obsolete && !po.IsCreditsEntry(e.MsgID) && e.IsTranslated() &&
-		len(c.Spelling.Misspelled(strings.Join(e.MsgStr, "\n"), e.MsgID+"\n"+e.MsgIDPlural)) > 0 {
-		issues = append(issues, po.IssueSpelling)
 	}
 	if len(c.ChecksOff) == 0 || len(issues) == 0 {
 		return issues

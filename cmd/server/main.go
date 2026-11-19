@@ -146,7 +146,6 @@ func main() {
 	}()
 	// Indonesian spelling check: the word list is stored on first start, then served from memory
 	spellingService := service.NewSpellingService(postgres.NewSpellingRepository(db), fetcher, cfg.Glossary.SpellingURL)
-	catalogService.SetSpelling(spellingService)
 	webHandler.SetSpelling(spellingService)
 	go func() {
 		for {

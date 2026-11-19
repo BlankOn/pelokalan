@@ -33,9 +33,6 @@ type Catalog struct {
 	CreditName, CreditEmail string
 	// ChecksOff: the viewer's switched-off editor checks (models.User.ChecksOff), not stored
 	ChecksOff []string
-	// Spelling checks the translations' words for project members of an Indonesian file (nil = no
-	// check), set by the service, not stored
-	Spelling SpellChecker
 	// DeletedAt is set when the file was deleted: it stays readable, but nobody changes it
 	DeletedAt      *time.Time
 	DeletedBy      *int64

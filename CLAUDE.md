@@ -302,9 +302,8 @@ make test
 - Tables (migration 041): `spelling_words` (filled once on start when empty, like the thesaurus; `SpellingService.Load`)
   and `spelling_extra` (a project's own words: "Kamus proyek"). The source has **no licence**: checks are for project
   members only (never public), and /licenses credits the source.
-- Only Indonesian files (`service.Indonesian`) of signed-in members: `CatalogService.Get` sets `Catalog.Spelling`
-  (a `models.SpellChecker`), and `validateEntry` adds `po.IssueSpelling` ("spelling", switchable in the editor's
-  Pengaturan like the other checks; skipped for translator-credits entries).
+- Only Indonesian files (`service.Indonesian`) of signed-in members. Unknown words are **not** a problem in Validasi
+  (no issue, no warning box, not counted in "bermasalah"): the underline and its popup are the only marks.
 - Editor (owner's files): the browser's spellcheck is off (`spellcheck="false"`). app.js posts the boxes' text to
   `POST /catalogs/{cid}/spell` (debounced) and draws `.spell-layer` behind each transparent `.tr-input` (metrics
   copied, scroll mirrored) with unknown words in `.typo` (red wavy underline). Clicking inside one opens `.spell-pop`
