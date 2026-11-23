@@ -373,6 +373,15 @@ func (s *AuthService) UserByUsername(ctx context.Context, username string) (*mod
 	return u, nil
 }
 
+// SetBadgeEmails turns the emails about new badges on or off for the user
+func (s *AuthService) SetBadgeEmails(ctx context.Context, user *models.User, on bool) error {
+	if err := s.users.SetBadgeEmails(ctx, user.ID, !on); err != nil {
+		return err
+	}
+	user.BadgeEmailsOff = !on
+	return nil
+}
+
 // UpdateProfile changes the user's name and UI language
 func (s *AuthService) UpdateProfile(ctx context.Context, user *models.User, username, name, lang string) error {
 	name = strings.TrimSpace(name)

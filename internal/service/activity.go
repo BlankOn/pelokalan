@@ -14,6 +14,7 @@ import (
 // Recording never fails the action itself: errors are only logged.
 type ActivityService struct {
 	repo repository.ActivityRepository
+	mail *badgeMail // emails about new badges (nil = off)
 }
 
 // NewActivityService creates the activity service

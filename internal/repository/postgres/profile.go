@@ -237,3 +237,54 @@ func (r *activityRepository) ClaimOneTimeJob(ctx context.Context, name string) (
 	n, _ := res.RowsAffected()
 	return n > 0, nil
 }
+
+func (r *activityRepository) BadgeUsers(ctx context.Context) ([]int64, error) {
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT user_id FROM activity_events WHERE user_id IS NOT NULL AND `+evContribute+`
+		UNION SELECT user_id FROM upstream_landings
+		UNION SELECT author_id FROM comments WHERE author_id IS NOT NULL AND deleted_at IS NULL
+		UNION SELECT user_id FROM wiki_edits WHERE user_id IS NOT NULL
+		UNION SELECT user_id FROM module_context_edits WHERE user_id IS NOT NULL
+		UNION SELECT author_id FROM catalog_commits WHERE author_id IS NOT NULL AND kind = 'manual'`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
+func (r *activityRepository) AwardedTiers(ctx context.Context, userID int64) (map[string]int, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT badge, MAX(tier) FROM badge_awards WHERE user_id = $1 GROUP BY badge`, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var b string
+		var t int
+		if err := rows.Scan(&b, &t); err != nil {
+			return nil, err
+		}
+		out[b] = t
+	}
+	return out, rows.Err()
+}
+
+func (r *activityRepository) AddAwards(ctx context.Context, userID int64, awards []models.BadgeAward, emailed bool) error {
+	for _, a := range awards {
+		if _, err := r.db.ExecContext(ctx, `INSERT INTO badge_awards (user_id, badge, tier, emailed) VALUES ($1, $2, $3, $4)
+			ON CONFLICT DO NOTHING`, userID, a.Badge, a.Tier, emailed); err != nil {
+			return err
+		}
+	}
+	return nil
+}

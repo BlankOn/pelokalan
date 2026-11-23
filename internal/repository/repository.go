@@ -23,6 +23,8 @@ type UserRepository interface {
 	GetByUsername(ctx context.Context, username string) (*models.User, error)
 	Update(ctx context.Context, user *models.User) error
 	TouchLogin(ctx context.Context, id int64) error
+	// SetBadgeEmails turns the emails about new badges off (true) or on
+	SetBadgeEmails(ctx context.Context, id int64, off bool) error
 }
 
 // OTPRepository defines methods for one-time code data access
@@ -311,6 +313,12 @@ type ActivityRepository interface {
 	UserCommunityWork(ctx context.Context, userID int64, kind string, limit int) ([]*models.ModuleWork, error)
 	// NthTime is when a person's nth item of a kind ("landed", "landed_modules", or a community kind) happened
 	NthTime(ctx context.Context, userID int64, kind string, n int) (*time.Time, error)
+	// BadgeUsers lists the people who have done any work that badges count (translation, upstream, community)
+	BadgeUsers(ctx context.Context) ([]int64, error)
+	// AwardedTiers returns the highest tier awarded per badge to a person
+	AwardedTiers(ctx context.Context, userID int64) (map[string]int, error)
+	// AddAwards records awarded badge tiers (already recorded ones are skipped)
+	AddAwards(ctx context.Context, userID int64, awards []models.BadgeAward, emailed bool) error
 	// ClaimOneTimeJob marks a one-time job as done; false when it already was (one_time_jobs)
 	ClaimOneTimeJob(ctx context.Context, name string) (bool, error)
 	// AddLandings stores strings accepted upstream; ones already stored are skipped. It returns how many are new.

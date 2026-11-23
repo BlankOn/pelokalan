@@ -115,6 +115,9 @@ type PageData struct {
 // siteLocation is the site's time zone (SITE_TIMEZONE): where profile days start and end
 var siteLocation = time.UTC
 
+// SiteLocation is the site's time zone, set when the handler is created (for background jobs)
+func SiteLocation() *time.Location { return siteLocation }
+
 func funcMap() template.FuncMap {
 	return template.FuncMap{
 		"t": func(lang, key string, args ...any) string { return i18n.T(lang, key, args...) },

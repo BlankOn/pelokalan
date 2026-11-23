@@ -210,6 +210,15 @@ func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/profile?flash=profile_saved", http.StatusSeeOther)
 }
 
+// UpdateBadgeEmails turns the emails about new badges on or off: POST /profile/badge-emails
+func (h *Handler) UpdateBadgeEmails(w http.ResponseWriter, r *http.Request) {
+	if err := h.authService.SetBadgeEmails(r.Context(), middleware.GetUser(r.Context()), r.FormValue("badge_emails") == "on"); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, "/profile?flash=profile_saved#badge-emails", http.StatusSeeOther)
+}
+
 // UpdateEditorSettings saves the editor settings (which checks Validasi uses) for the whole
 // account and goes back to the page the dialog was opened on
 func (h *Handler) UpdateEditorSettings(w http.ResponseWriter, r *http.Request) {

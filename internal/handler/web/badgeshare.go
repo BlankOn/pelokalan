@@ -1,8 +1,6 @@
 package web
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -10,12 +8,10 @@ import (
 	"strings"
 	"sync"
 	"time"
-	"unicode"
 
 	"github.com/go-chi/chi/v5"
 
 	"pelokalan/internal/badgecard"
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
 	"pelokalan/internal/service"
 )
@@ -30,46 +26,14 @@ type pageMeta struct {
 	Title, Desc, URL, Image, ImageAlt string
 }
 
-// badgeShare is one earned badge tier with its share texts
-type badgeShare struct {
-	Key, Icon, TierName string
-	Tier, Tiers         int
-	PageURL, ImageURL   string
-	Name, TierLabel     string // badge name, "Emas · tingkat 3 dari 5"
-	Done                string // what it took, past tense
-	Text                string // ready-made post text (first person)
-	OGTitle, OGDesc     string
-}
+// badgeShare is one earned badge tier with its share texts (service.BadgeShareFor)
+type badgeShare = service.BadgeShare
 
 func (h *Handler) siteURL() string { return strings.TrimRight(h.siteConfig.BaseURL, "/") }
 
 // shareFor builds the share texts of badge b at tier (1-based) for user u in lang
 func (h *Handler) shareFor(lang string, u *models.User, b service.Badge, tier int) badgeShare {
-	tn := service.TierName(tier)
-	s := badgeShare{Key: b.Key, Icon: b.Icon, TierName: tn, Tier: tier, Tiers: b.Tiers}
-	s.PageURL = fmt.Sprintf("%s/users/%s/badges/%s/%d", h.siteURL(), url.PathEscape(u.Username), b.Key, tier)
-	s.ImageURL = s.PageURL + ".png"
-	s.Name = i18n.T(lang, "badge."+b.Key)
-	tierName := i18n.T(lang, fmt.Sprintf("badges.tier_%s", tn))
-	s.TierLabel = i18n.T(lang, "badges.tier_label", tierName, tier, b.Tiers)
-	s.Done = i18n.T(lang, "badge."+b.Key+"_done", groupDigits(int64(b.Shown(b.Steps[tier-1]))))
-	s.Text = i18n.T(lang, "share.text", tierName, s.Name, s.Done)
-	s.OGTitle = i18n.T(lang, "share.og_title", u.DisplayName(), tierName, s.Name)
-	s.OGDesc = i18n.T(lang, "share.og_desc", capFirst(s.Done))
-	// the image address changes with what the card says (renamed badge or person, new wording), so
-	// browsers and link previews never keep an outdated picture for the day it may be cached
-	sum := sha256.Sum256([]byte(strings.Join([]string{u.DisplayName(), u.Username, s.Name, s.TierLabel, s.Done}, "\x00")))
-	s.ImageURL += "?v=" + hex.EncodeToString(sum[:4])
-	return s
-}
-
-// capFirst upper-cases the first letter ("menerjemahkan …" → "Menerjemahkan …")
-func capFirst(s string) string {
-	r := []rune(s)
-	if len(r) > 0 {
-		r[0] = unicode.ToUpper(r[0])
-	}
-	return string(r)
+	return service.BadgeShareFor(h.siteURL(), lang, u, b, tier)
 }
 
 func (h *Handler) ownerLang(u *models.User) string {
@@ -98,7 +62,7 @@ func (h *Handler) badgeImage(u *models.User, s badgeShare) ([]byte, error) {
 		host = pu.Host
 	}
 	data, err := badgecard.Render(badgecard.Card{Icon: s.Icon, Tier: s.TierName, TierIndex: s.Tier, TierCount: s.Tiers,
-		Brand: h.siteConfig.Name, Title: s.Name, TierLabel: s.TierLabel, Desc: capFirst(s.Done),
+		Brand: h.siteConfig.Name, Title: s.Name, TierLabel: s.TierLabel, Desc: service.CapFirst(s.Done),
 		Person: u.DisplayName() + " (@" + u.Username + ")", Footer: host})
 	if err != nil {
 		return nil, err

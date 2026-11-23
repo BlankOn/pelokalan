@@ -372,6 +372,14 @@ shows it only to members), role, joined_at. Documented in README.md.
   (`CatalogService.BackfillLandings`: stored project files, member work measured against their starting point a month
   earlier via `referenceAt`, dated when that upstream file was stored). It can be removed once it has run.
 
+- **Badge emails** (service/badgemail.go, `badge_awards` + `users.badge_emails_off`, migration 045): badges are computed,
+  so `ActivityService.AwardBadges` (main.go: once silently as `BadgeAwardsBaselineJob`, then hourly) compares everyone
+  with work (`BadgeUsers`) against the tiers recorded in `badge_awards` and emails the new ones in one message per person
+  (`badgeMessage`: picture, achievement, "Lihat lencana", LinkedIn/X/Facebook share links, encouragement to share, link
+  to turn them off). A tier is recorded once and never announced again, even if the count drops and rises. Recorded
+  silently when the person turned them off (profile page `#badge-emails`, `POST /profile/badge-emails`) or is no longer
+  whitelisted. Share texts and links come from `service.BadgeShareFor` (also used by the share page and dialog).
+
 ## Git-only projects
 
 - When every module group of a project is synced from GitHub (`GlossaryService.IsGitProject`), Penerjemahan hides the

@@ -19,13 +19,13 @@ func NewUserRepository(db *sql.DB) repository.UserRepository {
 	return &userRepository{db: db}
 }
 
-const userColumns = `id, email, username, name, lang, translator_name, translator_email, language_team, editor_checks_off, last_login_at, created_at, updated_at`
+const userColumns = `id, email, username, name, lang, translator_name, translator_email, language_team, editor_checks_off, badge_emails_off, last_login_at, created_at, updated_at`
 
 func scanUser(row interface{ Scan(...any) error }) (*models.User, error) {
 	u := &models.User{}
 	var off string
 	err := row.Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Lang, &u.TranslatorName, &u.TranslatorEmail, &u.LanguageTeam,
-		&off, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
+		&off, &u.BadgeEmailsOff, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
 	if off != "" {
 		u.ChecksOff = strings.Split(off, ",")
 	}
@@ -65,5 +65,10 @@ func (r *userRepository) Update(ctx context.Context, u *models.User) error {
 
 func (r *userRepository) TouchLogin(ctx context.Context, id int64) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE users SET last_login_at = NOW() WHERE id = $1`, id)
+	return err
+}
+
+func (r *userRepository) SetBadgeEmails(ctx context.Context, id int64, off bool) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE users SET badge_emails_off = $2 WHERE id = $1`, id, off)
 	return err
 }

@@ -64,3 +64,9 @@ type ModuleWork struct {
 
 // ProjectPath is the project's address
 func (m *ModuleWork) ProjectPath() string { return "/projects/" + m.ProjectSlug }
+
+// BadgeAward is a badge tier given to a person (badge_awards)
+type BadgeAward struct {
+	Badge string
+	Tier  int
+}

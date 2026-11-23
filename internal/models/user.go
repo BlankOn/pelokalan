@@ -15,10 +15,12 @@ type User struct {
 	LanguageTeam    string `json:"language_team"`
 	// ChecksOff: editor checks the user switched off (issue codes, "untranslated", "fuzzy");
 	// they apply to every file the user opens
-	ChecksOff   []string   `json:"checks_off,omitempty"`
-	LastLoginAt *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt   time.Time  `json:"created_at"`
-	UpdatedAt   time.Time  `json:"updated_at"`
+	ChecksOff []string `json:"checks_off,omitempty"`
+	// BadgeEmailsOff: no emails about new badges (profile page)
+	BadgeEmailsOff bool       `json:"badge_emails_off"`
+	LastLoginAt    *time.Time `json:"last_login_at,omitempty"`
+	CreatedAt      time.Time  `json:"created_at"`
+	UpdatedAt      time.Time  `json:"updated_at"`
 }
 
 // DisplayName returns the name, or the email when the name is empty

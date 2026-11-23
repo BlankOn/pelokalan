@@ -36,6 +36,13 @@ func (f *fakeActivityRepo) UserCommunityWork(context.Context, int64, string, int
 func (f *fakeActivityRepo) NthTime(context.Context, int64, string, int) (*time.Time, error) {
 	return nil, nil
 }
+func (f *fakeActivityRepo) BadgeUsers(context.Context) ([]int64, error) { return nil, nil }
+func (f *fakeActivityRepo) AwardedTiers(context.Context, int64) (map[string]int, error) {
+	return nil, nil
+}
+func (f *fakeActivityRepo) AddAwards(context.Context, int64, []models.BadgeAward, bool) error {
+	return nil
+}
 func (f *fakeActivityRepo) ClaimOneTimeJob(context.Context, string) (bool, error) { return false, nil }
 func (f *fakeActivityRepo) AddLandings(context.Context, []models.UpstreamLanding) (int, error) {
 	return 0, nil

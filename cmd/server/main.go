@@ -99,6 +99,7 @@ func main() {
 	discussionService := service.NewDiscussionService(repos.Discuss, repos.Project, repos.Glossary, repos.Catalog, blobs, mailer, cfg.Site)
 	// activity log for the Insight tab
 	activityService := service.NewActivityService(repos.Activity)
+	activityService.SetBadgeMail(repos.User, mailer, cfg.Site, authService.IsAllowed) // emails about new badges
 	authService.SetActivity(activityService)
 	glossaryService.SetProjects(repos.Project)
 	glossaryService.SetLandings(catalogService) // members' work accepted upstream, after each import
@@ -253,6 +254,7 @@ func main() {
 		r.Get("/profile", webHandler.ProfilePage)
 		r.Post("/profile", webHandler.UpdateProfile)
 		r.Post("/profile/identity", webHandler.UpdateIdentity)
+		r.Post("/profile/badge-emails", webHandler.UpdateBadgeEmails)
 		r.Post("/editor-settings", webHandler.UpdateEditorSettings)
 
 		r.Get("/invitations", webHandler.InvitationsPage)
@@ -351,21 +353,31 @@ func main() {
 		}
 	}()
 
-	// One-time catch-up (runs on the first start that has it, never again: one_time_jobs): members' work
-	// accepted upstream during the month before detection existed. Safe to delete after it ran.
+	// Badges and one-time catch-ups, in order: (1) once, record members' work accepted upstream during the
+	// month before detection existed (safe to delete after it ran); (2) once, record everyone's current
+	// badges silently (BadgeAwardsBaselineJob); (3) every hour, record new badge tiers and email them.
 	go func() {
 		ctx := context.Background()
-		claimed, err := activityService.ClaimOneTimeJob(ctx, service.BackfillLandingsJob)
-		if err != nil || !claimed {
-			return
+		if claimed, err := activityService.ClaimOneTimeJob(ctx, service.BackfillLandingsJob); err == nil && claimed {
+			if projects, err := repos.Project.ListAll(ctx, 0); err != nil {
+				log.Printf("upstream landings backfill: %v", err)
+			} else {
+				n, err := catalogService.BackfillLandings(ctx, projects, time.Now().AddDate(0, -1, 0))
+				log.Printf("upstream landings backfill: %d strings accepted upstream recorded (err: %v)", n, err)
+			}
 		}
-		projects, err := repos.Project.ListAll(ctx, 0)
-		if err != nil {
-			log.Printf("upstream landings backfill: %v", err)
-			return
+		if claimed, err := activityService.ClaimOneTimeJob(ctx, service.BadgeAwardsBaselineJob); err == nil && claimed {
+			_, err := activityService.AwardBadges(ctx, web.SiteLocation(), time.Now(), false)
+			log.Printf("badges: baseline recorded silently (err: %v)", err)
 		}
-		n, err := catalogService.BackfillLandings(ctx, projects, time.Now().AddDate(0, -1, 0))
-		log.Printf("upstream landings backfill: %d strings accepted upstream recorded (err: %v)", n, err)
+		for {
+			if n, err := activityService.AwardBadges(ctx, web.SiteLocation(), time.Now(), true); err != nil {
+				log.Printf("badges: %v", err)
+			} else if n > 0 {
+				log.Printf("badges: emailed %d people about new badges", n)
+			}
+			time.Sleep(time.Hour)
+		}
 	}()
 
 	// Remove stored files no attachment uses any more (like a bucket lifecycle rule)

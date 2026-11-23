@@ -36,4 +36,13 @@
         <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
     </form>
 </div>
+
+<div class="card narrow" id="badge-emails">
+    <h2>{{t .Lang "profile.badge_emails_title"}}</h2>
+    <form method="post" action="/profile/badge-emails" class="form">
+        <label class="check"><input type="checkbox" name="badge_emails" {{if not .User.BadgeEmailsOff}}checked{{end}}> {{t .Lang "profile.badge_emails"}}</label>
+        <p class="muted small field-help">{{t .Lang "profile.badge_emails_help"}} <a href="/users/{{.User.Username}}">{{t .Lang "nav.my_page"}}</a></p>
+        <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
+    </form>
+</div>
 {{end}}
