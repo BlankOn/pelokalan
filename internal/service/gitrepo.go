@@ -89,18 +89,35 @@ func RepoFileName(p string) string {
 	return strings.ReplaceAll(stem, "/", "__") + ext
 }
 
-// GitGroup returns the project's newest module group synced from a GitHub repository (nil = none)
-func (s *GlossaryService) GitGroup(ctx context.Context, p *models.Project) *models.ModuleGroup {
-	groups, err := s.Groups(ctx, p)
-	if err != nil {
+// GitGroupFor returns the module group a repository file was last synced from (nil = unknown)
+func (s *GlossaryService) GitGroupFor(ctx context.Context, p *models.Project, repoPath string) *models.ModuleGroup {
+	if repoPath == "" {
 		return nil
 	}
-	for _, g := range groups {
-		if g.IsGit() {
-			return g
-		}
+	if _, g, err := s.repo.ProjectFileByRepoPath(ctx, p.ID, repoPath); err == nil && g != nil && g.IsGit() {
+		return g
 	}
 	return nil
+}
+
+// GitBranchName is the local branch a file's patch goes on: one per module ("library/os.po" →
+// "pelokalan/library-os"), so each file becomes its own pull request
+func GitBranchName(repoPath string) string {
+	name := strings.TrimSuffix(repoPath, ".po")
+	var b strings.Builder
+	for _, r := range name {
+		switch {
+		case r >= 'a' && r <= 'z', r >= 'A' && r <= 'Z', r >= '0' && r <= '9', r == '.', r == '_':
+			b.WriteRune(r)
+		default:
+			b.WriteByte('-')
+		}
+	}
+	out := strings.Trim(strings.ReplaceAll(b.String(), "..", "-"), "-.")
+	if out == "" {
+		out = "file"
+	}
+	return "pelokalan/" + out
 }
 
 // GitFileURL is a repository file's address on GitHub ("" when its group is unknown)

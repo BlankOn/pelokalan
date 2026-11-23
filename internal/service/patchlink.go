@@ -13,9 +13,8 @@ import (
 	"pelokalan/internal/models"
 )
 
-// Patch links let a member fetch their git patch from a terminal (`curl … | git am`) without the
-// session cookie. A link names the user, what it covers (a project: all the member's repository files,
-// or one file) and an expiry, signed with the JWT secret. The patch is built when the link is fetched,
+// Patch links let a member fetch a file's git patch from a terminal (`curl … | git am`) without the
+// session cookie. A link names the user, the file and an expiry, signed with the JWT secret. The patch is built when the link is fetched,
 // so it always holds the current changes; the user's access is checked again then.
 
 // PatchLinkTTL is how long a patch link works
@@ -24,8 +23,7 @@ const PatchLinkTTL = 24 * time.Hour
 // PatchLink is what a valid patch link grants
 type PatchLink struct {
 	User      *models.User
-	ProjectID int64 // all the member's repository files in this project, or
-	CatalogID int64 // one file
+	CatalogID int64
 }
 
 func (s *AuthService) patchSig(payload string) string {
@@ -34,7 +32,7 @@ func (s *AuthService) patchSig(payload string) string {
 	return base64.RawURLEncoding.EncodeToString(m.Sum(nil)[:18])
 }
 
-// PatchLinkToken signs a patch link for user: kind "p" (project) or "c" (catalog) with its id
+// PatchLinkToken signs a patch link for user: kind "c" (catalog) with its id
 func (s *AuthService) PatchLinkToken(user *models.User, kind string, id int64, now time.Time) string {
 	payload := fmt.Sprintf("%s%s-%s-%s", kind, strconv.FormatInt(id, 36), strconv.FormatInt(user.ID, 36),
 		strconv.FormatInt(now.Add(PatchLinkTTL).Unix(), 36))
@@ -69,13 +67,9 @@ func (s *AuthService) ParsePatchLink(ctx context.Context, token string, now time
 		return nil, ErrNotWhitelisted
 	}
 	link := &PatchLink{User: user}
-	switch parts[0][0] {
-	case 'p':
-		link.ProjectID = id
-	case 'c':
-		link.CatalogID = id
-	default:
+	if parts[0][0] != 'c' {
 		return nil, ErrInvalidToken
 	}
+	link.CatalogID = id
 	return link, nil
 }

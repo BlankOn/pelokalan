@@ -43,8 +43,6 @@
         <div class="row-actions">
             {{if .Data.Template}}<button type="button" class="btn btn-primary" data-open-dialog="new-translation">+ {{t .Lang "project.new_translation"}}</button>{{end}}
             <button type="button" class="btn" data-open-dialog="upload">{{t .Lang "project.upload"}}</button>
-            {{with .Data.GitGroup}}<a class="btn" href="{{$p.Path}}/git/patch" title="{{t $.Lang "git.patch_help"}}">{{t $.Lang "git.patch"}}</a>
-            {{with $.Data.PatchCmd}}<button type="button" class="btn" data-copy="{{.}}" data-copied="{{t $.Lang "links.copied"}}" title="{{.}}">{{t $.Lang "git.copy_command"}}</button>{{end}}{{end}}
             {{with .Data.ProjectFiles}}{{if and .CanManage (or .HasFeed .Upstream)}}<form method="post" action="{{.Project.Path}}/project-files/sync" data-sync data-syncing="{{t $.Lang "files.syncing"}}">
                 <button class="btn" title="{{t $.Lang "files.sync_status_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync_status"}}</span></button>
             </form>{{end}}{{end}}

@@ -307,7 +307,6 @@ func main() {
 		r.Get("/projects/{id}/spell/suggest", webHandler.SpellSuggest)
 		r.Post("/projects/{id}/dictionary", webHandler.AddDictionaryWord)
 		r.Post("/projects/{id}/dictionary/delete", webHandler.DeleteDictionaryWord)
-		r.Get("/projects/{id}/git/patch", webHandler.ProjectGitPatch)
 		r.Get("/catalogs/{cid}/patch", webHandler.CatalogGitPatch)
 		r.Post("/projects/{id}/project-files/{fid}/take", webHandler.ProjectFileTake)
 		r.Post("/projects/{id}/project-files/sync", webHandler.ProjectFilesSync)

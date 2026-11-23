@@ -154,12 +154,6 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Error = errMsg
 	data.Data["Project"] = p
 	data.Data["Template"] = template
-	if g := h.glossary.GitGroup(r.Context(), p); g != nil {
-		data.Data["GitGroup"] = g
-		if p.Role.IsMember() {
-			data.Data["PatchCmd"] = PatchCommand(h.PatchLink(middleware.GetUser(r.Context()), p, nil))
-		}
-	}
 	h.glossary.AttachUpstreamToCatalogs(r.Context(), p, catalogs)
 	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, nil, 0)
 	data.Data["MemberFiles"] = h.fileList(r, p, catalogs, false, "", nil, nil, 0)
@@ -808,7 +802,7 @@ type fileListView struct {
 	Groups      []*models.ModuleGroupOption // module group filter options
 	Upstream    bool                        // some module group is a release upstream: show the state filter
 	Searched    bool
-	PatchCmds   map[int64]string // `curl … | git am` per own repository file on this page
+	PatchCmds   map[int64]string // the git patch command per own repository file on this page
 }
 
 // fileList filters a project's PO files: the user's own (mine) or the other members'.
@@ -894,11 +888,14 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 	if mine {
 		user := middleware.GetUser(r.Context())
 		for _, c := range v.Files {
-			if c.RepoPath != "" && user != nil {
+			if c.RepoPath == "" || user == nil {
+				continue
+			}
+			if g := h.glossary.GitGroupFor(r.Context(), p, c.RepoPath); g != nil {
 				if v.PatchCmds == nil {
 					v.PatchCmds = map[int64]string{}
 				}
-				v.PatchCmds[c.ID] = PatchCommand(h.PatchLink(user, p, c))
+				v.PatchCmds[c.ID] = PatchCommand(g, c.RepoPath, h.PatchLink(user, c))
 			}
 		}
 	}
