@@ -345,7 +345,7 @@ shows it only to members), role, joined_at. Documented in README.md.
   (`pageMeta` in `Data.Meta`, base.html) and a 1200×630 PNG at the same address + `.png` (`internal/badgecard`: gg + Go
   fonts, cached in memory, `Cache-Control` one day). Preview texts are in the owner's language (`ownerLang`); achievement
   lines are `badge.<key>_done`. The owner sees a share button on earned badges (`#share-dialog`, app.js: LinkedIn,
-  X, Facebook share URLs, copy link, "Unduh gambar" (`.png?download=1`, to attach the picture by hand: X often draws
+  X, Facebook share URLs, "Salin ke papan klip" (the post text, a blank line, then the link), "Unduh gambar" (`.png?download=1`, to attach the picture by hand: X often draws
   the card only after posting), and Web Share, which attaches the PNG as a file where the device can). The profile's own
   preview uses its highest badge's image. `chimiddleware.GetHead` answers HEAD like GET for crawlers.
 - **Veteran** = a member for N years (1/2/3/5) with work in every month of an unbroken run of N years: counted in

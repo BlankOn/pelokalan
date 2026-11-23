@@ -2917,7 +2917,7 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
         dlg.querySelector(".share-linkedin").href = "https://www.linkedin.com/sharing/share-offsite/?url=" + u;
         dlg.querySelector(".share-x").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(text) + "&url=" + u;
         dlg.querySelector(".share-facebook").href = "https://www.facebook.com/sharer/sharer.php?u=" + u;
-        dlg.querySelector(".share-copy").setAttribute("data-copy", url);
+        dlg.querySelector(".share-copy").setAttribute("data-copy", text + "\n\n" + url); // the post, ready to paste
         dlg.querySelector(".share-open").href = url;
         current.image = btn.getAttribute("data-share-image");
         dlg.querySelector(".share-download").href = current.image + "?download=1";
