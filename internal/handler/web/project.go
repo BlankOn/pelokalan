@@ -53,7 +53,6 @@ func (h *Handler) renderProjects(w http.ResponseWriter, r *http.Request, errMsg 
 	data.Error = errMsg
 	data.Data["Mine"] = mine
 	data.Data["Others"] = others
-	data.Data["Site"] = h.activity.SiteTotals(r.Context()) // the introduction's numbers
 	data.Data["HomeFeatures"] = homeFeatures
 	if user != nil {
 		invitations, err := h.projectService.InvitationsForUser(r.Context(), user)

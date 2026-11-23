@@ -44,7 +44,7 @@ static/              # CSS, JS, htmx, logo
 ## Common Commands
 
 ```bash
-make run-postgres   # PostgreSQL in Docker
+make prep           # .env, PostgreSQL in Docker (data volume, free port → DB_PORT), Go modules; safe to rerun
 make run            # run server (migrations run on start)
 make build
 make test
@@ -380,8 +380,7 @@ shows it only to members), role, joined_at. Documented in README.md.
 ## Home page introduction
 
 `/projects` starts with a landing introduction (`#home-intro`, pages/projects.html, `home.*` strings): headline, pitch,
-buttons (visitors: sign up / sign in; members: jump to the list), live numbers (`ActivityService.SiteTotals`: strings
-worked on, translators, projects, strings accepted upstream; cached 5 min), six feature cards (`homeFeatures`, badge
+buttons (visitors: sign up / sign in; members: jump to the list), six feature cards (`homeFeatures`, badge
 icons) and three "how it works" steps. Signed-in members can hide it (×, localStorage `homeIntroHidden`, applied by an
 inline script before paint) and bring it back with "Tampilkan perkenalan" next to the Proyek heading.
 

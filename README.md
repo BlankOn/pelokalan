@@ -49,13 +49,23 @@ The interface is in Bahasa Indonesia (default) and English.
 ## Spin up
 
 ```
-cp .env.example .env   # set EMAIL_WHITELIST to your address
-make run-postgres
+make prep
 make run
 ```
 
-Then open http://localhost:8080 and register with a whitelisted email. Without
-`MAILTRAP_API_TOKEN` the one-time codes are printed to the server log.
+Then open http://localhost:8080 and register. Without `MAILTRAP_API_TOKEN` the one-time codes are printed
+to the server log; `EMAIL_WHITELIST` in `.env` limits who may sign in (empty = anyone).
+
+`make prep` (`scripts/prep.sh`) is safe to run again at any time. It:
+
+- creates `.env` from `.env.example` when there is none (an existing `.env` is never overwritten);
+- starts PostgreSQL in Docker (container `pelokalan-postgres`), creating it the first time with a named
+  volume (`pelokalan-pgdata`) so the data survives restarts;
+- picks the next free port when 5432 is taken by something else, and writes it to `.env` as `DB_PORT`
+  (an existing container moves to the new port and keeps its data);
+- waits for the database and downloads the Go modules.
+
+`make stop-postgres` stops the database (its data is kept); `make prep` starts it again.
 
 ## Configuration
 

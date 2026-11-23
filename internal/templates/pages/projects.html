@@ -19,12 +19,6 @@
                 <a class="btn btn-link" href="/about">{{t .Lang "home.cta_about"}} →</a>
             </div>
         </div>
-        {{with .Data.Site}}<div class="home-stats">
-            <div><strong>{{num .Contributions}}</strong><span>{{t $.Lang "home.stat_strings"}}</span></div>
-            <div><strong>{{num .Translators}}</strong><span>{{t $.Lang "home.stat_translators"}}</span></div>
-            <div><strong>{{num .Projects}}</strong><span>{{t $.Lang "home.stat_projects"}}</span></div>
-            <div><strong>{{num .Landed}}</strong><span>{{t $.Lang "home.stat_landed"}}</span></div>
-        </div>{{end}}
     </div>
     <div class="home-features">
         {{range .Data.HomeFeatures}}

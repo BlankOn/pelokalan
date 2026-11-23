@@ -1,13 +1,13 @@
-.PHONY: build run test clean migrate-up migrate-down run-postgres stop-postgres dev fmt lint dbshell deploy deploy-logs deploy-dbshell
+.PHONY: prep build run test clean migrate-up migrate-down run-postgres stop-postgres setup dev fmt lint dbshell deploy deploy-logs deploy-dbshell
 
 # Configuration
-NETWORK=pelokalan-network
-POSTGRES_CONTAINER_NAME=pelokalan-postgres
+POSTGRES_CONTAINER_NAME ?= pelokalan-postgres
 POSTGRES_DB=pelokalan
 POSTGRES_USER=postgres
 POSTGRES_PASS=postgres
-POSTGRES_PORT=5432
-POSTGRES_IMAGE_TAG=postgres:16
+# the port make prep chose (DB_PORT in .env), else 5432
+POSTGRES_PORT=$(or $(shell grep -E '^DB_PORT=' .env 2>/dev/null | tail -n1 | cut -d= -f2),5432)
+POSTGRES_IMAGE_TAG ?= postgres:16
 
 # Build the application
 build:
@@ -25,29 +25,17 @@ test:
 clean:
 	rm -rf bin/
 
-# Docker network
-create-network:
-	docker network create ${NETWORK} || true
+# Prepare a development machine: .env, PostgreSQL in Docker (data kept in a volume), Go modules.
+# Safe to run again; afterwards `make run` starts the app. See scripts/prep.sh.
+prep:
+	@POSTGRES_CONTAINER_NAME=${POSTGRES_CONTAINER_NAME} POSTGRES_IMAGE_TAG=${POSTGRES_IMAGE_TAG} ./scripts/prep.sh
 
-# Run PostgreSQL in Docker
-run-postgres: stop-postgres create-network
-	docker run -d \
-		--network=${NETWORK} \
-		--name ${POSTGRES_CONTAINER_NAME} \
-		-e POSTGRES_DB=${POSTGRES_DB} \
-		-e POSTGRES_USER=${POSTGRES_USER} \
-		-e POSTGRES_PASSWORD=${POSTGRES_PASS} \
-		-p ${POSTGRES_PORT}:5432 \
-		${POSTGRES_IMAGE_TAG}
-	@echo "Waiting for PostgreSQL to be ready..."
-	@sleep 3
-	@until docker exec ${POSTGRES_CONTAINER_NAME} pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}; do sleep 1; done
-	@echo "PostgreSQL is ready!"
+# Start PostgreSQL in Docker (the same as prep: existing data is kept)
+run-postgres: prep
 
-# Stop PostgreSQL container
+# Stop the PostgreSQL container (its data is kept; make prep starts it again)
 stop-postgres:
 	docker stop ${POSTGRES_CONTAINER_NAME} || true
-	docker rm ${POSTGRES_CONTAINER_NAME} || true
 
 # Database migrations using golang-migrate (the server also runs them on start)
 migrate-up:
@@ -56,9 +44,8 @@ migrate-up:
 migrate-down:
 	migrate -path ./migrations -database "postgres://${POSTGRES_USER}:${POSTGRES_PASS}@localhost:${POSTGRES_PORT}/${POSTGRES_DB}?sslmode=disable" down
 
-# Setup: run postgres and migrate
-setup: run-postgres migrate-up
-	@echo "Setup complete! Database is ready."
+# Setup: the same as prep (the server runs migrations on start)
+setup: prep
 
 # Development with hot reload (requires air)
 dev:

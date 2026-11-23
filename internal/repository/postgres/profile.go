@@ -237,13 +237,3 @@ func (r *activityRepository) ClaimOneTimeJob(ctx context.Context, name string) (
 	n, _ := res.RowsAffected()
 	return n > 0, nil
 }
-
-func (r *activityRepository) SiteTotals(ctx context.Context) (*models.SiteTotals, error) {
-	t := &models.SiteTotals{}
-	err := r.db.QueryRowContext(ctx, `
-		SELECT (SELECT COUNT(*) FROM activity_events WHERE `+evContribute+`),
-		       (SELECT COUNT(DISTINCT user_id) FROM activity_events WHERE `+evContribute+`),
-		       (SELECT COUNT(*) FROM projects),
-		       (SELECT COUNT(*) FROM upstream_landings)`).Scan(&t.Contributions, &t.Translators, &t.Projects, &t.Landed)
-	return t, err
-}

@@ -64,11 +64,3 @@ type ModuleWork struct {
 
 // ProjectPath is the project's address
 func (m *ModuleWork) ProjectPath() string { return "/projects/" + m.ProjectSlug }
-
-// SiteTotals are the platform-wide numbers on the home page
-type SiteTotals struct {
-	Contributions int // strings worked on
-	Translators   int // people who worked on strings
-	Projects      int
-	Landed        int // strings accepted upstream
-}
