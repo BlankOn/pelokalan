@@ -5,6 +5,8 @@ package badgecard
 // draws them into the share image. Only path (M L H V C A Z, absolute or relative), circle and rect
 // elements are used, which is all draw.go understands.
 var Icons = map[string]string{
+	"merge":    `<circle cx="6" cy="5" r="2.5"/><circle cx="6" cy="19" r="2.5"/><circle cx="18" cy="12" r="2.5"/><path d="M6 7.5v9M6 9c0 3 3 3 9.5 3"/>`,
+	"upload":   `<path d="M12 15V4M7.5 8.5L12 4l4.5 4.5"/><path d="M4 14v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/>`,
 	"flame":    `<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2.5-5 .3 1.6 1 2.5 2 3 0-3 .5-5.5.5-8z"/>`,
 	"week":     `<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M7 14h10"/>`,
 	"month":    `<rect x="3.5" y="5" width="17" height="15" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4M8 14h2M14 14h2M8 17h2M14 17h2"/>`,

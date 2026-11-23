@@ -1,6 +1,7 @@
 package web
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -49,5 +50,38 @@ func TestBuildWordsChart(t *testing.T) {
 	}
 	if buildWordsChart("id", nil, h0) != nil {
 		t.Error("no data should give no chart")
+	}
+}
+
+func TestWordsChartCompressesQuietDays(t *testing.T) {
+	h0 := time.Date(2026, 8, 1, 9, 0, 0, 0, time.UTC)
+	hours := []models.ActivityDay{
+		{Day: h0, Strings: 10, Manual: 10},
+		{Day: h0.Add(time.Hour), Strings: 5, Manual: 5},
+		{Day: h0.AddDate(0, 3, 0), Strings: 7, Manual: 7}, // three quiet months later
+	}
+	now := h0.AddDate(0, 3, 0).Add(90 * time.Minute)
+	c := buildWordsChart("id", hours, now)
+	if len(c.Gaps) != 1 {
+		t.Fatalf("gaps: %+v", c.Gaps)
+	}
+	g := c.Gaps[0]
+	if g.W > wcGapW+0.01 || !strings.Contains(g.Title, "92") {
+		t.Errorf("gap %+v", g)
+	}
+	// the two active stretches (2 h + 2 h) share the rest of the width: the break is not drawn to scale
+	plotW := gcW - gcLeft - gcRight
+	if last := c.Points[len(c.Points)-1]; last.X < gcLeft+plotW-1 || last.Strings != 22 {
+		t.Errorf("last point %+v", last)
+	}
+	for _, p := range c.Points { // no hourly points inside the break
+		if p.Hour.After(h0.Add(2*time.Hour)) && p.Hour.Before(h0.AddDate(0, 3, 0)) {
+			t.Errorf("point inside the quiet stretch: %v", p.Hour)
+		}
+	}
+	// a quiet night (under a day) stays to scale
+	short := buildWordsChart("id", []models.ActivityDay{{Day: h0, Strings: 1}, {Day: h0.Add(14 * time.Hour), Strings: 1}}, h0.Add(15*time.Hour))
+	if len(short.Gaps) != 0 {
+		t.Errorf("a 13-hour pause was compressed")
 	}
 }

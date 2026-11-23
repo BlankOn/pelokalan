@@ -300,6 +300,8 @@ type ActivityRepository interface {
 	UserDays(ctx context.Context, userID int64, tz string) ([]models.ProfileDay, error)
 	// UserTotals counts a person's projects, files, languages and community work
 	UserTotals(ctx context.Context, userID int64) (*models.ProfileTotals, error)
+	// AddLandings stores strings accepted upstream; ones already stored are skipped. It returns how many are new.
+	AddLandings(ctx context.Context, landings []models.UpstreamLanding) (int, error)
 }
 
 // WikiRepository stores wiki pages and their files

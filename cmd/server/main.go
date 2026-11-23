@@ -101,6 +101,7 @@ func main() {
 	activityService := service.NewActivityService(repos.Activity)
 	authService.SetActivity(activityService)
 	glossaryService.SetProjects(repos.Project)
+	glossaryService.SetLandings(catalogService) // members' work accepted upstream, after each import
 	// state of project files on the GNOME translation site (read-only API, cached, rate limited)
 	glossaryService.SetUpstream(gnomel10n.New(gnomel10n.DefaultBase, false,
 		cfg.Site.Name+" upstream status (+"+cfg.Site.BaseURL+")"))

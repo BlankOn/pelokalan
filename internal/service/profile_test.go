@@ -14,8 +14,8 @@ func day(m time.Month, d, n int) models.ProfileDay {
 func TestComputeProfileStats(t *testing.T) {
 	days := []models.ProfileDay{
 		day(9, 1, 5), day(9, 2, 5), day(9, 3, 5), day(9, 4, 5), // 4 days (Tue-Fri)
-		day(10, 3, 1),                                          // a Saturday
-		day(11, 20, 10), day(11, 21, 300), day(11, 22, 2),      // Fri, Sat, Sun: current until today = Mon 23
+		day(10, 3, 1),                                     // a Saturday
+		day(11, 20, 10), day(11, 21, 300), day(11, 22, 2), // Fri, Sat, Sun: current until today = Mon 23
 	}
 	today := time.Date(2026, 11, 23, 0, 0, 0, 0, time.UTC)
 	s := ComputeProfileStats(days, nil, time.Date(2026, 8, 25, 0, 0, 0, 0, time.UTC), today)

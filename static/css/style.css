@@ -1540,6 +1540,10 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .badge-progress span { display: block; height: 100%; background: var(--tier-2); border-radius: 3px; }
 .badge.locked .badge-progress span { background: #9aa0aa; }
 .user-projects td a { font-weight: 600; }
+/* growth chart: a compressed quiet stretch */
+.wc-gap rect { fill: #f3f4f6; }
+.wc-gap line { stroke: #b8bdc6; stroke-width: 1; stroke-dasharray: 3 3; }
+.wc-gap text { font-size: 13px; fill: #8a909a; }
 .badge-share { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid transparent;
     background: transparent; color: var(--tier-2); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
 .badge-share:hover, .badge-share:focus-visible { background: #fff; border-color: color-mix(in srgb, var(--tier) 55%, var(--border-soft)); }

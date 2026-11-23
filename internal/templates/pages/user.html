@@ -22,7 +22,7 @@
     <div class="user-tile"><strong>{{num $s.Edited}}</strong><span>{{t .Lang "user.tile_edited"}}</span></div>
     <div class="user-tile"><strong>{{num $s.ActiveDays}}</strong><span>{{t .Lang "user.tile_days"}}</span></div>
     <div class="user-tile"><strong>{{num $s.CompletedFiles}}</strong><span>{{t .Lang "user.tile_completed"}}</span></div>
-    <div class="user-tile"><strong>{{num $s.BestDay}}</strong><span>{{t .Lang "user.tile_best_day"}}</span></div>
+    <div class="user-tile user-tile-upstream"><strong>{{num $s.Landed}}</strong><span>{{t .Lang "user.tile_landed"}}</span></div>
 </div>
 
 <h2 class="section-title">{{t .Lang "user.calendar"}}</h2>
@@ -71,7 +71,7 @@
         <tbody>{{range .}}<tr><td><a href="{{.Path}}">{{.Name}}</a></td><td class="num">{{num .Contributions}}</td><td class="num">{{num .Translated}}</td><td class="small muted">{{timeAgo $.Lang .LastActive}}</td></tr>{{end}}</tbody>
     </table>
     {{else}}<p class="muted">{{t .Lang "user.no_projects"}}</p>{{end}}
-    <p class="muted small">{{t .Lang "user.note"}}</p>
+    <p class="muted small">{{t .Lang "user.note"}} {{t .Lang "user.landed_note"}}</p>
 </section>
 </div>
 {{if .Data.Mine}}

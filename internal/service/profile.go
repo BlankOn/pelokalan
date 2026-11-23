@@ -45,8 +45,9 @@ type ProfileStats struct {
 	Weekends     int // weekends with work
 	MemberDays   int // days since signing up
 
-	Files, Projects, Languages, CompletedFiles        int
+	Files, Projects, Languages, CompletedFiles         int
 	Comments, Topics, WikiEdits, ContextEdits, Commits int
+	Landed, LandedModules                              int // accepted upstream
 }
 
 // BadgeDef is one badge with its tiers: thresholds of one number, lowest first
@@ -81,6 +82,10 @@ var Badges = []BadgeGroupDef{
 		{"reviewed", "check", []int{50, 500, 2500, 10000, 50000}, func(s *ProfileStats) int { return s.Reviewed }},
 		{"edited", "polish", []int{50, 250, 1000, 5000, 20000}, func(s *ProfileStats) int { return s.Edited }},
 		{"best_day", "bolt", []int{100, 300, 600, 1000, 2000}, func(s *ProfileStats) int { return s.BestDay }},
+	}},
+	{"upstream", []BadgeDef{
+		{"landed", "merge", []int{10, 100, 1000, 5000, 20000}, func(s *ProfileStats) int { return s.Landed }},
+		{"landed_modules", "upload", []int{1, 5, 25, 100, 250}, func(s *ProfileStats) int { return s.LandedModules }},
 	}},
 	{"reach", []BadgeDef{
 		{"completed", "flag", []int{1, 5, 25, 100, 250}, func(s *ProfileStats) int { return s.CompletedFiles }},
@@ -220,6 +225,7 @@ func ComputeProfileStats(days []models.ProfileDay, totals *models.ProfileTotals,
 	if totals != nil {
 		s.Files, s.Projects, s.Languages, s.CompletedFiles = totals.Files, len(totals.Projects), totals.Languages, totals.CompletedFiles
 		s.Comments, s.Topics, s.WikiEdits, s.ContextEdits, s.Commits = totals.Comments, totals.Topics, totals.WikiEdits, totals.ContextEdits, totals.Commits
+		s.Landed, s.LandedModules = totals.Landed, totals.LandedModules
 	}
 	return s
 }

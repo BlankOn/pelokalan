@@ -35,7 +35,18 @@ type GlossaryService struct {
 
 	stateMu   sync.Mutex
 	syncState map[int64]*SyncStatus // per project: the latest Sync button run
+
+	landings LandingDetector // finds members' work accepted upstream after each import (nil = off)
 }
+
+// LandingDetector finds members' translations that a just-imported upstream file now contains
+// (CatalogService.DetectLandings)
+type LandingDetector interface {
+	DetectLandings(ctx context.Context, projectID, groupID int64, lang, language string, files []UpstreamFile) (int, error)
+}
+
+// SetLandings turns on detecting members' work accepted upstream
+func (s *GlossaryService) SetLandings(d LandingDetector) { s.landings = d }
 
 // SetProjects lets imports and syncs check the project's language
 func (s *GlossaryService) SetProjects(r repository.ProjectRepository) { s.projects = r }
@@ -205,6 +216,28 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 			log.Printf("glossary: store project files of import %d: %v", imp.ID, err)
 		}
 		res.Imports = append(res.Imports, imp)
+	}
+	if s.landings != nil { // whose work is upstream now: in the background, imports do not wait
+		up := make([]UpstreamFile, 0, len(files))
+		for _, f := range files {
+			u := UpstreamFile{Name: f.Name, Data: f.Data}
+			if v.IsGit() {
+				u.RepoPath = f.Path
+			}
+			up = append(up, u)
+		}
+		for _, imp := range res.Imports {
+			go func(lang string) {
+				ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+				defer cancel()
+				n, err := s.landings.DetectLandings(ctx, v.ProjectID, v.ID, lang, language, up)
+				if err != nil {
+					log.Printf("upstream landings: group %d (%s): %v", v.ID, lang, err)
+				} else if n > 0 {
+					log.Printf("upstream landings: group %d (%s): %d strings accepted upstream", v.ID, lang, n)
+				}
+			}(imp.Language)
+		}
 	}
 	return res, nil
 }

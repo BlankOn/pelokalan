@@ -24,6 +24,9 @@ func (f *fakeActivityRepo) HourlyTranslated(context.Context, int64) ([]models.Ac
 func (f *fakeActivityRepo) UserDays(context.Context, int64, string) ([]models.ProfileDay, error) {
 	return nil, nil
 }
+func (f *fakeActivityRepo) AddLandings(context.Context, []models.UpstreamLanding) (int, error) {
+	return 0, nil
+}
 func (f *fakeActivityRepo) UserTotals(context.Context, int64) (*models.ProfileTotals, error) {
 	return &models.ProfileTotals{}, nil
 }

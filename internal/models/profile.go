@@ -38,5 +38,16 @@ type ProfileTotals struct {
 	WikiEdits      int
 	ContextEdits   int // Konteks notes saved
 	Commits        int // versions committed by hand
+	Landed         int // strings accepted upstream (UpstreamLanding)
+	LandedWords    int
+	LandedModules  int // modules (per project) with a string accepted upstream
 	FirstActive    *time.Time
+}
+
+// UpstreamLanding is a string a member translated in Pelokalan that later showed up, word for word, in
+// the upstream file at a sync: their work was accepted upstream
+type UpstreamLanding struct {
+	UserID, ProjectID, CatalogID, GroupID int64
+	EntryKey, Module, Filename            string
+	Words                                 int
 }

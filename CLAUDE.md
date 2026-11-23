@@ -256,8 +256,9 @@ make test
   the module group chart (moved here from Penerjemahan) and "Aktivitas anggota" (public, like the rest of the
   project): totals and a per-member table. Above the module chart, "Pertumbuhan terjemahan" (`wordschart.go`,
   `buildWordsChart` from `ActivityRepository.HourlyTranslated`): **strings** people saved with a translation, added up
-  hour by hour (one point per hour from the first recorded one to now, flat in hours without any; axis labels show times
-  when the span is 3 days or less). Four lines on one scale, all counted in the green total: typed by hand (blue; empty →
+  hour by hour (one point per hour; quiet stretches of more than a day, `wcQuiet`, are compressed to a fixed-width
+  dashed break `.wc-gap` whose tooltip gives its length, so active periods fill the width; labels sit where active
+  stretches start; times are shown when the span is 3 days or less). Four lines on one scale, all counted in the green total: typed by hand (blue; empty →
   translated, no machine origin), AI drafts saved unchanged (purple; origin ai, text unchanged), AI drafts edited before
   saving (orange), existing translations edited (teal; translated, no machine origin, text changed, every such save
   counts). Glossary/memory drafts are not counted, and AI drafts nobody saved are not logged. Hovering shows the nearest
@@ -345,6 +346,15 @@ shows it only to members), role, joined_at. Documented in README.md.
   fonts, cached in memory, `Cache-Control` one day). Preview texts are in the owner's language (`ownerLang`); achievement
   lines are `badge.<key>_done`. The owner sees a share button on earned badges (`#share-dialog`, app.js: LinkedIn,
   X, Facebook share URLs, copy link, Web Share). The profile's own preview uses its highest badge's image.
+
+- **Accepted upstream** (`upstream_landings`, migration 043; service/landing.go): after every module group import (sync or
+  upload), `GlossaryService` hands the downloaded files to `CatalogService.DetectLandings` in the background
+  (`SetLandings`). For each member file of the same module (git: same `repo_path`; else same name or module, same
+  language) a string counts when the member wrote it (it differs from the newest "initial"/"from upstream" snapshot,
+  the git patch reference), it is translated, not fuzzy and not an unreviewed AI draft, it is long enough to tell apart
+  (`landingWorthy`: 3+ words or 15+ characters), and the new upstream file has exactly that translation. One row per
+  member, file and string (insert once). Works the same for GNOME (release archives follow the modules' git) and
+  GitHub branches, however the work got in. Badges `landed` / `landed_modules` (group "upstream"), tile "Diterima upstream".
 
 ## Git-only projects
 

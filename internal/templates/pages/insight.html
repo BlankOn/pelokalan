@@ -12,6 +12,7 @@
     <svg class="gc-svg" viewBox="0 0 {{.W}} {{.H}}" role="img" aria-label="{{t $.Lang "insight.growth"}}">
         {{range .YLabels}}<line x1="0" x2="{{$w.W}}" y1="{{printf "%.1f" .Y}}" y2="{{printf "%.1f" .Y}}" class="grid"/>{{end}}
         <polygon points="{{.Area}}" class="wc-area"/>
+        {{range .Gaps}}<g class="wc-gap"><rect x="{{printf "%.1f" .X}}" y="{{$w.PlotTop}}" width="{{printf "%.1f" .W}}" height="{{printf "%.1f" $w.PlotH}}"/><line x1="{{printf "%.1f" .X}}" x2="{{printf "%.1f" .X}}" y1="{{$w.PlotTop}}" y2="{{$w.PlotBot}}"/><line x1="{{printf "%.1f" .X2}}" x2="{{printf "%.1f" .X2}}" y1="{{$w.PlotTop}}" y2="{{$w.PlotBot}}"/><text x="{{printf "%.1f" .Mid}}" y="{{printf "%.1f" $w.GapTextY}}" text-anchor="middle">⋯</text><title>{{.Title}}</title></g>{{end}}
         {{range .Series}}<polyline points="{{.Line}}" class="gc-line gc-{{.Kind}}"/>{{end}}
         <polyline points="{{.Line}}" class="gc-line gc-words"/>
         <line class="gc-guide" x1="0" x2="0" y1="{{.PlotTop}}" y2="{{.PlotBot}}" hidden/>
@@ -21,7 +22,7 @@
     <div class="gc-tip" role="tooltip" hidden data-rows="words manual ai_kept ai_edited edited added" data-l-words="{{t $.Lang "insight.growth_total"}}" data-l-manual="{{t $.Lang "insight.growth_manual"}}" data-l-ai_kept="{{t $.Lang "insight.growth_ai_kept"}}" data-l-ai_edited="{{t $.Lang "insight.growth_ai_edited"}}" data-l-edited="{{t $.Lang "insight.growth_edited"}}" data-l-added="{{t $.Lang "insight.growth_hour"}}"></div>
     <div class="gc-xlabels">{{range .XLabels}}<span style="left: {{printf "%.2f" (pct .X $w.W)}}%" data-t="{{.Time.Format "2006-01-02T15:04:05Z07:00"}}"{{if .WithTime}} data-with-time{{end}}>{{.Label}}</span>{{end}}</div>
     </div>
-    <p class="muted small">{{t $.Lang "insight.growth_note"}}</p>
+    <p class="muted small">{{t $.Lang "insight.growth_note"}}{{if .Gaps}} {{t $.Lang "insight.growth_gaps_note"}}{{end}}</p>
 </section>
 {{end}}
 

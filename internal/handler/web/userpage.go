@@ -69,7 +69,7 @@ func buildHeatmap(lang string, days []models.ProfileDay, today time.Time) heatma
 	for _, d := range days {
 		by[d.Day.Format("2006-01-02")] = d.Contributions
 	}
-	monday := today.AddDate(0, 0, -((int(today.Weekday())+6)%7)) // Monday of this week
+	monday := today.AddDate(0, 0, -((int(today.Weekday()) + 6) % 7)) // Monday of this week
 	start := monday.AddDate(0, 0, -7*(heatWeeks-1))
 	h := heatmap{W: heatLeft + heatWeeks*heatStride, H: heatTop + 7*heatStride, Levels: heatLevels}
 	lastMonth := time.Month(0)

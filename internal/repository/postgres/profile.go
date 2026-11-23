@@ -82,8 +82,12 @@ func (r *activityRepository) UserTotals(ctx context.Context, userID int64) (*mod
 		  (SELECT COUNT(*) FROM wiki_edits WHERE user_id = $1),
 		  (SELECT COUNT(*) FROM module_context_edits WHERE user_id = $1),
 		  (SELECT COUNT(*) FROM catalog_commits WHERE author_id = $1 AND kind = 'manual'),
+		  (SELECT COUNT(*) FROM upstream_landings WHERE user_id = $1),
+		  (SELECT COALESCE(SUM(words), 0) FROM upstream_landings WHERE user_id = $1),
+		  (SELECT COUNT(DISTINCT (project_id, module)) FROM upstream_landings WHERE user_id = $1),
 		  (SELECT MIN(created_at) FROM activity_events WHERE user_id = $1 AND `+evContribute+`)`, userID,
-	).Scan(&t.Files, &t.Languages, &t.CompletedFiles, &t.Comments, &t.Topics, &t.WikiEdits, &t.ContextEdits, &t.Commits, &first)
+	).Scan(&t.Files, &t.Languages, &t.CompletedFiles, &t.Comments, &t.Topics, &t.WikiEdits, &t.ContextEdits, &t.Commits,
+		&t.Landed, &t.LandedWords, &t.LandedModules, &first)
 	if err != nil {
 		return nil, err
 	}
@@ -91,4 +95,22 @@ func (r *activityRepository) UserTotals(ctx context.Context, userID int64) (*mod
 		t.FirstActive = &first.Time
 	}
 	return t, nil
+}
+
+func (r *activityRepository) AddLandings(ctx context.Context, landings []models.UpstreamLanding) (int, error) {
+	added := 0
+	for _, l := range landings {
+		res, err := r.db.ExecContext(ctx, `
+			INSERT INTO upstream_landings (user_id, project_id, catalog_id, group_id, entry_key, module, filename, words)
+			VALUES ($1, $2, $3, NULLIF($4, 0), $5, $6, $7, $8)
+			ON CONFLICT (user_id, catalog_id, entry_key) DO NOTHING`,
+			l.UserID, l.ProjectID, l.CatalogID, l.GroupID, l.EntryKey, l.Module, l.Filename, l.Words)
+		if err != nil {
+			return added, err
+		}
+		if n, _ := res.RowsAffected(); n > 0 {
+			added++
+		}
+	}
+	return added, nil
 }
