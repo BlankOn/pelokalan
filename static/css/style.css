@@ -1426,14 +1426,6 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 form[data-sync] .sync-icon { display: inline-block; }
 form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 @keyframes pf-spin { to { transform: rotate(360deg); } }
-/* git workflow guide (Penerjemahan, projects with a GitHub module group) */
-.git-guide-btn { min-width: 32px; padding-left: 0; padding-right: 0; font-weight: 700; }
-.git-steps { padding-left: 22px; margin: 12px 22px; display: flex; flex-direction: column; gap: 12px; font-size: 14px; }
-.git-steps li { min-width: 0; }
-.git-steps pre { margin: 6px 0 0; padding: 8px 10px; background: var(--surface-2); border: 1px solid var(--border-soft); border-radius: 6px;
-    font-size: 12.5px; overflow-x: auto; white-space: pre; max-width: 100%; box-sizing: border-box; }
-.git-guide > p { margin-top: 0; margin-bottom: 8px; }
-.git-guide .dialog-actions { margin-bottom: 20px; }
 /* Settings → Kamus proyek */
 .dict-words { list-style: none; padding: 0; margin: 8px 0 0; display: flex; flex-wrap: wrap; gap: 6px; }
 .dict-words li { display: inline-flex; align-items: center; gap: 4px; border: 1px solid var(--border); border-radius: 12px; padding: 2px 4px 2px 10px; }

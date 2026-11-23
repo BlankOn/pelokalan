@@ -44,7 +44,7 @@
             {{if .Data.Template}}<button type="button" class="btn btn-primary" data-open-dialog="new-translation">+ {{t .Lang "project.new_translation"}}</button>{{end}}
             <button type="button" class="btn" data-open-dialog="upload">{{t .Lang "project.upload"}}</button>
             {{with .Data.GitGroup}}<a class="btn" href="{{$p.Path}}/git/patch" title="{{t $.Lang "git.patch_help"}}">{{t $.Lang "git.patch"}}</a>
-            <button type="button" class="btn btn-icon git-guide-btn" data-open-dialog="git-guide" title="{{t $.Lang "git.guide_title"}}" aria-label="{{t $.Lang "git.guide_title"}}">?</button>{{end}}
+            {{with $.Data.PatchCmd}}<button type="button" class="btn" data-copy="{{.}}" data-copied="{{t $.Lang "links.copied"}}" title="{{.}}">{{t $.Lang "git.copy_command"}}</button>{{end}}{{end}}
             {{with .Data.ProjectFiles}}{{if and .CanManage (or .HasFeed .Upstream)}}<form method="post" action="{{.Project.Path}}/project-files/sync" data-sync data-syncing="{{t $.Lang "files.syncing"}}">
                 <button class="btn" title="{{t $.Lang "files.sync_status_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync_status"}}</span></button>
             </form>{{end}}{{end}}
@@ -153,36 +153,6 @@
         </div>
     </form>
 </dialog>
-{{with .Data.GitGroup}}
-<dialog id="git-guide" class="dialog dialog-wide git-guide">
-    <div class="dialog-head">
-        <h2>{{t $.Lang "git.guide_title"}}</h2>
-        <button type="button" class="btn btn-small" data-close-dialog aria-label="{{t $.Lang "action.close"}}">×</button>
-    </div>
-    <p class="muted small">{{t $.Lang "git.guide_intro" .GitRepo .GitBranch}} <a href="{{.GitURL}}/tree/{{.GitBranch}}" target="_blank" rel="noopener">github.com/{{.GitRepo}}</a></p>
-    <ol class="git-steps">
-        <li><strong>{{t $.Lang "git.step_setup"}}</strong> {{t $.Lang "git.step_setup_help"}}
-<pre><code>git clone git@github.com:USERNAME/{{.GitName}}.git
-cd {{.GitName}}
-git remote add upstream https://github.com/{{.GitRepo}}.git</code></pre></li>
-        <li><strong>{{t $.Lang "git.step_translate"}}</strong> {{t $.Lang "git.step_translate_help"}}</li>
-        <li><strong>{{t $.Lang "git.step_download"}}</strong> {{t $.Lang "git.step_download_help"}}</li>
-        <li><strong>{{t $.Lang "git.step_apply"}}</strong> {{t $.Lang "git.step_apply_help"}}
-<pre><code>git fetch upstream
-git switch -c pelokalan-update upstream/{{.GitBranch}}
-git am ~/Downloads/{{.GitName}}-{{.GitBranch}}-pelokalan-*.patch</code></pre></li>
-        <li><strong>{{t $.Lang "git.step_send"}}</strong> {{t $.Lang "git.step_send_help" .GitBranch}}
-<pre><code>git push -u origin pelokalan-update
-gh pr create --repo {{.GitRepo}} --base {{.GitBranch}}</code></pre></li>
-    </ol>
-    <p class="muted small">{{t $.Lang "git.guide_conflict"}}</p>
-    <p class="muted small">{{t $.Lang "git.guide_scope"}}</p>
-    <div class="dialog-actions">
-        <a class="btn btn-primary" href="{{$.Data.Project.Path}}/git/patch">{{t $.Lang "git.patch"}}</a>
-        <button type="button" class="btn" data-close-dialog>{{t $.Lang "action.close"}}</button>
-    </div>
-</dialog>
-{{end}}
 <dialog id="replace-dialog" class="dialog">
     <form method="post" action="" enctype="multipart/form-data" class="form" data-busy="{{t .Lang "upload.busy"}}">
         <h2>{{t .Lang "replace.title"}} <span class="replace-name"></span></h2>

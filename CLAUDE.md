@@ -483,11 +483,16 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   like gettext (`gitpatch.writeString`/`wrap`: 79 columns, Unicode-like break rules; matches msgcat on 99.6% of
   python-docs entries, and msgcat leaves a patched file unchanged). Within an entry, lines are diffed (LCS) so
   unchanged lines stay context. Output is one `git format-patch` commit (author = translator identity) for `git am`.
-- UI: Berkas Anda shows "Unduh patch git" (`GET /projects/{id}/git/patch`, all the member's repository files) and a
-  "?" button opening `#git-guide` (fork/clone once, Sinkronkan + Perbarui, download, `git switch -c … upstream/<branch>`,
-  `git am`, push, `gh pr create`), only when the project has a git group (`GlossaryService.GitGroup`). Each repository
+- UI: Berkas Anda shows "Unduh patch git" (`GET /projects/{id}/git/patch`, all the member's repository files) and
+  "Salin perintah git patch" (copies `curl … | git am`, below), only when the project has a git group
+  (`GlossaryService.GitGroup`). There is no guide popup any more. Each repository
   file's ⋯ menu has "Unduh patch git" (`GET /catalogs/{cid}/patch`) and the list shows its repository path. Nothing to
   send → back to Penerjemahan with `flash.git_no_changes`. The editor's "Modul" opens the file on GitHub.
+- **Patch links** (`service/patchlink.go`, `GET /git/{token}.patch`, public route, `Handler.GitPatchByLink`):
+  "Salin perintah git patch" copies `curl -fsSL '<link>' | git am` (all the member's repository files; each file's ⋯
+  menu has the same item for one file), so nothing is downloaded. The token = kind (p project / c catalog) + id, user id
+  and expiry (base 36, "-" separated) + "." + HMAC (JWT secret), valid `PatchLinkTTL` (24 h); access is checked again when
+  fetched and the patch is built then. Failures are plain text: 403 expired/invalid, 404 nothing to send.
 
 ## Module groups UI
 

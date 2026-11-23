@@ -114,7 +114,8 @@
                 <form method="post" action="/catalogs/{{.ID}}/update"><button class="linklike">{{t $v.Lang "action.update_from_template"}}</button></form>
                 {{end}}
                 <button type="button" class="linklike" data-replace="/catalogs/{{.ID}}/replace" data-replace-name="{{.Filename}}" data-replace-url="{{.SourceURL}}" data-replace-page="{{.UpstreamPage}}">{{t $v.Lang "action.update_file"}}</button>
-                {{if .RepoPath}}<a href="/catalogs/{{.ID}}/patch" title="{{.RepoPath}}">{{t $v.Lang "git.patch_file"}}</a>{{end}}
+                {{if .RepoPath}}<a href="/catalogs/{{.ID}}/patch" title="{{.RepoPath}}">{{t $v.Lang "git.patch_file"}}</a>
+                {{with index $v.PatchCmds .ID}}<button type="button" class="linklike" data-copy="{{.}}" data-copied="{{t $v.Lang "links.copied"}}" title="{{.}}">{{t $v.Lang "git.copy_command"}}</button>{{end}}{{end}}
                 <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $v.Lang "confirm.delete_file"}}"><button class="linklike danger">{{t $v.Lang "action.delete"}}</button></form>
             </div>
         </details>
