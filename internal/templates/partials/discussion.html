@@ -10,7 +10,7 @@
             <div class="comment-head">
                 <span class="avatar avatar-sm">{{initial .AuthorName}}</span>
                 <strong>{{or .AuthorName "—"}}</strong>
-                {{if .AuthorUsername}}<span class="muted small">@{{.AuthorUsername}}</span>{{end}}
+                {{if .AuthorUsername}}<a class="muted small" href="/users/{{.AuthorUsername}}">@{{.AuthorUsername}}</a>{{end}}
                 <a class="muted small" href="#comment-{{.ID}}">{{timeAgo $.Lang .CreatedAt}}</a>
             </div>
             <p class="comment-body comment-removed">{{if .DeletedByOther}}{{t $.Lang "discuss.deleted_by" .DeleterName (timeAgo $.Lang (derefTime .DeletedAt))}}{{else}}{{t $.Lang "discuss.deleted_at" (timeAgo $.Lang (derefTime .DeletedAt))}}{{end}}</p>
@@ -18,7 +18,7 @@
             <div class="comment-head">
                 <span class="avatar avatar-sm">{{initial .AuthorName}}</span>
                 <strong>{{.AuthorName}}</strong>
-                {{if .AuthorUsername}}<span class="muted small">@{{.AuthorUsername}}</span>{{end}}
+                {{if .AuthorUsername}}<a class="muted small" href="/users/{{.AuthorUsername}}">@{{.AuthorUsername}}</a>{{end}}
                 <a class="muted small" href="#comment-{{.ID}}">{{timeAgo $.Lang .CreatedAt}}</a>
                 {{if .EditedAt}}<span class="muted small">· {{t $.Lang "discuss.edited"}}</span>{{end}}
                 <div class="spacer"></div>

@@ -104,7 +104,7 @@ var reservedUsernames = map[string]bool{
 	"glossary": true, "members": true, "settings": true, "files": true, "upload": true, "translations": true,
 	"update-all": true, "invitations": true, "ai": true, "delete": true, "po": true, "api": true, "static": true,
 	"login": true, "logout": true, "register": true, "verify": true, "profile": true, "projects": true,
-	"catalogs": true, "lang": true, "join": true, "invite-links": true, "root": true, "system": true, "null": true, "undefined": true, "me": true,
+	"catalogs": true, "lang": true, "join": true, "invite-links": true, "root": true, "system": true, "null": true, "undefined": true, "me": true, "users": true,
 }
 
 // NormalizeUsername lowercases and trims a username ("@Ani " -> "ani")
@@ -362,6 +362,15 @@ func (s *AuthService) Authenticate(ctx context.Context, tokenString string) (*mo
 		return nil, ErrNotWhitelisted
 	}
 	return user, nil
+}
+
+// UserByUsername finds a person for their public profile page
+func (s *AuthService) UserByUsername(ctx context.Context, username string) (*models.User, error) {
+	u, err := s.users.GetByUsername(ctx, NormalizeUsername(username))
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	return u, nil
 }
 
 // UpdateProfile changes the user's name and UI language

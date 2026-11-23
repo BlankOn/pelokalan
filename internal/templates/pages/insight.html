@@ -62,7 +62,7 @@
         <tbody>
         {{range $v.Rows}}
         <tr>
-            <td><strong>@{{.Username}}</strong>{{if .Name}} <span class="muted small">{{.Name}}</span>{{end}}</td>
+            <td><a href="/users/{{.Username}}"><strong>@{{.Username}}</strong></a>{{if .Name}} <span class="muted small">{{.Name}}</span>{{end}}</td>
             <td class="num">{{num .Translated}}</td>
             <td class="num">{{num .TranslatedWords}}</td>
             <td class="num">{{num .Reviewed}}</td>

@@ -296,6 +296,10 @@ type ActivityRepository interface {
 	HourlyTranslated(ctx context.Context, projectID int64) ([]models.ActivityDay, error)
 	// Since returns the time of the project's first recorded event (nil when there is none)
 	Since(ctx context.Context, projectID int64) (*time.Time, error)
+	// UserDays returns a person's work per calendar day in time zone tz (an IANA name), oldest first
+	UserDays(ctx context.Context, userID int64, tz string) ([]models.ProfileDay, error)
+	// UserTotals counts a person's projects, files, languages and community work
+	UserTotals(ctx context.Context, userID int64) (*models.ProfileTotals, error)
 }
 
 // WikiRepository stores wiki pages and their files

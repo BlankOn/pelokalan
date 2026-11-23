@@ -2896,3 +2896,6 @@ document.addEventListener("click", function (ev) {
     document.addEventListener("htmx:afterSettle", layout); // filters and rows can change height
 })();
 
+
+// Profile contribution calendar: on narrow screens show the latest weeks first
+document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft = el.scrollWidth; });

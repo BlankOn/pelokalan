@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"syscall"
 	"time"
+	_ "time/tzdata" // SITE_TIMEZONE works without the system's zone files
 
 	"github.com/go-chi/chi/v5"
 	chimiddleware "github.com/go-chi/chi/v5/middleware"
@@ -202,6 +203,7 @@ func main() {
 		r.Get("/projects/{id}/glossary/search", webHandler.GlossarySearch)
 		r.Get("/projects/{id}/members", webHandler.MembersPage)
 		r.Get("/api/projects/{id}/members", webHandler.APIMembers) // public JSON, no key
+		r.Get("/users/{username}", webHandler.UserPage)            // public profile: stats and badges
 		r.Get("/git/{token}", webHandler.GitPatchByLink)           // signed patch link for curl | git am
 		r.Get("/projects/{id}/insight", webHandler.InsightPage)
 		r.Get("/join/{token}", webHandler.JoinPage)

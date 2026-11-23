@@ -21,6 +21,12 @@ func (f *fakeActivityRepo) Since(context.Context, int64) (*time.Time, error) { r
 func (f *fakeActivityRepo) HourlyTranslated(context.Context, int64) ([]models.ActivityDay, error) {
 	return nil, nil
 }
+func (f *fakeActivityRepo) UserDays(context.Context, int64, string) ([]models.ProfileDay, error) {
+	return nil, nil
+}
+func (f *fakeActivityRepo) UserTotals(context.Context, int64) (*models.ProfileTotals, error) {
+	return &models.ProfileTotals{}, nil
+}
 
 func TestEntrySavedEvent(t *testing.T) {
 	repo := &fakeActivityRepo{}

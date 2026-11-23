@@ -76,7 +76,7 @@
         {{range .Data.Members}}
         <tr>
             <td class="member-cell"><span class="avatar avatar-sm">{{.User.Initial}}</span>
-                <div class="member-id"><strong>{{.User.DisplayName}}</strong> <span class="muted small">@{{.User.Username}}</span>{{if and $.User (eq .User.ID $.User.ID)}} <span class="muted small">({{t $.Lang "members.you"}})</span>{{end}}
+                <div class="member-id"><strong>{{.User.DisplayName}}</strong> <a class="muted small" href="/users/{{.User.Username}}">@{{.User.Username}}</a>{{if and $.User (eq .User.ID $.User.ID)}} <span class="muted small">({{t $.Lang "members.you"}})</span>{{end}}
                 {{if $p.Role.IsMember}}<div class="muted small member-email">{{.User.Email}}</div>{{end}}</div></td>
             <td>
                 {{if and $canManage (ne .Role "owner")}}

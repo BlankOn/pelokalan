@@ -154,6 +154,7 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Error = errMsg
 	data.Data["Project"] = p
 	data.Data["Template"] = template
+	data.Data["IsGit"] = h.glossary.IsGitProject(r.Context(), p)
 	h.glossary.AttachUpstreamToCatalogs(r.Context(), p, catalogs)
 	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, nil, 0)
 	data.Data["MemberFiles"] = h.fileList(r, p, catalogs, false, "", nil, nil, 0)

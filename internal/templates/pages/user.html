@@ -1,0 +1,76 @@
+{{define "content"}}{{$pr := .Data.Profile}}{{$u := $pr.User}}{{$s := $pr.Stats}}{{$hm := .Data.Heatmap}}
+<div class="user-page">
+<section class="card user-head">
+    <div class="user-avatar" aria-hidden="true">{{initial $u.DisplayName}}</div>
+    <div class="user-id">
+        <h1>{{$u.DisplayName}}</h1>
+        <div class="muted">@{{$u.Username}}</div>
+        <div class="muted small">{{t .Lang "user.joined" (monthYear .Lang $u.CreatedAt)}}{{with $pr.Totals.FirstActive}} · {{t $.Lang "user.first_active" (monthYear $.Lang .)}}{{end}}</div>
+    </div>
+    <div class="user-streak{{if $s.StreakDays}} on{{end}}" title="{{t .Lang "user.streak_help"}}">
+        {{template "badge_icon" "flame"}}
+        <div><strong>{{$s.StreakDays}}</strong> <span>{{t .Lang "user.streak_days"}}</span>
+        <div class="muted small">{{t .Lang "user.streak_best" $s.BestStreakDays}} · {{t .Lang "user.streak_weeks" $s.StreakWeeks}}</div></div>
+    </div>
+</section>
+
+<div class="user-tiles">
+    <div class="user-tile"><strong>{{num $s.Contributions}}</strong><span>{{t .Lang "user.tile_contributions"}}</span></div>
+    <div class="user-tile"><strong>{{num $s.Translated}}</strong><span>{{t .Lang "user.tile_translated"}}</span></div>
+    <div class="user-tile"><strong>{{num $s.Words}}</strong><span>{{t .Lang "user.tile_words"}}</span></div>
+    <div class="user-tile"><strong>{{num $s.Reviewed}}</strong><span>{{t .Lang "user.tile_reviewed"}}</span></div>
+    <div class="user-tile"><strong>{{num $s.Edited}}</strong><span>{{t .Lang "user.tile_edited"}}</span></div>
+    <div class="user-tile"><strong>{{num $s.ActiveDays}}</strong><span>{{t .Lang "user.tile_days"}}</span></div>
+    <div class="user-tile"><strong>{{num $s.CompletedFiles}}</strong><span>{{t .Lang "user.tile_completed"}}</span></div>
+    <div class="user-tile"><strong>{{num $s.BestDay}}</strong><span>{{t .Lang "user.tile_best_day"}}</span></div>
+</div>
+
+<h2 class="section-title">{{t .Lang "user.calendar"}}</h2>
+<section class="card user-calendar">
+    <div class="heat-scroll">
+    <svg class="heatmap" viewBox="0 0 {{$hm.W}} {{$hm.H}}" width="{{$hm.W}}" height="{{$hm.H}}" role="img" aria-label="{{t .Lang "user.calendar"}}">
+        {{range $hm.Months}}<text x="{{.X}}" y="{{.Y}}" class="heat-label">{{.Label}}</text>{{end}}
+        {{range $hm.Weekdays}}<text x="{{.X}}" y="{{.Y}}" class="heat-label" text-anchor="end">{{.Label}}</text>{{end}}
+        {{range $hm.Cells}}<rect x="{{.X}}" y="{{.Y}}" width="11" height="11" rx="2" class="heat-l{{.Level}}"><title>{{.Title}}</title></rect>{{end}}
+    </svg>
+    </div>
+    <div class="heat-foot small muted">
+        <span>{{t .Lang "user.calendar_note" .Data.TimeZone}}</span>
+        <span class="heat-legend">{{t .Lang "user.less"}} <i class="heat-l0"></i><i class="heat-l1"></i><i class="heat-l2"></i><i class="heat-l3"></i><i class="heat-l4"></i> {{t .Lang "user.more"}}</span>
+    </div>
+</section>
+
+<h2 class="section-title">{{t .Lang "user.badges"}} <span class="muted small">{{t .Lang "user.badges_count" $pr.Earned $pr.Tiers}}</span></h2>
+{{range $pr.Badges}}{{$g := .}}
+<section class="card badge-group">
+    <h3>{{t $.Lang (printf "badges.group_%s" .Key)}}</h3>
+    <div class="badge-grid">
+    {{range .Badges}}
+        <div class="badge{{if .Tier}} tier-{{.TierName}}{{else}} locked{{end}}" title="{{t $.Lang (printf "badge.%s_desc" .Key) (num .Target)}}">
+            <div class="badge-medal">{{template "badge_icon" .Icon}}</div>
+            <div class="badge-body">
+                <div class="badge-name">{{t $.Lang (printf "badge.%s" .Key)}}</div>
+                <div class="badge-tier small">{{if .Tier}}{{t $.Lang (printf "badges.tier_%s" .TierName)}}{{else}}{{t $.Lang "badges.locked"}}{{end}}
+                    <span class="badge-pips" aria-hidden="true">{{$b := .}}{{range $i, $step := .Steps}}<i{{if lt $i $b.Tier}} class="on"{{end}}></i>{{end}}</span></div>
+                <div class="badge-desc small muted">{{if .Max}}{{t $.Lang "badges.max"}}{{else}}{{t $.Lang (printf "badge.%s_desc" .Key) (num .Target)}}{{end}}</div>
+                {{if not .Max}}<div class="badge-progress" role="progressbar" aria-valuenow="{{.Value}}" aria-valuemax="{{.Target}}"><span style="width: {{.Percent}}%"></span></div>
+                <div class="badge-count small muted">{{num .Value}} / {{num .Target}}</div>{{end}}
+            </div>
+        </div>
+    {{end}}
+    </div>
+</section>
+{{end}}
+
+<h2 class="section-title">{{t .Lang "user.projects"}}</h2>
+<section class="card">
+    {{with $pr.Totals.Projects}}
+    <table class="table user-projects">
+        <thead><tr><th>{{t $.Lang "user.col_project"}}</th><th class="num">{{t $.Lang "user.tile_contributions"}}</th><th class="num">{{t $.Lang "user.tile_translated"}}</th><th>{{t $.Lang "user.col_last"}}</th></tr></thead>
+        <tbody>{{range .}}<tr><td><a href="{{.Path}}">{{.Name}}</a></td><td class="num">{{num .Contributions}}</td><td class="num">{{num .Translated}}</td><td class="small muted">{{timeAgo $.Lang .LastActive}}</td></tr>{{end}}</tbody>
+    </table>
+    {{else}}<p class="muted">{{t .Lang "user.no_projects"}}</p>{{end}}
+    <p class="muted small">{{t .Lang "user.note"}}</p>
+</section>
+</div>
+{{end}}

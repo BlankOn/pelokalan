@@ -42,7 +42,7 @@
     <div class="card-head card-head-end" data-stick>
         <div class="row-actions">
             {{if .Data.Template}}<button type="button" class="btn btn-primary" data-open-dialog="new-translation">+ {{t .Lang "project.new_translation"}}</button>{{end}}
-            <button type="button" class="btn" data-open-dialog="upload">{{t .Lang "project.upload"}}</button>
+            {{if not .Data.IsGit}}<button type="button" class="btn" data-open-dialog="upload">{{t .Lang "project.upload"}}</button>{{end}}
             {{with .Data.ProjectFiles}}{{if and .CanManage (or .HasFeed .Upstream)}}<form method="post" action="{{.Project.Path}}/project-files/sync" data-sync data-syncing="{{t $.Lang "files.syncing"}}">
                 <button class="btn" title="{{t $.Lang "files.sync_status_help"}}"><span class="sync-icon" aria-hidden="true">⟳</span> <span class="sync-label">{{t $.Lang "files.sync_status"}}</span></button>
             </form>{{end}}{{end}}
@@ -73,6 +73,7 @@
     {{end}}
 </section>
 
+{{if not .Data.IsGit}}
 <section class="card">
     <div class="card-head">
         <h2>{{t .Lang "project.template"}}</h2>
@@ -100,6 +101,7 @@
     <p class="muted">{{t .Lang "project.no_template"}}</p>
     {{end}}
 </section>
+{{end}}
 </div>
 
 {{end}}

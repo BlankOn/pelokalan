@@ -66,6 +66,9 @@ func NewHandler(
 	wikiService *service.WikiService,
 	contextService *service.ContextService,
 ) (*Handler, error) {
+	if loc, err := time.LoadLocation(siteConfig.TimeZone); err == nil {
+		siteLocation = loc
+	}
 	h := &Handler{
 		templatesDir:   templatesDir,
 		siteConfig:     siteConfig,
@@ -107,6 +110,9 @@ type PageData struct {
 	Flash    string
 	Data     map[string]any
 }
+
+// siteLocation is the site's time zone (SITE_TIMEZONE): where profile days start and end
+var siteLocation = time.UTC
 
 func funcMap() template.FuncMap {
 	return template.FuncMap{
@@ -240,6 +246,11 @@ func funcMap() template.FuncMap {
 			default:
 				return fmt.Sprintf("%d B", n)
 			}
+		},
+		// monthYear formats a time as "Nov 2026" in the site's time zone
+		"monthYear": func(lang string, t time.Time) string {
+			t = t.In(siteLocation)
+			return i18n.T(lang, fmt.Sprintf("month.short_%d", int(t.Month()))) + " " + strconv.Itoa(t.Year())
 		},
 		"initial": func(s string) string {
 			for _, r := range s {

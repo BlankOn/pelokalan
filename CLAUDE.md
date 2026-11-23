@@ -319,6 +319,28 @@ signed in or not, `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-
 members with username, name, **sign-in email** (the operator chose to publish it here, although the members page
 shows it only to members), role, joined_at. Documented in README.md.
 
+## Public profiles and badges
+
+- `/users/{username}` (public, `Handler.UserPage`, pages/user.html; "users" is a reserved username): a person's work
+  across all projects, never their email. Linked from the user menu ("Halaman publik saya"), members page, Statistik
+  table and comment authors. Data: `ActivityRepository.UserDays` (per calendar day in `SITE_TIMEZONE`, default
+  Asia/Jakarta; `siteLocation`; main.go embeds time/tzdata) and `UserTotals` (projects, files, languages, completed
+  files, comments, topics, wiki/Konteks edits, manual commits) in repository/postgres/profile.go. A **contribution** =
+  an entry save that translated, reviewed (fuzzy/AI → translated), changed a translated string, or saved a machine
+  draft (`evContribute`, the Statistik rules); streaks count days with at least one.
+- `service/profile.go`: `ComputeProfileStats` (current/best streaks of days, Monday–Sunday weeks and months; the period
+  not over yet does not break a streak; active days, best day, night 00–05 / early 05–07, weekends, member days) and the
+  badge catalog `Badges`: groups (streak, work, reach, community, habits) of badges with up to 5 tiers
+  (`BadgeTierNames` bronze…diamond; strings `badges.*`, `badge.<key>` + `badge.<key>_desc` with the target).
+  Add a badge there (plus strings and a `badge_icon` case). Completed files = own files the person worked on that are
+  now fully translated. The page: head with streak, tiles, a 53-week calendar (`buildHeatmap`, levels `heatLevels`),
+  badges (earned first, pips, progress to the next tier) and projects. Work before the activity log began is not counted.
+
+## Git-only projects
+
+- When every module group of a project is synced from GitHub (`GlossaryService.IsGitProject`), Penerjemahan hides the
+  template (POT) section and "Tambah berkas manual": files come from the repository.
+
 ## About page
 
 `/about` (footer link "Tentang", before Lisensi; `AboutPage`, pages/about.html, `about.*` strings) explains the

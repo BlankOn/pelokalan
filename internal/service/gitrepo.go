@@ -89,6 +89,22 @@ func RepoFileName(p string) string {
 	return strings.ReplaceAll(stem, "/", "__") + ext
 }
 
+// IsGitProject tells whether a project's files come from git repositories only (it has module groups
+// and every one is synced from GitHub): files then come from the repository, so the Penerjemahan page
+// has no template section and no manual upload. A project that also has other groups keeps both.
+func (s *GlossaryService) IsGitProject(ctx context.Context, p *models.Project) bool {
+	groups, err := s.Groups(ctx, p)
+	if err != nil || len(groups) == 0 {
+		return false
+	}
+	for _, g := range groups {
+		if !g.IsGit() {
+			return false
+		}
+	}
+	return true
+}
+
 // GitGroupFor returns the module group a repository file was last synced from (nil = unknown)
 func (s *GlossaryService) GitGroupFor(ctx context.Context, p *models.Project, repoPath string) *models.ModuleGroup {
 	if repoPath == "" {

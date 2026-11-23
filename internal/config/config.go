@@ -89,6 +89,8 @@ type SiteConfig struct {
 	Name    string
 	// DefaultLang is the UI language used when the visitor has not picked one.
 	DefaultLang string
+	// TimeZone (IANA name, SITE_TIMEZONE) sets where a day starts and ends for profile streaks
+	TimeZone string
 }
 
 // MailConfig holds outgoing email configuration (Mailtrap)
@@ -146,6 +148,7 @@ func Load() *Config {
 			BaseURL:     strings.TrimRight(getEnv("SITE_BASE_URL", "http://localhost:8080"), "/"),
 			Name:        getEnv("SITE_NAME", "Pelokalan"),
 			DefaultLang: getEnv("DEFAULT_LANG", "id"),
+			TimeZone:    getEnv("SITE_TIMEZONE", "Asia/Jakarta"),
 		},
 		Mail: MailConfig{
 			APIToken:  getEnv("MAILTRAP_API_TOKEN", ""),

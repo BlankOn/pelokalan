@@ -29,6 +29,7 @@
                 <span class="small">@{{.User.Username}}</span>
                 <span class="muted small">{{.User.Email}}</span>
             </div>
+            <a href="/users/{{.User.Username}}">{{t .Lang "nav.my_page"}}</a>
             <a href="/profile">{{t .Lang "nav.profile"}}</a>
             <a href="/invitations">{{t .Lang "nav.invitations"}}</a>
             <form method="post" action="/logout"><button type="submit" class="linklike">{{t .Lang "nav.logout"}}</button></form>
