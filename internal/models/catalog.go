@@ -25,6 +25,9 @@ type Catalog struct {
 	Owned bool
 	// SourceURL is the link the file was downloaded from ("" = uploaded from disk)
 	SourceURL string
+	// RepoPath is the file's path in its module group's git repository (taken from a project file),
+	// used to export changes as a git patch ("" = not from a repository)
+	RepoPath string
 	// UpstreamPage is the file's page on the GNOME translation site, entered by hand; its state is
 	// fetched for this file ("" = found through the project files instead)
 	UpstreamPage string

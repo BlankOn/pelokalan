@@ -66,6 +66,8 @@ func (h *Handler) moduleGroupsData(r *http.Request, p *models.Project, data *Pag
 	data.Data["FormVersion"] = r.FormValue("version_name")
 	data.Data["FormURL"] = r.FormValue("url")
 	data.Data["FormMode"] = r.FormValue("source")
+	data.Data["FormGitRepo"] = r.FormValue("git_repo")
+	data.Data["FormGitBranch"] = r.FormValue("git_branch")
 	if open != "" {
 		data.Data["GroupsError"] = errMsg
 	}
@@ -105,13 +107,17 @@ func (h *Handler) AddModuleGroupSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if r.FormValue("source") == "url" {
-		g, out, err := h.glossary.SetGroupSync(r.Context(), user, p, service.GroupSyncInput{
+	if src := r.FormValue("source"); src == "url" || src == "git" {
+		in := service.GroupSyncInput{
 			Name:     r.FormValue("name"),
 			Version:  r.FormValue("version_name"),
 			URL:      r.FormValue("url"),
 			Language: r.FormValue("language"),
-		})
+		}
+		if src == "git" { // a GitHub repository branch, downloaded as one archive
+			in.URL, in.Repo, in.Branch = "", r.FormValue("git_repo"), r.FormValue("git_branch")
+		}
+		g, out, err := h.glossary.SetGroupSync(r.Context(), user, p, in)
 		if err != nil {
 			h.renderModuleGroups(w, r, p, h.errorMessage(r, err), "add")
 			return

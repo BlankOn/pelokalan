@@ -24,6 +24,8 @@ type CatalogService struct {
 	commits  repository.CommitRepository
 	projects *ProjectService
 	activity *ActivityService
+	// project files, for git patches against the repository's own files (SetProjectFiles)
+	projectFiles repository.GlossaryRepository
 }
 
 // SetActivity makes the service record entry saves and commits in the activity log

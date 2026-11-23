@@ -207,7 +207,9 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 	if c.Owned {
 		data.Data["Uncommitted"] = h.commitDirtyCount(r, c)
 	}
-	if !c.IsTemplate { // the file's page on the GNOME translation site, from its stored state or own link
+	if u := h.glossary.GitFileURL(r.Context(), p, c.RepoPath); u != "" { // a repository file: its page on GitHub
+		data.Data["ModulePage"] = u
+	} else if !c.IsTemplate { // the file's page on the GNOME translation site, from its stored state or own link
 		h.glossary.AttachUpstreamToCatalogs(r.Context(), p, []*models.Catalog{c})
 		if c.Upstream != nil && c.Upstream.PageURL != "" {
 			data.Data["ModulePage"] = c.Upstream.PageURL

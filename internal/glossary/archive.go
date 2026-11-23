@@ -16,6 +16,7 @@ import (
 // File is one translation file read from an upload
 type File struct {
 	Name string // base name, e.g. "gtk.gtk-4-24.id.po"
+	Path string // the whole path inside the archive, "/" separated (= Name for a single file)
 	Data []byte
 }
 
@@ -89,7 +90,8 @@ func (r *reader) add(name string, data []byte) error {
 	if r.total > r.lim.MaxTotalBytes {
 		return ErrTooLarge
 	}
-	r.files = append(r.files, File{Name: path.Base(strings.ReplaceAll(name, "\\", "/")), Data: data})
+	p := strings.TrimPrefix(path.Clean("/"+strings.ReplaceAll(name, "\\", "/")), "/")
+	r.files = append(r.files, File{Name: path.Base(p), Path: p, Data: data})
 	return nil
 }
 

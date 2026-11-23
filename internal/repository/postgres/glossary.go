@@ -38,13 +38,13 @@ func (r *glossaryRepository) GetOrCreateGroup(ctx context.Context, projectID int
 
 const versionColumns = `v.id, v.project_id, v.name, v.version, v.created_at, v.sync_url, v.sync_language,
 	v.feed_created_by, v.last_fetched_at, v.last_changed_at, v.last_fetch_error, v.fetch_etag, v.fetch_last_modified,
-	v.fetch_content_hash, (SELECT COUNT(*) FROM module_group_imports i WHERE i.group_id = v.id)`
+	v.fetch_content_hash, v.git_repo, v.git_branch, (SELECT COUNT(*) FROM module_group_imports i WHERE i.group_id = v.id)`
 
 func scanGroup(row interface{ Scan(...any) error }) (*models.ModuleGroup, error) {
 	v := &models.ModuleGroup{}
 	err := row.Scan(&v.ID, &v.ProjectID, &v.Name, &v.Version, &v.CreatedAt, &v.SyncURL, &v.SyncLanguage,
 		&v.FeedCreatedBy, &v.LastFetchedAt, &v.LastChangedAt, &v.LastFetchError, &v.FetchETag, &v.FetchLastModified,
-		&v.FetchContentHash, &v.ImportCount)
+		&v.FetchContentHash, &v.GitRepo, &v.GitBranch, &v.ImportCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -475,6 +475,30 @@ func (r *glossaryRepository) Modules(ctx context.Context, projectID int64, langu
 	return out, rows.Err()
 }
 
+func (r *glossaryRepository) SetGroupGit(ctx context.Context, groupID int64, repo, branch string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE module_groups SET git_repo = $2, git_branch = $3 WHERE id = $1`, groupID, repo, branch)
+	return err
+}
+
+func (r *glossaryRepository) ProjectFileByRepoPath(ctx context.Context, projectID int64, path string) (*models.ProjectFile, *models.ModuleGroup, error) {
+	var fid, gid int64
+	err := r.db.QueryRowContext(ctx, `
+		SELECT f.id, f.group_id FROM project_files f JOIN module_groups v ON v.id = f.group_id
+		WHERE f.project_id = $1 AND f.repo_path = $2 AND v.git_repo <> ''
+		ORDER BY f.created_at DESC, f.id DESC LIMIT 1`, projectID, path).Scan(&fid, &gid)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil, repository.ErrNotFound
+	} else if err != nil {
+		return nil, nil, err
+	}
+	f, err := r.GetProjectFile(ctx, projectID, fid)
+	if err != nil {
+		return nil, nil, err
+	}
+	g, err := r.GetGroup(ctx, gid)
+	return f, g, err
+}
+
 func (r *glossaryRepository) AddProjectFiles(ctx context.Context, files []*models.ProjectFile) error {
 	if len(files) == 0 {
 		return nil
@@ -485,15 +509,15 @@ func (r *glossaryRepository) AddProjectFiles(ctx context.Context, files []*model
 	}
 	defer tx.Rollback()
 	stmt, err := tx.PrepareContext(ctx, `INSERT INTO project_files
-		(import_id, project_id, group_id, filename, language, total, translated, fuzzy, size, data)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`)
+		(import_id, project_id, group_id, filename, language, total, translated, fuzzy, size, data, repo_path)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 	for _, f := range files {
 		if _, err := stmt.ExecContext(ctx, f.ImportID, f.ProjectID, f.GroupID, f.Filename, f.Language,
-			f.Total, f.Translated, f.Fuzzy, f.Size, f.Data); err != nil {
+			f.Total, f.Translated, f.Fuzzy, f.Size, f.Data, f.RepoPath); err != nil {
 			return err
 		}
 	}
@@ -501,7 +525,7 @@ func (r *glossaryRepository) AddProjectFiles(ctx context.Context, files []*model
 }
 
 const projectFileColumns = `f.id, f.import_id, f.project_id, f.group_id, v.name || '-' || v.version, f.filename, f.language,
-	f.total, f.translated, f.fuzzy, f.size, f.created_at`
+	f.total, f.translated, f.fuzzy, f.size, f.created_at, f.repo_path`
 
 func (r *glossaryRepository) ListProjectFiles(ctx context.Context, projectID int64, query string, groupIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error) {
 	// every word must appear in the file name, language or module group label
@@ -532,7 +556,7 @@ func (r *glossaryRepository) ListProjectFiles(ctx context.Context, projectID int
 	for rows.Next() {
 		f := &models.ProjectFile{}
 		if err := rows.Scan(&f.ID, &f.ImportID, &f.ProjectID, &f.GroupID, &f.GroupLabel, &f.Filename, &f.Language,
-			&f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt); err != nil {
+			&f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt, &f.RepoPath); err != nil {
 			return nil, 0, err
 		}
 		out = append(out, f)
@@ -545,7 +569,7 @@ func (r *glossaryRepository) GetProjectFile(ctx context.Context, projectID, id i
 	err := r.db.QueryRowContext(ctx, `SELECT `+projectFileColumns+`, f.data
 		FROM project_files f JOIN module_groups v ON v.id = f.group_id
 		WHERE f.project_id = $1 AND f.id = $2`, projectID, id).Scan(&f.ID, &f.ImportID, &f.ProjectID, &f.GroupID,
-		&f.GroupLabel, &f.Filename, &f.Language, &f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt, &f.Data)
+		&f.GroupLabel, &f.Filename, &f.Language, &f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt, &f.RepoPath, &f.Data)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -570,7 +594,7 @@ func (r *glossaryRepository) ProjectFilesForLanguage(ctx context.Context, projec
 	for rows.Next() {
 		f := &models.ProjectFile{}
 		if err := rows.Scan(&f.ID, &f.ImportID, &f.ProjectID, &f.GroupID, &f.GroupLabel, &f.Filename, &f.Language,
-			&f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt); err != nil {
+			&f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt, &f.RepoPath); err != nil {
 			return nil, err
 		}
 		out = append(out, f)

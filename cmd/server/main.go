@@ -94,6 +94,7 @@ func main() {
 	fetcher := glossary.NewFetcher(cfg.Glossary.MaxDownloadMB<<20, cfg.Glossary.AllowPrivateHosts,
 		cfg.Site.Name+" glossary fetcher (+"+cfg.Site.BaseURL+")")
 	glossaryService := service.NewGlossaryService(repos.Glossary, fetcher)
+	catalogService.SetProjectFiles(repos.Glossary) // git patches against repository files
 	discussionService := service.NewDiscussionService(repos.Discuss, repos.Project, repos.Glossary, repos.Catalog, blobs, mailer, cfg.Site)
 	// activity log for the Insight tab
 	activityService := service.NewActivityService(repos.Activity)
@@ -305,6 +306,8 @@ func main() {
 		r.Get("/projects/{id}/spell/suggest", webHandler.SpellSuggest)
 		r.Post("/projects/{id}/dictionary", webHandler.AddDictionaryWord)
 		r.Post("/projects/{id}/dictionary/delete", webHandler.DeleteDictionaryWord)
+		r.Get("/projects/{id}/git/patch", webHandler.ProjectGitPatch)
+		r.Get("/catalogs/{cid}/patch", webHandler.CatalogGitPatch)
 		r.Post("/projects/{id}/project-files/{fid}/take", webHandler.ProjectFileTake)
 		r.Post("/projects/{id}/project-files/sync", webHandler.ProjectFilesSync)
 		r.Get("/projects/{id}/project-files/sync", webHandler.ProjectFilesSyncStatus)

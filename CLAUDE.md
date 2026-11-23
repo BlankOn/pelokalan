@@ -463,6 +463,32 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - `/catalogs/{cid}/properties` edits Project-Id-Version, Report-Msgid-Bugs-To,
   Language-Team and the header comment lines.
 
+## Git repositories (GitHub module groups and patches)
+
+- A module group can be synced from a **GitHub repository branch** (e.g. python/python-docs-id, 3.14): "Repositori
+  GitHub" in the add form (`source=git`, `git_repo`, `git_branch`; `service.ParseGitHubRepo` accepts owner/name or
+  the github.com address, `/tree/<branch>` too). Stored in `module_groups.git_repo/git_branch` (migration 042);
+  the sync URL is the branch archive on codeload.github.com (`GitHubArchiveURL`: no API calls, no key), so FetchDue,
+  ETag and "Sinkronkan" work as for any archive.
+- Import (`importInto`, `gitFiles`): the archive's top folder is dropped; every file keeps its path as
+  `project_files.repo_path` ("library/os.po") and gets a flat, collision-free Pelokalan name (`RepoFileName`:
+  folders joined with "__", inner dots → "-": "library__os-path.po"), so modules stay unique. Only strings of at
+  most `GitTermMaxWords` (12) words become glossary terms (documentation paragraphs are not terms).
+- "Ambil"/"Perbarui" copy `repo_path` to the member's file (`catalogs.repo_path`, `CatalogService.SetRepoPath`).
+- **Patch export** (`internal/gitpatch`, `CatalogService.GitPatch`): starts from the repository's file as last synced
+  (newest project file with that path, `ProjectFileByRepoPath`) and rewrites only entries the member changed in
+  Pelokalan since taking/updating the file (compared with the newest "initial" or "from upstream" version in its
+  history), so newer repository translations are never reverted; unreviewed AI drafts and emptied strings stay out.
+  Rewritten entries keep comments and source lines, gain/lose "fuzzy" (dropping `#|` lines), and msgstr is wrapped
+  like gettext (`gitpatch.writeString`/`wrap`: 79 columns, Unicode-like break rules; matches msgcat on 99.6% of
+  python-docs entries, and msgcat leaves a patched file unchanged). Within an entry, lines are diffed (LCS) so
+  unchanged lines stay context. Output is one `git format-patch` commit (author = translator identity) for `git am`.
+- UI: Berkas Anda shows "Unduh patch git" (`GET /projects/{id}/git/patch`, all the member's repository files) and a
+  "?" button opening `#git-guide` (fork/clone once, Sinkronkan + Perbarui, download, `git switch -c … upstream/<branch>`,
+  `git am`, push, `gh pr create`), only when the project has a git group (`GlossaryService.GitGroup`). Each repository
+  file's ⋯ menu has "Unduh patch git" (`GET /catalogs/{cid}/patch`) and the list shows its repository path. Nothing to
+  send → back to Penerjemahan with `flash.git_no_changes`. The editor's "Modul" opens the file on GitHub.
+
 ## Module groups UI
 
 - Settings has a "Kelompok modul" section (`#module-groups`, owners and managers) with the group labels and buttons

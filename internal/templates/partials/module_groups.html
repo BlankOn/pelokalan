@@ -45,7 +45,8 @@
                     {{else if $v.LastFetchedAt}}<span class="feed-status feed-ok">{{t $.Lang "feed.status_ok"}}</span>
                     {{else}}<span class="feed-status">{{t $.Lang "feed.status_pending"}}</span>{{end}}
                 </div>
-                <a class="gl-feed-url small" href="{{$v.SyncURL}}" rel="noopener noreferrer nofollow">{{$v.SyncURL}}</a>
+                {{if $v.IsGit}}<a class="gl-feed-url small" href="{{$v.GitURL}}/tree/{{$v.GitBranch}}" rel="noopener noreferrer nofollow">GitHub: {{$v.GitRepo}} · {{$v.GitBranch}}</a>
+                {{else}}<a class="gl-feed-url small" href="{{$v.SyncURL}}" rel="noopener noreferrer nofollow">{{$v.SyncURL}}</a>{{end}}
                 <div class="muted small">
                     {{if $v.LastFetchedAt}}{{t $.Lang "feed.checked" (timeAgo $.Lang $v.LastFetchedAt)}}{{else}}{{t $.Lang "feed.never"}}{{end}}
                     {{with $v.LastChangedAt}} · {{t $.Lang "feed.changed" (timeAgo $.Lang .)}}{{end}}
@@ -97,10 +98,24 @@
                 <legend>{{t .Lang "groups.source_type"}}</legend>
                 <label class="check"><input type="radio" name="source" value="file" {{if ne .Data.FormMode "url"}}checked{{end}}> {{t .Lang "groups.source_file"}}</label>
                 <label class="check"><input type="radio" name="source" value="url" {{if eq .Data.FormMode "url"}}checked{{end}}> {{t .Lang "groups.source_url"}}</label>
+                <label class="check"><input type="radio" name="source" value="git" {{if eq .Data.FormMode "git"}}checked{{end}}> {{t .Lang "groups.source_git"}}</label>
             </fieldset>
             <div data-source="file" {{if eq .Data.FormMode "url"}}hidden{{end}}>
                 <label for="mg-file">{{t .Lang "field.file"}}</label>
                 <input id="mg-file" type="file" name="file" accept=".po,.tar.gz,.tgz,.tar,.zip,.gz">
+            </div>
+            <div data-source="git" {{if ne .Data.FormMode "git"}}hidden{{end}}>
+                <div class="grid-2">
+                    <div>
+                        <label for="mg-git-repo">{{t .Lang "groups.git_repo"}}</label>
+                        <input id="mg-git-repo" name="git_repo" maxlength="300" value="{{.Data.FormGitRepo}}" placeholder="https://github.com/python/python-docs-id" spellcheck="false">
+                    </div>
+                    <div>
+                        <label for="mg-git-branch">{{t .Lang "groups.git_branch"}}</label>
+                        <input id="mg-git-branch" name="git_branch" maxlength="200" value="{{.Data.FormGitBranch}}" placeholder="3.14" spellcheck="false">
+                    </div>
+                </div>
+                <p class="muted small">{{t .Lang "groups.git_help"}}</p>
             </div>
             <div data-source="url" {{if ne .Data.FormMode "url"}}hidden{{end}}>
                 <label for="mg-url">{{t .Lang "field.download_url"}}</label>

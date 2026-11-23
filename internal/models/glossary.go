@@ -69,12 +69,35 @@ type ModuleGroup struct {
 	FetchLastModified string
 	FetchContentHash  string
 
+	// A GitHub repository branch the group is synced from ("" = an archive or an upload)
+	GitRepo   string // "owner/name"
+	GitBranch string
+
 	// Filled by listing queries
 	ImportCount int
 }
 
 // HasFeed reports whether the module group is downloaded automatically
 func (v *ModuleGroup) HasFeed() bool { return v.SyncURL != "" }
+
+// IsGit reports whether the group comes from a GitHub repository branch
+func (v *ModuleGroup) IsGit() bool { return v.GitRepo != "" }
+
+// GitName is the repository's name without its owner ("python-docs-id")
+func (v *ModuleGroup) GitName() string {
+	if i := strings.LastIndex(v.GitRepo, "/"); i >= 0 {
+		return v.GitRepo[i+1:]
+	}
+	return v.GitRepo
+}
+
+// GitURL is the repository's address on GitHub
+func (v *ModuleGroup) GitURL() string { return "https://github.com/" + v.GitRepo }
+
+// GitFileURL is a file's address on GitHub (path inside the repository)
+func (v *ModuleGroup) GitFileURL(path string) string {
+	return "https://github.com/" + v.GitRepo + "/blob/" + v.GitBranch + "/" + path
+}
 
 // Label returns the display form, e.g. "gnome-51"
 func (v *ModuleGroup) Label() string { return GroupLabelOf(v.Name, v.Version) }
@@ -119,6 +142,7 @@ type ProjectFile struct {
 	Translated   int
 	Fuzzy        int
 	Size         int64
+	RepoPath     string   // path inside the group's git repository ("" = not from a repository)
 	Data         []byte   // gzip-compressed; only filled when one file is loaded
 	Mine         *Catalog // the viewer's own file of the same module, if any (not stored)
 	UpstreamInfo          // state on the GNOME translation site (not stored)

@@ -1461,9 +1461,27 @@ document.addEventListener("submit", function (ev) {
         form.querySelectorAll("[data-source]").forEach(function (el) { el.hidden = el.dataset.source !== mode; });
         document.getElementById("mg-file").required = mode === "file";
         document.getElementById("mg-url").required = mode === "url";
+        var repo = document.getElementById("mg-git-repo"), branch = document.getElementById("mg-git-branch");
+        if (repo) repo.required = mode === "git";
+        if (branch) branch.required = mode === "git";
     }
     form.addEventListener("change", function (ev) { if (ev.target.name === "source") sync(); });
     sync();
+
+    // GitHub repository: the name comes from the repository, the version from the branch
+    // (https://github.com/python/python-docs-id/tree/3.14 → python-docs-id, 3.14)
+    var gitRepo = document.getElementById("mg-git-repo"), gitBranch = document.getElementById("mg-git-branch");
+    function suggestGit() {
+        var m = /github\.com\/[^\/\s]+\/([^\/\s#?]+?)(?:\.git)?(?:\/tree\/([^\s#?]+))?\/?$/i.exec(gitRepo.value.trim());
+        if (m && m[2] && !gitBranch.value) gitBranch.value = m[2];
+        var name = document.getElementById("mg-name"), version = document.getElementById("mg-version");
+        if (m && !name.dataset.touched) name.value = m[1].toLowerCase();
+        if (gitBranch.value && !version.value) version.value = gitBranch.value.replace(/[^A-Za-z0-9._+~]/g, "-");
+    }
+    if (gitRepo && gitBranch) {
+        gitRepo.addEventListener("change", suggestGit);
+        gitBranch.addEventListener("change", suggestGit);
+    }
 
     // Suggest name + version from a download link such as .../gnome-51/ui.tar.gz
     document.getElementById("mg-url").addEventListener("change", function (ev) {

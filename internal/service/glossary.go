@@ -140,7 +140,19 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 		return nil, userErr("err.glossary_unreadable")
 	}
 
+	if v.IsGit() {
+		files = gitFiles(files)
+	}
 	built := glossary.Build(files, language)
+	if v.IsGit() { // documentation: whole paragraphs are no glossary terms
+		terms := built.Terms[:0]
+		for _, t := range built.Terms {
+			if t.WordCount <= GitTermMaxWords {
+				terms = append(terms, t)
+			}
+		}
+		built.Terms = terms
+	}
 	if len(built.Terms) == 0 {
 		return nil, userErr("err.glossary_empty")
 	}
@@ -189,7 +201,7 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 				log.Printf("glossary: record stats of version %d: %v", v.ID, err)
 			}
 		}()
-		if err := s.repo.AddProjectFiles(ctx, projectFiles(files, imp, language)); err != nil {
+		if err := s.repo.AddProjectFiles(ctx, projectFiles(files, imp, language, v.IsGit())); err != nil {
 			log.Printf("glossary: store project files of import %d: %v", imp.ID, err)
 		}
 		res.Imports = append(res.Imports, imp)
@@ -197,9 +209,11 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 	return res, nil
 }
 
-// GroupSyncInput defines an automatic download source
+// GroupSyncInput defines an automatic download source: a download URL, or a GitHub repository
+// (Repo: "owner/name" or its address, Branch) whose branch is downloaded as one archive
 type GroupSyncInput struct {
 	Name, Version, URL, Language string
+	Repo, Branch                 string
 }
 
 // SetGroupSync stores a download URL for a module group and fetches it right away. The
@@ -211,6 +225,14 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 	name, version, err := cleanGroup(in.Name, in.Version)
 	if err != nil {
 		return nil, nil, err
+	}
+	var repo, branch string
+	if strings.TrimSpace(in.Repo) != "" {
+		var ok bool
+		if repo, branch, ok = ParseGitHubRepo(in.Repo, in.Branch); !ok {
+			return nil, nil, userErr("err.git_repo_invalid")
+		}
+		in.URL = GitHubArchiveURL(repo, branch)
 	}
 	u, err := glossary.ValidateURL(in.URL)
 	if err != nil {
@@ -228,6 +250,9 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 		return nil, nil, err
 	}
 	if err := s.repo.SetGroupSync(ctx, v.ID, u.String(), language, &user.ID); err != nil {
+		return nil, nil, err
+	}
+	if err := s.repo.SetGroupGit(ctx, v.ID, repo, branch); err != nil { // "" for a plain download link
 		return nil, nil, err
 	}
 	if v, err = s.repo.GetGroup(ctx, v.ID); err != nil {
@@ -619,7 +644,7 @@ func (s *GlossaryService) Search(ctx context.Context, p *models.Project, in Glos
 
 // projectFiles prepares the PO files of one language from a glossary source for storage:
 // statistics from the parsed file, contents gzip-compressed
-func projectFiles(files []glossary.File, imp *models.ModuleGroupImport, language string) []*models.ProjectFile {
+func projectFiles(files []glossary.File, imp *models.ModuleGroupImport, language string, git bool) []*models.ProjectFile {
 	var out []*models.ProjectFile
 	for _, f := range files {
 		cat, err := po.ParseBytes(f.Data)
@@ -635,6 +660,9 @@ func projectFiles(files []glossary.File, imp *models.ModuleGroupImport, language
 		}
 		pf := &models.ProjectFile{ImportID: imp.ID, ProjectID: imp.ProjectID, GroupID: imp.GroupID,
 			Filename: f.Name, Language: lang, Size: int64(len(f.Data))}
+		if git {
+			pf.RepoPath = f.Path
+		}
 		for _, e := range cat.Entries {
 			if e.Obsolete {
 				continue

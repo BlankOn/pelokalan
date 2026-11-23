@@ -110,6 +110,8 @@ type CatalogRepository interface {
 	SetSourceURL(ctx context.Context, id int64, url string) error
 	// SetUpstreamPage stores the file's page on the GNOME translation site ("" = none)
 	SetUpstreamPage(ctx context.Context, id int64, page string) error
+	// SetRepoPath stores the file's path in its module group's git repository
+	SetRepoPath(ctx context.Context, id int64, path string) error
 }
 
 // Suggestion is a translation memory match
@@ -176,6 +178,11 @@ type GlossaryRepository interface {
 	DeleteGroup(ctx context.Context, id int64) error
 	// SetGroupSync sets (or, with an empty URL, removes) the download URL of a module group
 	SetGroupSync(ctx context.Context, groupID int64, url, language string, userID *int64) error
+	// SetGroupGit stores the GitHub repository ("owner/name") and branch a module group is synced from
+	SetGroupGit(ctx context.Context, groupID int64, repo, branch string) error
+	// ProjectFileByRepoPath returns the newest project file with this path from a git module group
+	// (with its data) and that group
+	ProjectFileByRepoPath(ctx context.Context, projectID int64, path string) (*models.ProjectFile, *models.ModuleGroup, error)
 	// DueGroupSyncs returns module groups with a URL not fetched since the given time
 	DueGroupSyncs(ctx context.Context, before time.Time) ([]*models.ModuleGroup, error)
 	// RecordFetch stores the outcome of a download

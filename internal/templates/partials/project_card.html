@@ -95,6 +95,7 @@
 <tr>
     <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a>
         <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div>
+        {{if .RepoPath}}<div class="small muted repo-path" title="{{t $v.Lang "git.repo_path"}}">{{.RepoPath}}</div>{{end}}
         {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}</td>
     <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>{{end}}</td>
     <td class="num">{{if not .IsTemplate}}{{.Stats.Translated}}{{end}}</td>
@@ -113,6 +114,7 @@
                 <form method="post" action="/catalogs/{{.ID}}/update"><button class="linklike">{{t $v.Lang "action.update_from_template"}}</button></form>
                 {{end}}
                 <button type="button" class="linklike" data-replace="/catalogs/{{.ID}}/replace" data-replace-name="{{.Filename}}" data-replace-url="{{.SourceURL}}" data-replace-page="{{.UpstreamPage}}">{{t $v.Lang "action.update_file"}}</button>
+                {{if .RepoPath}}<a href="/catalogs/{{.ID}}/patch" title="{{.RepoPath}}">{{t $v.Lang "git.patch_file"}}</a>{{end}}
                 <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $v.Lang "confirm.delete_file"}}"><button class="linklike danger">{{t $v.Lang "action.delete"}}</button></form>
             </div>
         </details>

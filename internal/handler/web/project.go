@@ -154,6 +154,10 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Error = errMsg
 	data.Data["Project"] = p
 	data.Data["Template"] = template
+	if g := h.glossary.GitGroup(r.Context(), p); g != nil {
+		data.Data["GitGroup"] = g
+		data.Data["SiteURL"] = strings.TrimRight(h.siteConfig.BaseURL, "/")
+	}
 	h.glossary.AttachUpstreamToCatalogs(r.Context(), p, catalogs)
 	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, nil, 0)
 	data.Data["MemberFiles"] = h.fileList(r, p, catalogs, false, "", nil, nil, 0)
@@ -680,6 +684,9 @@ func (h *Handler) ProjectFileTake(w http.ResponseWriter, r *http.Request) {
 		if err == nil {
 			err = h.catalogService.UpdateFromUpstream(r.Context(), user, c, label, data)
 		}
+		if err == nil && f.RepoPath != "" && c.RepoPath != f.RepoPath { // a repository file: keep its path
+			err = h.catalogService.SetRepoPath(r.Context(), user, c, f.RepoPath)
+		}
 		if err != nil {
 			h.renderProject(w, r, p, h.errorMessage(r, err))
 			return
@@ -695,6 +702,12 @@ func (h *Handler) ProjectFileTake(w http.ResponseWriter, r *http.Request) {
 	if res != nil { // merged into the member's existing file of that language
 		http.Redirect(w, r, p.Path()+fmt.Sprintf("/files?merged=1&added=%d&obsolete=%d&skipped=%d", res.Added, res.Obsolete, res.Skipped), http.StatusSeeOther)
 		return
+	}
+	if f.RepoPath != "" { // a repository file: its path is what the git patch writes to
+		if err := h.catalogService.SetRepoPath(r.Context(), user, c, f.RepoPath); err != nil {
+			h.fail(w, r, err)
+			return
+		}
 	}
 	http.Redirect(w, r, c.URL(), http.StatusSeeOther)
 }

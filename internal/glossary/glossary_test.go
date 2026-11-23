@@ -92,7 +92,7 @@ func TestReadFilesFormats(t *testing.T) {
 }
 
 func TestBuild(t *testing.T) {
-	res := Build([]File{{"a.master.id.po", []byte(poA)}, {"b.main.id.po", []byte(poB)}}, "")
+	res := Build([]File{{Name: "a.master.id.po", Data: []byte(poA)}, {Name: "b.main.id.po", Data: []byte(poB)}}, "")
 	if res.Files != 2 || len(res.Skipped) != 0 || len(res.Languages) != 1 || res.Languages[0] != "id" {
 		t.Fatalf("result = %+v", res)
 	}
