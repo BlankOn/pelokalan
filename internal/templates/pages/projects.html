@@ -7,7 +7,6 @@
 {{end}}
 
 <section class="home-intro" id="home-intro" aria-labelledby="home-intro-title">
-    {{if .User}}<button type="button" class="btn btn-small home-intro-hide" data-hide-intro title="{{t .Lang "home.hide"}}" aria-label="{{t .Lang "home.hide"}}">×</button>{{end}}
     <div class="home-hero">
         <div class="home-hero-text">
             <p class="home-kicker">{{.SiteName}}</p>
@@ -28,6 +27,29 @@
         </div>
         {{end}}
     </div>
+    <h2 class="home-how-title">{{t .Lang "home.sources_title"}}</h2>
+    <div class="home-sources">
+        <div class="home-source">
+            <div class="home-source-head"><div class="home-feature-icon"><svg class="badge-icon" viewBox="0 0 24 24" aria-hidden="true">{{badgeIcon "globe"}}</svg></div>
+                <div><h3>{{t .Lang "home.src_gnome"}}</h3><p>{{t .Lang "home.src_gnome_text"}}</p></div></div>
+            <ul>
+                <li>{{t .Lang "home.src_gnome_1"}}</li>
+                <li>{{t .Lang "home.src_gnome_2"}}</li>
+                <li>{{t .Lang "home.src_gnome_3"}}</li>
+                <li>{{t .Lang "home.src_gnome_4"}}</li>
+            </ul>
+        </div>
+        <div class="home-source">
+            <div class="home-source-head"><div class="home-feature-icon"><svg class="badge-icon" viewBox="0 0 24 24" aria-hidden="true">{{badgeIcon "merge"}}</svg></div>
+                <div><h3>{{t .Lang "home.src_github"}}</h3><p>{{t .Lang "home.src_github_text"}}</p></div></div>
+            <ul>
+                <li>{{t .Lang "home.src_github_1"}}</li>
+                <li>{{t .Lang "home.src_github_2"}}</li>
+                <li>{{t .Lang "home.src_github_3"}}</li>
+                <li>{{t .Lang "home.src_github_4"}}</li>
+            </ul>
+        </div>
+    </div>
     <h2 class="home-how-title">{{t .Lang "home.how_title"}}</h2>
     <ol class="home-how">
         <li><strong>{{t .Lang "home.how_1"}}</strong><span>{{t .Lang "home.how_1_text"}}</span></li>
@@ -35,11 +57,9 @@
         <li><strong>{{t .Lang "home.how_3"}}</strong><span>{{t .Lang "home.how_3_text"}}</span></li>
     </ol>
 </section>
-{{if .User}}<script>try { if (localStorage.getItem("homeIntroHidden")) document.getElementById("home-intro").hidden = true; } catch (e) {}</script>{{end}}
 
 <div class="page-head" id="projects">
     <h1>{{t .Lang "title.projects"}}</h1>
-    {{if .User}}<button type="button" class="btn btn-link home-intro-show" data-show-intro hidden>{{t .Lang "home.show"}}</button>{{end}}
     {{if .User}}<button type="button" class="btn btn-primary" data-open-dialog="new-project">+ {{t .Lang "project.new"}}</button>{{end}}
 </div>
 

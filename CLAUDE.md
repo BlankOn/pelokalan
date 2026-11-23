@@ -381,8 +381,8 @@ shows it only to members), role, joined_at. Documented in README.md.
 
 `/projects` starts with a landing introduction (`#home-intro`, pages/projects.html, `home.*` strings): headline, pitch,
 buttons (visitors: sign up / sign in; members: jump to the list), six feature cards (`homeFeatures`, badge
-icons) and three "how it works" steps. Signed-in members can hide it (×, localStorage `homeIntroHidden`, applied by an
-inline script before paint) and bring it back with "Tampilkan perkenalan" next to the Proyek heading.
+icons), the connected sources (GNOME l10n.gnome.org and GitHub repositories, `home.src_*`) and three "how it works"
+steps. It is always shown (no hide button).
 
 ## About page
 

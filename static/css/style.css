@@ -1546,8 +1546,6 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 /* Home page introduction (projects page, above the list) */
 .home-intro { position: relative; background: linear-gradient(135deg, var(--accent-soft), #fff 55%); border: 1px solid var(--border-soft);
     border-radius: 16px; padding: 30px 30px 26px; margin-bottom: 26px; }
-.home-intro[hidden] { display: none; }
-.home-intro-hide { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; padding: 0; font-size: 18px; line-height: 1; }
 .home-hero { max-width: 820px; }
 .home-kicker { margin: 0 0 6px; font-weight: 700; color: var(--accent); }
 .home-hero h1 { margin: 0 0 10px; font-size: 30px; line-height: 1.2; }
@@ -1561,13 +1559,18 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .home-feature-icon .badge-icon { width: 22px; height: 22px; stroke: currentColor; }
 .home-feature h3 { margin: 0 0 4px; font-size: 15px; }
 .home-feature p { margin: 0; font-size: 13.5px; color: #4a4e56; }
+.home-sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.home-source { background: #fff; border: 1px solid var(--border-soft); border-radius: 12px; padding: 16px; }
+.home-source-head { display: flex; gap: 12px; }
+.home-source h3 { margin: 0 0 4px; font-size: 15px; }
+.home-source p { margin: 0; font-size: 13.5px; color: #4a4e56; }
+.home-source ul { margin: 10px 0 0; padding-left: 68px; font-size: 13.5px; color: #4a4e56; display: flex; flex-direction: column; gap: 4px; }
 .home-how-title { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 24px 0 10px; }
 .home-how { list-style: none; counter-reset: how; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
 .home-how li { counter-increment: how; display: flex; flex-direction: column; gap: 4px; padding-left: 42px; position: relative; font-size: 13.5px; color: #4a4e56; }
 .home-how li::before { content: counter(how); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%;
     background: var(--accent); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; }
 .home-how strong { color: var(--text); font-size: 15px; }
-.home-intro-show { margin-left: auto; }
 @media (max-width: 960px) {
     .home-features, .home-how { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -1600,8 +1603,9 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .badge-hero.tier-platinum { --tier-2: #23737d; } .badge-hero.tier-diamond { --tier-2: #5a37b8; }
 @media (max-width: 700px) {
     .home-intro { padding: 22px 16px 18px; border-radius: 12px; }
-    .home-hero h1 { font-size: 23px; padding-right: 30px; }
-    .home-features, .home-how { grid-template-columns: minmax(0, 1fr); }
+    .home-hero h1 { font-size: 23px; }
+    .home-features, .home-how, .home-sources { grid-template-columns: minmax(0, 1fr); }
+    .home-source ul { padding-left: 20px; }
     .user-avatar { width: 56px; height: 56px; font-size: 24px; }
     .user-streak { width: 100%; }
     .user-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }

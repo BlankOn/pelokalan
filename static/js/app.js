@@ -2941,23 +2941,3 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
     });
 })();
 
-// Home page introduction: signed-in members can hide it (remembered in localStorage) and show it again
-(function () {
-    var intro = document.getElementById("home-intro");
-    var show = document.querySelector("[data-show-intro]");
-    if (!intro) return;
-    var sync = function () { if (show) show.hidden = !intro.hidden; };
-    sync();
-    document.addEventListener("click", function (ev) {
-        if (ev.target.closest("[data-hide-intro]")) {
-            intro.hidden = true;
-            try { localStorage.setItem("homeIntroHidden", "1"); } catch (e) {}
-            sync();
-        } else if (ev.target.closest("[data-show-intro]")) {
-            intro.hidden = false;
-            try { localStorage.removeItem("homeIntroHidden"); } catch (e) {}
-            sync();
-            intro.scrollIntoView({ behavior: "smooth", block: "start" });
-        }
-    });
-})();
