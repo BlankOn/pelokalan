@@ -202,9 +202,10 @@ func main() {
 		r.Get("/projects/{id}/glossary", webHandler.GlossaryPage)
 		r.Get("/projects/{id}/glossary/search", webHandler.GlossarySearch)
 		r.Get("/projects/{id}/members", webHandler.MembersPage)
-		r.Get("/api/projects/{id}/members", webHandler.APIMembers) // public JSON, no key
-		r.Get("/users/{username}", webHandler.UserPage)            // public profile: stats and badges
-		r.Get("/git/{token}", webHandler.GitPatchByLink)           // signed patch link for curl | git am
+		r.Get("/api/projects/{id}/members", webHandler.APIMembers)                // public JSON, no key
+		r.Get("/users/{username}", webHandler.UserPage)                           // public profile: stats and badges
+		r.Get("/users/{username}/badges/{key}/{tier}", webHandler.BadgeSharePage) // share page, or its preview (.png)
+		r.Get("/git/{token}", webHandler.GitPatchByLink)                          // signed patch link for curl | git am
 		r.Get("/projects/{id}/insight", webHandler.InsightPage)
 		r.Get("/join/{token}", webHandler.JoinPage)
 		r.Get("/projects/{id}/wiki", webHandler.WikiIndex)

@@ -1,0 +1,18 @@
+{{define "content"}}{{$s := .Data.Share}}{{$u := .Data.Owner}}
+{{template "medal_defs"}}
+<div class="badge-share-page">
+    <div class="card badge-hero tier-{{$s.TierName}}">
+        <img class="badge-hero-img" src="{{$s.ImageURL}}" alt="{{$s.Name}} · {{$s.TierLabel}}" width="1200" height="630">
+        <div class="badge-hero-text">
+            <p class="muted small">{{t .Lang "share.earned_by" $u.DisplayName}}</p>
+            <h1>{{$s.Name}}</h1>
+            <p class="badge-hero-tier">{{$s.TierLabel}}</p>
+            <p>{{$s.OGDesc}}</p>
+            <div class="row-actions">
+                <a class="btn btn-primary" href="/users/{{$u.Username}}">{{t .Lang "share.view_profile" $u.Username}}</a>
+                {{if not .User}}<a class="btn" href="/register">{{t .Lang "share.join"}}</a>{{end}}
+            </div>
+        </div>
+    </div>
+</div>
+{{end}}

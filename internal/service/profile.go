@@ -263,3 +263,23 @@ func (s *ActivityService) Profile(ctx context.Context, user *models.User, loc *t
 	p.Badges, p.Earned, p.Tiers = EvalBadges(&p.Stats)
 	return p, nil
 }
+
+// FindBadge returns a badge of the catalog by key
+func (p *Profile) FindBadge(key string) (Badge, bool) {
+	for _, g := range p.Badges {
+		for _, b := range g.Badges {
+			if b.Key == key {
+				return b, true
+			}
+		}
+	}
+	return Badge{}, false
+}
+
+// TierName is the name key of tier n (1-based)
+func TierName(n int) string {
+	if n < 1 || n > len(BadgeTierNames) {
+		return ""
+	}
+	return BadgeTierNames[n-1]
+}

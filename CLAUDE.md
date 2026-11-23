@@ -336,6 +336,16 @@ shows it only to members), role, joined_at. Documented in README.md.
   now fully translated. The page: head with streak, tiles, a 53-week calendar (`buildHeatmap`, levels `heatLevels`),
   badges (earned first, pips, progress to the next tier) and projects. Work before the activity log began is not counted.
 
+- **Medals:** `partials/badge_medal.html` (`badge_medal`, `medal_defs` gradients): an earned medal has a tier-coloured rim,
+  shaded face and white icon; an unearned badge is an empty dashed slot. Icons live once in `badgecard.Icons`
+  (template func `badgeIcon`); tier colours in `badgecard.Tiers` and the `.tier-*` CSS must stay in step.
+- **Sharing:** every earned tier has a page `/users/{username}/badges/{key}/{tier}` (`BadgeSharePage`; the tier is in the
+  address so a shared Silver stays Silver; not or no longer earned → back to the profile) with Open Graph / Twitter tags
+  (`pageMeta` in `Data.Meta`, base.html) and a 1200×630 PNG at the same address + `.png` (`internal/badgecard`: gg + Go
+  fonts, cached in memory, `Cache-Control` one day). Preview texts are in the owner's language (`ownerLang`); achievement
+  lines are `badge.<key>_done`. The owner sees a share button on earned badges (`#share-dialog`, app.js: LinkedIn,
+  X, Facebook share URLs, copy link, Web Share). The profile's own preview uses its highest badge's image.
+
 ## Git-only projects
 
 - When every module group of a project is synced from GitHub (`GlossaryService.IsGitProject`), Penerjemahan hides the

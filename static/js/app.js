@@ -2899,3 +2899,30 @@ document.addEventListener("click", function (ev) {
 
 // Profile contribution calendar: on narrow screens show the latest weeks first
 document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft = el.scrollWidth; });
+
+// Profile: share an earned badge (#share-dialog). Each network gets the badge page's address; its
+// preview (title, text, image) comes from the page's Open Graph tags. X also takes the post text.
+(function () {
+    var dlg = document.getElementById("share-dialog");
+    if (!dlg) return;
+    var current = null;
+    document.addEventListener("click", function (ev) {
+        var btn = ev.target.closest && ev.target.closest("[data-share]");
+        if (!btn) return;
+        var url = btn.getAttribute("data-share"), text = btn.getAttribute("data-share-text") || "";
+        var u = encodeURIComponent(url);
+        current = { url: url, text: text, title: btn.getAttribute("data-share-title") || "" };
+        dlg.querySelector(".share-preview").src = btn.getAttribute("data-share-image");
+        dlg.querySelector(".share-text").textContent = text;
+        dlg.querySelector(".share-linkedin").href = "https://www.linkedin.com/sharing/share-offsite/?url=" + u;
+        dlg.querySelector(".share-x").href = "https://twitter.com/intent/tweet?text=" + encodeURIComponent(text) + "&url=" + u;
+        dlg.querySelector(".share-facebook").href = "https://www.facebook.com/sharer/sharer.php?u=" + u;
+        dlg.querySelector(".share-copy").setAttribute("data-copy", url);
+        dlg.querySelector(".share-open").href = url;
+        dlg.querySelector(".share-native").hidden = !navigator.share;
+        dlg.showModal();
+    });
+    dlg.querySelector(".share-native").addEventListener("click", function () {
+        if (current && navigator.share) navigator.share({ title: current.title, text: current.text, url: current.url }).catch(function () {});
+    });
+})();

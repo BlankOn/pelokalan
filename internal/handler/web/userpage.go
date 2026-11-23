@@ -119,5 +119,30 @@ func (h *Handler) UserPage(w http.ResponseWriter, r *http.Request) {
 	data.Data["Profile"] = prof
 	data.Data["Heatmap"] = buildHeatmap(data.Lang, prof.Days, prof.Today)
 	data.Data["TimeZone"] = loc.String()
+	// share links of the earned badges (the owner sees Share buttons) and the profile's own link preview
+	shares := map[string]badgeShare{}
+	var top *service.Badge
+	for _, g := range prof.Badges {
+		for i, b := range g.Badges {
+			if b.Tier == 0 {
+				continue
+			}
+			shares[b.Key] = h.shareFor(data.Lang, u, b, b.Tier)
+			if top == nil || b.Tier > top.Tier {
+				top = &g.Badges[i]
+			}
+		}
+	}
+	data.Data["Shares"] = shares
+	data.Data["Mine"] = data.User != nil && data.User.ID == u.ID
+	ol := h.ownerLang(u)
+	meta := pageMeta{Title: i18n.T(ol, "user.og_title", u.DisplayName(), u.Username),
+		Desc: i18n.T(ol, "user.og_desc", groupDigits(int64(prof.Stats.Contributions)), prof.Earned),
+		URL:  h.siteURL() + "/users/" + u.Username}
+	if top != nil {
+		s := h.shareFor(ol, u, *top, top.Tier)
+		meta.Image, meta.ImageAlt = s.ImageURL, s.Name+" · "+s.TierLabel
+	}
+	data.Data["Meta"] = meta
 	h.render(w, "user", data)
 }

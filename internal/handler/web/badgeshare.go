@@ -1,0 +1,153 @@
+package web
+
+import (
+	"fmt"
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+	"sync"
+	"time"
+	"unicode"
+
+	"github.com/go-chi/chi/v5"
+
+	"pelokalan/internal/badgecard"
+	"pelokalan/internal/i18n"
+	"pelokalan/internal/models"
+	"pelokalan/internal/service"
+)
+
+// Sharing badges: every earned tier has its own page, /users/{username}/badges/{key}/{tier}, with Open Graph
+// and Twitter card tags, and a 1200×630 PNG preview (…/{tier}.png, drawn by badgecard). The address names
+// the tier, so a link shared at Silver keeps showing Silver after the person reaches Gold (social sites
+// cache previews by address). Preview texts are in the badge owner's language: they are the one sharing.
+
+// pageMeta are the link preview tags of a page (base.html)
+type pageMeta struct {
+	Title, Desc, URL, Image, ImageAlt string
+}
+
+// badgeShare is one earned badge tier with its share texts
+type badgeShare struct {
+	Key, Icon, TierName string
+	Tier, Tiers         int
+	PageURL, ImageURL   string
+	Name, TierLabel     string // badge name, "Emas · tingkat 3 dari 5"
+	Done                string // what it took, past tense
+	Text                string // ready-made post text (first person)
+	OGTitle, OGDesc     string
+}
+
+func (h *Handler) siteURL() string { return strings.TrimRight(h.siteConfig.BaseURL, "/") }
+
+// shareFor builds the share texts of badge b at tier (1-based) for user u in lang
+func (h *Handler) shareFor(lang string, u *models.User, b service.Badge, tier int) badgeShare {
+	tn := service.TierName(tier)
+	s := badgeShare{Key: b.Key, Icon: b.Icon, TierName: tn, Tier: tier, Tiers: b.Tiers}
+	s.PageURL = fmt.Sprintf("%s/users/%s/badges/%s/%d", h.siteURL(), url.PathEscape(u.Username), b.Key, tier)
+	s.ImageURL = s.PageURL + ".png"
+	s.Name = i18n.T(lang, "badge."+b.Key)
+	tierName := i18n.T(lang, fmt.Sprintf("badges.tier_%s", tn))
+	s.TierLabel = i18n.T(lang, "badges.tier_label", tierName, tier, b.Tiers)
+	s.Done = i18n.T(lang, "badge."+b.Key+"_done", groupDigits(int64(b.Steps[tier-1])))
+	s.Text = i18n.T(lang, "share.text", tierName, s.Name, s.Done)
+	s.OGTitle = i18n.T(lang, "share.og_title", u.DisplayName(), tierName, s.Name)
+	s.OGDesc = i18n.T(lang, "share.og_desc", capFirst(s.Done))
+	return s
+}
+
+// capFirst upper-cases the first letter ("menerjemahkan …" → "Menerjemahkan …")
+func capFirst(s string) string {
+	r := []rune(s)
+	if len(r) > 0 {
+		r[0] = unicode.ToUpper(r[0])
+	}
+	return string(r)
+}
+
+func (h *Handler) ownerLang(u *models.User) string {
+	if u.Lang != "" {
+		return u.Lang
+	}
+	return h.siteConfig.DefaultLang
+}
+
+// badgeImages caches rendered share images (drawing one takes a few hundred milliseconds)
+var badgeImages = struct {
+	sync.Mutex
+	m map[string][]byte
+}{m: map[string][]byte{}}
+
+func (h *Handler) badgeImage(u *models.User, s badgeShare) ([]byte, error) {
+	key := strings.Join([]string{strconv.FormatInt(u.ID, 10), u.Username, u.DisplayName(), s.Key, strconv.Itoa(s.Tier), s.Name, s.Done}, "\x00")
+	badgeImages.Lock()
+	data, ok := badgeImages.m[key]
+	badgeImages.Unlock()
+	if ok {
+		return data, nil
+	}
+	host := h.siteURL()
+	if pu, err := url.Parse(host); err == nil && pu.Host != "" {
+		host = pu.Host
+	}
+	data, err := badgecard.Render(badgecard.Card{Icon: s.Icon, Tier: s.TierName, TierIndex: s.Tier, TierCount: s.Tiers,
+		Brand: h.siteConfig.Name, Title: s.Name, TierLabel: s.TierLabel, Desc: capFirst(s.Done),
+		Person: u.DisplayName() + " (@" + u.Username + ")", Footer: host})
+	if err != nil {
+		return nil, err
+	}
+	badgeImages.Lock()
+	if len(badgeImages.m) >= 300 {
+		badgeImages.m = map[string][]byte{}
+	}
+	badgeImages.m[key] = data
+	badgeImages.Unlock()
+	return data, nil
+}
+
+// BadgeSharePage serves an earned badge tier's share page, or its preview image when the address ends
+// in .png: GET /users/{username}/badges/{key}/{tier}
+func (h *Handler) BadgeSharePage(w http.ResponseWriter, r *http.Request) {
+	u, err := h.authService.UserByUsername(r.Context(), chi.URLParam(r, "username"))
+	if err != nil {
+		h.fail(w, r, service.ErrNotFound)
+		return
+	}
+	tierParam := chi.URLParam(r, "tier")
+	image := strings.HasSuffix(tierParam, ".png")
+	tier, err := strconv.Atoi(strings.TrimSuffix(tierParam, ".png"))
+	prof, perr := h.activity.Profile(r.Context(), u, siteLocation, time.Now())
+	if perr != nil {
+		h.fail(w, r, perr)
+		return
+	}
+	b, ok := prof.FindBadge(chi.URLParam(r, "key"))
+	if !ok || err != nil || tier < 1 || tier > b.Tier { // not (or no longer) earned
+		if image {
+			http.NotFound(w, r)
+			return
+		}
+		http.Redirect(w, r, "/users/"+url.PathEscape(u.Username), http.StatusSeeOther)
+		return
+	}
+	owner := h.shareFor(h.ownerLang(u), u, b, tier)
+	if image {
+		data, err := h.badgeImage(u, owner)
+		if err != nil {
+			h.fail(w, r, err)
+			return
+		}
+		w.Header().Set("Content-Type", "image/png")
+		w.Header().Set("Cache-Control", "public, max-age=86400")
+		_, _ = w.Write(data)
+		return
+	}
+	data := h.page(r, "")
+	data.Title = owner.OGTitle
+	data.Data["Meta"] = pageMeta{Title: owner.OGTitle, Desc: owner.OGDesc, URL: owner.PageURL, Image: owner.ImageURL, ImageAlt: owner.Name + " · " + owner.TierLabel}
+	data.Data["Owner"] = u
+	data.Data["Share"] = h.shareFor(data.Lang, u, b, tier) // the page itself in the reader's language
+	data.Data["Badge"] = b
+	h.render(w, "badge_share", data)
+}

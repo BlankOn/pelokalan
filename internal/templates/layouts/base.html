@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="htmx-config" content='{"defaultSwapStyle":"outerHTML","scrollIntoViewOnBoost":false}'>
     <title>{{.Title}}</title>
+    {{with .Data.Meta}}<meta name="description" content="{{.Desc}}">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="{{$.SiteName}}">
+    <meta property="og:title" content="{{.Title}}">
+    <meta property="og:description" content="{{.Desc}}">
+    <meta property="og:url" content="{{.URL}}">
+    {{if .Image}}<meta property="og:image" content="{{.Image}}">
+    <meta property="og:image:type" content="image/png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="{{.ImageAlt}}">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:image" content="{{.Image}}">{{else}}<meta name="twitter:card" content="summary">{{end}}
+    <meta name="twitter:title" content="{{.Title}}">
+    <meta name="twitter:description" content="{{.Desc}}">
+    <link rel="canonical" href="{{.URL}}">{{end}}
     <link rel="icon" href="/static/img/logo.svg" type="image/svg+xml">
     <link rel="stylesheet" href="/static/css/style.css?v={{.Asset}}">
     <script src="/static/js/htmx.min.js"></script>

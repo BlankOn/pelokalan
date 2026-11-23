@@ -3,12 +3,15 @@ module pelokalan
 go 1.24.0
 
 require (
+	github.com/fogleman/gg v1.3.0
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/golang-jwt/jwt/v5 v5.3.0
 	github.com/golang-migrate/migrate/v4 v4.19.1
+	github.com/golang/freetype v0.0.0-20170609003504-e2365dfdc4a0
 	github.com/jackc/pgx/v5 v5.8.0
 	github.com/joho/godotenv v1.5.1
 	github.com/yuin/goldmark v1.7.8
+	golang.org/x/image v0.25.0
 )
 
 require (

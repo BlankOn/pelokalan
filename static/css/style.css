@@ -1504,21 +1504,29 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .heat-legend i { width: 11px; height: 11px; border-radius: 2px; display: inline-block; }
 .badge-group h3 { margin: 0 0 12px; font-size: 15px; }
 .badge-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
-.badge { --tier: #c3c7cf; --tier-2: #9aa0aa; display: flex; gap: 12px; padding: 12px; border: 1px solid var(--border-soft);
-    border-radius: 12px; background: var(--surface); min-width: 0; }
-.badge.tier-bronze { --tier: #d99a62; --tier-2: #9c5a2a; }
-.badge.tier-silver { --tier: #c9d0d8; --tier-2: #7d8794; }
-.badge.tier-gold { --tier: #f2cd5c; --tier-2: #b8860b; }
-.badge.tier-platinum { --tier: #8fd6dc; --tier-2: #2f8f9a; }
-.badge.tier-diamond { --tier: #b9a4f5; --tier-2: #6440c9; }
-.badge:not(.locked) { background: linear-gradient(135deg, color-mix(in srgb, var(--tier) 14%, #fff), #fff 60%);
-    border-color: color-mix(in srgb, var(--tier) 45%, var(--border-soft)); }
-.badge-medal { width: 52px; height: 58px; flex: none; display: flex; align-items: center; justify-content: center;
-    clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-    background: linear-gradient(160deg, var(--tier), var(--tier-2)); }
-.badge-medal .badge-icon { width: 26px; height: 26px; stroke: #fff; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, .25)); }
-.badge.locked .badge-medal { background: linear-gradient(160deg, #eef0f3, #d9dce2); }
-.badge.locked .badge-medal .badge-icon { stroke: #a4a9b3; filter: none; }
+.badge { --tier: #c3c7cf; --tier-2: #9aa0aa; display: flex; gap: 12px; padding: 12px; border: 1px dashed #d5d8de;
+    border-radius: 12px; background: var(--surface); min-width: 0; position: relative; }
+.badge.tier-bronze { --tier: #d98c4e; --tier-2: #9c5a2a; }
+.badge.tier-silver { --tier: #9db3cf; --tier-2: #4d6584; }
+.badge.tier-gold { --tier: #f2c443; --tier-2: #9a6e05; }
+.badge.tier-platinum { --tier: #8fd6dc; --tier-2: #23737d; }
+.badge.tier-diamond { --tier: #b9a4f5; --tier-2: #5a37b8; }
+.badge:not(.locked) { border-style: solid; background: linear-gradient(135deg, color-mix(in srgb, var(--tier) 16%, #fff), #fff 65%);
+    border-color: color-mix(in srgb, var(--tier) 55%, var(--border-soft)); box-shadow: 0 1px 3px rgba(0, 0, 0, .06); }
+.badge-medal { width: 54px; height: 60px; flex: none; overflow: visible; }
+.badge:not(.locked) .badge-medal { filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .18)); }
+.badge.tier-bronze .m-rim { fill: #7a3f14; }
+.badge.tier-silver .m-rim { fill: #4d6584; }
+.badge.tier-gold .m-rim { fill: #8a6206; }
+.badge.tier-platinum .m-rim { fill: #1d6670; }
+.badge.tier-diamond .m-rim { fill: #45289a; }
+.m-bevel { fill: none; stroke: rgba(255, 255, 255, .5); stroke-width: .8; }
+.m-icon .badge-icon, .m-icon > * { stroke: #fff; }
+.m-icon { fill: none; stroke: #fff; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.badge.locked .m-rim { fill: none; stroke: #c4c8cf; stroke-width: 1.4; stroke-dasharray: 3 2.5; }
+.badge.locked .m-face { fill: #f6f7f9; }
+.badge.locked .m-icon { stroke: #b6bbc4; }
+.badge.locked .badge-medal { opacity: .9; }
 .badge-icon { fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .badge-body { min-width: 0; flex: 1; display: flex; flex-direction: column; gap: 2px; }
 .badge-name { font-weight: 600; }
@@ -1532,6 +1540,25 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .badge-progress span { display: block; height: 100%; background: var(--tier-2); border-radius: 3px; }
 .badge.locked .badge-progress span { background: #9aa0aa; }
 .user-projects td a { font-weight: 600; }
+.badge-share { position: absolute; top: 8px; right: 8px; width: 30px; height: 30px; border-radius: 50%; border: 1px solid transparent;
+    background: transparent; color: var(--tier-2); display: flex; align-items: center; justify-content: center; cursor: pointer; padding: 0; }
+.badge-share:hover, .badge-share:focus-visible { background: #fff; border-color: color-mix(in srgb, var(--tier) 55%, var(--border-soft)); }
+.badge-share svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; }
+.badge:has(.badge-share) .badge-body { padding-right: 22px; }
+.share-dialog { max-width: 560px; }
+.share-preview { width: 100%; height: auto; border-radius: 10px; border: 1px solid var(--border-soft); display: block; }
+.share-text { margin: 10px 0; }
+.share-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.share-linkedin { color: #0a66c2; }
+.share-facebook { color: #1877f2; }
+.badge-share-page { max-width: 760px; margin: 0 auto; }
+.badge-hero { padding: 0; overflow: hidden; }
+.badge-hero-img { width: 100%; height: auto; display: block; border-bottom: 1px solid var(--border-soft); }
+.badge-hero-text { padding: 18px 22px 22px; }
+.badge-hero-text h1 { margin: 2px 0 4px; }
+.badge-hero-tier { margin: 0 0 8px; font-weight: 600; color: var(--tier-2, var(--accent)); }
+.badge-hero.tier-bronze { --tier-2: #9c5a2a; } .badge-hero.tier-silver { --tier-2: #4d6584; } .badge-hero.tier-gold { --tier-2: #9a6e05; }
+.badge-hero.tier-platinum { --tier-2: #23737d; } .badge-hero.tier-diamond { --tier-2: #5a37b8; }
 @media (max-width: 700px) {
     .user-avatar { width: 56px; height: 56px; font-size: 24px; }
     .user-streak { width: 100%; }

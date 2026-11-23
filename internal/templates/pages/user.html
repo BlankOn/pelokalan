@@ -1,5 +1,5 @@
 {{define "content"}}{{$pr := .Data.Profile}}{{$u := $pr.User}}{{$s := $pr.Stats}}{{$hm := .Data.Heatmap}}
-<div class="user-page">
+<div class="user-page">{{template "medal_defs"}}
 <section class="card user-head">
     <div class="user-avatar" aria-hidden="true">{{initial $u.DisplayName}}</div>
     <div class="user-id">
@@ -47,7 +47,8 @@
     <div class="badge-grid">
     {{range .Badges}}
         <div class="badge{{if .Tier}} tier-{{.TierName}}{{else}} locked{{end}}" title="{{t $.Lang (printf "badge.%s_desc" .Key) (num .Target)}}">
-            <div class="badge-medal">{{template "badge_icon" .Icon}}</div>
+            {{template "badge_medal" .}}
+            {{if and $.Data.Mine .Tier}}{{with index $.Data.Shares .Key}}<button type="button" class="badge-share" data-share="{{.PageURL}}" data-share-text="{{.Text}}" data-share-image="{{.ImageURL}}" data-share-title="{{.Name}} · {{.TierLabel}}" title="{{t $.Lang "share.button"}}" aria-label="{{t $.Lang "share.button"}} {{.Name}}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg></button>{{end}}{{end}}
             <div class="badge-body">
                 <div class="badge-name">{{t $.Lang (printf "badge.%s" .Key)}}</div>
                 <div class="badge-tier small">{{if .Tier}}{{t $.Lang (printf "badges.tier_%s" .TierName)}}{{else}}{{t $.Lang "badges.locked"}}{{end}}
@@ -73,4 +74,22 @@
     <p class="muted small">{{t .Lang "user.note"}}</p>
 </section>
 </div>
+{{if .Data.Mine}}
+<dialog id="share-dialog" class="dialog share-dialog">
+    <div class="dialog-head">
+        <h2>{{t .Lang "share.title"}}</h2>
+        <button type="button" class="btn btn-small" data-close-dialog aria-label="{{t .Lang "action.close"}}">×</button>
+    </div>
+    <img class="share-preview" alt="" width="1200" height="630">
+    <p class="share-text small"></p>
+    <div class="share-buttons">
+        <a class="btn share-linkedin" target="_blank" rel="noopener">LinkedIn</a>
+        <a class="btn share-x" target="_blank" rel="noopener">X</a>
+        <a class="btn share-facebook" target="_blank" rel="noopener">Facebook</a>
+        <button type="button" class="btn share-native" hidden>{{t .Lang "share.native"}}</button>
+        <button type="button" class="btn share-copy" data-copy="" data-copied="{{t .Lang "links.copied"}}">{{t .Lang "share.copy"}}</button>
+    </div>
+    <p class="small"><a class="share-open" target="_blank" rel="noopener">{{t .Lang "share.open"}} ↗</a></p>
+</dialog>
+{{end}}
 {{end}}

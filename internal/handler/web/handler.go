@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/badgecard"
 	"pelokalan/internal/config"
 	"pelokalan/internal/glossary"
 	"pelokalan/internal/handler/middleware"
@@ -247,6 +248,8 @@ func funcMap() template.FuncMap {
 				return fmt.Sprintf("%d B", n)
 			}
 		},
+		// badgeIcon is a badge's line icon (the inside of a 24×24 <svg>), from badgecard.Icons
+		"badgeIcon": func(key string) template.HTML { return template.HTML(badgecard.Icons[key]) },
 		// monthYear formats a time as "Nov 2026" in the site's time zone
 		"monthYear": func(lang string, t time.Time) string {
 			t = t.In(siteLocation)
