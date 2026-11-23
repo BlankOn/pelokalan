@@ -30,7 +30,7 @@ func TestEarnedPeriod(t *testing.T) {
 		{"best_day", 300, "11-06", "11-06", "11-06"},
 		{"active_days", 4, "11-06", "11-02", "11-06"},
 		{"streak_week", 2, "11-08", "11-02", "11-15"}, // weeks of 2 and 9 Nov… only the first has work → none
-		{"weekend", 1, "11-07", "11-02", "11-07"},    // Saturday 7 Nov
+		{"weekend", 1, "11-07", "11-02", "11-07"},     // Saturday 7 Nov
 		{"files", 5, "-", "-", "-"},                   // counted from totals: no date
 	} {
 		e, f, to := earnedPeriod(c.key, c.t, days)

@@ -1543,6 +1543,39 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .badge-progress span { display: block; height: 100%; background: var(--tier-2); border-radius: 3px; }
 .badge.locked .badge-progress span { background: #9aa0aa; }
 .user-projects td a { font-weight: 600; }
+/* Home page introduction (projects page, above the list) */
+.home-intro { position: relative; background: linear-gradient(135deg, var(--accent-soft), #fff 55%); border: 1px solid var(--border-soft);
+    border-radius: 16px; padding: 30px 30px 26px; margin-bottom: 26px; }
+.home-intro[hidden] { display: none; }
+.home-intro-hide { position: absolute; top: 14px; right: 14px; width: 32px; height: 32px; padding: 0; font-size: 18px; line-height: 1; }
+.home-hero { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 28px; align-items: center; }
+.home-kicker { margin: 0 0 6px; font-weight: 700; color: var(--accent); }
+.home-hero h1 { margin: 0 0 10px; font-size: 30px; line-height: 1.2; }
+.home-lead { margin: 0 0 18px; font-size: 16px; color: #3f434b; max-width: 62ch; }
+.btn-link { background: none; border-color: transparent; color: var(--accent); }
+.home-hero .row-actions { flex-wrap: wrap; }
+.home-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.home-stats div { background: #fff; border: 1px solid var(--border-soft); border-radius: 12px; padding: 14px 16px; display: flex; flex-direction: column; }
+.home-stats strong { font-size: 24px; font-variant-numeric: tabular-nums; }
+.home-stats span { font-size: 13px; color: var(--muted); }
+.home-features { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 26px; }
+.home-feature { display: flex; gap: 12px; background: #fff; border: 1px solid var(--border-soft); border-radius: 12px; padding: 14px; }
+.home-feature-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft); color: var(--accent);
+    display: flex; align-items: center; justify-content: center; flex: none; }
+.home-feature-icon .badge-icon { width: 22px; height: 22px; stroke: currentColor; }
+.home-feature h3 { margin: 0 0 4px; font-size: 15px; }
+.home-feature p { margin: 0; font-size: 13.5px; color: #4a4e56; }
+.home-how-title { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 24px 0 10px; }
+.home-how { list-style: none; counter-reset: how; padding: 0; margin: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+.home-how li { counter-increment: how; display: flex; flex-direction: column; gap: 4px; padding-left: 42px; position: relative; font-size: 13.5px; color: #4a4e56; }
+.home-how li::before { content: counter(how); position: absolute; left: 0; top: 0; width: 30px; height: 30px; border-radius: 50%;
+    background: var(--accent); color: #fff; font-weight: 700; display: flex; align-items: center; justify-content: center; }
+.home-how strong { color: var(--text); font-size: 15px; }
+.home-intro-show { margin-left: auto; }
+@media (max-width: 960px) {
+    .home-hero { grid-template-columns: minmax(0, 1fr); }
+    .home-features, .home-how { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
 /* growth chart: a compressed quiet stretch */
 .wc-gap rect { fill: #f3f4f6; }
 .wc-gap line { stroke: #b8bdc6; stroke-width: 1; stroke-dasharray: 3 3; }
@@ -1571,6 +1604,9 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .badge-hero.tier-bronze { --tier-2: #9c5a2a; } .badge-hero.tier-silver { --tier-2: #4d6584; } .badge-hero.tier-gold { --tier-2: #9a6e05; }
 .badge-hero.tier-platinum { --tier-2: #23737d; } .badge-hero.tier-diamond { --tier-2: #5a37b8; }
 @media (max-width: 700px) {
+    .home-intro { padding: 22px 16px 18px; border-radius: 12px; }
+    .home-hero h1 { font-size: 23px; padding-right: 30px; }
+    .home-features, .home-how { grid-template-columns: minmax(0, 1fr); }
     .user-avatar { width: 56px; height: 56px; font-size: 24px; }
     .user-streak { width: 100%; }
     .user-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }

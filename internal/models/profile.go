@@ -32,7 +32,7 @@ type ProfileTotals struct {
 	Projects       []*ProfileProject // most contributions first
 	Files          int               // PO files worked on
 	Languages      int               // languages worked in
-	CompletedFiles int               // own files worked on that are now fully translated
+	CompletedFiles int               // own files worked on that are fully translated (deleted ones too)
 	Comments       int               // comments not deleted
 	Topics         int               // discussions started
 	WikiEdits      int
@@ -64,3 +64,11 @@ type ModuleWork struct {
 
 // ProjectPath is the project's address
 func (m *ModuleWork) ProjectPath() string { return "/projects/" + m.ProjectSlug }
+
+// SiteTotals are the platform-wide numbers on the home page
+type SiteTotals struct {
+	Contributions int // strings worked on
+	Translators   int // people who worked on strings
+	Projects      int
+	Landed        int // strings accepted upstream
+}

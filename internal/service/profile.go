@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"sort"
+	"sync"
 	"time"
 
 	"pelokalan/internal/models"
@@ -307,4 +308,29 @@ func TierName(n int) string {
 		return ""
 	}
 	return BadgeTierNames[n-1]
+}
+
+// siteTotals caches the home page numbers for a few minutes (they count the whole activity log)
+var siteTotals struct {
+	sync.Mutex
+	at time.Time
+	t  *models.SiteTotals
+}
+
+// SiteTotals returns the platform-wide numbers for the home page (cached for 5 minutes)
+func (s *ActivityService) SiteTotals(ctx context.Context) *models.SiteTotals {
+	if s == nil {
+		return nil
+	}
+	siteTotals.Lock()
+	defer siteTotals.Unlock()
+	if siteTotals.t != nil && time.Since(siteTotals.at) < 5*time.Minute {
+		return siteTotals.t
+	}
+	t, err := s.repo.SiteTotals(ctx)
+	if err != nil {
+		return siteTotals.t
+	}
+	siteTotals.t, siteTotals.at = t, time.Now()
+	return t
 }

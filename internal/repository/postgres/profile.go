@@ -74,7 +74,8 @@ func (r *activityRepository) UserTotals(ctx context.Context, userID int64) (*mod
 		SELECT
 		  (SELECT COUNT(DISTINCT catalog_id) FROM activity_events WHERE user_id = $1 AND `+evContribute+`),
 		  (SELECT COUNT(DISTINCT language) FROM activity_events WHERE user_id = $1 AND language <> '' AND `+evContribute+`),
-		  (SELECT COUNT(*) FROM catalogs c WHERE c.owner_id = $1 AND c.deleted_at IS NULL AND NOT c.is_template
+		  -- completed files: deleted ones too (a soft delete keeps the entries), so tidying up never takes a badge away
+		  (SELECT COUNT(*) FROM catalogs c WHERE c.owner_id = $1 AND NOT c.is_template
 		     AND EXISTS (SELECT 1 FROM entries e WHERE e.catalog_id = c.id AND NOT e.obsolete)
 		     AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.catalog_id = c.id AND NOT e.obsolete
 		                     AND (e.fuzzy OR e.origin = 'ai' OR `+untranslatedExpr+`))
@@ -235,4 +236,14 @@ func (r *activityRepository) ClaimOneTimeJob(ctx context.Context, name string) (
 	}
 	n, _ := res.RowsAffected()
 	return n > 0, nil
+}
+
+func (r *activityRepository) SiteTotals(ctx context.Context) (*models.SiteTotals, error) {
+	t := &models.SiteTotals{}
+	err := r.db.QueryRowContext(ctx, `
+		SELECT (SELECT COUNT(*) FROM activity_events WHERE `+evContribute+`),
+		       (SELECT COUNT(DISTINCT user_id) FROM activity_events WHERE `+evContribute+`),
+		       (SELECT COUNT(*) FROM projects),
+		       (SELECT COUNT(*) FROM upstream_landings)`).Scan(&t.Contributions, &t.Translators, &t.Projects, &t.Landed)
+	return t, err
 }

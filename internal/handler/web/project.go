@@ -24,6 +24,12 @@ import (
 )
 
 // Projects lists all projects (public) and the user's pending invitations
+// homeFeatures are the introduction's feature cards on the home page: home.f_<key> (+ _text), with a
+// badge icon (badgecard.Icons)
+var homeFeatures = []struct{ Key, Icon string }{
+	{"browser", "pen"}, {"terms", "book"}, {"drafts", "bolt"}, {"upstream", "upload"}, {"team", "chat"}, {"credit", "medal"},
+}
+
 func (h *Handler) Projects(w http.ResponseWriter, r *http.Request) {
 	h.renderProjects(w, r, "", nil)
 }
@@ -47,6 +53,8 @@ func (h *Handler) renderProjects(w http.ResponseWriter, r *http.Request, errMsg 
 	data.Error = errMsg
 	data.Data["Mine"] = mine
 	data.Data["Others"] = others
+	data.Data["Site"] = h.activity.SiteTotals(r.Context()) // the introduction's numbers
+	data.Data["HomeFeatures"] = homeFeatures
 	if user != nil {
 		invitations, err := h.projectService.InvitationsForUser(r.Context(), user)
 		if err != nil {

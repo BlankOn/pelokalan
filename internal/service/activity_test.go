@@ -33,7 +33,12 @@ func (f *fakeActivityRepo) UserLandingWork(context.Context, int64, int) ([]*mode
 func (f *fakeActivityRepo) UserCommunityWork(context.Context, int64, string, int) ([]*models.ModuleWork, error) {
 	return nil, nil
 }
-func (f *fakeActivityRepo) NthTime(context.Context, int64, string, int) (*time.Time, error) { return nil, nil }
+func (f *fakeActivityRepo) NthTime(context.Context, int64, string, int) (*time.Time, error) {
+	return nil, nil
+}
+func (f *fakeActivityRepo) SiteTotals(context.Context) (*models.SiteTotals, error) {
+	return &models.SiteTotals{}, nil
+}
 func (f *fakeActivityRepo) ClaimOneTimeJob(context.Context, string) (bool, error) { return false, nil }
 func (f *fakeActivityRepo) AddLandings(context.Context, []models.UpstreamLanding) (int, error) {
 	return 0, nil

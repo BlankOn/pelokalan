@@ -334,7 +334,7 @@ shows it only to members), role, joined_at. Documented in README.md.
   badge catalog `Badges`: groups (streak, work, reach, community, habits) of badges with up to 5 tiers
   (`BadgeTierNames` bronze…diamond; strings `badges.*`, `badge.<key>` + `badge.<key>_desc` with the target).
   Add a badge there (plus strings and a `badge_icon` case). Completed files = own files the person worked on that are
-  now fully translated. The page: head with streak, tiles, a 53-week calendar (`buildHeatmap`, levels `heatLevels`),
+  fully translated, deleted ones included (a soft delete never takes a badge away). The page: head with streak, tiles, a 53-week calendar (`buildHeatmap`, levels `heatLevels`),
   badges (earned first, pips, progress to the next tier) and projects. Work before the activity log began is not counted.
 
 - **Medals:** `partials/badge_medal.html` (`badge_medal`, `medal_defs` gradients): an earned medal has a tier-coloured rim,
@@ -376,6 +376,14 @@ shows it only to members), role, joined_at. Documented in README.md.
 
 - When every module group of a project is synced from GitHub (`GlossaryService.IsGitProject`), Penerjemahan hides the
   template (POT) section and "Tambah berkas manual": files come from the repository.
+
+## Home page introduction
+
+`/projects` starts with a landing introduction (`#home-intro`, pages/projects.html, `home.*` strings): headline, pitch,
+buttons (visitors: sign up / sign in; members: jump to the list), live numbers (`ActivityService.SiteTotals`: strings
+worked on, translators, projects, strings accepted upstream; cached 5 min), six feature cards (`homeFeatures`, badge
+icons) and three "how it works" steps. Signed-in members can hide it (×, localStorage `homeIntroHidden`, applied by an
+inline script before paint) and bring it back with "Tampilkan perkenalan" next to the Proyek heading.
 
 ## About page
 

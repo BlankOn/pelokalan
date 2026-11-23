@@ -311,6 +311,8 @@ type ActivityRepository interface {
 	UserCommunityWork(ctx context.Context, userID int64, kind string, limit int) ([]*models.ModuleWork, error)
 	// NthTime is when a person's nth item of a kind ("landed", "landed_modules", or a community kind) happened
 	NthTime(ctx context.Context, userID int64, kind string, n int) (*time.Time, error)
+	// SiteTotals counts work across the whole platform (home page)
+	SiteTotals(ctx context.Context) (*models.SiteTotals, error)
 	// ClaimOneTimeJob marks a one-time job as done; false when it already was (one_time_jobs)
 	ClaimOneTimeJob(ctx context.Context, name string) (bool, error)
 	// AddLandings stores strings accepted upstream; ones already stored are skipped. It returns how many are new.
