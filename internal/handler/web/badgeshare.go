@@ -50,7 +50,7 @@ func (h *Handler) shareFor(lang string, u *models.User, b service.Badge, tier in
 	s.Name = i18n.T(lang, "badge."+b.Key)
 	tierName := i18n.T(lang, fmt.Sprintf("badges.tier_%s", tn))
 	s.TierLabel = i18n.T(lang, "badges.tier_label", tierName, tier, b.Tiers)
-	s.Done = i18n.T(lang, "badge."+b.Key+"_done", groupDigits(int64(b.Steps[tier-1])))
+	s.Done = i18n.T(lang, "badge."+b.Key+"_done", groupDigits(int64(b.Shown(b.Steps[tier-1]))))
 	s.Text = i18n.T(lang, "share.text", tierName, s.Name, s.Done)
 	s.OGTitle = i18n.T(lang, "share.og_title", u.DisplayName(), tierName, s.Name)
 	s.OGDesc = i18n.T(lang, "share.og_desc", capFirst(s.Done))
@@ -140,6 +140,9 @@ func (h *Handler) BadgeSharePage(w http.ResponseWriter, r *http.Request) {
 		}
 		w.Header().Set("Content-Type", "image/png")
 		w.Header().Set("Cache-Control", "public, max-age=86400")
+		if r.URL.Query().Has("download") { // "Unduh gambar": to attach the picture to a post by hand
+			w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="pelokalan-%s-%s-%d.png"`, u.Username, owner.Key, owner.Tier))
+		}
 		_, _ = w.Write(data)
 		return
 	}
@@ -149,5 +152,51 @@ func (h *Handler) BadgeSharePage(w http.ResponseWriter, r *http.Request) {
 	data.Data["Owner"] = u
 	data.Data["Share"] = h.shareFor(data.Lang, u, b, tier) // the page itself in the reader's language
 	data.Data["Badge"] = b
+	if det, err := h.activity.BadgeDetail(r.Context(), prof, b, tier, siteLocation); err == nil {
+		data.Data["Detail"] = h.badgeDetailView(data.Lang, det)
+	}
 	h.render(w, "badge_share", data)
+}
+
+// badgeDetailRow is one project/module line of a badge's details
+type badgeDetailRow struct {
+	ProjectName, ProjectPath, Module, Filename string
+	Count                                      int
+	When                                       string // "3 Nov 2026" or "3 Nov – 9 Nov 2026"
+}
+
+// badgeDetailView is a badge's details as the share page shows them
+type badgeDetailView struct {
+	Earned, Period string
+	CountKey       string // badges.count_<…>
+	Modules        bool
+	Rows           []badgeDetailRow
+}
+
+// dateRange formats a span of dates ("3 Nov 2026", "3–9 Nov 2026" style kept simple: "3 Nov 2026 – 9 Nov 2026")
+func dateRange(lang string, a, b time.Time) string {
+	if a.Year() == b.Year() && a.YearDay() == b.YearDay() {
+		return shortDate(lang, a)
+	}
+	return shortDate(lang, a) + " – " + shortDate(lang, b)
+}
+
+func (h *Handler) badgeDetailView(lang string, d *service.BadgeDetail) *badgeDetailView {
+	v := &badgeDetailView{CountKey: fmt.Sprintf("badges.count_%s", d.Count), Modules: d.Modules}
+	if d.EarnedOn != nil {
+		e := *d.EarnedOn
+		if e.Hour() != 0 || e.Minute() != 0 || e.Location() != time.UTC { // a moment, not a date: its day here
+			e = e.In(siteLocation)
+		}
+		v.Earned = shortDate(lang, e)
+	}
+	if d.From != nil && d.To != nil {
+		v.Period = dateRange(lang, *d.From, *d.To)
+	}
+	for _, m := range d.Work {
+		v.Rows = append(v.Rows, badgeDetailRow{ProjectName: m.ProjectName, ProjectPath: m.ProjectPath(),
+			Module: m.Module, Filename: m.Filename, Count: m.Count,
+			When: dateRange(lang, m.First.In(siteLocation), m.Last.In(siteLocation))})
+	}
+	return v
 }

@@ -1560,6 +1560,12 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .badge-hero-img { width: 100%; height: auto; display: block; border-bottom: 1px solid var(--border-soft); }
 .badge-hero-text { padding: 18px 22px 22px; }
 .badge-hero-text h1 { margin: 2px 0 4px; }
+.badge-share-page { display: flex; flex-direction: column; gap: 14px; }
+.badge-detail h2 { margin: 0 0 10px; font-size: 17px; }
+.badge-facts { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 0 0 12px; }
+.badge-facts dt { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .03em; }
+.badge-facts dd { margin: 2px 0 0; font-weight: 600; }
+.badge-work td { vertical-align: top; }
 .badge-hero-tier { margin: 0 0 8px; font-weight: 600; color: var(--tier-2, var(--accent)); }
 .badge-hero.tier-bronze { --tier-2: #9c5a2a; } .badge-hero.tier-silver { --tier-2: #4d6584; } .badge-hero.tier-gold { --tier-2: #9a6e05; }
 .badge-hero.tier-platinum { --tier-2: #23737d; } .badge-hero.tier-diamond { --tier-2: #5a37b8; }

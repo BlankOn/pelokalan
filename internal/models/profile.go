@@ -50,4 +50,17 @@ type UpstreamLanding struct {
 	UserID, ProjectID, CatalogID, GroupID int64
 	EntryKey, Module, Filename            string
 	Words                                 int
+	LandedAt                              *time.Time // nil = now
 }
+
+// ModuleWork is a person's work on one module of a project over a period, for a badge's details
+type ModuleWork struct {
+	ProjectSlug, ProjectName string
+	Module                   string // file name before the first dot; "" = the project as a whole
+	Filename                 string // the most recent file name of the module
+	Count                    int
+	First, Last              time.Time
+}
+
+// ProjectPath is the project's address
+func (m *ModuleWork) ProjectPath() string { return "/projects/" + m.ProjectSlug }

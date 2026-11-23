@@ -2,7 +2,9 @@ package service
 
 import (
 	"context"
+	"log"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"pelokalan/internal/glossary"
@@ -52,17 +54,7 @@ func (s *CatalogService) DetectLandings(ctx context.Context, projectID, groupID 
 	}
 	added := 0
 	for _, f := range files {
-		var matched []*models.Catalog
-		for _, c := range mine {
-			switch {
-			case f.RepoPath != "" && c.RepoPath != "":
-				if c.RepoPath == f.RepoPath {
-					matched = append(matched, c)
-				}
-			case c.Filename == f.Name || moduleKey(c.Filename) == moduleKey(f.Name):
-				matched = append(matched, c)
-			}
-		}
+		matched := matchUpstream(mine, f.Name, f.RepoPath)
 		if len(matched) == 0 {
 			continue
 		}
@@ -73,14 +65,9 @@ func (s *CatalogService) DetectLandings(ctx context.Context, projectID, groupID 
 		if language == "" && glossary.DetectLanguage(cat, f.Name) != lang {
 			continue
 		}
-		upstream := make(map[string][]string, len(cat.Entries))
-		for _, e := range cat.Entries {
-			if !e.Obsolete && !e.Fuzzy && e.IsTranslated() {
-				upstream[e.Key()] = e.Translation
-			}
-		}
+		upstream := upstreamTranslations(cat)
 		for _, c := range matched {
-			n, err := s.landingsIn(ctx, c, groupID, upstream)
+			n, err := s.landingsIn(ctx, c, groupID, upstream, nil, nil)
 			if err != nil {
 				return added, err
 			}
@@ -90,9 +77,38 @@ func (s *CatalogService) DetectLandings(ctx context.Context, projectID, groupID 
 	return added, nil
 }
 
-// landingsIn records the strings of c the member wrote that upstream now has
-func (s *CatalogService) landingsIn(ctx context.Context, c *models.Catalog, groupID int64, upstream map[string][]string) (int, error) {
-	ref := s.reference(ctx, c)
+// matchUpstream picks the member files an upstream file is for: the same repository path, else the same
+// file name or module
+func matchUpstream(mine []*models.Catalog, name, repoPath string) []*models.Catalog {
+	var out []*models.Catalog
+	for _, c := range mine {
+		switch {
+		case repoPath != "" && c.RepoPath != "":
+			if c.RepoPath == repoPath {
+				out = append(out, c)
+			}
+		case c.Filename == name || moduleKey(c.Filename) == moduleKey(name):
+			out = append(out, c)
+		}
+	}
+	return out
+}
+
+// upstreamTranslations maps an upstream file's finished translations by entry key
+func upstreamTranslations(cat *po.Catalog) map[string][]string {
+	out := make(map[string][]string, len(cat.Entries))
+	for _, e := range cat.Entries {
+		if !e.Obsolete && !e.Fuzzy && e.IsTranslated() {
+			out[e.Key()] = e.Translation
+		}
+	}
+	return out
+}
+
+// landingsIn records the strings of c the member wrote that upstream now has. refAt measures "wrote" against
+// the member's starting point at that time (nil = now); landedAt is stored as the time (nil = now).
+func (s *CatalogService) landingsIn(ctx context.Context, c *models.Catalog, groupID int64, upstream map[string][]string, refAt, landedAt *time.Time) (int, error) {
+	ref := s.referenceAt(ctx, c, refAt)
 	if ref == nil { // no version to tell the member's work from what they started with
 		return 0, nil
 	}
@@ -113,10 +129,80 @@ func (s *CatalogService) landingsIn(ctx context.Context, c *models.Catalog, grou
 			continue
 		}
 		out = append(out, models.UpstreamLanding{UserID: c.OwnerID, ProjectID: c.ProjectID, CatalogID: c.ID, GroupID: groupID,
-			EntryKey: e.KeyHash(), Module: moduleKey(c.Filename), Filename: c.Filename, Words: len(strings.Fields(e.MsgID))})
+			EntryKey: e.KeyHash(), Module: moduleKey(c.Filename), Filename: c.Filename, Words: len(strings.Fields(e.MsgID)), LandedAt: landedAt})
 	}
 	if len(out) == 0 {
 		return 0, nil
 	}
 	return s.activity.repo.AddLandings(ctx, out)
+}
+
+// BackfillLandingsJob names the one-time catch-up in one_time_jobs
+const BackfillLandingsJob = "backfill-upstream-landings-2026-11"
+
+// BackfillLandings is a one-time catch-up for work accepted upstream before detection existed: every
+// member file is compared with the upstream files stored at earlier syncs (project files), measuring the
+// member's work against their starting point as it was at since (so work merged and then pulled back
+// with "Perbarui" after since still counts). A string found is dated when that upstream file was stored.
+// Run once at start-up (main.go, one_time_jobs); it returns how many strings it recorded.
+func (s *CatalogService) BackfillLandings(ctx context.Context, projects []*models.Project, since time.Time) (int, error) {
+	if s.activity == nil || s.projectFiles == nil {
+		return 0, nil
+	}
+	added := 0
+	for _, p := range projects {
+		all, err := s.catalogs.ListAllByProject(ctx, p.ID)
+		if err != nil {
+			return added, err
+		}
+		byLang := map[string][]*models.Catalog{}
+		for _, c := range all {
+			if !c.IsTemplate && c.DeletedAt == nil && c.Language != "" {
+				byLang[c.Language] = append(byLang[c.Language], c)
+			}
+		}
+		for lang, mine := range byLang {
+			files, err := s.projectFiles.ProjectFilesForLanguage(ctx, p.ID, lang)
+			if err != nil {
+				return added, err
+			}
+			for _, f := range files {
+				matched := matchUpstream(mine, f.Filename, f.RepoPath)
+				if len(matched) == 0 {
+					continue
+				}
+				full, err := s.projectFiles.GetProjectFile(ctx, p.ID, f.ID)
+				if err != nil {
+					continue
+				}
+				data, err := gunzip(full.Data)
+				if err != nil {
+					continue
+				}
+				cat, err := po.ParseBytes(data)
+				if err != nil {
+					continue
+				}
+				upstream := upstreamTranslations(cat)
+				at := f.CreatedAt
+				for _, c := range matched {
+					n, err := s.landingsIn(ctx, c, f.GroupID, upstream, &since, &at)
+					if err != nil {
+						log.Printf("upstream landings backfill: file %d: %v", c.ID, err)
+						continue
+					}
+					added += n
+				}
+			}
+		}
+	}
+	return added, nil
+}
+
+// ClaimOneTimeJob marks a one-time job as started; false when it already ran
+func (s *ActivityService) ClaimOneTimeJob(ctx context.Context, name string) (bool, error) {
+	if s == nil {
+		return false, nil
+	}
+	return s.repo.ClaimOneTimeJob(ctx, name)
 }

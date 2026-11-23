@@ -47,14 +47,33 @@ type poState struct {
 // reference is what the member started from: the file as taken, or as last updated from upstream
 // (the newest "initial" or "from upstream" version); nil when the file has no such version
 func (s *CatalogService) reference(ctx context.Context, c *models.Catalog) map[string]poState {
+	return s.referenceAt(ctx, c, nil)
+}
+
+// referenceAt is reference as it was at time at (nil = now): the newest such version made by then, else the
+// oldest one (a file taken after at)
+func (s *CatalogService) referenceAt(ctx context.Context, c *models.Catalog, at *time.Time) map[string]poState {
 	list, err := s.commits.List(ctx, c.ID) // newest first
 	if err != nil {
 		return nil
 	}
+	var refs []*models.Commit
 	for _, cm := range list {
-		if cm.Kind != models.CommitInitial && !strings.HasPrefix(cm.Message, CommitMsgFromUpstream) {
-			continue
+		if cm.Kind == models.CommitInitial || strings.HasPrefix(cm.Message, CommitMsgFromUpstream) {
+			refs = append(refs, cm)
 		}
+	}
+	if at != nil && len(refs) > 1 {
+		pick := refs[len(refs)-1] // the oldest
+		for _, cm := range refs {
+			if !cm.CreatedAt.After(*at) {
+				pick = cm
+				break
+			}
+		}
+		refs = []*models.Commit{pick}
+	}
+	for _, cm := range refs {
 		data, err := s.commits.Snapshot(ctx, cm.ID)
 		if err != nil {
 			return nil

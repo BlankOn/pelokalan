@@ -14,5 +14,25 @@
             </div>
         </div>
     </div>
+    {{with .Data.Detail}}
+    <section class="card badge-detail">
+        <h2>{{t $.Lang "badges.detail_title"}}</h2>
+        <dl class="badge-facts">
+            {{with .Earned}}<div><dt>{{t $.Lang "badges.earned_on"}}</dt><dd>{{.}}</dd></div>{{end}}
+            {{with .Period}}<div><dt>{{t $.Lang "badges.period"}}</dt><dd>{{.}}</dd></div>{{end}}
+        </dl>
+        {{if .Rows}}
+        <table class="table badge-work">
+            <thead><tr><th>{{t $.Lang "user.col_project"}}</th>{{if .Modules}}<th>{{t $.Lang "badges.col_module"}}</th>{{end}}<th class="num">{{t $.Lang .CountKey}}</th><th>{{t $.Lang "badges.col_when"}}</th></tr></thead>
+            <tbody>{{range .Rows}}<tr>
+                <td><a href="{{.ProjectPath}}">{{.ProjectName}}</a></td>
+                {{if $.Data.Detail.Modules}}<td>{{if .Module}}<strong>{{.Module}}</strong>{{if and .Filename (ne .Filename .Module)}}<div class="muted small">{{.Filename}}</div>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>{{end}}
+                <td class="num">{{num .Count}}</td>
+                <td class="small muted">{{.When}}</td>
+            </tr>{{end}}</tbody>
+        </table>
+        {{else}}<p class="muted">{{t $.Lang "badges.detail_none"}}</p>{{end}}
+    </section>
+    {{end}}
 </div>
 {{end}}

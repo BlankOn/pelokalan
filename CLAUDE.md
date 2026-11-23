@@ -345,7 +345,12 @@ shows it only to members), role, joined_at. Documented in README.md.
   (`pageMeta` in `Data.Meta`, base.html) and a 1200×630 PNG at the same address + `.png` (`internal/badgecard`: gg + Go
   fonts, cached in memory, `Cache-Control` one day). Preview texts are in the owner's language (`ownerLang`); achievement
   lines are `badge.<key>_done`. The owner sees a share button on earned badges (`#share-dialog`, app.js: LinkedIn,
-  X, Facebook share URLs, copy link, Web Share). The profile's own preview uses its highest badge's image.
+  X, Facebook share URLs, copy link, "Unduh gambar" (`.png?download=1`, to attach the picture by hand: X often draws
+  the card only after posting), and Web Share, which attaches the PNG as a file where the device can). The profile's own
+  preview uses its highest badge's image. `chimiddleware.GetHead` answers HEAD like GET for crawlers.
+- **Veteran** = a member for N years (1/2/3/5) with work in every month of an unbroken run of N years: counted in
+  months (`min(BestStreakMonths, MemberMonths)`, tiers 12/24/36/60); `BadgeDef.Div` shows thresholds in years and
+  `Unit` adds "bulan" to the progress count. Badge defs use `ID` (not `Key`: the i18n test reads `Key: "…"` literals).
 
 - **Accepted upstream** (`upstream_landings`, migration 043; service/landing.go): after every module group import (sync or
   upload), `GlossaryService` hands the downloaded files to `CatalogService.DetectLandings` in the background
@@ -355,6 +360,16 @@ shows it only to members), role, joined_at. Documented in README.md.
   (`landingWorthy`: 3+ words or 15+ characters), and the new upstream file has exactly that translation. One row per
   member, file and string (insert once). Works the same for GNOME (release archives follow the modules' git) and
   GitHub branches, however the work got in. Badges `landed` / `landed_modules` (group "upstream"), tile "Diterima upstream".
+
+- **Badge details** on the share page (`ActivityService.BadgeDetail`, service/badgedetail.go): when the tier was reached
+  and the work behind it per project and module (`ActivityRepository.UserModuleWork`; module = file name before the first
+  dot, deleted files keep their name). Streak badges use the run that earned the tier (`earnedPeriod`: days, Monday–Sunday
+  weeks, months), counting badges the work up to the day the count was reached, community badges per project
+  (`UserCommunityWork`, date from `NthTime`), upstream badges the accepted modules (`UserLandingWork`).
+- **One-time jobs** (`one_time_jobs`, migration 044): `ClaimOneTimeJob` marks a start-up job as run. The first one,
+  `BackfillLandingsJob` (main.go), recorded work accepted upstream during the month before detection existed
+  (`CatalogService.BackfillLandings`: stored project files, member work measured against their starting point a month
+  earlier via `referenceAt`, dated when that upstream file was stored). It can be removed once it has run.
 
 ## Git-only projects
 

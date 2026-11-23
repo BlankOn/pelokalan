@@ -24,6 +24,17 @@ func (f *fakeActivityRepo) HourlyTranslated(context.Context, int64) ([]models.Ac
 func (f *fakeActivityRepo) UserDays(context.Context, int64, string) ([]models.ProfileDay, error) {
 	return nil, nil
 }
+func (f *fakeActivityRepo) UserModuleWork(context.Context, int64, string, string, *time.Time, *time.Time, int) ([]*models.ModuleWork, error) {
+	return nil, nil
+}
+func (f *fakeActivityRepo) UserLandingWork(context.Context, int64, int) ([]*models.ModuleWork, error) {
+	return nil, nil
+}
+func (f *fakeActivityRepo) UserCommunityWork(context.Context, int64, string, int) ([]*models.ModuleWork, error) {
+	return nil, nil
+}
+func (f *fakeActivityRepo) NthTime(context.Context, int64, string, int) (*time.Time, error) { return nil, nil }
+func (f *fakeActivityRepo) ClaimOneTimeJob(context.Context, string) (bool, error) { return false, nil }
 func (f *fakeActivityRepo) AddLandings(context.Context, []models.UpstreamLanding) (int, error) {
 	return 0, nil
 }

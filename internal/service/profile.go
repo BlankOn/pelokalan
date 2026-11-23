@@ -44,6 +44,7 @@ type ProfileStats struct {
 	Night, Early int // contributions late at night / early in the morning
 	Weekends     int // weekends with work
 	MemberDays   int // days since signing up
+	MemberMonths int // whole months since signing up
 
 	Files, Projects, Languages, CompletedFiles         int
 	Comments, Topics, WikiEdits, ContextEdits, Commits int
@@ -52,10 +53,12 @@ type ProfileStats struct {
 
 // BadgeDef is one badge with its tiers: thresholds of one number, lowest first
 type BadgeDef struct {
-	Key   string // badge.<key> (name), badge.<key>_desc (what it takes, with the target)
+	ID    string // badge.<id> (name), badge.<key>_desc (what it takes, with the target)
 	Icon  string // badge_icon partial
 	Tiers []int
 	value func(*ProfileStats) int
+	Div   int    // descriptions show thresholds divided by this (months → years); 0 = as they are
+	Unit  string // badges.unit_<unit> after the progress count ("7 / 12 bulan"); "" = none
 }
 
 // BadgeGroupDef is a row of related badges
@@ -71,40 +74,43 @@ var BadgeTierNames = []string{"bronze", "silver", "gold", "platinum", "diamond"}
 // the last takes a long time of steady work.
 var Badges = []BadgeGroupDef{
 	{"streak", []BadgeDef{
-		{"streak_day", "flame", []int{3, 7, 30, 100, 365}, func(s *ProfileStats) int { return s.BestStreakDays }},
-		{"streak_week", "week", []int{4, 12, 26, 52, 104}, func(s *ProfileStats) int { return s.BestStreakWeeks }},
-		{"streak_month", "month", []int{3, 6, 12, 24, 48}, func(s *ProfileStats) int { return s.BestStreakMonths }},
-		{"active_days", "calendar", []int{10, 50, 100, 365, 1000}, func(s *ProfileStats) int { return s.ActiveDays }},
+		{ID: "streak_day", Icon: "flame", Tiers: []int{3, 7, 30, 100, 365}, value: func(s *ProfileStats) int { return s.BestStreakDays }},
+		{ID: "streak_week", Icon: "week", Tiers: []int{4, 12, 26, 52, 104}, value: func(s *ProfileStats) int { return s.BestStreakWeeks }},
+		{ID: "streak_month", Icon: "month", Tiers: []int{3, 6, 12, 24, 48}, value: func(s *ProfileStats) int { return s.BestStreakMonths }},
+		{ID: "active_days", Icon: "calendar", Tiers: []int{10, 50, 100, 365, 1000}, value: func(s *ProfileStats) int { return s.ActiveDays }},
 	}},
 	{"work", []BadgeDef{
-		{"translated", "pen", []int{100, 1000, 5000, 20000, 100000}, func(s *ProfileStats) int { return s.Translated }},
-		{"words", "type", []int{1000, 10000, 50000, 250000, 1000000}, func(s *ProfileStats) int { return s.Words }},
-		{"reviewed", "check", []int{50, 500, 2500, 10000, 50000}, func(s *ProfileStats) int { return s.Reviewed }},
-		{"edited", "polish", []int{50, 250, 1000, 5000, 20000}, func(s *ProfileStats) int { return s.Edited }},
-		{"best_day", "bolt", []int{100, 300, 600, 1000, 2000}, func(s *ProfileStats) int { return s.BestDay }},
+		{ID: "translated", Icon: "pen", Tiers: []int{100, 1000, 5000, 20000, 100000}, value: func(s *ProfileStats) int { return s.Translated }},
+		{ID: "words", Icon: "type", Tiers: []int{1000, 10000, 50000, 250000, 1000000}, value: func(s *ProfileStats) int { return s.Words }},
+		{ID: "reviewed", Icon: "check", Tiers: []int{50, 500, 2500, 10000, 50000}, value: func(s *ProfileStats) int { return s.Reviewed }},
+		{ID: "edited", Icon: "polish", Tiers: []int{50, 250, 1000, 5000, 20000}, value: func(s *ProfileStats) int { return s.Edited }},
+		{ID: "best_day", Icon: "bolt", Tiers: []int{100, 300, 600, 1000, 2000}, value: func(s *ProfileStats) int { return s.BestDay }},
 	}},
 	{"upstream", []BadgeDef{
-		{"landed", "merge", []int{10, 100, 1000, 5000, 20000}, func(s *ProfileStats) int { return s.Landed }},
-		{"landed_modules", "upload", []int{1, 5, 25, 100, 250}, func(s *ProfileStats) int { return s.LandedModules }},
+		{ID: "landed", Icon: "merge", Tiers: []int{10, 100, 1000, 5000, 20000}, value: func(s *ProfileStats) int { return s.Landed }},
+		{ID: "landed_modules", Icon: "upload", Tiers: []int{1, 5, 25, 100, 250}, value: func(s *ProfileStats) int { return s.LandedModules }},
 	}},
 	{"reach", []BadgeDef{
-		{"completed", "flag", []int{1, 5, 25, 100, 250}, func(s *ProfileStats) int { return s.CompletedFiles }},
-		{"files", "layers", []int{5, 25, 100, 300, 1000}, func(s *ProfileStats) int { return s.Files }},
-		{"projects", "grid", []int{1, 2, 3, 5, 10}, func(s *ProfileStats) int { return s.Projects }},
-		{"languages", "globe", []int{2, 3, 5}, func(s *ProfileStats) int { return s.Languages }},
+		{ID: "completed", Icon: "flag", Tiers: []int{1, 5, 25, 100, 250}, value: func(s *ProfileStats) int { return s.CompletedFiles }},
+		{ID: "files", Icon: "layers", Tiers: []int{5, 25, 100, 300, 1000}, value: func(s *ProfileStats) int { return s.Files }},
+		{ID: "projects", Icon: "grid", Tiers: []int{1, 2, 3, 5, 10}, value: func(s *ProfileStats) int { return s.Projects }},
+		{ID: "languages", Icon: "globe", Tiers: []int{2, 3, 5}, value: func(s *ProfileStats) int { return s.Languages }},
 	}},
 	{"community", []BadgeDef{
-		{"comments", "chat", []int{10, 50, 200, 1000, 5000}, func(s *ProfileStats) int { return s.Comments }},
-		{"topics", "topic", []int{1, 10, 50, 200}, func(s *ProfileStats) int { return s.Topics }},
-		{"wiki", "book", []int{1, 10, 50, 200}, func(s *ProfileStats) int { return s.WikiEdits }},
-		{"context", "note", []int{1, 10, 50, 200}, func(s *ProfileStats) int { return s.ContextEdits }},
-		{"commits", "commit", []int{1, 10, 50, 200, 1000}, func(s *ProfileStats) int { return s.Commits }},
+		{ID: "comments", Icon: "chat", Tiers: []int{10, 50, 200, 1000, 5000}, value: func(s *ProfileStats) int { return s.Comments }},
+		{ID: "topics", Icon: "topic", Tiers: []int{1, 10, 50, 200}, value: func(s *ProfileStats) int { return s.Topics }},
+		{ID: "wiki", Icon: "book", Tiers: []int{1, 10, 50, 200}, value: func(s *ProfileStats) int { return s.WikiEdits }},
+		{ID: "context", Icon: "note", Tiers: []int{1, 10, 50, 200}, value: func(s *ProfileStats) int { return s.ContextEdits }},
+		{ID: "commits", Icon: "commit", Tiers: []int{1, 10, 50, 200, 1000}, value: func(s *ProfileStats) int { return s.Commits }},
 	}},
 	{"habits", []BadgeDef{
-		{"night", "moon", []int{50, 500, 2000}, func(s *ProfileStats) int { return s.Night }},
-		{"early", "sun", []int{50, 500, 2000}, func(s *ProfileStats) int { return s.Early }},
-		{"weekend", "weekend", []int{4, 12, 52}, func(s *ProfileStats) int { return s.Weekends }},
-		{"veteran", "medal", []int{30, 365, 730, 1825}, func(s *ProfileStats) int { return s.MemberDays }},
+		{ID: "night", Icon: "moon", Tiers: []int{50, 500, 2000}, value: func(s *ProfileStats) int { return s.Night }},
+		{ID: "early", Icon: "sun", Tiers: []int{50, 500, 2000}, value: func(s *ProfileStats) int { return s.Early }},
+		{ID: "weekend", Icon: "weekend", Tiers: []int{4, 12, 52}, value: func(s *ProfileStats) int { return s.Weekends }},
+		// a member for N years with work in every month of an unbroken run of N years (counted in months)
+		{ID: "veteran", Icon: "medal", Tiers: []int{12, 24, 36, 60}, Div: 12, Unit: "months", value: func(s *ProfileStats) int {
+			return min(s.BestStreakMonths, s.MemberMonths)
+		}},
 	}},
 }
 
@@ -118,8 +124,16 @@ type Badge struct {
 	Target    int // the next tier's threshold, or the top one when all are earned
 	Percent   int // progress towards Target
 	Max       bool
-	Steps     []int // all thresholds
+	Steps     []int  // all thresholds
+	Div       int    // see BadgeDef.Div (at least 1)
+	Unit      string // see BadgeDef.Unit
 }
+
+// Shown is a threshold as the descriptions say it (BadgeDef.Div)
+func (b Badge) Shown(v int) int { return v / max(1, b.Div) }
+
+// ShownTarget is the next (or top) threshold as the descriptions say it
+func (b Badge) ShownTarget() int { return b.Shown(b.Target) }
 
 // BadgeGroup is a row of badges on the page
 type BadgeGroup struct {
@@ -130,7 +144,7 @@ type BadgeGroup struct {
 
 func evalBadge(d BadgeDef, s *ProfileStats) Badge {
 	v := d.value(s)
-	b := Badge{Key: d.Key, Icon: d.Icon, Value: v, Tiers: len(d.Tiers), Steps: d.Tiers}
+	b := Badge{Key: d.ID, Icon: d.Icon, Value: v, Tiers: len(d.Tiers), Steps: d.Tiers, Div: max(1, d.Div), Unit: d.Unit}
 	for _, t := range d.Tiers {
 		if v >= t {
 			b.Tier++
@@ -221,6 +235,11 @@ func ComputeProfileStats(days []models.ProfileDay, totals *models.ProfileTotals,
 	s.BestStreakMonths, s.StreakMonths, _ = runs(monthNs, today.Year()*12+int(today.Month())-1)
 	if !joined.IsZero() {
 		s.MemberDays = max(0, tn-dayNum(joined))
+		m := (today.Year()-joined.Year())*12 + int(today.Month()) - int(joined.Month())
+		if today.Day() < joined.Day() {
+			m--
+		}
+		s.MemberMonths = max(0, m)
 	}
 	if totals != nil {
 		s.Files, s.Projects, s.Languages, s.CompletedFiles = totals.Files, len(totals.Projects), totals.Languages, totals.CompletedFiles

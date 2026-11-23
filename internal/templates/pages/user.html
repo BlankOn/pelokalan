@@ -46,16 +46,16 @@
     <h3>{{t $.Lang (printf "badges.group_%s" .Key)}}</h3>
     <div class="badge-grid">
     {{range .Badges}}
-        <div class="badge{{if .Tier}} tier-{{.TierName}}{{else}} locked{{end}}" title="{{t $.Lang (printf "badge.%s_desc" .Key) (num .Target)}}">
+        <div class="badge{{if .Tier}} tier-{{.TierName}}{{else}} locked{{end}}" title="{{t $.Lang (printf "badge.%s_desc" .Key) (num .ShownTarget)}}">
             {{template "badge_medal" .}}
             {{if and $.Data.Mine .Tier}}{{with index $.Data.Shares .Key}}<button type="button" class="badge-share" data-share="{{.PageURL}}" data-share-text="{{.Text}}" data-share-image="{{.ImageURL}}" data-share-title="{{.Name}} · {{.TierLabel}}" title="{{t $.Lang "share.button"}}" aria-label="{{t $.Lang "share.button"}} {{.Name}}"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4"/></svg></button>{{end}}{{end}}
             <div class="badge-body">
                 <div class="badge-name">{{t $.Lang (printf "badge.%s" .Key)}}</div>
                 <div class="badge-tier small">{{if .Tier}}{{t $.Lang (printf "badges.tier_%s" .TierName)}}{{else}}{{t $.Lang "badges.locked"}}{{end}}
                     <span class="badge-pips" aria-hidden="true">{{$b := .}}{{range $i, $step := .Steps}}<i{{if lt $i $b.Tier}} class="on"{{end}}></i>{{end}}</span></div>
-                <div class="badge-desc small muted">{{if .Max}}{{t $.Lang "badges.max"}}{{else}}{{t $.Lang (printf "badge.%s_desc" .Key) (num .Target)}}{{end}}</div>
+                <div class="badge-desc small muted">{{if .Max}}{{t $.Lang "badges.max"}}{{else}}{{t $.Lang (printf "badge.%s_desc" .Key) (num .ShownTarget)}}{{end}}</div>
                 {{if not .Max}}<div class="badge-progress" role="progressbar" aria-valuenow="{{.Value}}" aria-valuemax="{{.Target}}"><span style="width: {{.Percent}}%"></span></div>
-                <div class="badge-count small muted">{{num .Value}} / {{num .Target}}</div>{{end}}
+                <div class="badge-count small muted">{{num .Value}} / {{num .Target}}{{with .Unit}} {{t $.Lang (printf "badges.unit_%s" .)}}{{end}}</div>{{end}}
             </div>
         </div>
     {{end}}
@@ -88,7 +88,9 @@
         <a class="btn share-facebook" target="_blank" rel="noopener">Facebook</a>
         <button type="button" class="btn share-native" hidden>{{t .Lang "share.native"}}</button>
         <button type="button" class="btn share-copy" data-copy="" data-copied="{{t .Lang "links.copied"}}">{{t .Lang "share.copy"}}</button>
+        <a class="btn share-download" download>{{t .Lang "share.download"}}</a>
     </div>
+    <p class="muted small">{{t .Lang "share.preview_help"}}</p>
     <p class="small"><a class="share-open" target="_blank" rel="noopener">{{t .Lang "share.open"}} ↗</a></p>
 </dialog>
 {{end}}

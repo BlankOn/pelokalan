@@ -170,6 +170,7 @@ func main() {
 	r := chi.NewRouter()
 	r.Use(chimiddleware.RequestID)
 	r.Use(chimiddleware.RealIP)
+	r.Use(chimiddleware.GetHead) // HEAD is answered like GET (link preview crawlers check links with it)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.SecurityHeaders)
@@ -348,6 +349,23 @@ func main() {
 			glossaryService.FetchDue(context.Background(), cfg.Glossary.FetchInterval)
 			glossaryService.RecordStats(context.Background())
 		}
+	}()
+
+	// One-time catch-up (runs on the first start that has it, never again: one_time_jobs): members' work
+	// accepted upstream during the month before detection existed. Safe to delete after it ran.
+	go func() {
+		ctx := context.Background()
+		claimed, err := activityService.ClaimOneTimeJob(ctx, service.BackfillLandingsJob)
+		if err != nil || !claimed {
+			return
+		}
+		projects, err := repos.Project.ListAll(ctx, 0)
+		if err != nil {
+			log.Printf("upstream landings backfill: %v", err)
+			return
+		}
+		n, err := catalogService.BackfillLandings(ctx, projects, time.Now().AddDate(0, -1, 0))
+		log.Printf("upstream landings backfill: %d strings accepted upstream recorded (err: %v)", n, err)
 	}()
 
 	// Remove stored files no attachment uses any more (like a bucket lifecycle rule)

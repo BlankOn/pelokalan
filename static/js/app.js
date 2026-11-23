@@ -2919,10 +2919,24 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
         dlg.querySelector(".share-facebook").href = "https://www.facebook.com/sharer/sharer.php?u=" + u;
         dlg.querySelector(".share-copy").setAttribute("data-copy", url);
         dlg.querySelector(".share-open").href = url;
+        current.image = btn.getAttribute("data-share-image");
+        dlg.querySelector(".share-download").href = current.image + "?download=1";
         dlg.querySelector(".share-native").hidden = !navigator.share;
         dlg.showModal();
     });
+    // the system share sheet gets the picture itself when the device can share files (phones), so it shows
+    // in the post whatever the app does with link previews
     dlg.querySelector(".share-native").addEventListener("click", function () {
-        if (current && navigator.share) navigator.share({ title: current.title, text: current.text, url: current.url }).catch(function () {});
+        if (!current || !navigator.share) return;
+        var plain = function () {
+            navigator.share({ title: current.title, text: current.text, url: current.url }).catch(function () {});
+        };
+        if (!navigator.canShare) { plain(); return; }
+        fetch(current.image).then(function (r) { return r.blob(); }).then(function (blob) {
+            var file = new File([blob], "pelokalan-badge.png", { type: "image/png" });
+            var data = { title: current.title, text: current.text + " " + current.url, files: [file] };
+            if (navigator.canShare(data)) return navigator.share(data);
+            plain();
+        }).catch(function () {});
     });
 })();
