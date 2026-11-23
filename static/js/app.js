@@ -2920,7 +2920,7 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
         dlg.querySelector(".share-copy").setAttribute("data-copy", text + "\n\n" + url); // the post, ready to paste
         dlg.querySelector(".share-open").href = url;
         current.image = btn.getAttribute("data-share-image");
-        dlg.querySelector(".share-download").href = current.image + "?download=1";
+        dlg.querySelector(".share-download").href = current.image + (current.image.indexOf("?") < 0 ? "?" : "&") + "download=1";
         dlg.querySelector(".share-native").hidden = !navigator.share;
         dlg.showModal();
     });

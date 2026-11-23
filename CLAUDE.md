@@ -348,6 +348,7 @@ shows it only to members), role, joined_at. Documented in README.md.
   X, Facebook share URLs, "Salin ke papan klip" (the post text, a blank line, then the link), "Unduh gambar" (`.png?download=1`, to attach the picture by hand: X often draws
   the card only after posting), and Web Share, which attaches the PNG as a file where the device can). The profile's own
   preview uses its highest badge's image. `chimiddleware.GetHead` answers HEAD like GET for crawlers.
+  Image addresses carry `?v=` (a hash of the card's text) so renamed badges never show a cached old picture.
 - **Veteran** = a member for N years (1/2/3/5) with work in every month of an unbroken run of N years: counted in
   months (`min(BestStreakMonths, MemberMonths)`, tiers 12/24/36/60); `BadgeDef.Div` shows thresholds in years and
   `Unit` adds "bulan" to the progress count. Badge defs use `ID` (not `Key`: the i18n test reads `Key: "…"` literals).

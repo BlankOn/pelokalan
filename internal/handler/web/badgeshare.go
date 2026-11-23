@@ -1,6 +1,8 @@
 package web
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -54,6 +56,10 @@ func (h *Handler) shareFor(lang string, u *models.User, b service.Badge, tier in
 	s.Text = i18n.T(lang, "share.text", tierName, s.Name, s.Done)
 	s.OGTitle = i18n.T(lang, "share.og_title", u.DisplayName(), tierName, s.Name)
 	s.OGDesc = i18n.T(lang, "share.og_desc", capFirst(s.Done))
+	// the image address changes with what the card says (renamed badge or person, new wording), so
+	// browsers and link previews never keep an outdated picture for the day it may be cached
+	sum := sha256.Sum256([]byte(strings.Join([]string{u.DisplayName(), u.Username, s.Name, s.TierLabel, s.Done}, "\x00")))
+	s.ImageURL += "?v=" + hex.EncodeToString(sum[:4])
 	return s
 }
 
