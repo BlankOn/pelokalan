@@ -34,7 +34,7 @@
         {{else if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .GroupLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
             <input type="hidden" name="into" value="{{.Mine.ID}}">
             <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
-        {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"><button class="btn btn-small btn-primary" title="{{if $v.Res.On}}{{t $v.Lang "reserve.take_help"}}{{else}}{{t $v.Lang "files.take_help"}}{{end}}">{{if $v.Res.On}}{{t $v.Lang "reserve.take"}}{{else}}{{t $v.Lang "files.take"}}{{end}}</button></form>{{end}}{{end}}
+        {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"{{if $v.Res.On}} data-confirm="{{t $v.Lang "reserve.take_confirm" (module .Filename)}}{{if $v.Res.Days}} {{t $v.Lang "reserve.take_confirm_days" $v.Res.Days}}{{end}}" data-confirm-ok="{{t $v.Lang "reserve.take"}}"{{end}}><button class="btn btn-small btn-primary" title="{{if $v.Res.On}}{{t $v.Lang "reserve.take_help"}}{{else}}{{t $v.Lang "files.take_help"}}{{end}}">{{if $v.Res.On}}{{t $v.Lang "reserve.take"}}{{else}}{{t $v.Lang "files.take"}}{{end}}</button></form>{{end}}{{end}}
         <a class="btn btn-small btn-icon" href="{{$v.Project.Path}}/project-files/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
     </div></td>
 </tr>

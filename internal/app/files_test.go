@@ -68,6 +68,9 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 		t.Fatalf("reservations not switched on")
 	}
 
+	// "Ambil tugas" asks first (the UI is in Indonesian by default), saying that it reserves the module and how it is released
+	kiki.get(base+"/files").status(http.StatusOK).contains(`data-confirm-ok="Ambil tugas"`, "Ambil tugas modul calc?", "setelah 30 hari tanpa simpanan")
+
 	// kiki takes calc: a copy in her files, and the module is hers
 	calc := scalar[int64](t, `SELECT id FROM project_files WHERE project_id = $1 AND filename = 'calc.main.id.po'`, pid)
 	kiki.post(base+"/project-files/"+strconv.FormatInt(calc, 10)+"/take", nil).redirectsTo(base + "/" + kiki.Username + "/po/calc.main.id.po")

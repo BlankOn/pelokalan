@@ -634,11 +634,12 @@ type reservationView struct {
 	On      bool  // the project uses reservations
 	UserID  int64 // the viewer
 	Manager bool  // may release anyone's reservation
+	Days    int   // released after this many days without saves (0 = never)
 	Lang    string
 }
 
 func (h *Handler) reservationView(r *http.Request, p *models.Project) reservationView {
-	v := reservationView{On: p.Reservations, Manager: p.Role.CanManage(), Lang: middleware.GetLang(r.Context())}
+	v := reservationView{On: p.Reservations, Manager: p.Role.CanManage(), Days: p.ReservationDays, Lang: middleware.GetLang(r.Context())}
 	if u := middleware.GetUser(r.Context()); u != nil {
 		v.UserID = u.ID
 	}

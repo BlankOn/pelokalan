@@ -340,8 +340,8 @@ shows it only to members), role, joined_at. Documented in README.md.
   the spell check do not. The editor/raw/entry pane call `applyLock`: a module another member holds opens read-only
   (`Owned` false) with a banner (`editor-hold`; the holder sees `editor-hold-mine` with "Lepas").
 - Released as "merged" by `CatalogService.landingsIn` after each sync (GNOME archive or GitHub branch) when every string
-  the holder changed is upstream word for word. Lists: `res_chip` under file names, "Ambil & pesan" / "Sedang dipesan"
-  in Berkas proyek, "Pesan modul" / "Lepas pesanan" in the ⋯ menu, `reserve_filter` (`rv` = mine, other, free; Berkas
+  the holder changed is upstream word for word. Lists: `res_chip` under file names, "Ambil tugas" (asks first: it reserves the module) / "Sedang dipesan"
+  in Berkas proyek, "Pesan modul" / "Lepas reservasi tugas" in the ⋯ menu, `reserve_filter` (`rv` = mine, other, free; Berkas
   proyek uses `GlossaryService.ProjectFiles` with a keep filter, `KeepStates` for upstream states). Settings lists held
   modules (`#held-modules`) for owners/managers.
 
