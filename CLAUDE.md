@@ -327,7 +327,7 @@ shows it only to members), role, joined_at. Documented in README.md.
 
 ## Module reservations
 
-- Project setting (Settings → Umum, `projects.reservations` + `reservation_days` 0/14/30/60, default off/30; migration
+- Project setting "Reservasi modul untuk dikerjakan" (Settings → Umum, `projects.reservations` + `reservation_days` 0/14/30/60, default off/30; migration
   046, `module_reservations` with one active holder per project + module by a partial unique index). Unit = module
   (`service.ModuleOf` / `ModuleKey`, the file name before the first dot). `ReservationService` (service/reservation.go):
   `Claim` (free → yours; held by another → `ErrModuleReserved`), `Check`, `Release` (holder, or owner/manager who
@@ -340,8 +340,8 @@ shows it only to members), role, joined_at. Documented in README.md.
   the spell check do not. The editor/raw/entry pane call `applyLock`: a module another member holds opens read-only
   (`Owned` false) with a banner (`editor-hold`; the holder sees `editor-hold-mine` with "Lepas").
 - Released as "merged" by `CatalogService.landingsIn` after each sync (GNOME archive or GitHub branch) when every string
-  the holder changed is upstream word for word. Lists: a red lock (`res_lock`, `.res-lock`: red circle, white lock; tooltip "Direservasi oleh @user") right after the file name and `res_chip` under it, "Ambil tugas" (asks first: it reserves the module) / "Sedang dipesan"
-  in Berkas proyek, "Pesan modul" / "Lepas reservasi tugas" in the ⋯ menu, `reserve_filter` (`rv` = mine, other, free; Berkas
+  the holder changed is upstream word for word. Lists: a red lock (`res_lock`, `.res-lock`: red circle, white lock; tooltip "Direservasi oleh @user") right after the file name (blue `.res-lock-mine` when the viewer holds it) and `res_chip` under it, "Reservasi modul" (takes the file; asks first: it reserves the module) / "Sedang direservasi"
+  in Berkas proyek, "Reservasi modul" / "Lepas reservasi tugas" in the ⋯ menu, "Reservasi & Terjemahkan" instead of "Terjemahkan" on free modules in Berkas Anda (asks, reserves, opens the editor), `reserve_filter` (`rv` = mine, other, free; Berkas
   proyek uses `GlossaryService.ProjectFiles` with a keep filter, `KeepStates` for upstream states). Settings lists held
   modules (`#held-modules`) for owners/managers.
 

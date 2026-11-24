@@ -68,8 +68,8 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 		t.Fatalf("reservations not switched on")
 	}
 
-	// "Ambil tugas" asks first (the UI is in Indonesian by default), saying that it reserves the module and how it is released
-	kiki.get(base+"/files").status(http.StatusOK).contains(`data-confirm-ok="Ambil tugas"`, "Ambil tugas modul calc?", "setelah 30 hari tanpa simpanan")
+	// "Reservasi modul" asks first (the UI is in Indonesian by default), saying that it reserves the module and how it is released
+	kiki.get(base+"/files").status(http.StatusOK).contains(`data-confirm-ok="Reservasi modul"`, "Reservasi modul calc untuk dikerjakan?", "setelah 30 hari tanpa simpanan")
 
 	// kiki takes calc: a copy in her files, and the module is hers
 	calc := scalar[int64](t, `SELECT id FROM project_files WHERE project_id = $1 AND filename = 'calc.main.id.po'`, pid)
@@ -105,14 +105,31 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 	}
 	kiki.get(base + "/" + kiki.Username + "/po/calc.main.id.po").status(http.StatusOK).contains("editor-hold")
 
+	// in Berkas Anda the holder's own reservation has a blue lock and the release item
+	owner.get(base+"/my-files").status(http.StatusOK).contains("Lepas reservasi tugas", "Direservasi oleh Anda", `res-lock-wrap res-lock-mine`)
+	// kiki's copy of the module the owner holds has the red lock and "Lihat"
+	kiki.get(base + "/my-files").status(http.StatusOK).contains(`class="res-lock-wrap" title="Direservasi oleh @` + owner.Username + `"`).lacks("res-lock-mine")
+
 	// the red lock after the file name names the holder
-	visitor(t).get(base+"/files").status(http.StatusOK).contains(`class="res-lock-wrap" title="Direservasi oleh @`+owner.Username+`"`)
+	visitor(t).get(base + "/files").status(http.StatusOK).contains(`class="res-lock-wrap" title="Direservasi oleh @` + owner.Username + `"`)
 
 	// Settings lists the held module for managers
-	owner.get(base+"/settings").status(http.StatusOK).contains("held-modules", "calc")
+	owner.get(base+"/settings").status(http.StatusOK).contains("Reservasi modul untuk dikerjakan", "held-modules", "calc")
 
 	// the reservation filter on Berkas proyek
 	visitor(t).get(base + "/project-files?rv=free").status(http.StatusOK).contains("edit.main.id.po").lacks("calc.main.id.po")
+
+	// the owner releases calc; their copy then offers "Reservasi & Terjemahkan", which asks first,
+	// reserves the module and opens the editor
+	owner.post(base+"/reservations/release", url.Values{"module": {"calc"}}).redirectsTo(base)
+	mine := owner.get(base + "/my-files").status(http.StatusOK)
+	mine.contains("Reservasi &amp; Terjemahkan", "Reservasi modul calc untuk dikerjakan?").lacks("res-lock-wrap")
+	editor := base + "/" + owner.Username + "/po/calc.main.id.po"
+	owner.post(base+"/reservations", url.Values{"module": {"calc"}, "next": {editor}}).redirectsTo(editor)
+	if h := scalar[int64](t, `SELECT user_id FROM module_reservations WHERE project_id = $1 AND module = 'calc' AND released_at IS NULL`, pid); h != owner.ID {
+		t.Fatalf("calc held by %d after Reservasi & Terjemahkan, want the owner", h)
+	}
+	owner.get(base + "/my-files").status(http.StatusOK).lacks("Reservasi &amp; Terjemahkan").contains("res-lock-mine")
 }
 
 // Deleting a PO file is a soft delete: it leaves the lists but opens read-only
