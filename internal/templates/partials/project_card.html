@@ -23,14 +23,14 @@
 {{define "project_file_rows"}}{{$v := .}}
 {{range .Files}}
 <tr>
-    <td><strong class="pf-name">{{.Filename}}</strong><div class="muted small">{{langName .Language}} · {{.Language}}</div>
+    <td><strong class="pf-name">{{.Filename}}</strong>{{with .Reservation}}{{template "res_lock" (dict "Lang" $v.Lang "R" .)}}{{end}}<div class="muted small">{{langName .Language}} · {{.Language}}</div>
         {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}
         {{with .Mine}}<div class="small pf-mine">{{t $v.Lang "files.mine_copy"}} <a href="{{.URL}}">{{.Filename}}</a></div>{{end}}
         {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}</td>
     <td>{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · <span class="c-fuzzy">{{t $v.Lang "files.fuzzy_count" .Fuzzy}}</span>{{end}}</span></td>
     <td class="small"><span class="version-badge">{{.GroupLabel}}</span></td>
     <td class="actions"><div class="pf-actions">
-        {{if $v.CanTake}}{{if and $v.Res.On .Reservation (ne .Reservation.UserID $v.Res.UserID)}}<span class="res-locked small" title="{{t $v.Lang "reserve.locked_help"}}">🔒 {{t $v.Lang "reserve.locked"}}</span>
+        {{if $v.CanTake}}{{if and $v.Res.On .Reservation (ne .Reservation.UserID $v.Res.UserID)}}<span class="res-locked small" title="{{t $v.Lang "reserve.locked_help"}}">{{template "lock_icon"}}{{t $v.Lang "reserve.locked"}}</span>
         {{else if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .GroupLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
             <input type="hidden" name="into" value="{{.Mine.ID}}">
             <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
@@ -110,13 +110,16 @@
 {{end}}
 
 {{/* who holds a module (R: *models.ModuleReservation; Me: the viewer's id; Manager may release it) */}}
-{{define "res_chip"}}<div class="res-chip small{{if eq .R.UserID .Me}} res-mine{{end}}" title="{{t .Lang "reserve.since" (timeAgo .Lang .R.ReservedAt)}}">🔒 {{if eq .R.UserID .Me}}{{t .Lang "reserve.by_me"}}{{else}}{{t .Lang "reserve.by"}} <a href="/users/{{.R.Username}}">@{{.R.Username}}</a>{{end}} · {{timeAgo .Lang .R.ReservedAt}}{{if and .Manager (ne .R.UserID .Me)}}<form method="post" action="{{.Project.Path}}/reservations/release" class="inline-form" data-confirm="{{t .Lang "reserve.release_other_confirm" .R.Module .R.Username}}"><input type="hidden" name="module" value="{{.R.Module}}"><button class="linklike">{{t .Lang "reserve.release"}}</button></form>{{end}}</div>{{end}}
+{{define "lock_icon"}}<span class="res-lock" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="6" y="11" width="12" height="9" rx="2"/><path d="M8.5 11V8a3.5 3.5 0 0 1 7 0v3"/></svg></span>{{end}}
+{{/* red lock after a file name when its module is reserved; the tooltip names the holder */}}
+{{define "res_lock"}}<span class="res-lock-wrap" title="{{t .Lang "reserve.by"}} @{{.R.Username}}" role="img" aria-label="{{t .Lang "reserve.by"}} @{{.R.Username}}">{{template "lock_icon"}}</span>{{end}}
+{{define "res_chip"}}<div class="res-chip small{{if eq .R.UserID .Me}} res-mine{{end}}" title="{{t .Lang "reserve.since" (timeAgo .Lang .R.ReservedAt)}}">{{if eq .R.UserID .Me}}{{t .Lang "reserve.by_me"}}{{else}}{{t .Lang "reserve.by"}} <a href="/users/{{.R.Username}}">@{{.R.Username}}</a>{{end}} · {{timeAgo .Lang .R.ReservedAt}}{{if and .Manager (ne .R.UserID .Me)}}<form method="post" action="{{.Project.Path}}/reservations/release" class="inline-form" data-confirm="{{t .Lang "reserve.release_other_confirm" .R.Module .R.Username}}"><input type="hidden" name="module" value="{{.R.Module}}"><button class="linklike">{{t .Lang "reserve.release"}}</button></form>{{end}}</div>{{end}}
 
 {{/* a page of PO files: the user's own (Mine) or other members' (read-only) */}}
 {{define "file_rows"}}{{$v := .}}
 {{range .Files}}
 <tr>
-    <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a>
+    <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a>{{with .Reservation}}{{template "res_lock" (dict "Lang" $v.Lang "R" .)}}{{end}}
         <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div>
         {{if .RepoPath}}<div class="small muted repo-path" title="{{t $v.Lang "git.repo_path"}}">{{.RepoPath}}</div>{{end}}
         {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}

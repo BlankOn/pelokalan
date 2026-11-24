@@ -325,6 +325,13 @@ h1 .ai-badge { font-size: 12px; }
 .res-chip.res-mine { color: #23468a; }
 .res-chip a { color: inherit; font-weight: 600; }
 .res-chip .linklike { font-size: 12px; }
+/* reserved module: a red circle with a white lock, after the file name */
+.res-lock { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex: none;
+  border-radius: 50%; background: #d93025; vertical-align: -3px; }
+.res-lock svg { width: 12px; height: 12px; fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+.res-lock svg rect { fill: #fff; stroke: none; }
+.res-lock-wrap { display: inline-flex; margin-left: 6px; vertical-align: middle; cursor: help; }
+.editor-hold .res-lock { margin-right: 4px; }
 .res-locked { display: inline-flex; align-items: center; gap: 4px; color: #8a4a1c; white-space: nowrap; }
 .held-table td { vertical-align: middle; }
 

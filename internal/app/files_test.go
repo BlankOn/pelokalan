@@ -105,6 +105,9 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 	}
 	kiki.get(base + "/" + kiki.Username + "/po/calc.main.id.po").status(http.StatusOK).contains("editor-hold")
 
+	// the red lock after the file name names the holder
+	visitor(t).get(base+"/files").status(http.StatusOK).contains(`class="res-lock-wrap" title="Direservasi oleh @`+owner.Username+`"`)
+
 	// Settings lists the held module for managers
 	owner.get(base+"/settings").status(http.StatusOK).contains("held-modules", "calc")
 

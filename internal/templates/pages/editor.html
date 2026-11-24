@@ -130,7 +130,7 @@
     {{if .Flash}}<div class="editor-flash">{{.Flash}}</div>{{end}}
     {{with .Data.Hold}}{{if $.Data.HoldMine}}{{if $c.Owned}}<div class="editor-flash editor-hold-mine" role="status">{{t $.Lang "reserve.editor_mine" (timeAgo $.Lang .ReservedAt)}}
         <form method="post" action="{{$.Data.Project.Path}}/reservations/release" class="inline-form" data-confirm="{{t $.Lang "reserve.release_confirm" $.Data.HoldModule}}"><input type="hidden" name="module" value="{{$.Data.HoldModule}}"><input type="hidden" name="next" value="{{$c.URL}}"><button class="linklike">{{t $.Lang "reserve.release"}}</button></form></div>{{end}}
-    {{else}}<div class="editor-flash editor-hold" role="status">🔒 {{t $.Lang "reserve.editor_other" .Username (timeAgo $.Lang .ReservedAt)}}{{if $.Data.Project.Role.CanManage}}
+    {{else}}<div class="editor-flash editor-hold" role="status">{{template "lock_icon"}} {{t $.Lang "reserve.editor_other" .Username (timeAgo $.Lang .ReservedAt)}}{{if $.Data.Project.Role.CanManage}}
         <form method="post" action="{{$.Data.Project.Path}}/reservations/release" class="inline-form" data-confirm="{{t $.Lang "reserve.release_other_confirm" $.Data.HoldModule .Username}}"><input type="hidden" name="module" value="{{$.Data.HoldModule}}"><input type="hidden" name="next" value="{{$c.URL}}"><button class="linklike">{{t $.Lang "reserve.release"}}</button></form>{{end}}</div>{{end}}{{end}}
     {{if $c.IsDeleted}}<div class="editor-flash editor-deleted" role="status">{{t .Lang "editor.deleted_notice" (or $c.DeleterName "—") (timeAgo .Lang $c.DeletedTime)}}</div>{{end}}
     {{with .Data.AIJob}}{{template "ai_job" .}}{{end}}
