@@ -168,7 +168,7 @@ func (h *Handler) CommitCatalog(w http.ResponseWriter, r *http.Request) {
 
 // RestoreCommit brings the catalog back to an earlier version
 func (h *Handler) RestoreCommit(w http.ResponseWriter, r *http.Request) {
-	c, _, ok := h.loadOwnCatalog(w, r)
+	c, _, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}
@@ -186,7 +186,7 @@ func (h *Handler) RestoreCommit(w http.ResponseWriter, r *http.Request) {
 
 // DiscardChanges returns the catalog to its latest version
 func (h *Handler) DiscardChanges(w http.ResponseWriter, r *http.Request) {
-	c, _, ok := h.loadOwnCatalog(w, r)
+	c, _, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}

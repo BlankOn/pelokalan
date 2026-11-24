@@ -23,6 +23,7 @@
         <input type="search" name="q" placeholder="{{t $.Lang "files.project_search"}}" aria-label="{{t $.Lang "files.project_search"}}" autocomplete="off">
         {{if .Groups}}{{template "group_filter" (dict "Lang" $.Lang "Groups" .Groups "NoGroup" false)}}{{end}}
         {{if .Upstream}}{{template "upstream_filter" (dict "Lang" $.Lang)}}{{end}}
+        {{if .Res.On}}{{template "reserve_filter" (dict "Lang" $.Lang)}}{{end}}
         </form>
     </div>
     <p class="pf-sync-msg small" role="status" hidden></p>
@@ -52,7 +53,7 @@
 
     {{with .Data.MyFiles}}
     {{if .All}}
-    {{template "file_filter" (dict "Lang" $.Lang "ID" "my" "URL" (printf "%s/my-files" .Project.Path) "Groups" .Groups "Upstream" .Upstream)}}
+    {{template "file_filter" (dict "Lang" $.Lang "ID" "my" "URL" (printf "%s/my-files" .Project.Path) "Groups" .Groups "Upstream" .Upstream "Reserve" .Res.On)}}
     <table class="table files-table">
         <thead data-stick><tr>
             <th>{{t $.Lang "project.col_file"}}</th>
@@ -111,7 +112,7 @@
 <h2 class="section-title" data-stick><button type="button" class="section-toggle" aria-expanded="true"><svg class="st-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span>{{t $.Lang "files.others"}}</span> <span class="muted small">({{.All}})</span></button></h2>
 {{if .All}}
 <section class="card">
-    {{template "file_filter" (dict "Lang" $.Lang "ID" "member" "URL" (printf "%s/member-files" .Project.Path) "Groups" .Groups "Upstream" .Upstream)}}
+    {{template "file_filter" (dict "Lang" $.Lang "ID" "member" "URL" (printf "%s/member-files" .Project.Path) "Groups" .Groups "Upstream" .Upstream "Reserve" .Res.On)}}
     <table class="table files-table">
         <thead data-stick><tr>
             <th>{{t $.Lang "project.col_file"}}</th>

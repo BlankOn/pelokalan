@@ -316,6 +316,17 @@ h1 .ai-badge { font-size: 12px; }
 .tb-filter-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
 .editor-flash { background: var(--ok-soft); color: #1d5e39; padding: 6px 14px; border-bottom: 1px solid #bfe3cc; font-size: 13px; }
 .editor-flash.editor-deleted { background: var(--fuzzy-soft); color: #7a4d05; border-bottom-color: #f1d29a; }
+.editor-flash.editor-hold { background: #fdf0e6; color: #7a3f14; border-bottom-color: #f2cfb3; }
+.editor-flash.editor-hold-mine { background: var(--accent-soft); color: #23468a; border-bottom-color: #c9d9f6; }
+.editor-flash .inline-form, .res-chip .inline-form { display: inline; margin-left: 8px; }
+.editor-flash .linklike { font-size: 13px; }
+/* module reservations in file lists */
+.res-chip { margin-top: 4px; color: #8a4a1c; }
+.res-chip.res-mine { color: #23468a; }
+.res-chip a { color: inherit; font-weight: 600; }
+.res-chip .linklike { font-size: 12px; }
+.res-locked { display: inline-flex; align-items: center; gap: 4px; color: #8a4a1c; white-space: nowrap; }
+.held-table td { vertical-align: middle; }
 
 .workspace { flex: 1; display: flex; min-height: 0; }
 .main-col { flex: 1; display: flex; flex-direction: column; min-width: 0; }

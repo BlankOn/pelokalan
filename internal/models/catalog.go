@@ -13,6 +13,8 @@ import (
 
 // Catalog is one translation file of a project
 type Catalog struct {
+	// Reservation is who holds the file's module when the project uses reservations (not stored here)
+	Reservation   *ModuleReservation `json:"-"`
 	ID            int64
 	ProjectID     int64
 	OwnerID       int64

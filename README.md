@@ -67,6 +67,19 @@ to the server log; `EMAIL_WHITELIST` in `.env` limits who may sign in (empty = a
 
 `make stop-postgres` stops the database (its data is kept); `make prep` starts it again.
 
+## Tests
+
+```
+make test              # unit tests; integration tests are skipped
+make test-integration  # everything, including HTTP tests against a real PostgreSQL (needs make prep)
+make cover             # coverage of all packages (bin/coverage.html)
+```
+
+The integration tests (`internal/app/*_test.go`) start the real router and services, sign people up
+through the forms (the one-time codes are read from captured emails) and use the site like a browser. Each
+run creates its own database `pelokalan_test_<random>` on the PostgreSQL named by `TEST_DATABASE_URL`
+(the Makefile points it at the `make prep` container) and drops it afterwards, so your data is never touched.
+
 ## Configuration
 
 See `.env.example`. The important settings:

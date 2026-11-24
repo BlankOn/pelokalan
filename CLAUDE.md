@@ -21,8 +21,11 @@ invite collaborators and translate in a desktop-style editor.
 ## Project Structure
 
 ```
-cmd/server/main.go   # Bootstrap, dependency wiring, routes
+cmd/server/main.go   # Bootstrap: config, DB, migrations, background jobs, HTTP server
 internal/
+  app/               # Wiring of repositories, services, handlers and all routes (app.New, app.Migrate);
+                     # *_test.go: HTTP integration tests
+  testdb/            # Throwaway PostgreSQL database for integration tests
   config/            # Environment configuration, email whitelist
   i18n/              # UI strings (id = primary, en); T(lang, key, args...)
   ai/                # LLM client (OpenAI-compatible), glossary matching, prompts, verification, estimates
@@ -47,7 +50,9 @@ static/              # CSS, JS, htmx, logo
 make prep           # .env, PostgreSQL in Docker (data volume, free port → DB_PORT), Go modules; safe to rerun
 make run            # run server (migrations run on start)
 make build
-make test
+make test           # unit tests (integration tests skip without TEST_DATABASE_URL)
+make test-integration  # all tests against a throwaway DB on the make prep PostgreSQL
+make cover          # coverage of every package by every test (bin/coverage.html)
 ```
 
 ## Architecture
@@ -319,6 +324,26 @@ signed in or not, `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-
 `GET /api/projects/{id}/members` (slug or numeric id; `APIMembers`): project slug, name, URL (`SITE_BASE_URL`), and
 members with username, name, **sign-in email** (the operator chose to publish it here, although the members page
 shows it only to members), role, joined_at. Documented in README.md.
+
+## Module reservations
+
+- Project setting (Settings → Umum, `projects.reservations` + `reservation_days` 0/14/30/60, default off/30; migration
+  046, `module_reservations` with one active holder per project + module by a partial unique index). Unit = module
+  (`service.ModuleOf` / `ModuleKey`, the file name before the first dot). `ReservationService` (service/reservation.go):
+  `Claim` (free → yours; held by another → `ErrModuleReserved`), `Check`, `Release` (holder, or owner/manager who
+  releases someone else's → the holder is emailed), `ReleaseMerged`, `Expire` (hourly in main.go: reminder email
+  `ReminderDays` (3) before, released after `reservation_days` without saves; last save = newest `updated_at` of the
+  holder's files of the module).
+- Hard lock: content changes go through `loadEditableCatalog` (handler/web/reservation.go: SaveEntry, AI, pre-translate,
+  raw, properties, template update, replace, restore, discard), which claims a free module and refuses a held one.
+  `CatalogService.Upload` (take, manual add, link) and "Perbarui" claim too. Commit, messages, delete, downloads and
+  the spell check do not. The editor/raw/entry pane call `applyLock`: a module another member holds opens read-only
+  (`Owned` false) with a banner (`editor-hold`; the holder sees `editor-hold-mine` with "Lepas").
+- Released as "merged" by `CatalogService.landingsIn` after each sync (GNOME archive or GitHub branch) when every string
+  the holder changed is upstream word for word. Lists: `res_chip` under file names, "Ambil & pesan" / "Sedang dipesan"
+  in Berkas proyek, "Pesan modul" / "Lepas pesanan" in the ⋯ menu, `reserve_filter` (`rv` = mine, other, free; Berkas
+  proyek uses `GlossaryService.ProjectFiles` with a keep filter, `KeepStates` for upstream states). Settings lists held
+  modules (`#held-modules`) for owners/managers.
 
 ## Public profiles and badges
 
@@ -777,6 +802,17 @@ An htmx request still waiting after 1 s covers the page with a half transparent 
 `body[data-loading]`). Polling (`hx-trigger="every …"`) and anything inside `[data-no-busy]` never show it; it hides
 when the last request ends and after 30 s at most. The editor's entry load/save use `fetch`, not htmx, so they do not
 show it.
+
+## Integration tests
+
+- `internal/app` tests run the real router (`app.New` with `Options{Offline: true}`: no GNOME site client; a capture
+  mailer) on a database made by `testdb.Create` (`pelokalan_test_<random>` on `TEST_DATABASE_URL`, migrated, dropped in
+  `TestMain`; only names with that prefix are ever dropped). Without `TEST_DATABASE_URL` they skip.
+- Harness (`harness_test.go`): `signUp` registers through the forms and reads the code from the captured email;
+  `user.get/post/hx/upload` (Origin set, redirects not followed), `response.status/redirectsTo/contains/lacks`,
+  `scalar[T]` reads the DB, `poFile`/`targz` build files, `mails.waitFor` waits for background emails. Tests share one
+  database, so give everything unique names (`unique`).
+- Add a test there when adding a route or a rule that touches the database. Never call external sites from tests.
 
 ## Conventions
 

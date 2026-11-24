@@ -13,7 +13,7 @@ import (
 // AITranslateEntry translates one entry with the model and returns the text (JSON); the
 // editor puts it in the translation box for the owner to review and save
 func (h *Handler) AITranslateEntry(w http.ResponseWriter, r *http.Request) {
-	c, p, ok := h.loadOwnCatalog(w, r)
+	c, p, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}

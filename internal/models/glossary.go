@@ -131,6 +131,8 @@ type GlossaryTerm struct {
 
 // ProjectFile is a PO file contained in a glossary source (e.g. a release tarball)
 type ProjectFile struct {
+	// Reservation is who holds the file's module when the project uses reservations (not stored here)
+	Reservation  *ModuleReservation `json:"-"`
 	ID           int64
 	ImportID     int64
 	ProjectID    int64

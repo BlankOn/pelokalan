@@ -25,14 +25,16 @@
 <tr>
     <td><strong class="pf-name">{{.Filename}}</strong><div class="muted small">{{langName .Language}} · {{.Language}}</div>
         {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}
-        {{with .Mine}}<div class="small pf-mine">{{t $v.Lang "files.mine_copy"}} <a href="{{.URL}}">{{.Filename}}</a></div>{{end}}</td>
+        {{with .Mine}}<div class="small pf-mine">{{t $v.Lang "files.mine_copy"}} <a href="{{.URL}}">{{.Filename}}</a></div>{{end}}
+        {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}</td>
     <td>{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · <span class="c-fuzzy">{{t $v.Lang "files.fuzzy_count" .Fuzzy}}</span>{{end}}</span></td>
     <td class="small"><span class="version-badge">{{.GroupLabel}}</span></td>
     <td class="actions"><div class="pf-actions">
-        {{if $v.CanTake}}{{if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .GroupLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
+        {{if $v.CanTake}}{{if and $v.Res.On .Reservation (ne .Reservation.UserID $v.Res.UserID)}}<span class="res-locked small" title="{{t $v.Lang "reserve.locked_help"}}">🔒 {{t $v.Lang "reserve.locked"}}</span>
+        {{else if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .GroupLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
             <input type="hidden" name="into" value="{{.Mine.ID}}">
             <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
-        {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"><button class="btn btn-small btn-primary" title="{{t $v.Lang "files.take_help"}}">{{t $v.Lang "files.take"}}</button></form>{{end}}{{end}}
+        {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"><button class="btn btn-small btn-primary" title="{{if $v.Res.On}}{{t $v.Lang "reserve.take_help"}}{{else}}{{t $v.Lang "files.take_help"}}{{end}}">{{if $v.Res.On}}{{t $v.Lang "reserve.take"}}{{else}}{{t $v.Lang "files.take"}}{{end}}</button></form>{{end}}{{end}}
         <a class="btn btn-small btn-icon" href="{{$v.Project.Path}}/project-files/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
     </div></td>
 </tr>
@@ -85,9 +87,30 @@
         <input type="search" name="q" placeholder="{{t .Lang "files.search"}}" aria-label="{{t .Lang "files.search"}}" autocomplete="off">
         {{if .Groups}}{{template "group_filter" (dict "Lang" .Lang "Groups" .Groups "NoGroup" true)}}{{end}}
         {{if .Upstream}}{{template "upstream_filter" (dict "Lang" .Lang)}}{{end}}
+        {{if .Reserve}}{{template "reserve_filter" (dict "Lang" .Lang)}}{{end}}
     </form>
 </div>
 {{end}}
+
+{{/* module reservation checkbox dropdown (name rv: mine, other, free); none ticked = all */}}
+{{define "reserve_filter"}}
+<details class="multi-filter" data-multi-filter>
+    <summary class="mf-btn" title="{{t .Lang "reserve.filter"}}">
+        <svg class="mf-icon" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+        <span class="mf-label" data-all="{{t .Lang "reserve.filter_all"}}" data-many="{{t .Lang "reserve.filter_many"}}">{{t .Lang "reserve.filter_all"}}</span>
+        <span class="combo-caret">▾</span>
+    </summary>
+    <div class="mf-pop">
+        <label class="mf-opt"><input type="checkbox" name="rv" value="mine"> <span class="mf-text">{{t .Lang "reserve.filter_mine"}}</span></label>
+        <label class="mf-opt"><input type="checkbox" name="rv" value="other"> <span class="mf-text">{{t .Lang "reserve.filter_other"}}</span></label>
+        <label class="mf-opt"><input type="checkbox" name="rv" value="free"> <span class="mf-text">{{t .Lang "reserve.filter_free"}}</span></label>
+        <button type="button" class="linklike small mf-clear mf-none">{{t .Lang "filter.clear"}}</button>
+    </div>
+</details>
+{{end}}
+
+{{/* who holds a module (R: *models.ModuleReservation; Me: the viewer's id; Manager may release it) */}}
+{{define "res_chip"}}<div class="res-chip small{{if eq .R.UserID .Me}} res-mine{{end}}" title="{{t .Lang "reserve.since" (timeAgo .Lang .R.ReservedAt)}}">🔒 {{if eq .R.UserID .Me}}{{t .Lang "reserve.by_me"}}{{else}}{{t .Lang "reserve.by"}} <a href="/users/{{.R.Username}}">@{{.R.Username}}</a>{{end}} · {{timeAgo .Lang .R.ReservedAt}}{{if and .Manager (ne .R.UserID .Me)}}<form method="post" action="{{.Project.Path}}/reservations/release" class="inline-form" data-confirm="{{t .Lang "reserve.release_other_confirm" .R.Module .R.Username}}"><input type="hidden" name="module" value="{{.R.Module}}"><button class="linklike">{{t .Lang "reserve.release"}}</button></form>{{end}}</div>{{end}}
 
 {{/* a page of PO files: the user's own (Mine) or other members' (read-only) */}}
 {{define "file_rows"}}{{$v := .}}
@@ -96,18 +119,21 @@
     <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a>
         <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div>
         {{if .RepoPath}}<div class="small muted repo-path" title="{{t $v.Lang "git.repo_path"}}">{{.RepoPath}}</div>{{end}}
-        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}</td>
+        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}
+        {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}</td>
     <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>{{end}}</td>
     <td class="num">{{if not .IsTemplate}}{{.Stats.Translated}}{{end}}</td>
     <td class="num">{{if not .IsTemplate}}{{.Stats.Fuzzy}}{{end}}</td>
     <td class="num">{{if not .IsTemplate}}{{.Stats.Untranslated}}{{else}}{{t $v.Lang "project.template_strings" .Stats.Total}}{{end}}</td>
     <td class="small muted">{{timeAgo $v.Lang .UpdatedAt}}</td>
     <td class="actions">
-        {{if $v.Mine}}
-        <a class="btn btn-small btn-primary" href="{{.URL}}">{{t $v.Lang "action.translate"}}</a>
+        {{if $v.Mine}}{{$heldOther := and .Reservation (ne .Reservation.UserID $v.Res.UserID)}}
+        <a class="btn btn-small btn-primary" href="{{.URL}}">{{if $heldOther}}{{t $v.Lang "action.view"}}{{else}}{{t $v.Lang "action.translate"}}{{end}}</a>
         <details class="dropdown">
             <summary class="btn btn-small" aria-label="{{t $v.Lang "action.more"}}">⋯</summary>
             <div class="menu">
+                {{if and $v.Res.On (not .IsTemplate)}}{{if not .Reservation}}<form method="post" action="{{$v.Project.Path}}/reservations"><input type="hidden" name="module" value="{{module .Filename}}"><button class="linklike" title="{{t $v.Lang "reserve.reserve_help"}}">{{t $v.Lang "reserve.reserve"}}</button></form>
+                {{else if eq .Reservation.UserID $v.Res.UserID}}<form method="post" action="{{$v.Project.Path}}/reservations/release" data-confirm="{{t $v.Lang "reserve.release_confirm" .Reservation.Module}}"><input type="hidden" name="module" value="{{.Reservation.Module}}"><button class="linklike">{{t $v.Lang "reserve.release_mine"}}</button></form>{{end}}{{end}}
                 <a href="/catalogs/{{.ID}}/download">{{t $v.Lang "action.download_po"}}</a>
                 <a href="/catalogs/{{.ID}}/download.mo">{{t $v.Lang "action.download_mo"}}</a>
                 {{if $v.HasTemplate}}

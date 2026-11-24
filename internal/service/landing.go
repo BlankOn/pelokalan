@@ -117,25 +117,38 @@ func (s *CatalogService) landingsIn(ctx context.Context, c *models.Catalog, grou
 		return 0, err
 	}
 	var out []models.UpstreamLanding
+	changed, pending := 0, 0 // the member's changes, and those upstream does not have yet
 	for _, e := range entries {
-		if e.Obsolete || e.Fuzzy || e.IsAI() || !e.IsTranslated() || !landingWorthy(e.MsgID) {
+		if e.Obsolete || e.Fuzzy || e.IsAI() || !e.IsTranslated() {
 			continue
 		}
 		key := e.Key()
 		if r, ok := ref[key]; ok && !r.fuzzy && sameStrings(r.tr, e.MsgStr) {
 			continue // the member did not change it: it was there when they started
 		}
+		changed++
 		if up, ok := upstream[key]; !ok || !sameStrings(up, e.MsgStr) {
+			pending++
+			continue
+		}
+		if !landingWorthy(e.MsgID) {
 			continue
 		}
 		out = append(out, models.UpstreamLanding{UserID: c.OwnerID, ProjectID: c.ProjectID, CatalogID: c.ID, GroupID: groupID,
 			EntryKey: e.KeyHash(), Module: moduleKey(c.Filename), Filename: c.Filename, Words: len(strings.Fields(e.MsgID)), LandedAt: landedAt})
+	}
+	// all the member's changes are upstream: their reservation of the module is done (live syncs only)
+	if refAt == nil && changed > 0 && pending == 0 && s.reservations != nil {
+		s.reservations.ReleaseMerged(ctx, c.ProjectID, moduleKey(c.Filename), c.OwnerID)
 	}
 	if len(out) == 0 {
 		return 0, nil
 	}
 	return s.activity.repo.AddLandings(ctx, out)
 }
+
+// SetReservations lets syncs release a module whose holder's changes are all upstream
+func (s *CatalogService) SetReservations(r *ReservationService) { s.reservations = r }
 
 // BackfillLandingsJob names the one-time catch-up in one_time_jobs
 const BackfillLandingsJob = "backfill-upstream-landings-2026-11"

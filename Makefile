@@ -1,4 +1,4 @@
-.PHONY: prep build run test clean migrate-up migrate-down run-postgres stop-postgres setup dev fmt lint dbshell deploy deploy-logs deploy-dbshell
+.PHONY: prep build run test test-integration cover clean migrate-up migrate-down run-postgres stop-postgres setup dev fmt lint dbshell deploy deploy-logs deploy-dbshell
 
 # Configuration
 POSTGRES_CONTAINER_NAME ?= pelokalan-postgres
@@ -17,9 +17,22 @@ build:
 run:
 	go run ./cmd/server
 
-# Run tests
+# Run tests (integration tests are skipped without TEST_DATABASE_URL)
 test:
 	go test ./...
+
+# Every test, including the HTTP integration tests, against a throwaway database on the local
+# PostgreSQL (make prep). Each run creates pelokalan_test_<random> and drops it; your data is untouched.
+TEST_DATABASE_URL ?= postgres://$(POSTGRES_USER):$(POSTGRES_PASS)@localhost:$(POSTGRES_PORT)/postgres?sslmode=disable
+test-integration:
+	TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test -count=1 ./...
+
+# Coverage of all packages by all tests (integration included): total on the last line, HTML in bin/coverage.html
+cover:
+	@mkdir -p bin
+	TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test -count=1 -coverpkg=./... -coverprofile=bin/coverage.out ./... > /dev/null
+	go tool cover -func=bin/coverage.out | tail -n 1
+	go tool cover -html=bin/coverage.out -o bin/coverage.html
 
 # Clean build artifacts
 clean:

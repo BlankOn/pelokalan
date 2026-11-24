@@ -134,7 +134,7 @@ func TestUpstreamWarmAndFilter(t *testing.T) {
 	s.SetUpstream(client)
 	p := &models.Project{ID: 1, Language: "id"}
 	classes := func(states map[string]bool) map[int64]string {
-		files, _, err := s.ProjectFiles(ctx, p, "", nil, states, 0)
+		files, _, err := s.ProjectFiles(ctx, p, "", nil, KeepStates(states), 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -162,11 +162,11 @@ func TestUpstreamWarmAndFilter(t *testing.T) {
 			t.Errorf("file %d: %q, want %q", id, got[id], w)
 		}
 	}
-	files, total, _ := s.ProjectFiles(ctx, p, "", nil, map[string]bool{"missing": true, "unknown": true}, 0)
+	files, total, _ := s.ProjectFiles(ctx, p, "", nil, KeepStates(map[string]bool{"missing": true, "unknown": true}), 0)
 	if total != 2 || len(files) != 2 {
 		t.Errorf("filter missing+unknown: %d files", total)
 	}
-	if _, total, _ := s.ProjectFiles(ctx, p, "", []int64{1}, map[string]bool{"none": true}, 0); total != 1 {
+	if _, total, _ := s.ProjectFiles(ctx, p, "", []int64{1}, KeepStates(map[string]bool{"none": true}), 0); total != 1 {
 		t.Errorf("filter none in gnome-51 (sync link): %d", total)
 	}
 	maps := repo.states["gnome-51/id/gnome-maps.gnome-51"]

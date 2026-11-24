@@ -3,6 +3,7 @@ package web
 import (
 	"fmt"
 	"net/http"
+	"sort"
 	"strconv"
 
 	"pelokalan/internal/handler/middleware"
@@ -46,6 +47,15 @@ func (h *Handler) renderSettingsWith(w http.ResponseWriter, r *http.Request, p *
 	}
 	data.Data["Project"] = p
 	data.Data["Tab"] = "settings"
+	data.Data["ReservationDays"] = service.ReservationDays
+	if p.Reservations && p.Role.CanManage() { // modules held now, with Lepas buttons
+		var held []*models.ModuleReservation
+		for _, res := range h.reservations.Map(r.Context(), p) {
+			held = append(held, res)
+		}
+		sort.Slice(held, func(i, j int) bool { return held[i].ReservedAt.Before(held[j].ReservedAt) })
+		data.Data["Held"] = held
+	}
 	if n, err := h.discuss.NotificationSettings(r.Context(), middleware.GetUser(r.Context()), p); err == nil {
 		data.Data["Notify"] = n
 	}
@@ -153,7 +163,7 @@ func (h *Handler) AIEstimate(w http.ResponseWriter, r *http.Request) {
 
 // AIStart begins an AI pre-translation job
 func (h *Handler) AIStart(w http.ResponseWriter, r *http.Request) {
-	c, p, ok := h.loadOwnCatalog(w, r)
+	c, p, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}

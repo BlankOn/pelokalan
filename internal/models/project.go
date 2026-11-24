@@ -38,10 +38,14 @@ type Project struct {
 	// Language is what the project translates into; files in other languages are refused ("" = not chosen)
 	Language string `json:"language"`
 	// Open projects can be joined by any signed-in user (as translator); private ones need an invitation
-	Open      bool      `json:"open"`
-	OwnerID   int64     `json:"owner_id"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
+	Open bool `json:"open"`
+	// Reservations: members reserve a module while working on it (others cannot change it);
+	// ReservationDays releases one after that many days without saves (0 = never)
+	Reservations    bool      `json:"reservations"`
+	ReservationDays int       `json:"reservation_days"`
+	OwnerID         int64     `json:"owner_id"`
+	CreatedAt       time.Time `json:"created_at"`
+	UpdatedAt       time.Time `json:"updated_at"`
 
 	// Filled by listing queries
 	Role         ProjectRole `json:"role,omitempty"`
@@ -117,4 +121,34 @@ func (l *InviteLink) Limit() int {
 		return 0
 	}
 	return *l.MaxUses
+}
+
+// Module reservation release reasons (module_reservations.release_reason)
+const (
+	ReleaseHolder  = "holder"
+	ReleaseManager = "manager"
+	ReleaseMerged  = "merged"
+	ReleaseExpired = "expired"
+)
+
+// ModuleReservation is a member holding a module of a project while working on it
+type ModuleReservation struct {
+	ID         int64
+	ProjectID  int64
+	Module     string
+	UserID     int64
+	Username   string
+	Name       string
+	ReservedAt time.Time
+	RemindedAt *time.Time
+	// LastSave is the newest save in the holder's files of the module (or ReservedAt), for expiry
+	LastSave time.Time
+}
+
+// DisplayName is the holder's name, else their username
+func (r *ModuleReservation) DisplayName() string {
+	if r.Name != "" {
+		return r.Name
+	}
+	return r.Username
 }

@@ -721,10 +721,18 @@ func projectFiles(files []glossary.File, imp *models.ModuleGroupImport, language
 // ProjectFilePageSize is how many project files are listed at a time
 const ProjectFilePageSize = 10
 
-// ProjectFiles lists the project's source PO files, least complete first, with their
-// upstream state. states (UpstreamFilters values, nil = all) keeps only files in those
-// upstream states; that filter needs every matching file, so it pages here.
-func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, query string, groupIDs []int64, states map[string]bool, offset int) ([]*models.ProjectFile, int, error) {
+// KeepStates is a ProjectFiles filter keeping files in the given upstream states (nil when none are given)
+func KeepStates(states map[string]bool) func(*models.ProjectFile) bool {
+	if len(states) == 0 {
+		return nil
+	}
+	return func(f *models.ProjectFile) bool { return states[f.UpstreamClass()] }
+}
+
+// ProjectFiles pages a project's project files, least complete first: query (every word in name, language or group label),
+// groupIDs (none = all) and keep, a filter on the file with its upstream state attached (upstream states,
+// reservations; nil = all). A filter needs every matching file, so it pages here.
+func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, query string, groupIDs []int64, keep func(*models.ProjectFile) bool, offset int) ([]*models.ProjectFile, int, error) {
 	if offset < 0 {
 		offset = 0
 	}
@@ -732,7 +740,7 @@ func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, q
 		query = query[:200]
 	}
 	query = strings.TrimSpace(query)
-	if len(states) == 0 {
+	if keep == nil {
 		files, total, err := s.repo.ListProjectFiles(ctx, p.ID, query, groupIDs, ProjectFilePageSize, offset)
 		if err == nil {
 			s.AttachUpstream(ctx, p, files)
@@ -746,7 +754,7 @@ func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, q
 	s.AttachUpstream(ctx, p, all)
 	var kept []*models.ProjectFile
 	for _, f := range all {
-		if states[f.UpstreamClass()] {
+		if keep(f) {
 			kept = append(kept, f)
 		}
 	}

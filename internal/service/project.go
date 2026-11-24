@@ -42,6 +42,10 @@ type ProjectInput struct {
 	SourceLanguage string
 	Language       string // what the project translates into ("" = not chosen)
 	Open           bool   // anyone signed in may join (as translator)
+	// Reservations turns on module reservations; ReservationDays (one of ReservationDays) ends them
+	// after that many days without saves
+	Reservations    bool
+	ReservationDays int
 }
 
 // slugRe allows 3-50 lowercase letters, digits and dashes, not at the ends
@@ -244,6 +248,12 @@ func (s *ProjectService) Update(ctx context.Context, p *models.Project, in Proje
 		return err
 	}
 	p.Name, p.Slug, p.Description, p.SourceLanguage, p.Language, p.Open = in.Name, in.Slug, in.Description, in.SourceLanguage, in.Language, in.Open
+	p.Reservations, p.ReservationDays = in.Reservations, 30
+	for _, d := range ReservationDays { // only the offered choices
+		if d == in.ReservationDays {
+			p.ReservationDays = d
+		}
+	}
 	return s.projects.Update(ctx, p)
 }
 

@@ -1,0 +1,184 @@
+package app_test
+
+import (
+	"archive/tar"
+	"bytes"
+	"compress/gzip"
+	"net/http"
+	"net/url"
+	"strconv"
+	"testing"
+	"time"
+)
+
+// targz packs files (name → content) into a .tar.gz archive with a top folder, like a release download
+func targz(t *testing.T, files map[string][]byte) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	gz := gzip.NewWriter(&buf)
+	tw := tar.NewWriter(gz)
+	for name, data := range files {
+		if err := tw.WriteHeader(&tar.Header{Name: "ui/" + name, Mode: 0o644, Size: int64(len(data))}); err != nil {
+			t.Fatal(err)
+		}
+		tw.Write(data)
+	}
+	tw.Close()
+	gz.Close()
+	return buf.Bytes()
+}
+
+// addMember invites u by email with a role and accepts the invitation
+func addMember(t *testing.T, owner *user, slug string, u *user, role string) {
+	t.Helper()
+	base := "/projects/" + slug
+	owner.post(base+"/members/invite", url.Values{"email": {u.Email}, "role": {role}}).redirectsTo(base)
+	inv := scalar[int64](t, `SELECT id FROM project_invitations WHERE email = $1 AND project_id = $2`, u.Email, projectID(t, slug))
+	u.post("/invitations/"+strconv.FormatInt(inv, 10)+"/accept", nil).redirectsTo("/projects")
+}
+
+// Module group archive → glossary terms and project files → members take files; module reservations
+func TestModuleGroupsAndReservations(t *testing.T) {
+	skipWithoutDB(t)
+	owner := signUp(t, "joko")
+	slug := owner.newProject("Gnome")
+	base := "/projects/" + slug
+	pid := projectID(t, slug)
+	kiki := signUp(t, "kiki")
+	addMember(t, owner, slug, kiki, "translator")
+
+	archive := targz(t, map[string][]byte{
+		"calc.main.id.po": poFile("calc", "Open File", "Buka Berkas", "Close", "Tutup", "Add", ""),
+		"edit.main.id.po": poFile("edit", "Open File", "Buka Berkas", "Undo", "Urungkan"),
+	})
+	owner.upload(base+"/module-groups/sources", url.Values{"source": {"file"}, "name": {"gnome"}, "version_name": {"51"}, "language": {"id"}},
+		"ui.tar.gz", archive).redirectsTo(base + "/settings?")
+	if n := scalar[int](t, `SELECT count(*) FROM project_files WHERE project_id = $1`, pid); n != 2 {
+		t.Fatalf("project files = %d, want 2", n)
+	}
+
+	// the glossary is public and groups "Open File" from both files
+	visitor(t).get(base+"/glossary?q=open").status(http.StatusOK).contains("Open File", "Buka Berkas")
+	visitor(t).get(base+"/files").status(http.StatusOK).contains("calc.main.id.po", "edit.main.id.po")
+
+	// turn reservations on (owner)
+	owner.post(base+"/settings", url.Values{"name": {"Gnome"}, "slug": {slug}, "source_language": {"en"}, "access": {"private"},
+		"reservations": {"on"}, "reservation_days": {"30"}}).redirectsTo(base)
+	if !scalar[bool](t, `SELECT reservations FROM projects WHERE id = $1`, pid) {
+		t.Fatalf("reservations not switched on")
+	}
+
+	// kiki takes calc: a copy in her files, and the module is hers
+	calc := scalar[int64](t, `SELECT id FROM project_files WHERE project_id = $1 AND filename = 'calc.main.id.po'`, pid)
+	kiki.post(base+"/project-files/"+strconv.FormatInt(calc, 10)+"/take", nil).redirectsTo(base + "/" + kiki.Username + "/po/calc.main.id.po")
+	if h := scalar[int64](t, `SELECT user_id FROM module_reservations WHERE project_id = $1 AND module = 'calc' AND released_at IS NULL`, pid); h != kiki.ID {
+		t.Fatalf("calc held by %d, want kiki", h)
+	}
+
+	// the owner cannot take it while kiki holds it, and sees who does
+	owner.post(base+"/project-files/"+strconv.FormatInt(calc, 10)+"/take", nil).status(http.StatusOK).contains("@" + kiki.Username)
+	if n := scalar[int](t, `SELECT count(*) FROM catalogs WHERE project_id = $1 AND created_by = $2`, pid, owner.ID); n != 0 {
+		t.Fatalf("the owner got a copy of a held module")
+	}
+
+	// kiki translates; saving works for the holder
+	kc := scalar[int64](t, `SELECT id FROM catalogs WHERE project_id = $1 AND created_by = $2`, pid, kiki.ID)
+	eid, ver := entry(t, kc, "Add")
+	kiki.post("/catalogs/"+strconv.FormatInt(kc, 10)+"/entries/"+strconv.FormatInt(eid, 10), url.Values{"version": {strconv.Itoa(ver)}, "msgstr0": {"Tambah"}}).status(http.StatusOK)
+	if msgstr(t, eid) != "Tambah" {
+		t.Fatalf("holder's save failed")
+	}
+
+	// the owner (a manager) releases it; kiki is emailed, then the owner may take it
+	owner.post(base+"/reservations/release", url.Values{"module": {"calc"}}).redirectsTo(base)
+	mails.waitFor(t, kiki.Email, "calc")
+	owner.post(base+"/project-files/"+strconv.FormatInt(calc, 10)+"/take", nil).redirectsTo(base + "/" + owner.Username + "/po/calc.main.id.po")
+
+	// now kiki's copy is locked: her save is refused and the editor opens read-only
+	_, ver = entry(t, kc, "Add")
+	kiki.post("/catalogs/"+strconv.FormatInt(kc, 10)+"/entries/"+strconv.FormatInt(eid, 10), url.Values{"version": {strconv.Itoa(ver)}, "msgstr0": {"Tambahkan"}})
+	if msgstr(t, eid) != "Tambah" {
+		t.Fatalf("a save went through on a module someone else holds")
+	}
+	kiki.get(base + "/" + kiki.Username + "/po/calc.main.id.po").status(http.StatusOK).contains("editor-hold")
+
+	// Settings lists the held module for managers
+	owner.get(base+"/settings").status(http.StatusOK).contains("held-modules", "calc")
+
+	// the reservation filter on Berkas proyek
+	visitor(t).get(base + "/project-files?rv=free").status(http.StatusOK).contains("edit.main.id.po").lacks("calc.main.id.po")
+}
+
+// Deleting a PO file is a soft delete: it leaves the lists but opens read-only
+func TestSoftDelete(t *testing.T) {
+	skipWithoutDB(t)
+	lia := signUp(t, "lia")
+	slug := lia.newProject("Hapus")
+	base := "/projects/" + slug
+	lia.upload(base+"/upload", url.Values{"language": {"id"}}, "hapus.main.id.po", poFile("hapus", "Yes", "Ya")).
+		redirectsTo(base + "/" + lia.Username + "/po/hapus.main.id.po")
+	cid := scalar[int64](t, `SELECT id FROM catalogs WHERE created_by = $1`, lia.ID)
+	c := "/catalogs/" + strconv.FormatInt(cid, 10)
+
+	lia.post(c+"/delete", nil).redirectsTo(base)
+	if !scalar[bool](t, `SELECT deleted_at IS NOT NULL FROM catalogs WHERE id = $1`, cid) {
+		t.Fatalf("not soft-deleted")
+	}
+	lia.get(base + "/my-files").status(http.StatusOK).lacks("hapus.main.id.po")
+	lia.get(c).status(http.StatusOK).contains("Ya")
+
+	// no more changes
+	eid, ver := entry(t, cid, "Yes")
+	lia.post(c+"/entries/"+strconv.FormatInt(eid, 10), url.Values{"version": {strconv.Itoa(ver)}, "msgstr0": {"Iya"}})
+	if msgstr(t, eid) != "Ya" {
+		t.Fatalf("a deleted file was changed")
+	}
+	// the same name can be uploaded again
+	lia.upload(base+"/upload", url.Values{"language": {"id"}}, "hapus.main.id.po", poFile("hapus", "Yes", "")).
+		redirectsTo(base + "/" + lia.Username + "/po/hapus.main.id.po")
+}
+
+// Public profile with the person's work, and the badge share page with its image
+func TestProfileAndBadges(t *testing.T) {
+	skipWithoutDB(t)
+	mira := signUp(t, "mira")
+	slug := mira.newProject("Profil")
+	base := "/projects/" + slug
+	mira.upload(base+"/upload", url.Values{"language": {"id"}}, "profil.main.id.po", poFile("profil", "One", "", "Two", "")).
+		redirectsTo(base + "/")
+	cid := scalar[int64](t, `SELECT id FROM catalogs WHERE created_by = $1`, mira.ID)
+	for _, pair := range [][2]string{{"One", "Satu"}, {"Two", "Dua"}} {
+		eid, ver := entry(t, cid, pair[0])
+		mira.post("/catalogs/"+strconv.FormatInt(cid, 10)+"/entries/"+strconv.FormatInt(eid, 10),
+			url.Values{"version": {strconv.Itoa(ver)}, "msgstr0": {pair[1]}}).status(http.StatusOK)
+	}
+
+	page := visitor(t).get("/users/" + mira.Username).status(http.StatusOK)
+	page.contains("@"+mira.Username, "Profil").lacks(mira.Email)
+	visitor(t).get("/users/nobody-here").status(http.StatusNotFound)
+
+	// a fully translated file earns the bronze "completed" badge: share page and PNG
+	share := visitor(t).get("/users/" + mira.Username + "/badges/completed/1").status(http.StatusOK)
+	share.contains(`property="og:image"`)
+	img := visitor(t).get("/users/" + mira.Username + "/badges/completed/1.png").status(http.StatusOK)
+	if img.Header.Get("Content-Type") != "image/png" || len(img.Body) < 1000 {
+		t.Fatalf("badge image: %s, %d bytes", img.Header.Get("Content-Type"), len(img.Body))
+	}
+	// a tier not earned goes back to the profile
+	visitor(t).get("/users/" + mira.Username + "/badges/completed/2").redirectsTo("/users/" + mira.Username)
+
+	// badge emails: one message for new tiers, never twice
+	if _, err := env.Activity.AwardBadges(t.Context(), time.UTC, time.Now(), true); err != nil {
+		t.Fatal(err)
+	}
+	n := len(mails.to(mira.Email))
+	if _, err := env.Activity.AwardBadges(t.Context(), time.UTC, time.Now(), true); err != nil {
+		t.Fatal(err)
+	}
+	if len(mails.to(mira.Email)) != n {
+		t.Fatalf("badge email sent again")
+	}
+	if scalar[int](t, `SELECT count(*) FROM badge_awards WHERE user_id = $1`, mira.ID) == 0 {
+		t.Fatalf("no badge recorded")
+	}
+}

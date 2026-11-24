@@ -155,6 +155,7 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	hold := h.applyLock(r, p, c) // a module another member holds opens read-only
 	f := filterFromRequest(r)
 	listing, err := h.catalogService.Entries(r.Context(), c, f)
 	if err != nil {
@@ -174,6 +175,11 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 	data.Data["Status"] = map[string]any{"Lang": data.Lang, "Listing": listing, "Catalog": c}
 	data.Data["ReadOnly"] = c.IsTemplate || !c.Owned
 	data.Data["Owned"] = c.Owned
+	if hold != nil {
+		data.Data["Hold"] = hold
+		data.Data["HoldMine"] = hold.UserID == c.OwnerID
+		data.Data["HoldModule"] = service.ModuleOf(c)
+	}
 	if n, err := h.contexts.ForCatalog(r.Context(), c); err == nil {
 		data.Data["FileContext"] = n
 	}
@@ -293,6 +299,7 @@ func (h *Handler) EntryEditor(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	h.applyLock(r, p, c)
 	e, err := h.catalogService.Entry(r.Context(), c, idParam(r, "eid"))
 	if err != nil {
 		h.fail(w, r, err)
@@ -306,7 +313,7 @@ func (h *Handler) EntryEditor(w http.ResponseWriter, r *http.Request) {
 
 // SaveEntry stores a translation and returns the editor for the next entry (HTMX)
 func (h *Handler) SaveEntry(w http.ResponseWriter, r *http.Request) {
-	c, p, ok := h.loadOwnCatalog(w, r)
+	c, p, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}
@@ -423,7 +430,7 @@ func sendFile(w http.ResponseWriter, name, contentType string, body []byte) {
 
 // UpdateFromTemplate merges the template into the catalog
 func (h *Handler) UpdateFromTemplate(w http.ResponseWriter, r *http.Request) {
-	c, p, ok := h.loadOwnCatalog(w, r)
+	c, p, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}
@@ -437,7 +444,7 @@ func (h *Handler) UpdateFromTemplate(w http.ResponseWriter, r *http.Request) {
 
 // PreTranslate fills untranslated entries from the translation memory
 func (h *Handler) PreTranslate(w http.ResponseWriter, r *http.Request) {
-	c, p, ok := h.loadOwnCatalog(w, r)
+	c, p, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}
@@ -451,7 +458,7 @@ func (h *Handler) PreTranslate(w http.ResponseWriter, r *http.Request) {
 
 // ReplaceCatalog imports a new version of the translation file
 func (h *Handler) ReplaceCatalog(w http.ResponseWriter, r *http.Request) {
-	c, p, ok := h.loadOwnCatalog(w, r)
+	c, p, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}
@@ -500,6 +507,7 @@ func (h *Handler) RawEditor(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	h.applyLock(r, p, c)
 	pc, err := h.catalogService.Build(r.Context(), middleware.GetUser(r.Context()), c)
 	if err != nil {
 		h.fail(w, r, err)
@@ -523,7 +531,7 @@ func (h *Handler) renderRaw(w http.ResponseWriter, r *http.Request, c *models.Ca
 
 // SaveRaw stores edited PO text
 func (h *Handler) SaveRaw(w http.ResponseWriter, r *http.Request) {
-	c, p, ok := h.loadOwnCatalog(w, r)
+	c, p, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}
@@ -540,7 +548,7 @@ func (h *Handler) SaveRaw(w http.ResponseWriter, r *http.Request) {
 
 // UpdateProperties saves the catalog header values
 func (h *Handler) UpdateProperties(w http.ResponseWriter, r *http.Request) {
-	c, _, ok := h.loadOwnCatalog(w, r)
+	c, _, ok := h.loadEditableCatalog(w, r)
 	if !ok {
 		return
 	}

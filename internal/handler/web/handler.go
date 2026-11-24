@@ -50,6 +50,7 @@ type Handler struct {
 	thesaurus      *service.ThesaurusService
 	spelling       *service.SpellingService
 	activity       *service.ActivityService
+	reservations   *service.ReservationService // module reservations (nil-safe: off)
 	assetVersion   string
 }
 
@@ -83,7 +84,8 @@ func NewHandler(
 		wiki:           wikiService,
 		contexts:       contextService,
 	}
-	h.assetVersion = assetVersion("static")
+	// static/ sits two levels above internal/templates (the project root)
+	h.assetVersion = assetVersion(filepath.Join(filepath.Dir(filepath.Dir(templatesDir)), "static"))
 	if err := h.loadTemplates(); err != nil {
 		return nil, err
 	}
@@ -251,6 +253,8 @@ func funcMap() template.FuncMap {
 				return fmt.Sprintf("%d B", n)
 			}
 		},
+		// module is a file name's module (before the first dot), the unit of reservations
+		"module": service.ModuleKey,
 		// badgeIcon is a badge's line icon (the inside of a 24×24 <svg>), from badgecard.Icons
 		"badgeIcon": func(key string) template.HTML { return template.HTML(badgecard.Icons[key]) },
 		// monthYear formats a time as "Nov 2026" in the site's time zone

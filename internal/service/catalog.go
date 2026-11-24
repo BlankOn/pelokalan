@@ -24,6 +24,8 @@ type CatalogService struct {
 	commits  repository.CommitRepository
 	projects *ProjectService
 	activity *ActivityService
+	// reservations: released when a sync shows all the holder's changes upstream (nil = off)
+	reservations *ReservationService
 	// project files, for git patches against the repository's own files (SetProjectFiles)
 	projectFiles repository.GlossaryRepository
 }
@@ -236,6 +238,12 @@ func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *model
 		Header:         pc.Header,
 		HeaderComments: strings.Join(pc.HeaderComments, "\n"),
 		CreatedBy:      &user.ID,
+	}
+	// taking or adding a module's file claims it (and is refused when another member holds it)
+	if !isTemplate {
+		if err := s.reservations.Claim(ctx, user, p, moduleKey(c.Filename)); err != nil {
+			return nil, nil, err
+		}
 	}
 	if !isTemplate {
 		c.Header = po.SetHeaderField(c.Header, "Language", language)

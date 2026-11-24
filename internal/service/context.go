@@ -34,6 +34,9 @@ func NewContextService(repo repository.ContextRepository) *ContextService {
 // ModuleOf returns the module a PO file belongs to
 func ModuleOf(c *models.Catalog) string { return moduleKey(c.Filename) }
 
+// ModuleKey is the module of a file name (the part before the first dot, lowercase)
+func ModuleKey(filename string) string { return moduleKey(filename) }
+
 // ForModule returns a module's Konteks (also when its note is empty), or nil
 func (s *ContextService) ForModule(ctx context.Context, projectID int64, module string) (*models.ModuleContext, error) {
 	n, err := s.repo.Get(ctx, projectID, module)

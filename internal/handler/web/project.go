@@ -168,12 +168,13 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Data["Tab"] = "files"
 	if pf, total, err := h.glossary.ProjectFiles(r.Context(), p, "", nil, nil, 0); err == nil {
 		_ = h.catalogService.MatchOwnFiles(r.Context(), middleware.GetUser(r.Context()), p, pf)
+		h.attachReservations(r, p, nil, pf)
 		view := projectFilesView{Lang: data.Lang, Project: p, Files: pf, Total: total,
 			Next: len(pf), CanTake: p.Role.IsMember(), CanManage: p.Role.CanManage(),
 			SyncHours: int(h.syncEvery / time.Hour), Upstream: h.glossary.HasUpstream(r.Context(), p)}
 		view.HasFeed, view.LastSync = h.lastSync(r, p)
 		view.Groups, _ = h.glossary.GroupsWithFiles(r.Context(), p)
-		data.Data["ProjectFiles"] = view
+		data.Data["ProjectFiles"] = h.withReservations(r, p, view)
 	}
 	if msg := r.URL.Query().Get("merged"); msg != "" {
 		data.Flash = i18n.T(data.Lang, "flash.merged", r.URL.Query().Get("added"), r.URL.Query().Get("obsolete"))
@@ -432,7 +433,9 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		SourceLanguage: r.FormValue("source_language"),
 		Language:       r.FormValue("language"),
 		Open:           r.FormValue("access") == "open",
+		Reservations:   r.FormValue("reservations") == "on",
 	}
+	in.ReservationDays, _ = strconv.Atoi(r.FormValue("reservation_days"))
 	if err := h.projectService.Update(r.Context(), p, in); err != nil {
 		h.renderSettings(w, r, p, h.errorMessage(r, err), "")
 		return
@@ -623,6 +626,51 @@ type projectFilesView struct {
 	SyncHours int                         // automatic sync interval
 	Groups    []*models.ModuleGroupOption // filter options
 	Upstream  bool                        // some module group is a release upstream: show the state filter
+	Res       reservationView             // module reservations (Res.On = the project uses them)
+}
+
+// reservationView is what file lists need to show module reservations
+type reservationView struct {
+	On      bool  // the project uses reservations
+	UserID  int64 // the viewer
+	Manager bool  // may release anyone's reservation
+	Lang    string
+}
+
+func (h *Handler) reservationView(r *http.Request, p *models.Project) reservationView {
+	v := reservationView{On: p.Reservations, Manager: p.Role.CanManage(), Lang: middleware.GetLang(r.Context())}
+	if u := middleware.GetUser(r.Context()); u != nil {
+		v.UserID = u.ID
+	}
+	return v
+}
+
+func (h *Handler) withReservations(r *http.Request, p *models.Project, v projectFilesView) projectFilesView {
+	v.Res = h.reservationView(r, p)
+	return v
+}
+
+// projectFileKeep is the project files filter from the request: upstream states (u) and reservations (rv)
+func (h *Handler) projectFileKeep(r *http.Request, p *models.Project) func(*models.ProjectFile) bool {
+	states := models.UpstreamFilterSet(r.URL.Query()["u"])
+	var uid int64
+	if u := middleware.GetUser(r.Context()); u != nil {
+		uid = u.ID
+	}
+	res := reservationFilter(r.URL.Query(), uid)
+	if len(states) == 0 && res == nil {
+		return nil
+	}
+	var held map[string]*models.ModuleReservation
+	if res != nil {
+		held = h.reservations.Map(r.Context(), p)
+	}
+	return func(f *models.ProjectFile) bool {
+		if len(states) > 0 && !states[f.UpstreamClass()] {
+			return false
+		}
+		return res == nil || res(held[service.ModuleKey(f.Filename)])
+	}
 }
 
 // ProjectFilesMore returns the next page of project files (htmx "Muat lagi")
@@ -635,14 +683,15 @@ func (h *Handler) ProjectFilesMore(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	var groupIDs []int64
 	groupIDs = groupParams(r)
-	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, groupIDs, models.UpstreamFilterSet(r.URL.Query()["u"]), offset)
+	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, groupIDs, h.projectFileKeep(r, p), offset)
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
 	_ = h.catalogService.MatchOwnFiles(r.Context(), middleware.GetUser(r.Context()), p, pf)
-	h.renderPartials(w, partial{"project_file_rows", projectFilesView{Lang: middleware.GetLang(r.Context()), Project: p,
-		Files: pf, Total: total, Next: offset + len(pf), CanTake: p.Role.IsMember(), Query: q, Searched: true, CanManage: p.Role.CanManage()}})
+	h.attachReservations(r, p, nil, pf)
+	h.renderPartials(w, partial{"project_file_rows", h.withReservations(r, p, projectFilesView{Lang: middleware.GetLang(r.Context()), Project: p,
+		Files: pf, Total: total, Next: offset + len(pf), CanTake: p.Role.IsMember(), Query: q, Searched: true, CanManage: p.Role.CanManage()})})
 }
 
 // ProjectFileDownload sends a source PO file as it came from the glossary source
@@ -684,6 +733,9 @@ func (h *Handler) ProjectFileTake(w http.ResponseWriter, r *http.Request) {
 		c, cp, err := h.catalogService.Get(r.Context(), user, into)
 		if err == nil && cp.ID != p.ID {
 			err = service.ErrNotFound
+		}
+		if err == nil { // updating claims the module, unless another member holds it
+			err = h.reservations.Claim(r.Context(), user, p, service.ModuleOf(c))
 		}
 		if err == nil {
 			err = h.catalogService.UpdateFromUpstream(r.Context(), user, c, label, data)
@@ -811,6 +863,7 @@ type fileListView struct {
 	Upstream    bool                        // some module group is a release upstream: show the state filter
 	Searched    bool
 	PatchCmds   map[int64]string // the git patch command per own repository file on this page
+	Res         reservationView  // module reservations
 }
 
 // fileList filters a project's PO files: the user's own (mine) or the other members'.
@@ -828,6 +881,13 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 		}
 	}
 	v.Groups, _ = h.glossary.GroupsWithFiles(r.Context(), p)
+	v.Res = h.reservationView(r, p)
+	h.attachReservations(r, p, all, nil)
+	var resKeep func(*models.ModuleReservation) bool
+	if v.Res.On {
+		resKeep = reservationFilter(r.URL.Query(), v.Res.UserID)
+		v.Searched = v.Searched || resKeep != nil
+	}
 	moduleGroups, _ := h.glossary.ModuleGroups(r.Context(), p)
 	want := map[int64]bool{}
 	for _, g := range groups {
@@ -867,6 +927,9 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 		}
 		if ok && len(states) > 0 {
 			ok = states[c.UpstreamClass()]
+		}
+		if ok && resKeep != nil {
+			ok = !c.IsTemplate && resKeep(c.Reservation)
 		}
 		if ok {
 			list = append(list, c)
