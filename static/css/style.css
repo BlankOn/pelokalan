@@ -1326,7 +1326,6 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 .ai-entry-btn .s1 { fill: #7a3fd1; } .ai-entry-btn .s2 { fill: #e8780c; }
 .ai-entry-btn.working { cursor: progress; background: linear-gradient(110deg, #f3e8ff 0%, #fff1e0 30%, #e6eefc 60%, #f3e8ff 100%); background-size: 300% 100%; animation: ai-shimmer 1.6s linear infinite; }
 .ai-entry-btn.working svg .s1, .ai-entry-btn.working svg .s2 { animation: ai-twinkle 1s ease-in-out infinite; transform-origin: center; }
-.ed-label > .cmp-btn:not([hidden]) { margin-left: auto; }
 
 /* undo button in the editor actions */
 #btn-undo { display: inline-flex; align-items: center; gap: 5px; }
@@ -1344,19 +1343,6 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 }
 @media (prefers-reduced-motion: reduce) { .tr-input.ai-filling { animation: none; } }
 
-/* compare the previous (replaced) translation with the current one */
-.cmp-btn { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; cursor: pointer; }
-.cmp-btn:hover, .cmp-btn.active { border-color: var(--accent); background: var(--accent-soft); }
-.cmp-btn:not([hidden]) { margin-left: auto; }
-.cmp-btn:not([hidden]) + .ai-entry-btn { margin-left: 8px; }
-.cmp-panel { border: 1px solid var(--border); border-radius: 6px; background: var(--surface); padding: 8px; }
-.cmp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-.cmp-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
-.cmp-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.5; padding: 6px 8px; border-radius: 4px; background: var(--surface-2); min-height: 2.2em; }
-.cmp-text del { background: #fde2e1; color: #8f1f1b; text-decoration: line-through; border-radius: 2px; }
-.cmp-text ins { background: #dcf3e5; color: #145c41; text-decoration: none; border-radius: 2px; }
-.cmp-actions { display: flex; gap: 8px; justify-content: flex-end; margin-top: 8px; }
-@media (max-width: 700px) { .cmp-cols { grid-template-columns: 1fr; } }
 
 /* project (source) files */
 .pf-toolbar { display: flex; gap: 8px; align-items: center; }

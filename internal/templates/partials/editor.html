@@ -32,18 +32,12 @@
         <div class="ed-label">
             {{t .Lang "editor.translation"}}
             {{if $e.IsAI}}<span class="origin-tag origin-ai" title="{{t .Lang "editor.ai_notice"}}">{{template "icon_bot" (dict "Title" "" "Fuzzy" false)}} AI</span>{{else if eq $e.Origin "memory"}}<span class="origin-tag origin-memory" title="{{t .Lang "editor.memory_notice"}}">{{template "icon_memory" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "origin.memory"}}</span>{{else if eq $e.Origin "glossary"}}<span class="origin-tag origin-glossary" title="{{t .Lang "editor.glossary_notice"}}">{{template "icon_book" (dict "Title" "" "Fuzzy" false)}} {{t .Lang "origin.glossary"}}</span>{{end}}
-            <button type="button" class="cmp-btn" id="btn-compare" title="{{t .Lang "compare.help"}}"{{if not $e.ReplacedMsgStr}} hidden{{end}}{{with $e.ReplacedMsgStr}} data-replaced="{{toJSON .}}"{{end}}>⇄ {{t .Lang "compare.button"}}</button>
             {{if .Project.AIEnabled}}<button type="button" class="ai-entry-btn" id="btn-ai-entry" data-url="/catalogs/{{$c.ID}}/entries/{{$e.ID}}/ai" title="{{t .Lang "ai.entry_help"}} (Ctrl+Shift+A)"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="s1" d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path class="s2" d="M19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg><span>{{t .Lang "ai.entry_button"}}</span></button>
             <select id="ai-alt-count" class="ai-alt-count" title="{{t .Lang "ai.alt_count_help"}}" aria-label="{{t .Lang "ai.alt_count_help"}}">
                 <option value="1">{{t .Lang "ai.alt_n" 1}}</option><option value="2" selected>{{t .Lang "ai.alt_n" 2}}</option><option value="3">{{t .Lang "ai.alt_n" 3}}</option><option value="4">{{t .Lang "ai.alt_n" 4}}</option>
             </select>{{end}}
         </div>
         <div class="ai-alts" id="ai-alts" hidden data-use="{{t .Lang "ai.alt_use"}}" data-flagged="{{t .Lang "ai.alt_flagged"}}" data-title="{{t .Lang "ai.alt_title"}}" data-close="{{t .Lang "action.close"}}"></div>
-        <div class="cmp-panel" id="cmp-panel" hidden data-before="{{t .Lang "compare.before"}}" data-after="{{t .Lang "compare.after"}}">
-            <div class="cmp-cols"><div class="cmp-col"><div class="cmp-head">{{t .Lang "compare.before"}}</div><div class="cmp-text cmp-before"></div></div>
-            <div class="cmp-col"><div class="cmp-head">{{t .Lang "compare.after"}}</div><div class="cmp-text cmp-after"></div></div></div>
-            <div class="cmp-actions"><button type="button" class="btn btn-small" id="cmp-use-before">{{t .Lang "compare.use_before"}}</button><button type="button" class="btn btn-small" id="cmp-close">{{t .Lang "action.close"}}</button></div>
-        </div>
         {{if $e.IsPlural}}
         <div class="plural-tabs" role="tablist">
             {{range $i, $s := $e.MsgStr}}<button type="button" role="tab" class="ptab{{if eq $i 0}} active{{end}}" data-tab="{{$i}}">{{pluralLabel $.Lang $i (len $e.MsgStr)}}</button>{{end}}

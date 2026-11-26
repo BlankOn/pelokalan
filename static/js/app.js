@@ -500,12 +500,10 @@
     document.body.addEventListener("htmx:load", restoreAltCount);
     restoreAltCount();
 
-    // put one AI result (forms + flagged) into the translation box; fromAlternatives: chosen among
-    // several, which are compared with each other instead (the old text stays under Bandingkan)
-    function applyAIResult(f, res, notice, fromAlternatives) {
+    // put one AI result (forms + flagged) into the translation box (Urungkan brings the old text back)
+    function applyAIResult(f, res, notice) {
         var boxes = Array.prototype.slice.call(f.querySelectorAll(".tr-input"));
         pushUndo();
-        var beforeForms = boxes.map(function (ta) { return ta.value; });
         boxes.forEach(function (ta) {
             var i = parseInt(ta.dataset.panel, 10);
             if (res.forms && res.forms[i] !== undefined) ta.value = res.forms[i];
@@ -520,11 +518,6 @@
         syncUnfuzzyButton();
         var n = f.querySelector(".ed-notice");
         if (n) n.textContent = notice || "";
-        var changed = boxes.some(function (ta, i) { return ta.value !== beforeForms[i]; });
-        if (changed && beforeForms.some(function (v) { return v.trim() !== ""; })) {
-            if (!replacedForms()) setReplaced(beforeForms); // keep the person's text when switching alternatives
-            if (fromAlternatives) hideCompare(); else showCompare();
-        }
         focusTranslation();
     }
 
@@ -568,7 +561,7 @@
             card.setAttribute("role", "button");
             card.title = box.dataset.use;
             var choose = function () {
-                applyAIResult(f, alt, res.notice, true);
+                applyAIResult(f, alt, res.notice);
                 grid.querySelectorAll(".ai-alt").forEach(function (c) {
                     c.classList.toggle("ai-alt-chosen", c === card);
                     c.setAttribute("aria-pressed", c === card ? "true" : "false");
@@ -673,24 +666,6 @@
     }
     window.trBeforeChange = pushUndo; // used by the thesaurus popup
 
-    // Compare the previous translation (replaced by AI) with the current text, word by word
-    function diffWords(a, b) {
-        var x = a.split(/(\s+)/), y = b.split(/(\s+)/), n = x.length, m = y.length;
-        var L = [];
-        for (var i = 0; i <= n; i++) { L.push(new Array(m + 1).fill(0)); }
-        for (i = n - 1; i >= 0; i--) for (var j = m - 1; j >= 0; j--)
-            L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
-        var before = [], after = [];
-        i = 0; j = 0;
-        while (i < n && j < m) {
-            if (x[i] === y[j]) { before.push(["", x[i]]); after.push(["", y[j]]); i++; j++; }
-            else if (L[i + 1][j] >= L[i][j + 1]) { before.push(["del", x[i++]]); }
-            else { after.push(["ins", y[j++]]); }
-        }
-        while (i < n) before.push(["del", x[i++]]);
-        while (j < m) after.push(["ins", y[j++]]);
-        return [before, after];
-    }
     // wordOps aligns two texts word by word (whitespace kept as its own tokens): a list of
     // {op: "eq"|"del"|"ins", a: index in a's tokens, b: index in b's tokens}
     function wordOps(x, y) {
@@ -757,59 +732,6 @@
             el.appendChild(node);
         });
     }
-    function replacedForms() {
-        var btn = form() && form().querySelector("#btn-compare");
-        if (!btn || !btn.dataset.replaced) return null;
-        try { return JSON.parse(btn.dataset.replaced); } catch (e) { return null; }
-    }
-    function showCompare() {
-        var f = form(), panel = f && f.querySelector("#cmp-panel"), forms = replacedForms(), ta = activePanel();
-        if (!panel || !forms || !ta) return;
-        var i = parseInt(ta.dataset.panel, 10) || 0;
-        var d = diffWords(forms[i] || "", ta.value);
-        renderDiff(panel.querySelector(".cmp-before"), d[0]);
-        renderDiff(panel.querySelector(".cmp-after"), d[1]);
-        panel.hidden = false;
-        f.querySelector("#btn-compare").classList.add("active");
-    }
-    function hideCompare() {
-        var f = form(), panel = f && f.querySelector("#cmp-panel");
-        if (panel) panel.hidden = true;
-        var btn = f && f.querySelector("#btn-compare");
-        if (btn) btn.classList.remove("active");
-    }
-    // the editor's own AI button reports what it replaced, so the comparison works before saving
-    function setReplaced(forms) {
-        var btn = form() && form().querySelector("#btn-compare");
-        if (!btn) return;
-        btn.dataset.replaced = JSON.stringify(forms);
-        btn.hidden = false;
-    }
-    document.addEventListener("click", function (ev) {
-        if (!ev.target.closest) return;
-        if (ev.target.closest("#btn-compare")) {
-            ev.preventDefault();
-            var panel = form() && form().querySelector("#cmp-panel");
-            if (panel && !panel.hidden) hideCompare(); else showCompare();
-        } else if (ev.target.closest("#cmp-close")) {
-            hideCompare();
-        } else if (ev.target.closest("#cmp-use-before")) {
-            var forms = replacedForms(), f = form();
-            if (!forms || !f || editorLocked()) return;
-            pushUndo();
-            f.querySelectorAll(".tr-input").forEach(function (ta) {
-                var i = parseInt(ta.dataset.panel, 10);
-                if (forms[i] !== undefined) ta.value = forms[i];
-            });
-            setDirty(true);
-            showCompare();
-        }
-    });
-    // keep the comparison current while typing
-    document.addEventListener("input", function (ev) {
-        var panel = form() && form().querySelector("#cmp-panel");
-        if (panel && !panel.hidden && ev.target.matches && ev.target.matches("#entry-form .tr-input")) showCompare();
-    });
     function undo() {
         var f = form(), s = undoStack.pop();
         if (!f || !s) return;

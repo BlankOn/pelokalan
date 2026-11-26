@@ -689,8 +689,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   by side (`#ai-alts`), each marking (`<mark>`, `altDiffs`) where the alternatives differ: every alternative is aligned word by word with #1
   (`wordOps`), and a change is keyed by where it starts in #1, so the same place has the same colour in every card
   (golden-angle hues via `--h`; spaces between changed words stay in one change);
-  clicking a box (or Enter/Space on it) puts it in the translation box (undoable) without opening the Bandingkan panel
-  (the replaced text stays available there). With one result it goes straight in and the comparison opens.
+  clicking a box (or Enter/Space on it) puts it in the translation box (undoable). With one result it goes straight in.
 - Per-entry AI details:
   `POST /catalogs/{cid}/entries/{eid}/ai` → `AIService.TranslateEntry` translates one entry with the
   editor's current text as draft and returns it unsaved; cost is recorded as an `ai_jobs` row with
@@ -699,9 +698,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   source gets a lowercase hint ("Kontras" → "kontras"); the prompt says glossary fixes the word,
   not its capitalization.
 - When AI replaces existing text, the old text is kept in `entries.replaced_msgstr` (migration 026;
-  the last person-written text wins over earlier AI attempts) until a person saves. The editor's
-  "Bandingkan" button shows old vs new side by side with a word diff; "Pakai yang sebelumnya"
-  restores it (undoable). The per-entry AI button fills the comparison client-side.
+  the last person-written text wins over earlier AI attempts) until a person saves. The editor no longer shows it
+  (the "Bandingkan" comparison was removed at the community's request; "Urungkan" brings the old text back).
 - Requests use temperature 0.2 (`ai.chatTemperature`); if a model rejects it, the call is retried
   without a temperature.
 - `ai.Verify` flags results that miss a required glossary translation or fail `po.Validate`;
@@ -826,7 +824,7 @@ deploys never run stale JS/CSS.
 - Search boxes in htmx filter forms must not reload on their own `change` (fired on blur): triggers use
   `change[target.type!='search']`, otherwise the rows are swapped under the user's next click.
 - Problem warnings (`ed-alert-warn`) sit right below the translation box, before the save buttons. In the
-  Terjemahan label row, Bandingkan / "Terjemahkan dengan AI" + count sit on the right. The Perlu ditinjau checkbox
+  Terjemahan label row, "Terjemahkan dengan AI" + count sit on the right. The Perlu ditinjau checkbox
   sits in `.ed-actions` right before the save buttons.
   English calls Perlu ditinjau "Fuzzy".
 - Validation flags `control_chars` and `markup` (tags such as <gui>, <key> differing from the source);
