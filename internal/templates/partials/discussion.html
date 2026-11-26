@@ -32,7 +32,7 @@
                         {{if .Body}}<div class="comment-body">{{commentHTML .Body $.Known}}</div>{{end}}
             {{if .ReviewID}}{{if .ResolvedAt}}<div class="rv-resolved small muted">✓ {{t $.Lang "review.resolved_by" .ResolverName (timeAgo $.Lang (derefTime .ResolvedAt))}}</div>
             {{else if and $.User (not $.Thread.Subject.ReadOnly) (or $.CanManage (eq $.User.ID $.FileOwner) (and .AuthorID (eq (deref .AuthorID) $.User.ID)))}}
-            <button type="button" class="btn btn-small rv-resolve" hx-post="{{$.Project.Path}}/comments/{{.ID}}/resolve" hx-target="#{{$.ID}}" hx-swap="outerHTML">✓ {{t $.Lang "review.resolve"}}</button>{{end}}{{end}}
+            <button type="button" class="btn btn-small btn-approve rv-resolve" hx-post="{{$.Project.Path}}/comments/{{.ID}}/resolve" hx-target="#{{$.ID}}" hx-swap="outerHTML"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{t $.Lang "review.resolve"}}</button>{{end}}{{end}}
             {{if .Attachments}}
             <div class="comment-files">
                 {{range .Attachments}}{{$url := printf "%s/attachments/%d/%s" $.Project.Path .ID (pathEscape .Filename)}}

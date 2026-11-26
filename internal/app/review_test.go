@@ -84,7 +84,8 @@ func TestGitHubReviews(t *testing.T) {
 	// the review editor: the review's strings only, the diff, the note, the approval button; no edit pane tools
 	owner.get(page).status(http.StatusOK).contains("review-mode", `&#43;msgstr &#34;Tutup jendela&#34;`, "Mohon dicek istilahnya.",
 		"Setujui &amp; commit", `data-review-view="diff"`, "Close the window").lacks("Open the file", "tb-commit")
-	kiki.get(page).status(http.StatusOK).lacks("Setujui &amp; commit").contains("Batalkan permintaan tinjauan")
+	// the translator who asked opens their full editor instead
+	kiki.get(page).redirectsTo(base + "/" + kiki.Username + "/po/library__os.po")
 	kiki.post(page+"/approve", nil).status(http.StatusForbidden)
 
 	// sent back with a note
@@ -104,7 +105,7 @@ func TestGitHubReviews(t *testing.T) {
 	// a review comment on a string: approval waits until it is resolved
 	key := fmt.Sprintf("%d-%s", kc, models.KeyHashOf("Remove the directory"))
 	owner.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Pakai \"direktorinya\"?"}}).status(http.StatusOK).
-		contains("Selesaikan", `data-review-open="1"`)
+		contains("Sudah diselesaikan", "btn-approve rv-resolve", `data-review-open="1"`)
 	kiki.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Sudah saya pikirkan."}}).status(http.StatusOK)
 	if n := scalar[int](t, `SELECT count(*) FROM comments WHERE review_id = $1`, rid); n != 1 {
 		t.Fatalf("review comments = %d, want 1 (the translator's reply is a plain comment)", n)

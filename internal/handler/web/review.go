@@ -99,9 +99,20 @@ func (h *Handler) ReviewPage(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	c, _, err := h.catalogService.Get(r.Context(), middleware.GetUser(r.Context()), rv.CatalogID)
+	user := middleware.GetUser(r.Context())
+	c, _, err := h.catalogService.Get(r.Context(), user, rv.CatalogID)
 	if err != nil {
 		h.fail(w, r, err)
+		return
+	}
+	// the translator fixes things in the full editor: their own file opens there, on the strings with open
+	// review comments when there are any
+	if user != nil && c.OwnerID == user.ID && c.Owned {
+		target := c.URL()
+		if h.reviewComments(r, p, c, nil) > 0 {
+			target += "?status=review"
+		}
+		http.Redirect(w, r, target, http.StatusSeeOther)
 		return
 	}
 	h.editorPage(w, r, c, p, rv)

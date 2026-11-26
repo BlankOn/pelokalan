@@ -657,8 +657,10 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - **Review editor** (`/projects/{id}/reviews/{rid}` = `editorPage` with the review, `reviewData`; class `review-mode`):
   read-only, lists only the review's strings (`EntryFilter.Only`, `ReviewService.ChangedHashes`), no edit pane or
   status bar, toolbar `review_toolbar` (back, file + requester, Tabel/Diff `[data-review-view]` toggling
-  `#review-diff`, "Setujui & commit" disabled while review comments are open; the requester gets "Batalkan"), banner
-  `review_banner` (translator's note, open comments, last commit error). The sidebar works as usual.
+  `#review-diff`, "Setujui & commit" disabled while review comments are open), banner
+  `review_banner` (translator's note, open comments, last commit error). The sidebar works as usual. The file's owner
+  (the translator) is redirected from the review page to their full editor, filtered to open review comments
+  (`?status=review`) when there are any, so they fix things right away.
 - **View-only layout** ("Lihat" on another member's file, `?view=1`; `viewData`, `view_toolbar`, class `view-mode`
   with `review-mode`): the review layout without decisions or discussion (`.sb-thread` hidden): back, file + owner,
   "Hanya lihat", and for repository files the Tabel/Diff toggle with the member's changes against the last synced file.
@@ -669,7 +671,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   its access); it is the main button only until write access is confirmed.
 - **Review comments** (migration 049, `comments.review_id/resolved_at/resolved_by`): a comment by an owner/manager
   (not the requester) on an entry of a file with an open request is tied to it (`ReviewService.OpenFor` via
-  `DiscussionService.SetReviews`). It is open until resolved ("Selesaikan", `POST /projects/{id}/comments/{cid}/resolve`,
+  `DiscussionService.SetReviews`). It is open until resolved (green "Sudah diselesaikan" button with a check, `POST /projects/{id}/comments/{cid}/resolve`,
   file owner, the author or a manager): red dot on the entry row (`Entry.ReviewOpen`, `mark-review`, kept in sync by
   app.js from the thread's `data-review-open`), a "Komentar tinjauan" status filter (`EntryFilter.Review`) and status bar
   count in the translator's editor. Approving or sending (`push`/`PushNow`) waits until none is open
