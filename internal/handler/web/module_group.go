@@ -69,6 +69,9 @@ func (h *Handler) moduleGroupsData(r *http.Request, p *models.Project, data *Pag
 	data.Data["FormGitRepo"] = r.FormValue("git_repo")
 	data.Data["FormGitBranch"] = r.FormValue("git_branch")
 	data.Data["FormTPTeam"] = r.FormValue("tp_team")
+	if gh := h.glossary.GitHubApp(); gh != nil {
+		data.Data["GitHubInstall"] = gh.InstallURL()
+	}
 	if open != "" {
 		data.Data["GroupsError"] = errMsg
 	}
@@ -248,6 +251,8 @@ func (h *Handler) SetModuleGroupSync(w http.ResponseWriter, r *http.Request) {
 		Version:  r.FormValue("version_name"),
 		URL:      r.FormValue("url"),
 		Language: r.FormValue("language"),
+		Repo:     r.FormValue("git_repo"), // a GitHub group: repository and branch instead of a link
+		Branch:   r.FormValue("git_branch"),
 	})
 	if err != nil {
 		h.renderModuleGroups(w, r, p, h.errorMessage(r, err), "list")

@@ -96,6 +96,23 @@ See `.env.example`. The important settings:
 | `AI_SECRET_KEY` | Encrypts stored AI API keys (defaults to `JWT_SECRET`). |
 | `AI_ALLOW_PRIVATE_HOSTS` | Allow AI API URLs on local/private networks (default false). |
 | `JWT_SECRET` | Signs sessions and one-time code hashes. Change in production. |
+| `GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY_FILE` (or `GITHUB_APP_PRIVATE_KEY`) | The Pelokalan GitHub App for full integration with GitHub repositories (see below). Empty = off. |
+
+### GitHub App (full integration with repositories)
+
+With the app, a module group synced from a GitHub branch can write approved translations straight to that branch:
+members ask for a review of a module, an owner or manager approves it, and Pelokalan commits the file (author: the
+translator, `Reviewed-by:` the reviewer). Without it, files go back as git patches.
+
+1. Register a GitHub App once (GitHub → Settings → Developer settings → GitHub Apps → New GitHub App), owned by your
+   account or organisation. Homepage URL: your Pelokalan address. Turn the webhook off.
+2. Repository permissions: **Contents: Read and write** (Metadata: read-only is added automatically). Nothing else.
+3. "Where can this GitHub App be installed?": Any account, so other projects can install it on their repositories.
+4. Generate a private key and note the App ID and the app's URL name (`https://github.com/apps/<slug>`).
+5. Set `GITHUB_APP_ID`, `GITHUB_APP_SLUG` and `GITHUB_APP_PRIVATE_KEY_FILE` (path to the .pem) and restart.
+
+For each repository, a maintainer installs the app on it (the "Install" button in Settings → Kelompok modul leads
+there), then a project manager presses "Periksa akses" and "Aktifkan integrasi penuh" on that module group.
 
 ## Keyboard shortcuts (editor)
 

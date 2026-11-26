@@ -189,6 +189,36 @@ func Diff(path string, base []byte, want map[string]Target) *FileDiff {
 	return d
 }
 
+// Apply rewrites a repository file like Diff and returns the whole new file and how many entries
+// changed (0 = the file already has every wanted translation; data is then base itself)
+func Apply(base []byte, want map[string]Target) ([]byte, int) {
+	lines, ended := splitLines(base)
+	var out []string
+	last, entries := 0, 0
+	for _, b := range blocks(lines) {
+		t, ok := want[b.entry.Key()]
+		if !ok || sameStrings(normalize(t.Translation), normalize(b.entry.Translation)) && t.Fuzzy == b.entry.Fuzzy {
+			continue
+		}
+		nl := rewrite(lines[b.start:b.end], b.entry, t)
+		if sameStrings(nl, lines[b.start:b.end]) {
+			continue
+		}
+		out = append(append(out, lines[last:b.start]...), nl...)
+		last = b.end
+		entries++
+	}
+	if entries == 0 {
+		return base, 0
+	}
+	out = append(out, lines[last:]...)
+	text := strings.Join(out, "\n")
+	if ended {
+		text += "\n"
+	}
+	return []byte(text), entries
+}
+
 // lineChanges diffs two short line lists (one entry) with a longest common subsequence and
 // returns the differing runs as changes on the old lines (offset = the block's first line)
 func lineChanges(old, new []string, offset int) []change {

@@ -16,6 +16,7 @@ import (
 	"sync"
 	"time"
 
+	"pelokalan/internal/githubapp"
 	"pelokalan/internal/glossary"
 	"pelokalan/internal/gnomel10n"
 	"pelokalan/internal/models"
@@ -38,6 +39,8 @@ type GlossaryService struct {
 	syncState map[int64]*SyncStatus // per project: the latest Sync button run
 
 	landings LandingDetector // finds members' work accepted upstream after each import (nil = off)
+
+	github *githubapp.Client // the Pelokalan GitHub App (nil = not configured)
 }
 
 // LandingDetector finds members' translations that a just-imported upstream file now contains
@@ -135,6 +138,9 @@ func (s *GlossaryService) ImportGroup(ctx context.Context, user *models.User, p 
 	v, err := s.repo.GetOrCreateGroup(ctx, p.ID, name, version)
 	if err != nil {
 		return nil, err
+	}
+	if full, err := s.repo.GetGroup(ctx, v.ID); err == nil { // an existing GitHub group keeps repository paths
+		v = full
 	}
 	return s.importInto(ctx, v, in.Filename, in.Data, language, &user.ID)
 }

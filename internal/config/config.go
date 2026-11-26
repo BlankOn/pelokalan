@@ -29,6 +29,34 @@ type Config struct {
 	Auth     AuthConfig
 	Glossary GlossaryConfig
 	AI       AIConfig
+	GitHub   GitHubConfig
+}
+
+// GitHubConfig is the Pelokalan GitHub App, which writes approved translations straight to the
+// repositories it is installed on (empty AppID = not configured: the feature is hidden)
+type GitHubConfig struct {
+	AppID      int64
+	Slug       string // the app's URL name: https://github.com/apps/<slug>
+	PrivateKey string // PEM
+	API        string // REST API base ("" = api.github.com; tests use a fake)
+}
+
+// Enabled tells whether the GitHub App is configured
+func (c GitHubConfig) Enabled() bool { return c.AppID > 0 && c.Slug != "" && c.PrivateKey != "" }
+
+// gitHubPrivateKey reads GITHUB_APP_PRIVATE_KEY ("\n" allowed for line breaks) or GITHUB_APP_PRIVATE_KEY_FILE
+func gitHubPrivateKey() string {
+	if k := os.Getenv("GITHUB_APP_PRIVATE_KEY"); k != "" {
+		return strings.ReplaceAll(k, `\n`, "\n")
+	}
+	if f := os.Getenv("GITHUB_APP_PRIVATE_KEY_FILE"); f != "" {
+		if data, err := os.ReadFile(f); err == nil {
+			return string(data)
+		} else {
+			log.Printf("GITHUB_APP_PRIVATE_KEY_FILE: %v", err)
+		}
+	}
+	return ""
 }
 
 // AIConfig holds settings for LLM pre-translation
@@ -175,6 +203,12 @@ func Load() *Config {
 				"https://raw.githubusercontent.com/victoriasovereigne/tesaurus/refs/heads/master/dict.json"),
 			SpellingURL: getEnv("SPELLING_URL",
 				"https://raw.githubusercontent.com/aryakdaniswara/kbbi-v6-full-csv/main/kbbi_v6.1.0_full.csv"),
+		},
+		GitHub: GitHubConfig{
+			AppID:      int64(getEnvInt("GITHUB_APP_ID", 0)),
+			Slug:       getEnv("GITHUB_APP_SLUG", ""),
+			PrivateKey: gitHubPrivateKey(),
+			API:        getEnv("GITHUB_API_URL", ""),
 		},
 	}
 }

@@ -14,7 +14,11 @@ import (
 // Catalog is one translation file of a project
 type Catalog struct {
 	// Reservation is who holds the file's module when the project uses reservations (not stored here)
-	Reservation   *ModuleReservation `json:"-"`
+	Reservation *ModuleReservation `json:"-"`
+	// Review is the newest review request of the file for a repository Pelokalan writes to, and CanPush
+	// whether its module group commits approved files to the repository (set by ReviewService.Attach)
+	Review        *ModuleReview `json:"-"`
+	CanPush       bool          `json:"-"`
 	ID            int64
 	ProjectID     int64
 	OwnerID       int64

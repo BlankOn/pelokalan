@@ -546,6 +546,10 @@
         var grid = document.createElement("div");
         grid.className = "ai-alts-grid";
         grid.style.gridTemplateColumns = "repeat(" + res.alternatives.length + ", minmax(0, 1fr))";
+        // per plural form: the places where the alternatives differ, one colour per place in every card
+        var marks = (res.alternatives[0].forms || []).map(function (f, k) {
+            return altDiffs(res.alternatives.map(function (o) { return (o.forms && o.forms[k]) || ""; }));
+        });
         res.alternatives.forEach(function (alt, i) {
             var card = document.createElement("div");
             card.className = "ai-alt" + (alt.flagged ? " ai-alt-flagged" : "");
@@ -556,10 +560,7 @@
             alt.forms.forEach(function (text, k) {
                 var t = document.createElement("div");
                 t.className = "ai-alt-text";
-                // words this alternative does not share with every other one are marked
-                var others = res.alternatives.filter(function (o, j) { return j !== i; })
-                    .map(function (o) { return (o.forms && o.forms[k]) || ""; });
-                renderDiff(t, altDiff(text, others));
+                renderDiff(t, marks[k][i]);
                 card.appendChild(t);
             });
             // the whole box is the choice: click (or Enter/Space) puts it in the translation box
@@ -690,21 +691,69 @@
         while (j < m) after.push(["ins", y[j++]]);
         return [before, after];
     }
-    // altDiff marks ("mark") the words of text that are missing from the common part with any of others
-    function altDiff(text, others) {
-        var marked = null;
-        others.forEach(function (o) {
-            var before = diffWords(text, o)[0];
-            if (!marked) marked = before.map(function () { return false; });
-            before.forEach(function (p, i) { if (p[0] === "del") marked[i] = true; });
+    // wordOps aligns two texts word by word (whitespace kept as its own tokens): a list of
+    // {op: "eq"|"del"|"ins", a: index in a's tokens, b: index in b's tokens}
+    function wordOps(x, y) {
+        var n = x.length, m = y.length, L = [], i, j;
+        for (i = 0; i <= n; i++) { L.push(new Array(m + 1).fill(0)); }
+        for (i = n - 1; i >= 0; i--) for (j = m - 1; j >= 0; j--)
+            L[i][j] = x[i] === y[j] ? L[i + 1][j + 1] + 1 : Math.max(L[i + 1][j], L[i][j + 1]);
+        var ops = [];
+        i = 0; j = 0;
+        while (i < n && j < m) {
+            if (x[i] === y[j]) ops.push({ op: "eq", a: i++, b: j++ });
+            else if (L[i + 1][j] >= L[i][j + 1]) ops.push({ op: "del", a: i++, b: j });
+            else ops.push({ op: "ins", a: i, b: j++ });
+        }
+        while (i < n) ops.push({ op: "del", a: i++, b: j });
+        while (j < m) ops.push({ op: "ins", a: i, b: j++ });
+        return ops;
+    }
+    // altDiffs marks the places where alternatives differ, with one colour per place in every card: each
+    // alternative is aligned with #1, and a run of changed words (spaces between changed words included)
+    // is keyed by where it starts in #1, so "mengekspos" in #1 and "memperlihatkan" in #2 share a colour.
+    // Returns per text the parts for renderDiff: [tag, text, colour index].
+    function altDiffs(texts) {
+        var toks = texts.map(function (t) { return t.split(/(\s+)/); });
+        var ref = toks[0], refKey = ref.map(function () { return null; });
+        var keyed = toks.map(function (tk) { return tk.map(function () { return null; }); });
+        for (var t = 1; t < toks.length; t++) {
+            var ops = wordOps(ref, toks[t]), key = null;
+            for (var o = 0; o < ops.length; o++) {
+                var op = ops[o];
+                if (op.op === "eq") {
+                    // a space between two changes stays in the change; anything else ends it
+                    var next = ops[o + 1];
+                    if (key !== null && !ref[op.a].trim() && next && next.op !== "eq") continue;
+                    key = null;
+                    continue;
+                }
+                if (key === null) key = op.a; // where the change starts in #1
+                if (op.op === "del") { if (refKey[op.a] === null) refKey[op.a] = key; }
+                else keyed[t][op.b] = key;
+            }
+        }
+        keyed[0] = refKey;
+        // colours in reading order of #1
+        var keys = [];
+        keyed.forEach(function (ks) { ks.forEach(function (k) { if (k !== null && keys.indexOf(k) < 0) keys.push(k); }); });
+        keys.sort(function (a, b) { return a - b; });
+        return toks.map(function (tk, t) {
+            return tk.map(function (w, i) {
+                var k = keyed[t][i];
+                return k === null ? ["", w] : ["mark", w, keys.indexOf(k)];
+            });
         });
-        return diffWords(text, text)[0].map(function (p, i) { return [marked && marked[i] ? "mark" : "", p[1]]; });
     }
     function renderDiff(el, parts) {
         el.innerHTML = "";
         parts.forEach(function (p) {
             var node = p[0] && p[1].trim() ? document.createElement(p[0]) : document.createTextNode(p[1]);
-            if (p[0] && p[1].trim()) node.textContent = p[1];
+            if (p[0] && p[1].trim()) {
+                node.textContent = p[1];
+                // a colour per place (golden-angle hues, so neighbours differ clearly)
+                if (p[2] !== undefined) node.style.setProperty("--h", Math.round((48 + p[2] * 137.508) % 360));
+            }
             el.appendChild(node);
         });
     }
@@ -2866,6 +2915,22 @@ document.addEventListener("click", function (ev) {
     if (menu) menu.open = false;
     dlg.showModal();
     (url ? dlg.querySelector("button[type=submit]") : dlg.querySelector("#r-url")).focus();
+});
+
+// "Ajukan tinjauan" in a file's menu: one popup for every file (an optional note for the reviewer)
+document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest && ev.target.closest("[data-review]");
+    var dlg = document.getElementById("review-dialog");
+    if (!btn || !dlg) return;
+    ev.preventDefault();
+    var form = dlg.querySelector("form");
+    form.reset();
+    form.action = btn.dataset.review;
+    dlg.querySelector(".review-name").textContent = btn.dataset.reviewName || "";
+    var menu = btn.closest("details");
+    if (menu) menu.open = false;
+    dlg.showModal();
+    dlg.querySelector("textarea").focus();
 });
 
 // Penerjemahan: stack each section's sticky parts (title, card head, filters, column row):

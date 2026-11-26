@@ -38,13 +38,13 @@ func (r *glossaryRepository) GetOrCreateGroup(ctx context.Context, projectID int
 
 const versionColumns = `v.id, v.project_id, v.name, v.version, v.created_at, v.sync_url, v.sync_language,
 	v.feed_created_by, v.last_fetched_at, v.last_changed_at, v.last_fetch_error, v.fetch_etag, v.fetch_last_modified,
-	v.fetch_content_hash, v.git_repo, v.git_branch, v.tp_team, (SELECT COUNT(*) FROM module_group_imports i WHERE i.group_id = v.id)`
+	v.fetch_content_hash, v.git_repo, v.git_branch, v.tp_team, v.git_direct, v.git_installation, v.git_write, v.git_checked_at, v.git_access_error, (SELECT COUNT(*) FROM module_group_imports i WHERE i.group_id = v.id)`
 
 func scanGroup(row interface{ Scan(...any) error }) (*models.ModuleGroup, error) {
 	v := &models.ModuleGroup{}
 	err := row.Scan(&v.ID, &v.ProjectID, &v.Name, &v.Version, &v.CreatedAt, &v.SyncURL, &v.SyncLanguage,
 		&v.FeedCreatedBy, &v.LastFetchedAt, &v.LastChangedAt, &v.LastFetchError, &v.FetchETag, &v.FetchLastModified,
-		&v.FetchContentHash, &v.GitRepo, &v.GitBranch, &v.TPTeam, &v.ImportCount)
+		&v.FetchContentHash, &v.GitRepo, &v.GitBranch, &v.TPTeam, &v.GitDirect, &v.GitInstallation, &v.GitWrite, &v.GitCheckedAt, &v.GitAccessError, &v.ImportCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -477,6 +477,17 @@ func (r *glossaryRepository) Modules(ctx context.Context, projectID int64, langu
 
 func (r *glossaryRepository) SetGroupGit(ctx context.Context, groupID int64, repo, branch string) error {
 	_, err := r.db.ExecContext(ctx, `UPDATE module_groups SET git_repo = $2, git_branch = $3 WHERE id = $1`, groupID, repo, branch)
+	return err
+}
+
+func (r *glossaryRepository) SetGroupGitAccess(ctx context.Context, groupID, installation int64, write bool, errText string) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE module_groups SET git_installation = $2, git_write = $3, git_access_error = $4,
+		git_checked_at = now(), git_direct = git_direct AND $3 WHERE id = $1`, groupID, installation, write, errText)
+	return err
+}
+
+func (r *glossaryRepository) SetGroupGitDirect(ctx context.Context, groupID int64, on bool) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE module_groups SET git_direct = $2 WHERE id = $1`, groupID, on)
 	return err
 }
 

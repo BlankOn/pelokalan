@@ -1,4 +1,30 @@
 {{/* Module groups popup (Settings → Kelompok modul): groups with their imported archives and sync links */}}
+{{/* Full integration with a GitHub repository: the Pelokalan GitHub App writes approved modules to the branch */}}
+{{define "github_integration"}}{{$g := .G}}
+<div class="gh-integration">
+    <div class="source-sync-head">
+        <strong class="small">{{t .Lang "github.title"}}</strong>
+        {{if not .Install}}<span class="feed-status">{{t .Lang "github.status_unavailable"}}</span>
+        {{else if $g.GitDirect}}<span class="feed-status feed-ok">{{t .Lang "github.status_on"}}</span>
+        {{else if $g.GitWrite}}<span class="feed-status">{{t .Lang "github.status_ready"}}</span>
+        {{else if $g.GitCheckedAt}}<span class="feed-status feed-err">{{t .Lang "github.status_no_access"}}</span>
+        {{else}}<span class="feed-status">{{t .Lang "github.status_off"}}</span>{{end}}
+    </div>
+    {{if not .Install}}<p class="muted small">{{t .Lang "github.unavailable_help"}}</p>
+    {{else}}
+    <p class="muted small">{{t .Lang "github.help"}}</p>
+    {{if $g.GitAccessError}}<div class="feed-error small">{{errText .Lang $g.GitAccessError}}</div>{{end}}
+    {{with $g.GitCheckedAt}}<div class="muted small">{{t $.Lang "github.checked" (timeAgo $.Lang .)}}</div>{{end}}
+    <div class="row-actions">
+        {{if not $g.GitWrite}}<a class="btn btn-small btn-primary" href="{{.Install}}" target="_blank" rel="noopener">{{t .Lang "github.install"}} ↗</a>{{end}}
+        <form method="post" action="{{.P.Path}}/module-groups/{{$g.ID}}/github/check"><button class="btn btn-small" type="submit">{{t .Lang "github.check"}}</button></form>
+        {{if $g.GitDirect}}<form method="post" action="{{.P.Path}}/module-groups/{{$g.ID}}/github/direct" data-confirm="{{t .Lang "github.off_confirm"}}"><input type="hidden" name="on" value="0"><button class="btn btn-small" type="submit">{{t .Lang "github.turn_off"}}</button></form>
+        {{else if $g.GitWrite}}<form method="post" action="{{.P.Path}}/module-groups/{{$g.ID}}/github/direct" data-confirm="{{t .Lang "github.on_confirm" $g.GitRepo $g.GitBranch}}" data-confirm-ok="{{t .Lang "github.turn_on"}}"><input type="hidden" name="on" value="1"><button class="btn btn-small btn-primary" type="submit">{{t .Lang "github.turn_on"}}</button></form>{{end}}
+    </div>
+    {{end}}
+</div>
+{{end}}
+
 {{define "module_groups"}}{{$p := .Data.Project}}
 <dialog id="module-groups-dialog" class="dialog dialog-wide" {{if .Data.GroupsOpen}}data-open-on-load data-tab-initial="{{.Data.GroupsOpen}}"{{end}}>
     <div class="dialog-head">
@@ -58,12 +84,15 @@
                     <form method="post" action="{{$p.Path}}/module-groups/{{$v.ID}}/unsync" data-confirm="{{t $.Lang "confirm.remove_feed"}}"><button class="btn btn-small" type="submit">{{t $.Lang "feed.remove"}}</button></form>
                 </div>
                 {{end}}
+                {{if $v.IsGit}}{{template "github_integration" (dict "Lang" $.Lang "G" $v "P" $p "Install" $.Data.GitHubInstall)}}{{end}}
                 {{if not $v.IsTP}}<details class="sync-edit">
-                    <summary class="linklike small">{{if $v.HasFeed}}{{t $.Lang "feed.change_link"}}{{else}}+ {{t $.Lang "feed.set_link"}}{{end}}</summary>
+                    <summary class="linklike small">{{if $v.IsGit}}{{t $.Lang "groups.git_change"}}{{else if $v.HasFeed}}{{t $.Lang "feed.change_link"}}{{else}}+ {{t $.Lang "feed.set_link"}}{{end}}</summary>
                     <form method="post" action="{{$p.Path}}/module-groups/sync" class="form form-inline" data-busy="{{t $.Lang "groups.importing"}}">
                         <input type="hidden" name="name" value="{{$v.Name}}">
                         <input type="hidden" name="version_name" value="{{$v.Version}}">
-                        <input type="url" name="url" required maxlength="2000" value="{{$v.SyncURL}}" placeholder="https://l10n.gnome.org/languages/id/gnome-51/ui.tar.gz" aria-label="{{t $.Lang "field.download_url"}}">
+                        {{if $v.IsGit}}<input name="git_repo" required maxlength="300" value="{{$v.GitRepo}}" placeholder="python/python-docs-id" aria-label="{{t $.Lang "groups.git_repo"}}" spellcheck="false">
+                        <input name="git_branch" required maxlength="200" value="{{$v.GitBranch}}" placeholder="3.14" class="lang-input" aria-label="{{t $.Lang "groups.git_branch"}}" spellcheck="false">
+                        {{else}}<input type="url" name="url" required maxlength="2000" value="{{$v.SyncURL}}" placeholder="https://l10n.gnome.org/languages/id/gnome-51/ui.tar.gz" aria-label="{{t $.Lang "field.download_url"}}">{{end}}
                         <input name="language" list="mg-lang-codes" value="{{$v.SyncLanguage}}" placeholder="id" maxlength="12" class="lang-input" aria-label="{{t $.Lang "field.language_optional"}}">
                         <button type="submit" class="btn btn-small btn-primary">{{t $.Lang "feed.save_and_fetch"}}</button>
                     </form>

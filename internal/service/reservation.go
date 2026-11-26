@@ -145,6 +145,23 @@ func (s *ReservationService) ReleaseMerged(ctx context.Context, projectID int64,
 	s.notify(ctx, p, h, "merged", "")
 }
 
+// ReleasePushed releases a module held by holderID after Pelokalan committed their file to the repository
+// (the review email already tells them)
+func (s *ReservationService) ReleasePushed(ctx context.Context, projectID int64, module string, holderID int64) {
+	if s == nil {
+		return
+	}
+	p, err := s.projects.GetByID(ctx, projectID)
+	if err != nil {
+		return
+	}
+	if h := s.Holder(ctx, p, module); h != nil && h.UserID == holderID {
+		if err := s.repo.Release(ctx, h.ID, nil, models.ReleaseMerged); err != nil {
+			log.Printf("reservations: release pushed %s: %v", module, err)
+		}
+	}
+}
+
 // Expire reminds holders whose reservation ends within ReminderDays and releases those past the project's
 // ReservationDays without saves. It returns how many it released.
 func (s *ReservationService) Expire(ctx context.Context, now time.Time) (int, error) {

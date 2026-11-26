@@ -77,6 +77,14 @@ type ModuleGroup struct {
 	// A Translation Project team whose page the group is synced from ("" = none), e.g. "id"
 	TPTeam string
 
+	// Full integration with the GitHub repository (Pelokalan GitHub App): approved modules are committed
+	// to the branch. GitInstallation/GitWrite come from the last access check.
+	GitDirect       bool
+	GitInstallation int64
+	GitWrite        bool
+	GitCheckedAt    *time.Time
+	GitAccessError  string
+
 	// Filled by listing queries
 	ImportCount int
 }
@@ -86,6 +94,11 @@ func (v *ModuleGroup) HasFeed() bool { return v.SyncURL != "" }
 
 // IsGit reports whether the group comes from a GitHub repository branch
 func (v *ModuleGroup) IsGit() bool { return v.GitRepo != "" }
+
+// CanPush tells whether approved modules can be committed to the repository now
+func (v *ModuleGroup) CanPush() bool {
+	return v.IsGit() && v.GitDirect && v.GitInstallation > 0 && v.GitWrite
+}
 
 // IsTP reports whether the group comes from a Translation Project team page
 func (v *ModuleGroup) IsTP() bool { return v.TPTeam != "" }

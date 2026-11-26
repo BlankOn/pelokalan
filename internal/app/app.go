@@ -18,6 +18,7 @@ import (
 	"pelokalan/internal/ai"
 	"pelokalan/internal/blobstore"
 	"pelokalan/internal/config"
+	"pelokalan/internal/githubapp"
 	"pelokalan/internal/glossary"
 	"pelokalan/internal/gnomel10n"
 	"pelokalan/internal/handler/middleware"
@@ -52,6 +53,7 @@ type App struct {
 	Discussions  *service.DiscussionService
 	Activity     *service.ActivityService
 	Reservations *service.ReservationService
+	Reviews      *service.ReviewService
 	Wiki         *service.WikiService
 	Contexts     *service.ContextService
 	AI           *service.AIService
@@ -97,6 +99,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		Discuss:  postgres.NewDiscussionRepository(db),
 		Activity: postgres.NewActivityRepository(db),
 		Reserve:  postgres.NewReservationRepository(db),
+		Review:   postgres.NewReviewRepository(db),
 	}
 	repos := a.Repos
 
@@ -131,6 +134,14 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		a.Glossary.SetUpstream(gnomel10n.New(gnomel10n.DefaultBase, false,
 			cfg.Site.Name+" upstream status (+"+cfg.Site.BaseURL+")"))
 	}
+	if cfg.GitHub.Enabled() { // the Pelokalan GitHub App: approved modules are committed to repositories
+		gh, err := githubapp.New(cfg.GitHub.AppID, cfg.GitHub.Slug, cfg.GitHub.PrivateKey, cfg.GitHub.API)
+		if err != nil {
+			return nil, err
+		}
+		a.Glossary.SetGitHub(gh)
+	}
+	a.Reviews = service.NewReviewService(repos.Review, a.Catalogs, a.Glossary, a.Reservations, repos.Project, repos.User, mailer, cfg.Site)
 	a.Catalogs.SetActivity(a.Activity)
 	a.Discussions.SetActivity(a.Activity)
 	a.Discussions.SetNotifications(postgres.NewNotificationRepository(db))
@@ -166,6 +177,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	h.SetSyncInterval(cfg.Glossary.FetchInterval)
 	h.SetActivity(a.Activity)
 	h.SetReservations(a.Reservations)
+	h.SetReviews(a.Reviews)
 	// PO files can also be created from a URL: same SSRF-safe transport, upload size limit
 	h.SetPOFetcher(glossary.NewFetcher(cfg.Server.MaxUploadMB<<20, cfg.Glossary.AllowPrivateHosts,
 		cfg.Site.Name+" PO fetcher (+"+cfg.Site.BaseURL+")"))
@@ -259,6 +271,14 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Post("/profile/identity", h.UpdateIdentity)
 		r.Post("/profile/badge-emails", h.UpdateBadgeEmails)
 		r.Post("/projects/{id}/reservations", h.ReserveModule)
+		r.Get("/projects/{id}/reviews/{rid}", h.ReviewPage)
+		r.Post("/projects/{id}/reviews/{rid}/approve", h.ApproveReview)
+		r.Post("/projects/{id}/reviews/{rid}/reject", h.RejectReview)
+		r.Post("/projects/{id}/reviews/{rid}/withdraw", h.WithdrawReview)
+		r.Post("/projects/{id}/module-groups/{gid}/github/check", h.CheckModuleGroupGitHub)
+		r.Post("/projects/{id}/module-groups/{gid}/github/direct", h.SetModuleGroupDirect)
+		r.Post("/catalogs/{cid}/review", h.RequestReview)
+		r.Post("/catalogs/{cid}/push", h.PushCatalog)
 		r.Post("/projects/{id}/reservations/release", h.ReleaseModule)
 		r.Post("/editor-settings", h.UpdateEditorSettings)
 

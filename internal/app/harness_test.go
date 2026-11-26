@@ -25,11 +25,13 @@ import (
 
 	"pelokalan/internal/app"
 	"pelokalan/internal/config"
+	"pelokalan/internal/githubapp/githubtest"
 	"pelokalan/internal/service"
 	"pelokalan/internal/testdb"
 )
 
 var (
+	ghFake *githubtest.Server // the fake GitHub API the GitHub App talks to (review_test.go)
 	env    *app.App
 	srv    *httptest.Server
 	mails  = &captureMailer{}
@@ -68,7 +70,10 @@ func run(m *testing.M) int {
 	srv = httptest.NewUnstartedServer(nil)
 	srv.Start()
 	defer srv.Close()
+	ghFake = githubtest.New()
+	defer ghFake.Close()
 	cfg := testConfig(db.Config, srv.URL)
+	cfg.GitHub = config.GitHubConfig{AppID: ghFake.AppID, Slug: "pelokalan-test", PrivateKey: ghFake.PrivateKey, API: ghFake.URL}
 	env, err = app.New(cfg, db.SQL, app.Options{Root: root, Mailer: mails, Offline: true})
 	if err != nil {
 		log.Print(err)

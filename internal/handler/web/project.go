@@ -162,6 +162,7 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Data["Project"] = p
 	data.Data["Template"] = template
 	data.Data["IsGit"] = h.glossary.IsGitProject(r.Context(), p)
+	data.Data["Reviews"], _ = h.reviews.Open(r.Context(), p) // requests waiting for an owner/manager
 	h.glossary.AttachUpstreamToCatalogs(r.Context(), p, catalogs)
 	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, nil, 0)
 	data.Data["MemberFiles"] = h.fileList(r, p, catalogs, false, "", nil, nil, 0)
@@ -886,6 +887,7 @@ type fileListView struct {
 	Searched    bool
 	PatchCmds   map[int64]string // the git patch command per own repository file on this page
 	Res         reservationView  // module reservations
+	Reviewer    bool             // owner or manager: may send files to the repository
 }
 
 // fileList filters a project's PO files: the user's own (mine) or the other members'.
@@ -978,6 +980,8 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 	end := min(offset+FileListPageSize, len(list))
 	v.Files = list[offset:end]
 	v.Next = end
+	v.Reviewer = p.Role.CanManage()
+	h.reviews.Attach(r.Context(), p, v.Files)
 	if mine {
 		user := middleware.GetUser(r.Context())
 		for _, c := range v.Files {

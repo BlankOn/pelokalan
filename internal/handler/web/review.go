@@ -1,0 +1,181 @@
+package web
+
+import (
+	"net/http"
+	"net/url"
+	"strconv"
+	"strings"
+
+	"pelokalan/internal/handler/middleware"
+	"pelokalan/internal/i18n"
+	"pelokalan/internal/models"
+	"pelokalan/internal/service"
+)
+
+// Full GitHub integration (service/review.go, service/github.go): managers check the GitHub App's access on a
+// module group and turn the integration on; members ask for a review of a file; owners and managers approve
+// (Pelokalan commits the file to the branch) or send it back with a note, or send a file right away.
+
+// SetReviews turns on reviews of modules for repositories Pelokalan writes to
+func (h *Handler) SetReviews(s *service.ReviewService) { h.reviews = s }
+
+// CheckModuleGroupGitHub asks GitHub about the app's access: POST /projects/{id}/module-groups/{gid}/github/check
+func (h *Handler) CheckModuleGroupGitHub(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.glossary.CheckGitAccess(r.Context(), p, idParam(r, "gid")); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, moduleGroupsPath(p, url.Values{"flash": {"github_checked"}}, "list"), http.StatusSeeOther)
+}
+
+// SetModuleGroupDirect turns full integration on or off: POST /projects/{id}/module-groups/{gid}/github/direct (on=1|0)
+func (h *Handler) SetModuleGroupDirect(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	on := r.FormValue("on") == "1"
+	if err := h.glossary.SetGitDirect(r.Context(), p, idParam(r, "gid"), on); err != nil {
+		h.renderModuleGroups(w, r, p, h.errorMessage(r, err), "list")
+		return
+	}
+	flash := "github_direct_off"
+	if on {
+		flash = "github_direct_on"
+	}
+	http.Redirect(w, r, moduleGroupsPath(p, url.Values{"flash": {flash}}, "list"), http.StatusSeeOther)
+}
+
+// RequestReview asks for a review of the owner's file: POST /catalogs/{cid}/review (note)
+func (h *Handler) RequestReview(w http.ResponseWriter, r *http.Request) {
+	c, p, ok := h.loadOwnCatalog(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.reviews.Request(r.Context(), middleware.GetUser(r.Context()), p, c, r.FormValue("note")); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, safeNext(r.FormValue("next"), p.Path()+"/files")+flashSep(r.FormValue("next"))+"flash=review_requested", http.StatusSeeOther)
+}
+
+// PushCatalog sends a file to the repository right away (owners and managers): POST /catalogs/{cid}/push
+func (h *Handler) PushCatalog(w http.ResponseWriter, r *http.Request) {
+	c, p, ok := h.loadCatalog(w, r)
+	if !ok {
+		return
+	}
+	if _, err := h.reviews.PushNow(r.Context(), middleware.GetUser(r.Context()), p, c); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/files?flash=review_pushed", http.StatusSeeOther)
+}
+
+func flashSep(next string) string {
+	if strings.Contains(safeNext(next, "/x"), "?") {
+		return "&"
+	}
+	return "?"
+}
+
+type diffLine struct {
+	Kind string // add, del, hunk, ""
+	Text string
+}
+
+// ReviewPage shows a request with the changes it sends: GET /projects/{id}/reviews/{rid}
+func (h *Handler) ReviewPage(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	rv, err := h.reviews.Get(r.Context(), p, idParam(r, "rid"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	user := middleware.GetUser(r.Context())
+	c, _, err := h.catalogService.Get(r.Context(), user, rv.CatalogID)
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	data := h.page(r, "")
+	data.Title = i18n.T(data.Lang, "review.title", rv.RepoPath) + " · " + p.Name
+	data.Data["Project"] = p
+	data.Data["Tab"] = "files"
+	data.Data["Review"] = rv
+	data.Data["Catalog"] = c
+	data.Data["CanDecide"] = rv.Status == models.ReviewRequested && p.Role.CanManage() && rv.RequestedBy != user.ID
+	data.Data["CanWithdraw"] = rv.Status == models.ReviewRequested && rv.RequestedBy == user.ID
+	if rv.Status == models.ReviewRequested {
+		if d, err := h.reviews.Changes(r.Context(), p, c); err == nil && d != nil {
+			var lines []diffLine
+			for _, l := range strings.Split(strings.TrimRight(d.Hunks, "\n"), "\n") {
+				kind := ""
+				switch {
+				case strings.HasPrefix(l, "@@"):
+					kind = "hunk"
+				case strings.HasPrefix(l, "+"):
+					kind = "add"
+				case strings.HasPrefix(l, "-"):
+					kind = "del"
+				}
+				lines = append(lines, diffLine{kind, l})
+			}
+			data.Data["Diff"] = lines
+			data.Data["Changed"] = d.Changed
+		}
+	}
+	h.render(w, "review", data)
+}
+
+// ApproveReview commits a requested file: POST /projects/{id}/reviews/{rid}/approve
+func (h *Handler) ApproveReview(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	rv, err := h.reviews.Approve(r.Context(), middleware.GetUser(r.Context()), p, idParam(r, "rid"))
+	if err != nil {
+		if rv != nil { // the commit failed: the request stays open and shows the error
+			http.Redirect(w, r, p.Path()+"/reviews/"+strconv.FormatInt(idParam(r, "rid"), 10)+"?flash=review_failed", http.StatusSeeOther)
+			return
+		}
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/reviews/"+strconv.FormatInt(rv.ID, 10)+"?flash=review_pushed", http.StatusSeeOther)
+}
+
+// RejectReview sends a request back with a note: POST /projects/{id}/reviews/{rid}/reject (note)
+func (h *Handler) RejectReview(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	id := idParam(r, "rid")
+	if err := h.reviews.Reject(r.Context(), middleware.GetUser(r.Context()), p, id, r.FormValue("note")); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/reviews/"+strconv.FormatInt(id, 10)+"?flash=review_rejected", http.StatusSeeOther)
+}
+
+// WithdrawReview takes the user's own request back: POST /projects/{id}/reviews/{rid}/withdraw
+func (h *Handler) WithdrawReview(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	if err := h.reviews.Withdraw(r.Context(), middleware.GetUser(r.Context()), p, idParam(r, "rid")); err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/files?flash=review_withdrawn", http.StatusSeeOther)
+}

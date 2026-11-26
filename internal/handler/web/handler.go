@@ -51,6 +51,7 @@ type Handler struct {
 	spelling       *service.SpellingService
 	activity       *service.ActivityService
 	reservations   *service.ReservationService // module reservations (nil-safe: off)
+	reviews        *service.ReviewService      // reviews and commits to repositories (nil-safe: off)
 	assetVersion   string
 }
 

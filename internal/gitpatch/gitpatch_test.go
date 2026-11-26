@@ -153,3 +153,29 @@ func TestGitAm(t *testing.T) {
 		}
 	}
 }
+
+func TestApply(t *testing.T) {
+	want := map[string]Target{
+		"Process Parameters": {Translation: []string{"Parameter Proses"}},
+		"Return %s":          {Translation: []string{"Mengembalikan %s"}},
+	}
+	out, n := Apply([]byte(base), want)
+	if n != 1 {
+		t.Fatalf("changed = %d, want 1", n)
+	}
+	s := string(out)
+	if !strings.Contains(s, "msgstr \"Mengembalikan %s\"\n") || strings.Contains(s, "Kembalikan %s") ||
+		!strings.Contains(s, "Tidak disentuh") || !strings.HasSuffix(s, "\n") {
+		t.Fatalf("applied file:\n%s", s)
+	}
+	// the result is what the patch describes: applying again changes nothing
+	if _, n := Apply(out, want); n != 0 {
+		t.Fatalf("second apply changed %d entries", n)
+	}
+	if d := Diff("x.po", out, want); d != nil {
+		t.Fatalf("diff after apply: %+v", d)
+	}
+	if same, n := Apply([]byte(base), map[string]Target{}); n != 0 || string(same) != base {
+		t.Fatal("nothing wanted should return the file itself")
+	}
+}

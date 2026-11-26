@@ -183,6 +183,11 @@ type GlossaryRepository interface {
 	SetGroupSync(ctx context.Context, groupID int64, url, language string, userID *int64) error
 	// SetGroupGit stores the GitHub repository ("owner/name") and branch a module group is synced from
 	SetGroupGit(ctx context.Context, groupID int64, repo, branch string) error
+	// SetGroupGitAccess records an access check of the GitHub App on a group's repository (no write access
+	// also turns full integration off)
+	SetGroupGitAccess(ctx context.Context, groupID, installation int64, write bool, errText string) error
+	// SetGroupGitDirect turns full integration with the group's repository on or off
+	SetGroupGitDirect(ctx context.Context, groupID int64, on bool) error
 	// SetGroupTP stores the Translation Project team a module group is synced from ("" = none)
 	SetGroupTP(ctx context.Context, groupID int64, team string) error
 	// TPDomains returns a Translation Project team's domains as last read (data only when withData)
@@ -293,6 +298,22 @@ type Repositories struct {
 	Discuss  DiscussionRepository
 	Activity ActivityRepository
 	Reserve  ReservationRepository
+	Review   ReviewRepository
+}
+
+// ReviewRepository stores review requests of modules for repositories Pelokalan writes to (module_reviews)
+type ReviewRepository interface {
+	// Create stores a request; ErrConflict when the file already has an open one
+	Create(ctx context.Context, r *models.ModuleReview) error
+	Get(ctx context.Context, id int64) (*models.ModuleReview, error)
+	// Open lists a project's requests waiting for review, oldest first
+	Open(ctx context.Context, projectID int64) ([]*models.ModuleReview, error)
+	// Latest returns the newest review of each of the catalogs
+	Latest(ctx context.Context, catalogIDs []int64) (map[int64]*models.ModuleReview, error)
+	// Update stores the outcome (status, reviewer, note, commit, pushed data, error, entries)
+	Update(ctx context.Context, r *models.ModuleReview) error
+	// LastPushed returns the repository file (gzip) as last committed for a catalog (nil = never)
+	LastPushed(ctx context.Context, catalogID int64) ([]byte, error)
 }
 
 // ReservationRepository stores module reservations (module_reservations)

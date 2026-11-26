@@ -4,6 +4,20 @@
 {{if not .User}}
 <div class="alert alert-warn">{{t .Lang "files.guest_prefix"}} <a href="/login?next={{$p.Path}}/files">{{t .Lang "files.guest_login"}}</a> {{t .Lang "files.guest_or"}} <a href="/register?next={{$p.Path}}/files">{{t .Lang "files.guest_register"}}</a> {{t .Lang "files.guest_suffix"}}</div>
 {{end}}
+{{with .Data.Reviews}}
+<section class="card review-queue">
+    <h2 class="review-queue-title">{{t $.Lang "review.queue_title"}} <span class="muted small">({{len .}})</span></h2>
+    <p class="muted small">{{t $.Lang "review.queue_help"}}</p>
+    <ul class="review-list">
+        {{range .}}<li>
+            <a href="{{$p.Path}}/reviews/{{.ID}}"><strong>{{.RepoPath}}</strong></a>
+            <span class="muted small">@{{.RequesterUsername}} · {{t $.Lang "review.strings" .Entries}} · {{timeAgo $.Lang .CreatedAt}}</span>
+            {{if .Error}}<span class="rv-chip rv-rejected small" title="{{errText $.Lang .Error}}">{{t $.Lang "review.failed"}}</span>{{end}}
+            <a class="btn btn-small btn-primary" href="{{$p.Path}}/reviews/{{.ID}}">{{t $.Lang "review.open"}}</a>
+        </li>{{end}}
+    </ul>
+</section>
+{{end}}
 {{with .Data.ProjectFiles}}{{if .Files}}
 <div class="files-section" data-sticky-section data-collapse-key="files:{{$p.Slug}}:project">
 <h2 class="section-title" data-stick><button type="button" class="section-toggle" aria-expanded="true"><svg class="st-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span>{{t $.Lang "files.project"}}</span> <span class="muted small">({{.Total}})</span></button></h2>
@@ -173,6 +187,19 @@
         <div class="dialog-actions">
             <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
             <button type="submit" class="btn btn-primary">{{t .Lang "replace.submit"}}</button>
+        </div>
+    </form>
+</dialog>
+<dialog id="review-dialog" class="dialog">
+    <form method="post" action="" class="form">
+        <h2>{{t .Lang "review.request_title"}}</h2>
+        <p class="muted small"><strong class="review-name"></strong></p>
+        <p class="muted small">{{t .Lang "review.request_help"}}</p>
+        <label for="rv-note">{{t .Lang "review.note"}}</label>
+        <textarea id="rv-note" name="note" rows="4" maxlength="2000" placeholder="{{t .Lang "review.note_placeholder"}}"></textarea>
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "review.request"}}</button>
         </div>
     </form>
 </dialog>

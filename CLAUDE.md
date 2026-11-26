@@ -625,6 +625,32 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   access is checked again when fetched and the patch is built then. Failures are plain text: 403 expired/invalid,
   404 nothing to send.
 
+## Full GitHub integration (GitHub App)
+
+- Three ways to send work back to a GitHub repository: (1) git patch (above), (2) pull requests through the app
+  (planned), (3) **full integration**: Pelokalan commits approved modules straight to the branch. (3) is built.
+- `internal/githubapp`: the Pelokalan GitHub App (`GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY[_FILE]`,
+  `config.GitHubConfig`; unset = feature hidden). RS256 app JWT, `Installation` per repo, installation tokens cached
+  until 5 min before expiry, `GetFile` (contents API, blob API over 1 MB), `PutFile` (contents API with the blob
+  sha; `ErrConflict` when the branch moved). `githubtest` is a fake of those endpoints for tests (never call GitHub).
+- Module group (migration 048): `git_direct` (on/off), `git_installation`, `git_write`, `git_checked_at`,
+  `git_access_error`; `ModuleGroup.CanPush`. The popup's `github_integration` block (git groups): install link,
+  "Periksa akses" (`GlossaryService.CheckGitAccess`), "Aktifkan/Matikan integrasi penuh" (`SetGitDirect`, needs write).
+  Git groups edit repository + branch in "Ubah repositori atau cabang" instead of the archive link.
+- Reviews (`module_reviews`, `service/review.go`, `handler/web/review.go`): a member asks for a review of their file
+  ("Ajukan tinjauan" in the ⋯ menu, `#review-dialog` with an optional note; `POST /catalogs/{cid}/review`); owners and
+  managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan; `/projects/{id}/reviews/{rid}` shows the
+  changes (`ReviewService.Changes`: `CatalogService.ChangedTargets` = the git patch rule, against the last synced file)
+  with "Setujui & commit" / "Kembalikan dengan catatan" (note required, emailed). Nobody approves their own request.
+  Owners/managers may also "Kirim ke repositori" any file directly (`PushNow`). One open request per file.
+- Commit (`ReviewService.commit`): reads the branch's current file, `gitpatch.Apply` (the whole file with only the
+  member's changed entries rewritten), `PutFile` (one retry on conflict), author = translator's credit identity,
+  message "Update translation of <path>" + count + note + `Reviewed-by:` + project link. The committed file is kept
+  (`pushed_data`) and strings equal to it are never sent again, so later repository changes are not reverted. Then the
+  reservation is released quietly (`ReleasePushed`), the group re-synced (if it has a feed), and the translator emailed.
+  A failure keeps the request open with `error` shown on the review page and in the queue.
+- File rows show `review_chip` (Menunggu tinjauan / Perlu perbaikan / Masuk repositori · sha linking the commit).
+
 ## Module groups UI
 
 - Settings has a "Kelompok modul" section (`#module-groups`, owners and managers) with the group labels and buttons
@@ -660,7 +686,9 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   selector beside it (1–4 alternatives, default 2, remembered in localStorage `aiAltCount`). With n > 1 the
   entry is sent n times in one call, numbered by `Item.Alternative`, plus `ai.AlternativesNote`; only
   alternative 1 carries the draft. Unusable and duplicate answers are dropped; the editor shows the rest side
-  by side (`#ai-alts`), each marking (`<mark>`, `altDiff`) the words it does not share with every other alternative;
+  by side (`#ai-alts`), each marking (`<mark>`, `altDiffs`) where the alternatives differ: every alternative is aligned word by word with #1
+  (`wordOps`), and a change is keyed by where it starts in #1, so the same place has the same colour in every card
+  (golden-angle hues via `--h`; spaces between changed words stay in one change);
   clicking a box (or Enter/Space on it) puts it in the translation box (undoable) without opening the Bandingkan panel
   (the replaced text stays available there). With one result it goes straight in and the comparison opens.
 - Per-entry AI details:

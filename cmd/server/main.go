@@ -66,6 +66,19 @@ func main() {
 	if err := a.AI.RecoverJobs(context.Background()); err != nil {
 		log.Printf("AI: recover jobs: %v", err)
 	}
+	if gh := a.Glossary.GitHubApp(); gh != nil { // say whether the GitHub App's id and key work
+		go func() {
+			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			if info, err := gh.App(ctx); err != nil {
+				log.Printf("GitHub App: %v", err)
+			} else {
+				log.Printf("GitHub App: %s (%s), owned by %s", info.Name, info.Slug, info.Owner.Login)
+			}
+		}()
+	} else {
+		log.Printf("GitHub App: not configured (full integration with repositories is off)")
+	}
 	// Indonesian thesaurus and spelling word list: stored on first start, then served from memory
 	for _, load := range []struct {
 		name string

@@ -126,22 +126,9 @@ func (s *CatalogService) GitPatch(ctx context.Context, user *models.User, p *mod
 		if err != nil {
 			return nil, err
 		}
-		entries, err := s.catalogs.ListEntries(ctx, c.ID, false)
+		want, err := s.ChangedTargets(ctx, c, nil)
 		if err != nil {
 			return nil, err
-		}
-		ref := s.reference(ctx, c)
-		want := map[string]gitpatch.Target{}
-		for _, e := range entries {
-			if e.Obsolete || e.IsAI() || !e.IsTranslated() { // unreviewed AI drafts and empty strings stay out
-				continue
-			}
-			pe := e.ToPO()
-			st := poState{e.MsgStr, e.Fuzzy}
-			if r, ok := ref[pe.Key()]; ok && sameStrings(r.tr, st.tr) && r.fuzzy == st.fuzzy {
-				continue // not changed in Pelokalan: the repository's version stands
-			}
-			want[pe.Key()] = gitpatch.Target{Translation: e.MsgStr, Fuzzy: e.Fuzzy}
 		}
 		d := gitpatch.Diff(c.RepoPath, base, want)
 		if d == nil {
@@ -172,6 +159,43 @@ func (s *CatalogService) GitPatch(ctx context.Context, user *models.User, p *mod
 	}
 	res.Filename = fmt.Sprintf("%s-%s-pelokalan-%s.patch", name, strings.ReplaceAll(res.Branch, "/", "-"), now.Format("20060102-1504"))
 	return res, nil
+}
+
+// ChangedTargets are the entries the member changed in Pelokalan since taking or last updating the file
+// (the reference version), as patch targets; unreviewed AI drafts and empty strings stay out. Entries
+// whose state equals the one in sent (a repository file as Pelokalan last committed it; nil = none)
+// are left out too, so strings already sent never overwrite newer repository translations.
+func (s *CatalogService) ChangedTargets(ctx context.Context, c *models.Catalog, sent []byte) (map[string]gitpatch.Target, error) {
+	entries, err := s.catalogs.ListEntries(ctx, c.ID, false)
+	if err != nil {
+		return nil, err
+	}
+	ref := s.reference(ctx, c)
+	var done map[string]poState
+	if sent != nil {
+		if cat, err := po.ParseBytes(sent); err == nil {
+			done = make(map[string]poState, len(cat.Entries))
+			for _, e := range cat.Entries {
+				done[e.Key()] = poState{e.Translation, e.Fuzzy}
+			}
+		}
+	}
+	want := map[string]gitpatch.Target{}
+	for _, e := range entries {
+		if e.Obsolete || e.IsAI() || !e.IsTranslated() { // unreviewed AI drafts and empty strings stay out
+			continue
+		}
+		pe := e.ToPO()
+		st := poState{e.MsgStr, e.Fuzzy}
+		if r, ok := ref[pe.Key()]; ok && sameStrings(r.tr, st.tr) && r.fuzzy == st.fuzzy {
+			continue // not changed in Pelokalan: the repository's version stands
+		}
+		if r, ok := done[pe.Key()]; ok && sameStrings(r.tr, st.tr) && r.fuzzy == st.fuzzy {
+			continue // already committed by Pelokalan
+		}
+		want[pe.Key()] = gitpatch.Target{Translation: e.MsgStr, Fuzzy: e.Fuzzy}
+	}
+	return want, nil
 }
 
 func sameStrings(a, b []string) bool {
