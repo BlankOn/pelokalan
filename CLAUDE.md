@@ -462,8 +462,8 @@ steps. It is always shown (no hide button).
 
 ## Footer
 
-`layouts/base.html`: site name and tagline, Tentang/Lisensi links, and "Sebuah proyek dari" / "A project by" BlankOn
-Foundation linking to blankon.id. The logo (`static/img/blankon-foundation.png`, the light version: dark letters) shows when
+`layouts/base.html`: "Sebuah proyek dari" / "A project by" with the BlankOn Foundation logo (linking to blankon.id) on
+top, then the site name and tagline and the Tentang/Lisensi links. The logo (`static/img/blankon-foundation.png`, the light version: dark letters) shows when
 `static/img/blankon-foundation.svg` (or `.png`) exists
 (`PageData.ByLogo`, checked at start-up); otherwise the name is written in text.
 
