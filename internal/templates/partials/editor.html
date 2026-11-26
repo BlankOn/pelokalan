@@ -37,7 +37,6 @@
             <select id="ai-alt-count" class="ai-alt-count" title="{{t .Lang "ai.alt_count_help"}}" aria-label="{{t .Lang "ai.alt_count_help"}}">
                 <option value="1">{{t .Lang "ai.alt_n" 1}}</option><option value="2" selected>{{t .Lang "ai.alt_n" 2}}</option><option value="3">{{t .Lang "ai.alt_n" 3}}</option><option value="4">{{t .Lang "ai.alt_n" 4}}</option>
             </select>{{end}}
-            <label class="fuzzy-toggle" title="Ctrl+U"><input type="checkbox" name="fuzzy" value="1" {{if or $e.Fuzzy $e.IsAI}}checked{{end}}> {{if $e.IsAI}}{{t .Lang "editor.ai_review"}}{{else}}{{t .Lang "editor.needs_work"}}{{end}}</label>
         </div>
         <div class="ai-alts" id="ai-alts" hidden data-use="{{t .Lang "ai.alt_use"}}" data-flagged="{{t .Lang "ai.alt_flagged"}}" data-title="{{t .Lang "ai.alt_title"}}" data-close="{{t .Lang "action.close"}}"></div>
         <div class="cmp-panel" id="cmp-panel" hidden data-before="{{t .Lang "compare.before"}}" data-after="{{t .Lang "compare.after"}}">
@@ -64,6 +63,7 @@
         <button type="button" class="btn btn-small" id="btn-undo" disabled title="{{t .Lang "editor.undo_help"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>{{t .Lang "editor.undo"}}</button>
         <span class="ed-notice muted small" role="status">{{.Notice}}</span>
         <div class="spacer"></div>
+        <label class="fuzzy-toggle" title="Ctrl+U"><input type="checkbox" name="fuzzy" value="1" {{if or $e.Fuzzy $e.IsAI}}checked{{end}}> {{if $e.IsAI}}{{t .Lang "editor.ai_review"}}{{else}}{{t .Lang "editor.needs_work"}}{{end}}</label>
         <button type="submit" class="btn btn-small btn-primary" id="btn-save" title="{{if or $e.Fuzzy $e.IsAI}}Ctrl+Shift+Enter{{else}}Ctrl+Enter{{end}}"><svg class="ok-check" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{t .Lang "editor.save_next"}}</button>
         <button type="button" class="btn btn-small btn-approve" id="btn-unfuzzy-save" title="Ctrl+Enter" {{if not (or $e.Fuzzy $e.IsAI)}}hidden{{end}}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>{{t .Lang "editor.unfuzzy_save_next"}}</button>
     </div>

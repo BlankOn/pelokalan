@@ -24,6 +24,9 @@
         {{if .Groups}}{{template "group_filter" (dict "Lang" $.Lang "Groups" .Groups "NoGroup" false)}}{{end}}
         {{if .Upstream}}{{template "upstream_filter" (dict "Lang" $.Lang)}}{{end}}
         {{if .Res.On}}{{template "reserve_filter" (dict "Lang" $.Lang)}}{{end}}
+        <select name="s" class="pf-sort" aria-label="{{t $.Lang "files.sort"}}" title="{{t $.Lang "files.sort"}}">
+            {{range sortOptions .Res.On}}<option value="{{.}}">{{t $.Lang (printf "files.sort_%s" .)}}</option>{{end}}
+        </select>
         </form>
     </div>
     <p class="pf-sync-msg small" role="status" hidden></p>

@@ -149,8 +149,9 @@ type GlossaryTerm struct {
 type GlossaryRepository interface {
 	// project files: the PO files of glossary sources
 	AddProjectFiles(ctx context.Context, files []*models.ProjectFile) error
-	// ListProjectFiles pages the project files matching query, limited to groupIDs when given
-	ListProjectFiles(ctx context.Context, projectID int64, query string, groupIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error)
+	// ListProjectFiles pages the project files matching query, limited to groupIDs when given, in a sort
+	// order of service.ProjectFileSorts ("" or unknown = least complete first)
+	ListProjectFiles(ctx context.Context, projectID int64, query string, groupIDs []int64, sort string, limit, offset int) ([]*models.ProjectFile, int, error)
 	GroupsWithFiles(ctx context.Context, projectID int64) ([]*models.ModuleGroupOption, error)
 	// UpstreamCandidates lists every distinct project file with what is needed to find it upstream
 	UpstreamCandidates(ctx context.Context) ([]models.UpstreamCandidate, error)

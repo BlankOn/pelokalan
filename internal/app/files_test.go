@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 )
@@ -77,6 +78,23 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 	if h := scalar[int64](t, `SELECT user_id FROM module_reservations WHERE project_id = $1 AND module = 'calc' AND released_at IS NULL`, pid); h != kiki.ID {
 		t.Fatalf("calc held by %d, want kiki", h)
 	}
+
+	// sorting the project files (calc has 3 strings, edit 2; calc is reserved)
+	order := func(sort string) (calcFirst bool) {
+		body := owner.get(base + "/project-files?s=" + sort).status(http.StatusOK).Body
+		c, e := strings.Index(body, "calc.main.id.po"), strings.Index(body, "edit.main.id.po")
+		if c < 0 || e < 0 {
+			t.Fatalf("sort %s: a file is missing", sort)
+		}
+		return c < e
+	}
+	for sort, want := range map[string]bool{"most": true, "fewest": false, "name": true, "reserved": true, "free": false,
+		"complete": false, "incomplete": true} {
+		if order(sort) != want {
+			t.Errorf("sort %s: calc first = %v, want %v", sort, !want, want)
+		}
+	}
+	owner.get(base+"/files").status(http.StatusOK).contains(`name="s"`, "Direservasi dulu", "String terbanyak")
 
 	// the owner cannot take it while kiki holds it, and sees who does
 	owner.post(base+"/project-files/"+strconv.FormatInt(calc, 10)+"/take", nil).status(http.StatusOK).contains("@" + kiki.Username)

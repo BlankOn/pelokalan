@@ -166,7 +166,7 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, nil, 0)
 	data.Data["MemberFiles"] = h.fileList(r, p, catalogs, false, "", nil, nil, 0)
 	data.Data["Tab"] = "files"
-	if pf, total, err := h.glossary.ProjectFiles(r.Context(), p, "", nil, nil, 0); err == nil {
+	if pf, total, err := h.glossary.ProjectFiles(r.Context(), p, "", nil, nil, service.ProjectFileOrder{}, 0); err == nil {
 		_ = h.catalogService.MatchOwnFiles(r.Context(), middleware.GetUser(r.Context()), p, pf)
 		h.attachReservations(r, p, nil, pf)
 		view := projectFilesView{Lang: data.Lang, Project: p, Files: pf, Total: total,
@@ -674,6 +674,27 @@ func (h *Handler) projectFileKeep(r *http.Request, p *models.Project) func(*mode
 	}
 }
 
+// projectFileOrder is the project files order from the request (s): one of service.ProjectFileSorts;
+// "reserved" / "free" put reserved (or free) modules first, least complete first within each
+func (h *Handler) projectFileOrder(r *http.Request, p *models.Project) service.ProjectFileOrder {
+	o := service.ProjectFileOrder{Sort: r.URL.Query().Get("s")}
+	if o.Sort != "reserved" && o.Sort != "free" {
+		return o
+	}
+	if !p.Reservations {
+		return service.ProjectFileOrder{}
+	}
+	held := h.reservations.Map(r.Context(), p)
+	first := o.Sort == "reserved"
+	o.Rank = func(f *models.ProjectFile) int {
+		if (held[service.ModuleKey(f.Filename)] != nil) == first {
+			return 0
+		}
+		return 1
+	}
+	return o
+}
+
 // ProjectFilesMore returns the next page of project files (htmx "Muat lagi")
 func (h *Handler) ProjectFilesMore(w http.ResponseWriter, r *http.Request) {
 	p, ok := h.loadProject(w, r)
@@ -684,7 +705,7 @@ func (h *Handler) ProjectFilesMore(w http.ResponseWriter, r *http.Request) {
 	q := r.URL.Query().Get("q")
 	var groupIDs []int64
 	groupIDs = groupParams(r)
-	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, groupIDs, h.projectFileKeep(r, p), offset)
+	pf, total, err := h.glossary.ProjectFiles(r.Context(), p, q, groupIDs, h.projectFileKeep(r, p), h.projectFileOrder(r, p), offset)
 	if err != nil {
 		h.fail(w, r, err)
 		return

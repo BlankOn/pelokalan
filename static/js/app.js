@@ -500,8 +500,9 @@
     document.body.addEventListener("htmx:load", restoreAltCount);
     restoreAltCount();
 
-    // put one AI result (forms + flagged) into the translation box
-    function applyAIResult(f, res, notice) {
+    // put one AI result (forms + flagged) into the translation box; fromAlternatives: chosen among
+    // several, which are compared with each other instead (the old text stays under Bandingkan)
+    function applyAIResult(f, res, notice, fromAlternatives) {
         var boxes = Array.prototype.slice.call(f.querySelectorAll(".tr-input"));
         pushUndo();
         var beforeForms = boxes.map(function (ta) { return ta.value; });
@@ -521,8 +522,8 @@
         if (n) n.textContent = notice || "";
         var changed = boxes.some(function (ta, i) { return ta.value !== beforeForms[i]; });
         if (changed && beforeForms.some(function (v) { return v.trim() !== ""; })) {
-            setReplaced(beforeForms);
-            showCompare();
+            if (!replacedForms()) setReplaced(beforeForms); // keep the person's text when switching alternatives
+            if (fromAlternatives) hideCompare(); else showCompare();
         }
         focusTranslation();
     }
@@ -552,10 +553,13 @@
             num.className = "ai-alt-num";
             num.textContent = "#" + (i + 1) + (alt.flagged ? " · " + box.dataset.flagged : "");
             card.appendChild(num);
-            alt.forms.forEach(function (form) {
+            alt.forms.forEach(function (text, k) {
                 var t = document.createElement("div");
                 t.className = "ai-alt-text";
-                t.textContent = form;
+                // words this alternative does not share with every other one are marked
+                var others = res.alternatives.filter(function (o, j) { return j !== i; })
+                    .map(function (o) { return (o.forms && o.forms[k]) || ""; });
+                renderDiff(t, altDiff(text, others));
                 card.appendChild(t);
             });
             // the whole box is the choice: click (or Enter/Space) puts it in the translation box
@@ -563,7 +567,7 @@
             card.setAttribute("role", "button");
             card.title = box.dataset.use;
             var choose = function () {
-                applyAIResult(f, alt, res.notice);
+                applyAIResult(f, alt, res.notice, true);
                 grid.querySelectorAll(".ai-alt").forEach(function (c) {
                     c.classList.toggle("ai-alt-chosen", c === card);
                     c.setAttribute("aria-pressed", c === card ? "true" : "false");
@@ -685,6 +689,16 @@
         while (i < n) before.push(["del", x[i++]]);
         while (j < m) after.push(["ins", y[j++]]);
         return [before, after];
+    }
+    // altDiff marks ("mark") the words of text that are missing from the common part with any of others
+    function altDiff(text, others) {
+        var marked = null;
+        others.forEach(function (o) {
+            var before = diffWords(text, o)[0];
+            if (!marked) marked = before.map(function () { return false; });
+            before.forEach(function (p, i) { if (p[0] === "del") marked[i] = true; });
+        });
+        return diffWords(text, text)[0].map(function (p, i) { return [marked && marked[i] ? "mark" : "", p[1]]; });
     }
     function renderDiff(el, parts) {
         el.innerHTML = "";

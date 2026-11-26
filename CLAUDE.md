@@ -116,7 +116,10 @@ make cover          # coverage of every package by every test (bin/coverage.html
   ("Berkas Anda", `/projects/{id}/files`). Translation memory uses the user's own files.
 - **Project files** ("Berkas proyek", `project_files`, migration 027): every glossary import also
   stores its PO files (gzip) with stats, so the Penerjemahan tab has three sections: project files,
-  your files, other members' files. Listed least complete first, 10 at a time (`ProjectFilePageSize`,
+  your files, other members' files. Listed least complete first, 10 at a time (`ProjectFilePageSize`; the "Urutkan"
+  select in `#pf-filter`, param `s`, `service.ProjectFileSorts`: least/most complete, most/fewest strings, most left,
+  name, and with reservations on "Direservasi dulu"/"Belum direservasi dulu", which `projectFileOrder` ranks in Go
+  after the database order (`ProjectFileOrder.Rank`);
   "Muat lagi" via `GET /projects/{id}/project-files?offset=`); download, or "Ambil" copies one into
   the member's own files (`catalogService.Upload`). Synced module groups imported before 027 count as due
   (`DueGroupSyncs`) and are re-fetched to fill them in; groups uploaded by hand need a re-upload.
@@ -657,7 +660,9 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   selector beside it (1–4 alternatives, default 2, remembered in localStorage `aiAltCount`). With n > 1 the
   entry is sent n times in one call, numbered by `Item.Alternative`, plus `ai.AlternativesNote`; only
   alternative 1 carries the draft. Unusable and duplicate answers are dropped; the editor shows the rest side
-  by side (`#ai-alts`); clicking a box (or Enter/Space on it) puts it in the translation box (undoable). With one result it goes straight in.
+  by side (`#ai-alts`), each marking (`<mark>`, `altDiff`) the words it does not share with every other alternative;
+  clicking a box (or Enter/Space on it) puts it in the translation box (undoable) without opening the Bandingkan panel
+  (the replaced text stays available there). With one result it goes straight in and the comparison opens.
 - Per-entry AI details:
   `POST /catalogs/{cid}/entries/{eid}/ai` → `AIService.TranslateEntry` translates one entry with the
   editor's current text as draft and returns it unsaved; cost is recorded as an `ai_jobs` row with
@@ -707,6 +712,8 @@ pre-translation checkbox `mark_fuzzy` now only applies to memory and glossary re
 'memory' with blue cards (`icon_origin` in entry_list.html), with status-bar counts and filters for each. Snapshots keep it as an `x-origin-*` flag, stripped from downloads.
 
 ## Version history
+
+- The UI calls a manual commit "Simpan Versi" / "Save Version" (button, dialog, counts); code and tables keep "commit".
 
 - `catalog_commits`: linear history per catalog, gzip PO snapshot + stats + diff counts.
   Kinds: manual, auto (safety), restore, initial. Auto messages are i18n keys ("key|arg").
@@ -791,11 +798,12 @@ deploys never run stale JS/CSS.
 - Search boxes in htmx filter forms must not reload on their own `change` (fired on blur): triggers use
   `change[target.type!='search']`, otherwise the rows are swapped under the user's next click.
 - Problem warnings (`ed-alert-warn`) sit right below the translation box, before the save buttons. In the
-  Terjemahan label row, Bandingkan / "Terjemahkan dengan AI" + count sit on the right, just before Perlu ditinjau.
+  Terjemahan label row, Bandingkan / "Terjemahkan dengan AI" + count sit on the right. The Perlu ditinjau checkbox
+  sits in `.ed-actions` right before the save buttons.
   English calls Perlu ditinjau "Fuzzy".
 - Validation flags `control_chars` and `markup` (tags such as <gui>, <key> differing from the source);
   `ai.UserPrompt` sends markup unescaped, and AI results with control characters are never saved.
-- Toolbar order: Proyek | Tarik upstream, Riwayat, Commit | Konteks, Praterjemah, Validasi | Teks, Metadata |
+- Toolbar order: Proyek | Tarik upstream, Riwayat, Simpan Versi | Konteks, Praterjemah, Validasi | Teks, Metadata |
   PO, Modul | Bantuan, Pengaturan. "Modul" (`Data.ModulePage`) opens the file's module page on l10n.gnome.org (its
   stored upstream state's page, else its own/guessed link; hidden when there is none). MO is downloaded from the
   file menu on Penerjemahan only.

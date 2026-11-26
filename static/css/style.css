@@ -412,6 +412,8 @@ h1 .ai-badge { font-size: 12px; }
 .ptab { border: 1px solid var(--border); border-bottom: 0; background: var(--surface-2); padding: 4px 12px; border-radius: 6px 6px 0 0; font: inherit; font-size: 12px; cursor: pointer; }
 .ptab.active { background: var(--surface); font-weight: 600; }
 .ed-actions { display: flex; align-items: center; gap: 10px; }
+/* "Perlu ditinjau" sits right before the save buttons */
+.ed-actions .fuzzy-toggle { margin-left: 0; margin-right: 2px; }
 .ed-alert { padding: 8px 10px; border-radius: 6px; font-size: 13px; }
 .ed-alert-error { background: var(--error-soft); color: #8f1f1b; }
 .ed-alert-warn { background: var(--fuzzy-soft); color: #7a4d05; }
@@ -1324,8 +1326,6 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 .ai-entry-btn .s1 { fill: #7a3fd1; } .ai-entry-btn .s2 { fill: #e8780c; }
 .ai-entry-btn.working { cursor: progress; background: linear-gradient(110deg, #f3e8ff 0%, #fff1e0 30%, #e6eefc 60%, #f3e8ff 100%); background-size: 300% 100%; animation: ai-shimmer 1.6s linear infinite; }
 .ai-entry-btn.working svg .s1, .ai-entry-btn.working svg .s2 { animation: ai-twinkle 1s ease-in-out infinite; transform-origin: center; }
-/* the AI button (and its count) sits on the right, right before "Perlu ditinjau" */
-.ai-entry-btn + .fuzzy-toggle, .ai-alt-count + .fuzzy-toggle { margin-left: 10px; }
 .ed-label > .cmp-btn:not([hidden]) { margin-left: auto; }
 
 /* undo button in the editor actions */
@@ -1348,7 +1348,7 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 .cmp-btn { display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--text); font: inherit; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; cursor: pointer; }
 .cmp-btn:hover, .cmp-btn.active { border-color: var(--accent); background: var(--accent-soft); }
 .cmp-btn:not([hidden]) { margin-left: auto; }
-.cmp-btn:not([hidden]) + .ai-entry-btn, .cmp-btn:not([hidden]) ~ .fuzzy-toggle { margin-left: 8px; }
+.cmp-btn:not([hidden]) + .ai-entry-btn { margin-left: 8px; }
 .cmp-panel { border: 1px solid var(--border); border-radius: 6px; background: var(--surface); padding: 8px; }
 .cmp-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
 .cmp-head { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin-bottom: 4px; }
@@ -1427,6 +1427,8 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 .ai-alt-num { font-size: 11px; color: var(--muted); }
 .ai-alt-flagged .ai-alt-num { color: var(--fuzzy); }
 .ai-alt-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; line-height: 1.45; flex: 1; }
+/* words in which the alternatives differ from each other */
+.ai-alt-text mark { background: #fff1c2; color: inherit; border-radius: 3px; padding: 0 1px; box-shadow: 0 0 0 1px #f3dc8b; }
 .ai-alt { cursor: pointer; transition: border-color .12s, box-shadow .12s; }
 .ai-alt:hover, .ai-alt:focus-visible { border-color: var(--accent); outline: none; box-shadow: 0 0 0 2px var(--accent-soft); }
 .ai-alt-chosen { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-soft); }

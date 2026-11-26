@@ -123,6 +123,16 @@ func SiteLocation() *time.Location { return siteLocation }
 func funcMap() template.FuncMap {
 	return template.FuncMap{
 		"t": func(lang, key string, args ...any) string { return i18n.T(lang, key, args...) },
+		// sortOptions are the project file orders; the reservation ones only when the project uses them
+		"sortOptions": func(reservations bool) []string {
+			var out []string
+			for _, s := range service.ProjectFileSorts {
+				if reservations || s != "reserved" && s != "free" {
+					out = append(out, s)
+				}
+			}
+			return out
+		},
 		"dict": func(kv ...any) (map[string]any, error) {
 			if len(kv)%2 != 0 {
 				return nil, errors.New("dict needs key/value pairs")

@@ -31,7 +31,7 @@ func (r *upstreamRepo) ListGroups(context.Context, int64) ([]*models.ModuleGroup
 	return r.groups, nil
 }
 
-func (r *upstreamRepo) ListProjectFiles(_ context.Context, _ int64, _ string, groupIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error) {
+func (r *upstreamRepo) ListProjectFiles(_ context.Context, _ int64, _ string, groupIDs []int64, _ string, limit, offset int) ([]*models.ProjectFile, int, error) {
 	var out []*models.ProjectFile
 	for _, f := range r.files {
 		ok := len(groupIDs) == 0
@@ -134,7 +134,7 @@ func TestUpstreamWarmAndFilter(t *testing.T) {
 	s.SetUpstream(client)
 	p := &models.Project{ID: 1, Language: "id"}
 	classes := func(states map[string]bool) map[int64]string {
-		files, _, err := s.ProjectFiles(ctx, p, "", nil, KeepStates(states), 0)
+		files, _, err := s.ProjectFiles(ctx, p, "", nil, KeepStates(states), ProjectFileOrder{}, 0)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -162,11 +162,11 @@ func TestUpstreamWarmAndFilter(t *testing.T) {
 			t.Errorf("file %d: %q, want %q", id, got[id], w)
 		}
 	}
-	files, total, _ := s.ProjectFiles(ctx, p, "", nil, KeepStates(map[string]bool{"missing": true, "unknown": true}), 0)
+	files, total, _ := s.ProjectFiles(ctx, p, "", nil, KeepStates(map[string]bool{"missing": true, "unknown": true}), ProjectFileOrder{}, 0)
 	if total != 2 || len(files) != 2 {
 		t.Errorf("filter missing+unknown: %d files", total)
 	}
-	if _, total, _ := s.ProjectFiles(ctx, p, "", []int64{1}, KeepStates(map[string]bool{"none": true}), 0); total != 1 {
+	if _, total, _ := s.ProjectFiles(ctx, p, "", []int64{1}, KeepStates(map[string]bool{"none": true}), ProjectFileOrder{}, 0); total != 1 {
 		t.Errorf("filter none in gnome-51 (sync link): %d", total)
 	}
 	maps := repo.states["gnome-51/id/gnome-maps.gnome-51"]
@@ -296,7 +296,7 @@ func TestUpstreamWarmFromPage(t *testing.T) {
 		t.Errorf("orca = %+v", orca)
 	}
 	p := &models.Project{ID: 1, Language: "id"}
-	files, _, _ := s.ProjectFiles(ctx, p, "", nil, nil, 0)
+	files, _, _ := s.ProjectFiles(ctx, p, "", nil, nil, ProjectFileOrder{}, 0)
 	got := map[int64]string{}
 	for _, f := range files {
 		got[f.ID] = f.UpstreamClass()

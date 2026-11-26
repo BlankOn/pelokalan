@@ -776,7 +776,18 @@ func KeepStates(states map[string]bool) func(*models.ProjectFile) bool {
 // ProjectFiles pages a project's project files, least complete first: query (every word in name, language or group label),
 // groupIDs (none = all) and keep, a filter on the file with its upstream state attached (upstream states,
 // reservations; nil = all). A filter needs every matching file, so it pages here.
-func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, query string, groupIDs []int64, keep func(*models.ProjectFile) bool, offset int) ([]*models.ProjectFile, int, error) {
+// ProjectFileSorts are the orders of the project file list ("" = least complete first)
+var ProjectFileSorts = []string{"incomplete", "complete", "most", "fewest", "remaining", "name", "reserved", "free"}
+
+// ProjectFileOrder orders the project file list: Sort is done by the database (repository.ProjectFileSort),
+// Rank (lower first, ties keep that order) after loading every matching row, for orders the database
+// cannot know (reservations)
+type ProjectFileOrder struct {
+	Sort string
+	Rank func(*models.ProjectFile) int
+}
+
+func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, query string, groupIDs []int64, keep func(*models.ProjectFile) bool, order ProjectFileOrder, offset int) ([]*models.ProjectFile, int, error) {
 	if offset < 0 {
 		offset = 0
 	}
@@ -784,23 +795,26 @@ func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, q
 		query = query[:200]
 	}
 	query = strings.TrimSpace(query)
-	if keep == nil {
-		files, total, err := s.repo.ListProjectFiles(ctx, p.ID, query, groupIDs, ProjectFilePageSize, offset)
+	if keep == nil && order.Rank == nil {
+		files, total, err := s.repo.ListProjectFiles(ctx, p.ID, query, groupIDs, order.Sort, ProjectFilePageSize, offset)
 		if err == nil {
 			s.AttachUpstream(ctx, p, files)
 		}
 		return files, total, err
 	}
-	all, _, err := s.repo.ListProjectFiles(ctx, p.ID, query, groupIDs, 1<<30, 0)
+	all, _, err := s.repo.ListProjectFiles(ctx, p.ID, query, groupIDs, order.Sort, 1<<30, 0)
 	if err != nil {
 		return nil, 0, err
 	}
 	s.AttachUpstream(ctx, p, all)
 	var kept []*models.ProjectFile
 	for _, f := range all {
-		if keep(f) {
+		if keep == nil || keep(f) {
 			kept = append(kept, f)
 		}
+	}
+	if order.Rank != nil {
+		sort.SliceStable(kept, func(i, j int) bool { return order.Rank(kept[i]) < order.Rank(kept[j]) })
 	}
 	if offset > len(kept) {
 		offset = len(kept)

@@ -527,7 +527,16 @@ func (r *glossaryRepository) AddProjectFiles(ctx context.Context, files []*model
 const projectFileColumns = `f.id, f.import_id, f.project_id, f.group_id, v.name || '-' || v.version, f.filename, f.language,
 	f.total, f.translated, f.fuzzy, f.size, f.created_at, f.repo_path`
 
-func (r *glossaryRepository) ListProjectFiles(ctx context.Context, projectID int64, query string, groupIDs []int64, limit, offset int) ([]*models.ProjectFile, int, error) {
+// projectFileOrders are the ORDER BY clauses of the project file sorts (default: least complete first)
+var projectFileOrders = map[string]string{
+	"complete":  `f.translated::float8 / GREATEST(f.total, 1) DESC, f.translated DESC, f.filename, f.id DESC`,
+	"most":      `f.total DESC, f.filename, f.id DESC`,
+	"fewest":    `f.total, f.filename, f.id DESC`,
+	"remaining": `f.total - f.translated DESC, f.filename, f.id DESC`,
+	"name":      `f.filename, f.id DESC`,
+}
+
+func (r *glossaryRepository) ListProjectFiles(ctx context.Context, projectID int64, query string, groupIDs []int64, sort string, limit, offset int) ([]*models.ProjectFile, int, error) {
 	// every word must appear in the file name, language or module group label
 	where := `f.project_id = $1`
 	args := []any{projectID}
@@ -544,9 +553,13 @@ func (r *glossaryRepository) ListProjectFiles(ctx context.Context, projectID int
 	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*)`+from, args...).Scan(&total); err != nil {
 		return nil, 0, err
 	}
+	order, ok := projectFileOrders[sort]
+	if !ok {
+		order = `f.translated::float8 / GREATEST(f.total, 1), f.total - f.translated DESC, f.filename, f.id DESC`
+	}
 	args = append(args, limit, offset)
 	rows, err := r.db.QueryContext(ctx, `SELECT `+projectFileColumns+from+`
-		ORDER BY f.translated::float8 / GREATEST(f.total, 1), f.total - f.translated DESC, f.filename, f.id DESC
+		ORDER BY `+order+`
 		LIMIT $`+fmt.Sprint(len(args)-1)+` OFFSET $`+fmt.Sprint(len(args)), args...)
 	if err != nil {
 		return nil, 0, err
