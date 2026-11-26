@@ -24,7 +24,7 @@
 {{range .Files}}
 <tr>
     <td><strong class="pf-name">{{.Filename}}</strong>{{with .Reservation}}{{template "res_lock" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID)}}{{end}}<div class="muted small">{{langName .Language}} · {{.Language}}</div>
-        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}
+        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}{{template "tp_badge" (dict "Lang" $v.Lang "D" .TP)}}
         {{with .Mine}}<div class="small pf-mine">{{t $v.Lang "files.mine_copy"}} <a href="{{.URL}}">{{.Filename}}</a></div>{{end}}
         {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}</td>
     <td>{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · <span class="c-fuzzy">{{t $v.Lang "files.fuzzy_count" .Fuzzy}}</span>{{end}}</span></td>
@@ -65,6 +65,9 @@
 {{define "upstream_badge"}}{{if and (not .U) .L}}<a class="up-badge up-unknown" href="{{.L}}" target="_blank" rel="noopener" title="{{t .Lang "upstream.unknown_help"}}">{{t .Lang "upstream.unknown"}} <svg class="up-ext" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg></a>{{end}}{{with .U}}<a class="up-badge up-{{.StateClass}}" href="{{.PageURL}}" target="_blank" rel="noopener" title="{{t $.Lang "upstream.help"}}: {{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · {{t $.Lang "files.fuzzy_count" .Fuzzy}}{{end}}{{if .Untranslated}} · {{t $.Lang "upstream.untranslated" .Untranslated}}{{end}}">{{if .StateKey}}{{t $.Lang .StateKey}}{{else}}{{.State}}{{end}}</a>{{end}}{{end}}
 
 {{/* upstream state checkbox dropdown (name u); none ticked = all */}}
+{{/* the module's domain on the Translation Project: version and the team's progress there */}}
+{{define "tp_badge"}}{{with .D}}<a class="up-badge tp-badge" href="{{.PageURL}}" target="_blank" rel="noopener" title="{{t $.Lang "tp.badge_help" .Version .Translated .Total}}{{with .Updated}} · {{t $.Lang "tp.updated" (.Format "2006-01-02")}}{{end}} · {{if .Translator}}{{t $.Lang "tp.translator" .Translator}}{{else}}{{t $.Lang "tp.no_translator"}}{{end}}{{if .Restricted}} · {{t $.Lang "tp.restricted"}}{{end}}">TP {{.Version}} · {{.Percent}}%</a>{{end}}{{end}}
+
 {{define "upstream_filter"}}
 <details class="multi-filter" data-multi-filter>
     <summary class="mf-btn" title="{{t .Lang "upstream.filter"}}">
@@ -122,7 +125,7 @@
     <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a>{{with .Reservation}}{{template "res_lock" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID)}}{{end}}
         <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div>
         {{if .RepoPath}}<div class="small muted repo-path" title="{{t $v.Lang "git.repo_path"}}">{{.RepoPath}}</div>{{end}}
-        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}
+        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}{{template "tp_badge" (dict "Lang" $v.Lang "D" .TP)}}
         {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}</td>
     <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>{{end}}</td>
     <td class="num">{{if not .IsTemplate}}{{.Stats.Translated}}{{end}}</td>
@@ -144,6 +147,8 @@
                 <form method="post" action="/catalogs/{{.ID}}/update"><button class="linklike">{{t $v.Lang "action.update_from_template"}}</button></form>
                 {{end}}
                 <button type="button" class="linklike" data-replace="/catalogs/{{.ID}}/replace" data-replace-name="{{.Filename}}" data-replace-url="{{.SourceURL}}" data-replace-page="{{.UpstreamPage}}">{{t $v.Lang "action.update_file"}}</button>
+                {{$cid := .ID}}{{with .TP}}<a href="/catalogs/{{$cid}}/tp" title="{{.SubmitName}}">{{t $v.Lang "tp.download"}}</a>
+                <a href="mailto:robot@translationproject.org?subject={{urlquery .SubmitName}}&amp;body={{urlquery (t $v.Lang "tp.mail_body" .SubmitName)}}" title="{{t $v.Lang "tp.mail_help"}}{{if .Restricted}} {{t $v.Lang "tp.mail_restricted"}}{{end}}">{{t $v.Lang "tp.mail"}}</a>{{end}}
                 {{if .RepoPath}}<a href="/catalogs/{{.ID}}/patch" title="{{.RepoPath}}">{{t $v.Lang "git.patch_file"}}</a>
                 {{with index $v.PatchCmds .ID}}<button type="button" class="linklike" data-copy="{{.}}" data-copied="{{t $v.Lang "links.copied"}}" title="{{.}}">{{t $v.Lang "git.copy_command"}}</button>{{end}}{{end}}
                 <form method="post" action="/catalogs/{{.ID}}/delete" data-confirm="{{t $v.Lang "confirm.delete_file"}}"><button class="linklike danger">{{t $v.Lang "action.delete"}}</button></form>

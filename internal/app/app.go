@@ -320,6 +320,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Post("/projects/{id}/dictionary", h.AddDictionaryWord)
 		r.Post("/projects/{id}/dictionary/delete", h.DeleteDictionaryWord)
 		r.Get("/catalogs/{cid}/patch", h.CatalogGitPatch)
+		r.Get("/catalogs/{cid}/tp", h.DownloadTP)
 		r.Post("/projects/{id}/project-files/{fid}/take", h.ProjectFileTake)
 		r.Post("/projects/{id}/project-files/sync", h.ProjectFilesSync)
 		r.Get("/projects/{id}/project-files/sync", h.ProjectFilesSyncStatus)

@@ -31,6 +31,7 @@ internal/
   ai/                # LLM client (OpenAI-compatible), glossary matching, prompts, verification, estimates
   netsafe/           # HTTP transport refusing private/local addresses (SSRF protection)
   gnomel10n/         # Read-only client of the GNOME translation site API (cached, rate limited)
+  tpsite/            # Translation Project team pages (parser, file names, robot address)
   glossary/          # Read PO archives in memory and aggregate source/translation pairs
   po/                # PO/POT parser & writer, MO compiler, validation, plural rules
   models/            # User, OTP, Project, Invitation, Catalog, Entry
@@ -405,6 +406,32 @@ shows it only to members), role, joined_at. Documented in README.md.
   silently when the person turned them off (profile page `#badge-emails`, `POST /profile/badge-emails`) or is no longer
   whitelisted. Share texts and links come from `service.BadgeShareFor` (also used by the share page and dialog).
 
+## Translation Project (translationproject.org)
+
+- The site has no API. A module group can be synced from a **team page** (`/team/<code>.html`): "Tim Translation
+  Project" in the add form (`source=tp`, `tp_team` = code or team page address, `tpsite.ParseTeam`); stored in
+  `module_groups.tp_team` (migration 047), sync URL = the team page, sync language = the team code.
+- `internal/tpsite`: `ParseTeamPage` reads the domain table with regexes only (untrusted text): domain, version, the
+  team's PO file for that version (`PO-files/<team>/…`, already merged with the newest template) or the POT when
+  untranslated, translated/total, last submission, assigned translator, restricted (disclaimer needed). Fixture
+  `testdata/team_id.html`; if the site changes its markup, save a new copy and adjust the regexes. Do not use
+  `latest/` or `backups/` (they hold the last submission, often for an old version). `Prepare` turns Latin-1 into
+  UTF-8 and a POT into an empty PO of the team's language (Language, Plural-Forms, plural form count).
+- `GlossaryService.fetchTP` (service/tp.go): team page with ETag; files are downloaded only for rows whose
+  `Fingerprint` changed (version, file, counts, date), `tpPause` apart; the rest come from `tp_domains` (shared by
+  every project, file kept gzip). All files go into one in-memory .tar.gz (`tpsite.FileName`: "bash.id.po", module =
+  domain) handed to `importInto`, so glossary, project files, Ambil/Perbarui and upstream landings work as for other
+  sources (terms capped at `GitTermMaxWords` like git groups). A failed download keeps the last good copy and makes
+  the next round read the page again. Adding a TP source and "Ambil sekarang" run in the background
+  (`fetchInBackground`, flash `feed_started`); the popup hides "Ubah tautan" for TP groups.
+- Display: `UpstreamInfo.TP` (`attachTP`, called by `AttachUpstream`/`AttachUpstreamToCatalogs`; module + same
+  language as the team) → `tp_badge` ("TP <version> · <team %>", tooltip with counts, last submission, translator,
+  disclaimer). The editor's "Modul" opens the domain page.
+- Sending back: the robot only accepts email from the assigned translator's own address, so Pelokalan never sends.
+  The ⋯ menu of Berkas Anda has "Unduh untuk Translation Project" (`GET /catalogs/{cid}/tp`, owner only, `TPSubmit`:
+  the built file named `<domain>-<version>.<team>.po` with that Project-Id-Version) and a `mailto:` to
+  robot@translationproject.org with that subject (the translator attaches the file).
+
 ## Git-only projects
 
 - When every module group of a project is synced from GitHub (`GlossaryService.IsGitProject`), Penerjemahan hides the
@@ -414,7 +441,7 @@ shows it only to members), role, joined_at. Documented in README.md.
 
 `/projects` starts with a landing introduction (`#home-intro`, pages/projects.html, `home.*` strings): headline, pitch,
 buttons (visitors: sign up / sign in; members: jump to the list), six feature cards (`homeFeatures`, badge
-icons), the connected sources (GNOME l10n.gnome.org and GitHub repositories, `home.src_*`) and three "how it works"
+icons), the connected sources (GNOME l10n.gnome.org, GitHub repositories and the Translation Project, `home.src_*`) and three "how it works"
 steps. It is always shown (no hide button).
 
 ## About page

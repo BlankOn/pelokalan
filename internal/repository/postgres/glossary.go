@@ -38,13 +38,13 @@ func (r *glossaryRepository) GetOrCreateGroup(ctx context.Context, projectID int
 
 const versionColumns = `v.id, v.project_id, v.name, v.version, v.created_at, v.sync_url, v.sync_language,
 	v.feed_created_by, v.last_fetched_at, v.last_changed_at, v.last_fetch_error, v.fetch_etag, v.fetch_last_modified,
-	v.fetch_content_hash, v.git_repo, v.git_branch, (SELECT COUNT(*) FROM module_group_imports i WHERE i.group_id = v.id)`
+	v.fetch_content_hash, v.git_repo, v.git_branch, v.tp_team, (SELECT COUNT(*) FROM module_group_imports i WHERE i.group_id = v.id)`
 
 func scanGroup(row interface{ Scan(...any) error }) (*models.ModuleGroup, error) {
 	v := &models.ModuleGroup{}
 	err := row.Scan(&v.ID, &v.ProjectID, &v.Name, &v.Version, &v.CreatedAt, &v.SyncURL, &v.SyncLanguage,
 		&v.FeedCreatedBy, &v.LastFetchedAt, &v.LastChangedAt, &v.LastFetchError, &v.FetchETag, &v.FetchLastModified,
-		&v.FetchContentHash, &v.GitRepo, &v.GitBranch, &v.ImportCount)
+		&v.FetchContentHash, &v.GitRepo, &v.GitBranch, &v.TPTeam, &v.ImportCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}

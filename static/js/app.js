@@ -1464,6 +1464,10 @@ document.addEventListener("submit", function (ev) {
         var repo = document.getElementById("mg-git-repo"), branch = document.getElementById("mg-git-branch");
         if (repo) repo.required = mode === "git";
         if (branch) branch.required = mode === "git";
+        var team = document.getElementById("mg-tp-team");
+        if (team) team.required = mode === "tp";
+        var lang = document.getElementById("mg-lang-field");
+        if (lang) lang.hidden = mode === "tp"; // the team is the language
     }
     form.addEventListener("change", function (ev) { if (ev.target.name === "source") sync(); });
     sync();

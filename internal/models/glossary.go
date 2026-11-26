@@ -1,6 +1,7 @@
 package models
 
 import (
+	"net/url"
 	"strings"
 	"time"
 )
@@ -73,6 +74,9 @@ type ModuleGroup struct {
 	GitRepo   string // "owner/name"
 	GitBranch string
 
+	// A Translation Project team whose page the group is synced from ("" = none), e.g. "id"
+	TPTeam string
+
 	// Filled by listing queries
 	ImportCount int
 }
@@ -82,6 +86,9 @@ func (v *ModuleGroup) HasFeed() bool { return v.SyncURL != "" }
 
 // IsGit reports whether the group comes from a GitHub repository branch
 func (v *ModuleGroup) IsGit() bool { return v.GitRepo != "" }
+
+// IsTP reports whether the group comes from a Translation Project team page
+func (v *ModuleGroup) IsTP() bool { return v.TPTeam != "" }
 
 // GitName is the repository's name without its owner ("python-docs-id")
 func (v *ModuleGroup) GitName() string {
@@ -238,6 +245,7 @@ type UpstreamInfo struct {
 	Upstream        *UpstreamStats // nil = not on the site or not checked yet
 	UpstreamChecked bool           // the site was asked: Upstream nil then means the release has no such file
 	UpstreamLink    string         // without a state: the site's page for the file, to check by hand
+	TP              *TPDomain      // the module's domain on the Translation Project (nil = none)
 }
 
 // UpstreamClass is the file's value for the upstream state filter: a StateClass,
@@ -306,4 +314,36 @@ func UpstreamStateKeys() []string {
 		out = append(out, "upstream.state_"+k)
 	}
 	return out
+}
+
+// TPDomain is a textual domain of a Translation Project team as last read from the team page
+type TPDomain struct {
+	Team        string
+	Domain      string
+	Version     string
+	FileURL     string
+	Template    bool // nothing translated yet: FileURL is the POT file
+	Translated  int
+	Total       int
+	Updated     *time.Time // last submission (nil = never)
+	Translator  string     // assigned translator ("" = none)
+	Restricted  bool       // a signed disclaimer is needed
+	Fingerprint string
+	Data        []byte // the prepared file, gzip (only when asked for)
+}
+
+// SubmitName is the name (and email subject) the Translation Project's robot expects
+func (d *TPDomain) SubmitName() string { return d.Domain + "-" + d.Version + "." + d.Team + ".po" }
+
+// PageURL is the domain's page on the Translation Project
+func (d *TPDomain) PageURL() string {
+	return "https://translationproject.org/domain/" + url.PathEscape(d.Domain) + ".html"
+}
+
+// Percent is the share of the domain's strings the team has translated
+func (d *TPDomain) Percent() int {
+	if d.Total == 0 {
+		return 0
+	}
+	return d.Translated * 100 / d.Total
 }

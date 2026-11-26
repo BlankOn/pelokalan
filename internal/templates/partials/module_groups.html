@@ -46,6 +46,7 @@
                     {{else}}<span class="feed-status">{{t $.Lang "feed.status_pending"}}</span>{{end}}
                 </div>
                 {{if $v.IsGit}}<a class="gl-feed-url small" href="{{$v.GitURL}}/tree/{{$v.GitBranch}}" rel="noopener noreferrer nofollow">GitHub: {{$v.GitRepo}} · {{$v.GitBranch}}</a>
+                {{else if $v.IsTP}}<a class="gl-feed-url small" href="{{$v.SyncURL}}" rel="noopener noreferrer nofollow">Translation Project: {{t $.Lang "groups.tp_team_label" $v.TPTeam}}</a>
                 {{else}}<a class="gl-feed-url small" href="{{$v.SyncURL}}" rel="noopener noreferrer nofollow">{{$v.SyncURL}}</a>{{end}}
                 <div class="muted small">
                     {{if $v.LastFetchedAt}}{{t $.Lang "feed.checked" (timeAgo $.Lang $v.LastFetchedAt)}}{{else}}{{t $.Lang "feed.never"}}{{end}}
@@ -57,7 +58,7 @@
                     <form method="post" action="{{$p.Path}}/module-groups/{{$v.ID}}/unsync" data-confirm="{{t $.Lang "confirm.remove_feed"}}"><button class="btn btn-small" type="submit">{{t $.Lang "feed.remove"}}</button></form>
                 </div>
                 {{end}}
-                <details class="sync-edit">
+                {{if not $v.IsTP}}<details class="sync-edit">
                     <summary class="linklike small">{{if $v.HasFeed}}{{t $.Lang "feed.change_link"}}{{else}}+ {{t $.Lang "feed.set_link"}}{{end}}</summary>
                     <form method="post" action="{{$p.Path}}/module-groups/sync" class="form form-inline" data-busy="{{t $.Lang "groups.importing"}}">
                         <input type="hidden" name="name" value="{{$v.Name}}">
@@ -66,7 +67,7 @@
                         <input name="language" list="mg-lang-codes" value="{{$v.SyncLanguage}}" placeholder="id" maxlength="12" class="lang-input" aria-label="{{t $.Lang "field.language_optional"}}">
                         <button type="submit" class="btn btn-small btn-primary">{{t $.Lang "feed.save_and_fetch"}}</button>
                     </form>
-                </details>
+                </details>{{end}}
             </div>
         </div>
         {{else}}
@@ -96,11 +97,12 @@
 
             <fieldset class="source-choice">
                 <legend>{{t .Lang "groups.source_type"}}</legend>
-                <label class="check"><input type="radio" name="source" value="file" {{if ne .Data.FormMode "url"}}checked{{end}}> {{t .Lang "groups.source_file"}}</label>
+                <label class="check"><input type="radio" name="source" value="file" {{if or (eq .Data.FormMode "") (eq .Data.FormMode "file")}}checked{{end}}> {{t .Lang "groups.source_file"}}</label>
                 <label class="check"><input type="radio" name="source" value="url" {{if eq .Data.FormMode "url"}}checked{{end}}> {{t .Lang "groups.source_url"}}</label>
                 <label class="check"><input type="radio" name="source" value="git" {{if eq .Data.FormMode "git"}}checked{{end}}> {{t .Lang "groups.source_git"}}</label>
+                <label class="check"><input type="radio" name="source" value="tp" {{if eq .Data.FormMode "tp"}}checked{{end}}> {{t .Lang "groups.source_tp"}}</label>
             </fieldset>
-            <div data-source="file" {{if eq .Data.FormMode "url"}}hidden{{end}}>
+            <div data-source="file" {{if and (ne .Data.FormMode "") (ne .Data.FormMode "file")}}hidden{{end}}>
                 <label for="mg-file">{{t .Lang "field.file"}}</label>
                 <input id="mg-file" type="file" name="file" accept=".po,.tar.gz,.tgz,.tar,.zip,.gz">
             </div>
@@ -117,14 +119,21 @@
                 </div>
                 <p class="muted small">{{t .Lang "groups.git_help"}}</p>
             </div>
+            <div data-source="tp" {{if ne .Data.FormMode "tp"}}hidden{{end}}>
+                <label for="mg-tp-team">{{t .Lang "groups.tp_team"}}</label>
+                <input id="mg-tp-team" name="tp_team" maxlength="200" value="{{.Data.FormTPTeam}}" placeholder="https://translationproject.org/team/id.html" spellcheck="false">
+                <p class="muted small">{{t .Lang "groups.tp_help"}}</p>
+            </div>
             <div data-source="url" {{if ne .Data.FormMode "url"}}hidden{{end}}>
                 <label for="mg-url">{{t .Lang "field.download_url"}}</label>
                 <input id="mg-url" type="url" name="url" maxlength="2000" value="{{.Data.FormURL}}" placeholder="https://l10n.gnome.org/languages/id/gnome-51/ui.tar.gz">
                 <p class="muted small">{{t .Lang "feed.help"}}</p>
             </div>
 
+            <div id="mg-lang-field">
             <label for="mg-lang">{{t .Lang "field.language_optional"}}</label>
             <input id="mg-lang" name="language" list="mg-lang-codes" placeholder="id" maxlength="12">
+            </div>
             <button type="submit" class="btn btn-primary">{{t .Lang "groups.add_source"}}</button>
         </form>
     </div>

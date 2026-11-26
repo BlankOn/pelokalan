@@ -97,8 +97,9 @@ func testConfig(db config.DatabaseConfig, base string) *config.Config {
 			OTPResendInterval:    0,
 			InvitationExpiration: 14 * 24 * time.Hour,
 		},
-		AI:       config.AIConfig{SecretKey: "integration-test-secret"},
-		Glossary: config.GlossaryConfig{FetchInterval: time.Hour, MaxDownloadMB: 20},
+		AI: config.AIConfig{SecretKey: "integration-test-secret"},
+		// private hosts: the Translation Project test site runs on this machine (tp_test.go)
+		Glossary: config.GlossaryConfig{FetchInterval: time.Hour, MaxDownloadMB: 20, AllowPrivateHosts: true},
 	}
 }
 

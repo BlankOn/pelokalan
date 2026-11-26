@@ -1478,6 +1478,9 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .up-to_commit { background: #fef9c3; color: #854d0e; border-color: #f3e38b; }
 .up-committing { background: #e0f2fe; color: #0369a1; border-color: #b6e0fa; }
 .up-committed { background: #e3f4ec; color: #15803d; border-color: #b7e2c8; }
+/* the module's domain on the Translation Project */
+.tp-badge { background: #eef2ff; color: #3730a3; border-color: #c7d2fe; }
+.up-badge + .tp-badge { margin-left: 4px; }
 .mf-note { margin: 6px 8px 2px; max-width: 260px; line-height: 1.35; white-space: normal; }
 .c-untrans { color: var(--danger, #c92a2a); }
 .project-files .pf-name { overflow-wrap: anywhere; }
@@ -1579,7 +1582,8 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .home-feature-icon .badge-icon { width: 22px; height: 22px; stroke: currentColor; }
 .home-feature h3 { margin: 0 0 4px; font-size: 15px; }
 .home-feature p { margin: 0; font-size: 13.5px; color: #4a4e56; }
-.home-sources { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.home-sources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 960px) { .home-sources { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 .home-source { background: #fff; border: 1px solid var(--border-soft); border-radius: 12px; padding: 16px; }
 .home-source-head { display: flex; gap: 12px; }
 .home-source h3 { margin: 0 0 4px; font-size: 15px; }

@@ -21,6 +21,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
+	"pelokalan/internal/tpsite"
 )
 
 // GlossaryService builds and searches project glossaries
@@ -155,7 +156,7 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 		files = gitFiles(files)
 	}
 	built := glossary.Build(files, language)
-	if v.IsGit() { // documentation: whole paragraphs are no glossary terms
+	if v.IsGit() || v.IsTP() { // documentation and manual pages: whole paragraphs are no glossary terms
 		terms := built.Terms[:0]
 		for _, t := range built.Terms {
 			if t.WordCount <= GitTermMaxWords {
@@ -247,6 +248,7 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 type GroupSyncInput struct {
 	Name, Version, URL, Language string
 	Repo, Branch                 string
+	Team                         string // a Translation Project team (code or team page address)
 }
 
 // SetGroupSync stores a download URL for a module group and fetches it right away. The
@@ -266,6 +268,17 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 			return nil, nil, userErr("err.git_repo_invalid")
 		}
 		in.URL = GitHubArchiveURL(repo, branch)
+	}
+	var team string
+	if strings.TrimSpace(in.Team) != "" {
+		var ok bool
+		if team, ok = tpsite.ParseTeam(in.Team); !ok {
+			return nil, nil, userErr("err.tp_team_invalid")
+		}
+		in.URL = tpsite.TeamURL(team)
+		if strings.TrimSpace(in.Language) == "" {
+			in.Language = team
+		}
 	}
 	u, err := glossary.ValidateURL(in.URL)
 	if err != nil {
@@ -288,8 +301,15 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 	if err := s.repo.SetGroupGit(ctx, v.ID, repo, branch); err != nil { // "" for a plain download link
 		return nil, nil, err
 	}
+	if err := s.repo.SetGroupTP(ctx, v.ID, team); err != nil {
+		return nil, nil, err
+	}
 	if v, err = s.repo.GetGroup(ctx, v.ID); err != nil {
 		return nil, nil, err
+	}
+	if v.IsTP() { // one file per domain: too slow to wait for
+		s.fetchInBackground(v)
+		return v, nil, nil
 	}
 	out := s.FetchGroup(ctx, v)
 	return v, out, nil
@@ -339,7 +359,25 @@ func (s *GlossaryService) FetchGroupNow(ctx context.Context, p *models.Project, 
 	if !v.HasFeed() {
 		return nil, ErrNotFound
 	}
+	if v.IsTP() { // nil outcome: running in the background
+		s.fetchInBackground(v)
+		return nil, nil
+	}
 	return s.FetchGroup(ctx, v), nil
+}
+
+// fetchInBackground downloads a module group after the request (sources with one file per module),
+// one download round at a time like the hourly sync
+func (s *GlossaryService) fetchInBackground(v *models.ModuleGroup) {
+	go func() {
+		s.syncing.Lock()
+		defer s.syncing.Unlock()
+		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
+		defer cancel()
+		if out := s.FetchGroup(ctx, v); out.Err != nil {
+			log.Printf("glossary: background fetch of group %d: %v", v.ID, out.Err)
+		}
+	}()
 }
 
 // SyncAll downloads every module group with a sync link again in the background and
@@ -443,7 +481,13 @@ func (s *GlossaryService) FetchGroup(ctx context.Context, v *models.ModuleGroup)
 	if v.ImportCount == 0 || needFiles {
 		etag, lastMod = "", ""
 	}
-	res, err := s.fetcher.Fetch(ctx, v.SyncURL, etag, lastMod)
+	var res *glossary.FetchResult
+	var err error
+	if v.IsTP() { // a team page: the files of its domains, as one archive
+		res, err = s.fetchTP(ctx, v, etag, lastMod)
+	} else {
+		res, err = s.fetcher.Fetch(ctx, v.SyncURL, etag, lastMod)
+	}
 	switch {
 	case errors.Is(err, glossary.ErrNotModified):
 		v.LastFetchError = ""

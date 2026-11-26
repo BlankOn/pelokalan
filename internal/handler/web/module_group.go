@@ -68,6 +68,7 @@ func (h *Handler) moduleGroupsData(r *http.Request, p *models.Project, data *Pag
 	data.Data["FormMode"] = r.FormValue("source")
 	data.Data["FormGitRepo"] = r.FormValue("git_repo")
 	data.Data["FormGitBranch"] = r.FormValue("git_branch")
+	data.Data["FormTPTeam"] = r.FormValue("tp_team")
 	if open != "" {
 		data.Data["GroupsError"] = errMsg
 	}
@@ -78,6 +79,8 @@ func (h *Handler) moduleGroupsData(r *http.Request, p *models.Project, data *Pag
 		data.Error = i18n.T(data.Lang, "flash.feed_failed", q.Get("label"))
 	case "unchanged":
 		data.Flash = i18n.T(data.Lang, "flash.feed_unchanged", q.Get("label"))
+	case "started":
+		data.Flash = i18n.T(data.Lang, "flash.feed_started", q.Get("label"))
 	}
 	if q.Get("imported") != "" {
 		data.Flash = i18n.T(data.Lang, "flash.glossary_imported", q.Get("label"), q.Get("imported"), q.Get("files"))
@@ -107,7 +110,7 @@ func (h *Handler) AddModuleGroupSource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if src := r.FormValue("source"); src == "url" || src == "git" {
+	if src := r.FormValue("source"); src == "url" || src == "git" || src == "tp" {
 		in := service.GroupSyncInput{
 			Name:     r.FormValue("name"),
 			Version:  r.FormValue("version_name"),
@@ -116,6 +119,12 @@ func (h *Handler) AddModuleGroupSource(w http.ResponseWriter, r *http.Request) {
 		}
 		if src == "git" { // a GitHub repository branch, downloaded as one archive
 			in.URL, in.Repo, in.Branch = "", r.FormValue("git_repo"), r.FormValue("git_branch")
+		}
+		if src == "tp" { // a Translation Project team page: one file per domain
+			in.URL, in.Team = "", r.FormValue("tp_team")
+			if in.Team == "" {
+				in.Team = "-" // refused as invalid
+			}
 		}
 		g, out, err := h.glossary.SetGroupSync(r.Context(), user, p, in)
 		if err != nil {
@@ -183,6 +192,8 @@ func (h *Handler) importRedirect(w http.ResponseWriter, r *http.Request, p *mode
 func (h *Handler) syncRedirect(w http.ResponseWriter, r *http.Request, p *models.Project, g *models.ModuleGroup, out *service.FetchOutcome) {
 	q := url.Values{"label": {g.Label()}}
 	switch {
+	case out == nil: // downloading in the background (Translation Project)
+		q.Set("fetch", "started")
 	case out.Err != nil:
 		q.Set("fetch", "failed")
 	case out.Changed:
@@ -252,7 +263,7 @@ func (h *Handler) FetchModuleGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	gid := idParam(r, "gid")
-	out, err := h.glossary.FetchGroupNow(r.Context(), p, gid)
+	out, err := h.glossary.FetchGroupNow(r.Context(), p, gid) // nil outcome: running in the background
 	if err != nil {
 		h.fail(w, r, err)
 		return

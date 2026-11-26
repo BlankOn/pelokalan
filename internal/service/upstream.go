@@ -221,6 +221,7 @@ func (s *GlossaryService) info(k upstreamKey, rec *models.UpstreamRecord) models
 // AttachUpstream fills each project file's upstream state from the stored states (no
 // request to the site, except the release list every 12 hours for groups named after a release)
 func (s *GlossaryService) AttachUpstream(ctx context.Context, p *models.Project, files []*models.ProjectFile) {
+	s.attachTP(ctx, p, files, nil)
 	l := s.newUpstreamLookup(ctx, p)
 	if l == nil {
 		return
@@ -236,6 +237,7 @@ func (s *GlossaryService) AttachUpstream(ctx context.Context, p *models.Project,
 // when one was entered (Catalog.UpstreamPage), else through the project file they come from: the
 // same file name, else the same module (newest module group first)
 func (s *GlossaryService) AttachUpstreamToCatalogs(ctx context.Context, p *models.Project, catalogs []*models.Catalog) {
+	s.attachTP(ctx, p, nil, catalogs)
 	l := s.newUpstreamLookup(ctx, p)
 	if l == nil {
 		return

@@ -182,6 +182,12 @@ type GlossaryRepository interface {
 	SetGroupSync(ctx context.Context, groupID int64, url, language string, userID *int64) error
 	// SetGroupGit stores the GitHub repository ("owner/name") and branch a module group is synced from
 	SetGroupGit(ctx context.Context, groupID int64, repo, branch string) error
+	// SetGroupTP stores the Translation Project team a module group is synced from ("" = none)
+	SetGroupTP(ctx context.Context, groupID int64, team string) error
+	// TPDomains returns a Translation Project team's domains as last read (data only when withData)
+	TPDomains(ctx context.Context, team string, withData bool) ([]*models.TPDomain, error)
+	// SaveTPDomains replaces a team's domains (rows without Data keep the stored file)
+	SaveTPDomains(ctx context.Context, team string, domains []*models.TPDomain) error
 	// ProjectFileByRepoPath returns the newest project file with this path from a git module group
 	// (with its data) and that group
 	ProjectFileByRepoPath(ctx context.Context, projectID int64, path string) (*models.ProjectFile, *models.ModuleGroup, error)
