@@ -15,12 +15,12 @@ type contextRepository struct{ db *sql.DB }
 // NewContextRepository creates the Konteks repository
 func NewContextRepository(db *sql.DB) repository.ContextRepository { return &contextRepository{db: db} }
 
-const contextColumns = `x.id, x.project_id, x.module, x.note, x.version, x.updated_by, x.updated_at,
+const contextColumns = `x.id, x.project_id, x.module, x.title, x.note, x.version, x.updated_by, x.updated_at,
 	COALESCE((SELECT COALESCE(NULLIF(u.name, ''), u.username) FROM users u WHERE u.id = x.updated_by), '')`
 
 func scanContext(row interface{ Scan(...any) error }) (*models.ModuleContext, error) {
 	c := &models.ModuleContext{}
-	err := row.Scan(&c.ID, &c.ProjectID, &c.Module, &c.Note, &c.Version, &c.UpdatedBy, &c.UpdatedAt, &c.UpdaterName)
+	err := row.Scan(&c.ID, &c.ProjectID, &c.Module, &c.Title, &c.Note, &c.Version, &c.UpdatedBy, &c.UpdatedAt, &c.UpdaterName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -40,14 +40,15 @@ func (r *contextRepository) Save(ctx context.Context, c *models.ModuleContext, v
 	defer tx.Rollback()
 	if version == 0 {
 		err = tx.QueryRowContext(ctx,
-			`INSERT INTO module_contexts (project_id, module, note, updated_by) VALUES ($1, $2, $3, $4)
+			`INSERT INTO module_contexts (project_id, module, note, updated_by, title) VALUES ($1, $2, $3, $4, $5)
 			 ON CONFLICT (project_id, module) DO NOTHING
-			 RETURNING id, version, updated_at`, c.ProjectID, c.Module, c.Note, c.UpdatedBy).Scan(&c.ID, &c.Version, &c.UpdatedAt)
+			 RETURNING id, version, updated_at`, c.ProjectID, c.Module, c.Note, c.UpdatedBy, c.Title).Scan(&c.ID, &c.Version, &c.UpdatedAt)
 	} else {
 		err = tx.QueryRowContext(ctx,
-			`UPDATE module_contexts SET note = $3, updated_by = $4, updated_at = NOW(), version = version + 1
+			`UPDATE module_contexts SET note = $3, updated_by = $4, updated_at = NOW(), version = version + 1,
+			        title = CASE WHEN $6 <> '' THEN $6 ELSE title END
 			 WHERE project_id = $1 AND module = $2 AND version = $5
-			 RETURNING id, version, updated_at`, c.ProjectID, c.Module, c.Note, c.UpdatedBy, version).Scan(&c.ID, &c.Version, &c.UpdatedAt)
+			 RETURNING id, version, updated_at`, c.ProjectID, c.Module, c.Note, c.UpdatedBy, version, c.Title).Scan(&c.ID, &c.Version, &c.UpdatedAt)
 	}
 	if errors.Is(err, sql.ErrNoRows) {
 		return repository.ErrConflict
@@ -87,7 +88,7 @@ func (r *contextRepository) ListForProject(ctx context.Context, projectID int64,
 	for _, w := range strings.Fields(strings.ToLower(q)) {
 		args = append(args, "%"+escapeLike(w)+"%")
 		n := len(args)
-		filter += ` AND (lower(x.note) LIKE $` + itoaArg(n) + ` OR x.module LIKE $` + itoaArg(n) + `)`
+		filter += ` AND (lower(x.note) LIKE $` + itoaArg(n) + ` OR x.module LIKE $` + itoaArg(n) + ` OR lower(x.title) LIKE $` + itoaArg(n) + `)`
 	}
 	rows, err := r.db.QueryContext(ctx, `SELECT `+contextColumns+` FROM module_contexts x
 		WHERE x.project_id = $1 AND btrim(x.note) <> ''`+filter+` ORDER BY x.updated_at DESC LIMIT 500`, args...)

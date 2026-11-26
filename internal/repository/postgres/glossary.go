@@ -538,13 +538,14 @@ func (r *glossaryRepository) AddProjectFiles(ctx context.Context, files []*model
 const projectFileColumns = `f.id, f.import_id, f.project_id, f.group_id, v.name || '-' || v.version, f.filename, f.language,
 	f.total, f.translated, f.fuzzy, f.size, f.created_at, f.repo_path`
 
-// projectFileOrders are the ORDER BY clauses of the project file sorts (default: least complete first)
+// projectFileOrders are the ORDER BY clauses of the project file sorts (default: "remaining", most left first,
+// files nobody started after those with work left, complete files last; service.CompareProgress is the same in Go)
 var projectFileOrders = map[string]string{
-	"complete":  `f.translated::float8 / GREATEST(f.total, 1) DESC, f.translated DESC, f.filename, f.id DESC`,
-	"most":      `f.total DESC, f.filename, f.id DESC`,
-	"fewest":    `f.total, f.filename, f.id DESC`,
-	"remaining": `f.total - f.translated DESC, f.filename, f.id DESC`,
-	"name":      `f.filename, f.id DESC`,
+	"incomplete": `f.translated::float8 / GREATEST(f.total, 1), f.total - f.translated DESC, f.filename, f.id DESC`,
+	"complete":   `f.translated::float8 / GREATEST(f.total, 1) DESC, f.translated DESC, f.filename, f.id DESC`,
+	"most":       `f.total DESC, f.filename, f.id DESC`,
+	"fewest":     `f.total, f.filename, f.id DESC`,
+	"name":       `f.filename, f.id DESC`,
 }
 
 func (r *glossaryRepository) ListProjectFiles(ctx context.Context, projectID int64, query string, groupIDs []int64, sort string, limit, offset int) ([]*models.ProjectFile, int, error) {
@@ -566,7 +567,8 @@ func (r *glossaryRepository) ListProjectFiles(ctx context.Context, projectID int
 	}
 	order, ok := projectFileOrders[sort]
 	if !ok {
-		order = `f.translated::float8 / GREATEST(f.total, 1), f.total - f.translated DESC, f.filename, f.id DESC`
+		order = `CASE WHEN f.translated >= f.total THEN 2 WHEN f.translated = 0 THEN 1 ELSE 0 END,
+			f.total - f.translated DESC, f.filename, f.id DESC`
 	}
 	args = append(args, limit, offset)
 	rows, err := r.db.QueryContext(ctx, `SELECT `+projectFileColumns+from+`

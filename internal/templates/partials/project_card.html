@@ -89,9 +89,12 @@
 <div class="context-search pf-toolbar" data-stick>
     <form id="{{.ID}}-filter" class="pf-filter" hx-get="{{.URL}}" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change[target.type!='search'], submit" hx-target="#{{.ID}}-file-rows" hx-swap="innerHTML">
         <input type="search" name="q" placeholder="{{t .Lang "files.search"}}" aria-label="{{t .Lang "files.search"}}" autocomplete="off">
-        {{if .Groups}}{{template "group_filter" (dict "Lang" .Lang "Groups" .Groups "NoGroup" true)}}{{end}}
+        {{if and .Groups (gt (len .Groups) 1)}}{{template "group_filter" (dict "Lang" .Lang "Groups" .Groups "NoGroup" true)}}{{end}}
         {{if .Upstream}}{{template "upstream_filter" (dict "Lang" .Lang)}}{{end}}
         {{if .Reserve}}{{template "reserve_filter" (dict "Lang" .Lang)}}{{end}}
+        <select name="s" class="pf-sort" aria-label="{{t .Lang "files.sort"}}" title="{{t .Lang "files.sort"}}">
+            {{range fileSortOptions .Reserve}}<option value="{{.}}">{{t $.Lang (printf "files.sort_%s" .)}}</option>{{end}}
+        </select>
     </form>
 </div>
 {{end}}
@@ -188,7 +191,7 @@
 {{define "group_chart"}}{{$c := .}}
 <section class="card group-chart" id="group-chart">
     <form class="gc-controls" hx-get="{{.Project.Path}}/group-chart" hx-trigger="change" hx-target="#gc-body" hx-select="#gc-body" hx-swap="outerHTML">
-        {{template "group_filter" (dict "Lang" .Lang "Groups" .Groups "NoGroup" false "Selected" .Selected)}}
+        {{if and .Groups (gt (len .Groups) 1)}}{{template "group_filter" (dict "Lang" .Lang "Groups" .Groups "NoGroup" false "Selected" .Selected)}}{{end}}
         <div class="seg" title="{{t .Lang "chart.scale"}}">
             <label class="seg-opt"><input type="radio" name="cs" value="" {{if not $c.Scale}}checked{{end}}> {{t .Lang "chart.scale_shared"}}</label>
             <label class="seg-opt"><input type="radio" name="cs" value="each" {{if eq $c.Scale "each"}}checked{{end}}> {{t .Lang "chart.scale_each"}}</label>

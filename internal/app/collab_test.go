@@ -192,6 +192,49 @@ func TestWiki(t *testing.T) {
 	}
 }
 
+// Konteks items that belong to no module: members create and edit them, a stale save is refused and keeps the text
+func TestGeneralContexts(t *testing.T) {
+	skipWithoutDB(t)
+	owner := signUp(t, "kirana")
+	slug := owner.newProject("Konteks Umum")
+	base := "/projects/" + slug
+	visitor(t).get(base + "/contexts").status(http.StatusOK).lacks("Konteks baru")
+	owner.get(base + "/contexts").status(http.StatusOK).contains("Konteks baru")
+
+	// a title is required
+	owner.post(base+"/contexts", url.Values{"title": {"  "}, "note": {"Catatan tanpa judul"}}).
+		status(http.StatusOK).contains("Judul wajib diisi").contains("Catatan tanpa judul")
+	r := owner.post(base+"/contexts", url.Values{"title": {"Gaya bahasa"}, "note": {"Pakai kalimat aktif dan sapaan Anda."}})
+	r.status(http.StatusSeeOther)
+	key := scalar[string](t, `SELECT substr(x.module, 2) FROM module_contexts x JOIN projects p ON p.id = x.project_id WHERE p.slug = $1 AND x.module LIKE '~%'`, slug)
+	if !strings.Contains(r.Header.Get("Location"), "#ctx-"+key) {
+		t.Fatalf("redirect = %q", r.Header.Get("Location"))
+	}
+	visitor(t).get(base + "/contexts").status(http.StatusOK).contains("Gaya bahasa").contains("Pakai kalimat aktif")
+	v := formValue(t, owner.get(base+"/contexts").Body, "version")
+
+	owner.post(base+"/contexts/"+key, url.Values{"title": {"Gaya bahasa"}, "note": {"Versi dua"}, "version": {v}}).status(http.StatusSeeOther)
+	// the same old version again: refused, nothing overwritten, the text is kept in the form
+	owner.post(base+"/contexts/"+key, url.Values{"title": {"Gaya bahasa"}, "note": {"Versi lama saya"}, "version": {v}}).
+		status(http.StatusConflict).contains("Versi lama saya").contains("Versi dua")
+	if n := scalar[string](t, `SELECT note FROM module_contexts WHERE module = $1`, "~"+key); n != "Versi dua" {
+		t.Fatalf("note = %q", n)
+	}
+	// non-members cannot add or change items; module notes cannot be changed through this route
+	stranger := signUp(t, "lukas")
+	if stranger.post(base+"/contexts", url.Values{"title": {"Spam"}, "note": {"x"}}).Status == http.StatusSeeOther {
+		t.Fatalf("a non-member created a context")
+	}
+	stranger.post(base+"/contexts/"+key, url.Values{"title": {"Spam"}, "note": {"x"}, "version": {"2"}}).lacks("Context saved")
+	if n := scalar[string](t, `SELECT note FROM module_contexts WHERE module = $1`, "~"+key); n != "Versi dua" {
+		t.Fatalf("note after stranger = %q", n)
+	}
+	// emptying the note hides the item
+	v = formValue(t, owner.get(base+"/contexts").Body, "version")
+	owner.post(base+"/contexts/"+key, url.Values{"title": {"Gaya bahasa"}, "note": {""}, "version": {v}}).status(http.StatusSeeOther)
+	owner.get(base + "/contexts").status(http.StatusOK).lacks("Gaya bahasa")
+}
+
 // formValue reads the value of a named input from a page
 func formValue(t *testing.T, body, name string) string {
 	t.Helper()

@@ -14,6 +14,8 @@ var Icons = map[string]string{
 	"pen":      `<path d="M4 20l4-1 11-11-3-3L5 16z"/><path d="M14 6l3 3"/>`,
 	"type":     `<path d="M5 19l5-14h1l5 14M7 14h7"/><path d="M17 19h3"/>`,
 	"check":    `<circle cx="12" cy="12" r="8.5"/><path d="M8 12.5l3 3 5-6"/>`,
+	"keyboard": `<rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h1M9.5 10h1M13 10h1M16.5 10h1.5M6 13.5h1.5M10 13.5h1M13 13.5h1M16.5 13.5h1.5M8 16h8"/>`,
+	"robot":    `<rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 8V5.5"/><circle cx="12" cy="4.2" r="1.3"/><circle cx="9.5" cy="13" r="1.3"/><circle cx="14.5" cy="13" r="1.3"/><path d="M10 16.3h4M3 12v3M21 12v3"/>`,
 	"polish":   `<path d="M12 3l1.6 4.4L18 9l-4.4 1.6L12 15l-1.6-4.4L6 9l4.4-1.6z"/><path d="M18 15l.8 2.2L21 18l-2.2.8L18 21l-.8-2.2L15 18l2.2-.8z"/>`,
 	"bolt":     `<path d="M13 3L5 13h6l-1 8 8-10h-6z"/>`,
 	"flag":     `<path d="M5 21V4M5 4h11l-2 4 2 4H5"/>`,

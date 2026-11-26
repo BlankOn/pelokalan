@@ -31,6 +31,8 @@ type ProfileStats struct {
 	Translated    int
 	Words         int
 	Reviewed      int
+	AI            int // AI drafts reviewed and saved
+	Manual        int // empty strings translated by hand
 	Edited        int
 	ActiveDays    int
 	BestDay       int
@@ -84,6 +86,8 @@ var Badges = []BadgeGroupDef{
 		{ID: "words", Icon: "type", Tiers: []int{1000, 10000, 50000, 250000, 1000000}, value: func(s *ProfileStats) int { return s.Words }},
 		{ID: "reviewed", Icon: "check", Tiers: []int{50, 500, 2500, 10000, 50000}, value: func(s *ProfileStats) int { return s.Reviewed }},
 		{ID: "edited", Icon: "polish", Tiers: []int{50, 250, 1000, 5000, 20000}, value: func(s *ProfileStats) int { return s.Edited }},
+		{ID: "manual", Icon: "keyboard", Tiers: []int{50, 500, 2500, 10000, 50000}, value: func(s *ProfileStats) int { return s.Manual }},
+		{ID: "ai", Icon: "robot", Tiers: []int{25, 250, 1000, 5000, 20000}, value: func(s *ProfileStats) int { return s.AI }},
 		{ID: "best_day", Icon: "bolt", Tiers: []int{100, 300, 600, 1000, 2000}, value: func(s *ProfileStats) int { return s.BestDay }},
 	}},
 	{"upstream", []BadgeDef{
@@ -204,6 +208,8 @@ func ComputeProfileStats(days []models.ProfileDay, totals *models.ProfileTotals,
 		s.Words += d.Words
 		s.Reviewed += d.Reviewed
 		s.Edited += d.Edited
+		s.AI += d.AI
+		s.Manual += d.Manual
 		s.Night += d.Night
 		s.Early += d.Early
 		s.ActiveDays++

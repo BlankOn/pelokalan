@@ -8,7 +8,8 @@ import "time"
 type ModuleContext struct {
 	ID        int64
 	ProjectID int64
-	Module    string
+	Module    string // file name before the first dot; "~…" for an item that belongs to no module
+	Title     string // an item without a module is named by its title
 	Note      string
 	Version   int64 // bumped on every save; a save with an older version is a conflict
 	UpdatedBy *int64
@@ -24,4 +25,15 @@ type ModuleContext struct {
 type ContextEdit struct {
 	Username string
 	At       time.Time
+}
+
+// IsGeneral reports whether the item belongs to no module
+func (c *ModuleContext) IsGeneral() bool { return len(c.Module) > 0 && c.Module[0] == '~' }
+
+// GeneralKey is the address part of an item without a module (its module name without the "~")
+func (c *ModuleContext) GeneralKey() string {
+	if !c.IsGeneral() {
+		return ""
+	}
+	return c.Module[1:]
 }

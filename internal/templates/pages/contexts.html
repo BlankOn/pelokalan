@@ -1,12 +1,45 @@
-{{define "content"}}{{$p := .Data.Project}}
+{{define "content"}}{{$p := .Data.Project}}{{$d := .Data.Draft}}
 {{template "project_header" .}}
 <section class="card">
-    <form method="get" action="{{$p.Path}}/contexts" class="context-search">
-        <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "context.search"}}" aria-label="{{t .Lang "context.search"}}">
-    </form>
+    <div class="context-bar">
+        <form method="get" action="{{$p.Path}}/contexts" class="context-search">
+            <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "context.search"}}" aria-label="{{t .Lang "context.search"}}">
+        </form>
+        {{if $p.Role}}<details class="context-new"{{if and $d (not $d.Key)}} open{{end}}>
+            <summary class="btn btn-primary">+ {{t .Lang "context.new"}}</summary>
+            <form method="post" action="{{$p.Path}}/contexts" class="form context-form">
+                <p class="muted small">{{t .Lang "context.new_help"}}</p>
+                <label for="ctx-new-title">{{t .Lang "context.title_field"}}</label>
+                <input id="ctx-new-title" name="title" required maxlength="120"{{if and $d (not $d.Key)}} value="{{$d.Title}}"{{end}}>
+                <label for="ctx-new-note">{{t .Lang "context.note_field"}}</label>
+                <textarea id="ctx-new-note" name="note" rows="6" required>{{if and $d (not $d.Key)}}{{$d.Note}}{{end}}</textarea>
+                <div class="form-actions"><button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button></div>
+            </form>
+        </details>{{end}}
+    </div>
     {{if .Data.Items}}
     <ul class="context-list">
         {{range .Data.Items}}
+        {{if .IsGeneral}}
+        <li id="ctx-{{.GeneralKey}}">
+            <div class="context-file"><strong>{{.Title}}</strong> <span class="context-tag">{{t $.Lang "context.general"}}</span></div>
+            <div class="context-note">{{linkify .Note}}</div>
+            <div class="muted small">{{t $.Lang "context.by" (or .UpdaterName "—") (timeAgo $.Lang .UpdatedAt)}}</div>
+            {{$mine := and $d (eq $d.Key .GeneralKey)}}
+            {{if $p.Role}}<details class="context-edit"{{if $mine}} open{{end}}>
+                <summary class="small">{{t $.Lang "action.edit"}}</summary>
+                <form method="post" action="{{$p.Path}}/contexts/{{.GeneralKey}}" class="form context-form">
+                    <input type="hidden" name="version" value="{{.Version}}">
+                    <label for="ctx-t-{{.GeneralKey}}">{{t $.Lang "context.title_field"}}</label>
+                    <input id="ctx-t-{{.GeneralKey}}" name="title" required maxlength="120" value="{{if $mine}}{{$d.Title}}{{else}}{{.Title}}{{end}}">
+                    <label for="ctx-n-{{.GeneralKey}}">{{t $.Lang "context.note_field"}}</label>
+                    <textarea id="ctx-n-{{.GeneralKey}}" name="note" rows="6">{{if $mine}}{{$d.Note}}{{else}}{{.Note}}{{end}}</textarea>
+                    <p class="muted small">{{t $.Lang "context.empty_hides"}}</p>
+                    <div class="form-actions"><button type="submit" class="btn btn-primary">{{t $.Lang "action.save"}}</button></div>
+                </form>
+            </details>{{end}}
+        </li>
+        {{else}}
         <li>
             <div class="context-file"><strong>{{.Module}}</strong>
                 {{if .Files}}<span class="muted small">{{range $i, $f := .Files}}{{if $i}} · {{end}}<a href="{{$f.URL}}">{{$f.Filename}}</a> <span>@{{$f.OwnerUsername}}</span>{{end}}</span>
@@ -14,6 +47,7 @@
             <div class="context-note">{{linkify .Note}}</div>
             <div class="muted small">{{t $.Lang "context.by" (or .UpdaterName "—") (timeAgo $.Lang .UpdatedAt)}}</div>
         </li>
+        {{end}}
         {{end}}
     </ul>
     {{else}}

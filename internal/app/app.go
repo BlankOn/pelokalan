@@ -274,6 +274,8 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Post("/profile/identity", h.UpdateIdentity)
 		r.Post("/profile/badge-emails", h.UpdateBadgeEmails)
 		r.Post("/projects/{id}/reservations", h.ReserveModule)
+		r.Post("/projects/{id}/contexts", h.CreateGeneralContext)
+		r.Post("/projects/{id}/contexts/{key}", h.SaveGeneralContext)
 		r.Get("/projects/{id}/reviews/{rid}", h.ReviewPage)
 		r.Post("/projects/{id}/reviews/{rid}/approve", h.ApproveReview)
 		r.Post("/projects/{id}/reviews/{rid}/reject", h.RejectReview)

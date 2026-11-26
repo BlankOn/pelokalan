@@ -7,6 +7,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
@@ -82,6 +84,16 @@ func (h *Handler) ContextsPage(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	h.contextsPageWith(w, r, p, "", nil)
+}
+
+// contextDraft is what someone typed into a Konteks form that was refused: the form opens again with it
+type contextDraft struct {
+	Key, Title, Note string // Key "" = the new item form
+}
+
+// contextsPageWith renders the Konteks tab with an error shown on top and the refused form kept open
+func (h *Handler) contextsPageWith(w http.ResponseWriter, r *http.Request, p *models.Project, errMsg string, draft *contextDraft) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	items, err := h.contexts.List(r.Context(), p, q)
 	if err != nil {
@@ -106,5 +118,47 @@ func (h *Handler) ContextsPage(w http.ResponseWriter, r *http.Request) {
 	data.Data["Tab"] = "contexts"
 	data.Data["Items"] = items
 	data.Data["Query"] = q
+	if errMsg != "" {
+		data.Error = errMsg
+		data.Data["Draft"] = draft
+	}
 	h.render(w, "contexts", data)
+}
+
+// CreateGeneralContext adds a Konteks item without a module: POST /projects/{id}/contexts (title, note)
+func (h *Handler) CreateGeneralContext(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	n, err := h.contexts.CreateGeneral(r.Context(), middleware.GetUser(r.Context()), p, r.FormValue("title"), r.FormValue("note"))
+	if err != nil {
+		h.contextsPageWith(w, r, p, h.errorMessage(r, err), &contextDraft{Title: r.FormValue("title"), Note: r.FormValue("note")})
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/contexts?flash=context_saved#ctx-"+n.Module[1:], http.StatusSeeOther)
+}
+
+// SaveGeneralContext changes a Konteks item without a module: POST /projects/{id}/contexts/{key} (title, note, version)
+func (h *Handler) SaveGeneralContext(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	key := "~" + chi.URLParam(r, "key")
+	version, _ := strconv.ParseInt(r.FormValue("version"), 10, 64)
+	_, err := h.contexts.SaveGeneral(r.Context(), middleware.GetUser(r.Context()), p, key, r.FormValue("title"), r.FormValue("note"), version)
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) || errors.Is(err, service.ErrForbidden) {
+			h.fail(w, r, err)
+			return
+		}
+		if errors.Is(err, service.ErrContextConflict) {
+			w.Header().Set("Content-Type", "text/html; charset=utf-8")
+			w.WriteHeader(http.StatusConflict)
+		}
+		h.contextsPageWith(w, r, p, h.errorMessage(r, err), &contextDraft{Key: key[1:], Title: r.FormValue("title"), Note: r.FormValue("note")})
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/contexts?flash=context_saved#ctx-"+key[1:], http.StatusSeeOther)
 }

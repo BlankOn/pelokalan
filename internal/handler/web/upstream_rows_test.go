@@ -144,7 +144,7 @@ func TestOwnFilesUpstreamOrder(t *testing.T) {
 			file(off+8, "ToReview", 4, owned),
 		)
 	}
-	r := httptest.NewRequest("GET", "/", nil)
+	r := httptest.NewRequest("GET", "/?s=recent", nil) // last edit, own files needing upstream work on top
 	p := &models.Project{ID: 1, Slug: "x"}
 	var got []int64
 	for offset := 0; offset < 8; offset += FileListPageSize {

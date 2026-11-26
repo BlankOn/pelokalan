@@ -10,6 +10,8 @@ type ProfileDay struct {
 	Words         int       // source words of Translated
 	Reviewed      int       // strings that needed review confirmed (AI drafts too)
 	Edited        int       // translated strings whose text was changed
+	Manual        int       // empty strings translated by hand (no AI, glossary or memory draft)
+	AI            int       // AI drafts the person reviewed and saved (as they were or changed)
 	Night         int       // contributions between 00:00 and 04:59
 	Early         int       // contributions between 05:00 and 06:59
 }
@@ -60,6 +62,7 @@ type ModuleWork struct {
 	Filename                 string // the most recent file name of the module
 	Count                    int
 	First, Last              time.Time
+	AI                       bool // some of this work was an AI draft the person saved (AI-assisted)
 }
 
 // ProjectPath is the project's address

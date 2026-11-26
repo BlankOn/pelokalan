@@ -53,7 +53,9 @@ code, kbd, pre { font-family: var(--mono); font-size: 12px; }
     background: #24272e; color: #fff;
     flex-shrink: 0;
 }
-.topbar { position: relative; }
+.topbar { position: sticky; top: 0; z-index: 30; }
+/* anchors land below the sticky top bar */
+html { scroll-padding-top: 60px; }
 .brand { display: flex; align-items: center; gap: 8px; color: #fff; font-weight: 600; font-size: 15px; }
 /* page title centered in the top bar (project name, or file + project in the editor) */
 .top-title {
@@ -104,7 +106,8 @@ code, kbd, pre { font-family: var(--mono); font-size: 12px; }
 
 /* ---------- Layout ---------- */
 .container { max-width: 1080px; margin: 0 auto; padding: 24px 20px 40px; }
-.site-footer { text-align: center; color: var(--muted); font-size: 12px; padding: 16px; }
+.site-footer { text-align: center; color: var(--muted); font-size: 12px; padding: 28px 16px 24px; margin: 40px auto 0; max-width: 1100px;
+    border-top: 1px solid var(--border-soft); }
 .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
 .crumbs { font-size: 12px; color: var(--muted); }
 .card {
@@ -120,7 +123,7 @@ code, kbd, pre { font-family: var(--mono); font-size: 12px; }
 
 .tabs-nav { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
 /* the project tabs stay at the top while the page scrolls (section titles stack below them, app.js) */
-.tabs-nav { position: sticky; top: 0; z-index: 9; background: var(--bg); }
+.tabs-nav { position: sticky; top: 48px; z-index: 9; background: var(--bg); }
 .tabs-nav a { padding: 8px 14px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs-nav a.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 .tabs-nav a:hover { text-decoration: none; color: var(--text); }
@@ -1113,7 +1116,7 @@ h1 .ai-badge { font-size: 12px; }
 
 /* ---------- Wiki ---------- */
 .wiki-layout { display: grid; grid-template-columns: 240px minmax(0, 1fr); gap: 16px; align-items: start; }
-.wiki-nav { position: sticky; top: 12px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 12px; max-height: calc(100vh - 90px); overflow: auto; }
+.wiki-nav { position: sticky; top: 60px; background: var(--surface); border: 1px solid var(--border-soft); border-radius: var(--radius); padding: 12px; max-height: calc(100vh - 138px); overflow: auto; }
 .wiki-nav-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
 .wiki-nav-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); }
 .wiki-tree { list-style: none; margin: 0; padding: 0; }
@@ -1355,7 +1358,7 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 @media (max-width: 700px) { .kbd-list { grid-template-columns: 1fr; gap: 2px; } .kbd-list dd { margin-bottom: 8px; } }
 
 /* footer links and licenses page */
-.footer-links { margin-top: 6px; }
+.footer-links { margin-top: 8px; }
 .about h2 { margin-top: 0; }
 .about h2 + p, .about h3 + p { margin-top: 4px; }
 .about h3 { font-size: 15px; margin: 18px 0 0; }
@@ -1738,10 +1741,22 @@ select.role-locked, form[action$="/role"] select[name="role"] { min-width: 150px
 .gl-mod code { cursor: pointer; }
 .gl-mod:hover code { background: var(--accent-soft); color: var(--accent); }
 /* footer: "A project by" with the BlankOn Foundation logo */
-.footer-by { display: inline-flex; flex-direction: column; align-items: center; gap: 8px; margin-bottom: 18px; color: var(--muted);
+.footer-by { display: inline-flex; flex-direction: column; align-items: center; gap: 10px; margin-bottom: 20px; color: var(--muted);
     text-decoration: none; font-size: 12px; }
 .footer-by:hover { text-decoration: none; color: var(--text); }
 .footer-by img { height: 34px; width: auto; display: block; }
+/* Konteks tab: items without a module */
+.context-bar { display: flex; gap: 10px; align-items: flex-start; flex-wrap: wrap; margin-bottom: 12px; }
+.context-bar .context-search { flex: 1 1 240px; }
+.context-new { flex: 0 0 auto; }
+.context-new[open] { flex: 1 1 100%; order: 2; }
+.context-new > summary, .context-edit > summary { list-style: none; cursor: pointer; }
+.context-new > summary::-webkit-details-marker, .context-edit > summary::-webkit-details-marker { display: none; }
+.context-edit > summary { color: var(--accent); width: max-content; }
+.context-form { margin-top: 10px; max-width: 720px; }
+.context-form textarea { width: 100%; }
+.context-form .form-actions { margin-top: 10px; }
+.context-tag { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-dark); vertical-align: 1px; }
 /* the profile page: one form, one save button beside the title, two columns when there is room */
 .profile-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
 .profile-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 520px; }

@@ -118,9 +118,10 @@ make cover          # coverage of every package by every test (bin/coverage.html
   ("Berkas Anda", `/projects/{id}/files`). Translation memory uses the user's own files.
 - **Project files** ("Berkas proyek", `project_files`, migration 027): every glossary import also
   stores its PO files (gzip) with stats, so the Penerjemahan tab has three sections: project files,
-  your files, other members' files. Listed least complete first, 10 at a time (`ProjectFilePageSize`; the "Urutkan"
-  select in `#pf-filter`, param `s`, `service.ProjectFileSorts`: least/most complete, most/fewest strings, most left,
-  name, and with reservations on "Direservasi dulu"/"Belum direservasi dulu", which `projectFileOrder` ranks in Go
+  your files, other members' files. Listed 10 at a time (`ProjectFilePageSize`; the "Urutkan"
+  select in `#pf-filter`, param `s`, `service.ProjectFileSorts`; default "Sisa terjemahan terbanyak" (`remaining`): files with
+  work left, most left first, then files nobody started, then complete files; same rule in SQL (`projectFileOrders`) and Go
+  (`service.CompareProgress`); also least/most complete, most/fewest strings, name, and with reservations on "Direservasi dulu"/"Belum direservasi dulu", which `projectFileOrder` ranks in Go
   after the database order (`ProjectFileOrder.Rank`);
   "Muat lagi" via `GET /projects/{id}/project-files?offset=`); download, or "Ambil" copies one into
   the member's own files (`catalogService.Upload`). Synced module groups imported before 027 count as due
@@ -129,14 +130,16 @@ make cover          # coverage of every package by every test (bin/coverage.html
   (= `ModuleGroup` with project files, e.g. gnome-51; `group_filter` partial, checkbox dropdown
   `[data-multi-filter]` with "Tampilkan semua" like the editor filter, shown when there is a group; `g` params).
   Search and filter live in `#pf-filter`; "Muat lagi" includes it (`hx-include`).
-- The project tabs (`.tabs-nav`) stick at the top of every project page. Each of the three sections
+- The black top bar (`.topbar`) sticks at the top of every page (48px, `html { scroll-padding-top }` keeps anchors below
+  it); the project tabs (`.tabs-nav`, `top: 48px`) stick right under it on every project page. Each of the three sections
   (`.files-section[data-sticky-section]`) keeps its title, card head, filter bar and column row on top while it scrolls
   (`[data-stick]`, position: sticky); app.js stacks them below the tabs via `--stick-top` from the heights above (re-measured on resize and htmx swaps). They let go when the section ends; off on phones.
   Section titles are buttons (`.section-toggle`, chevron down / right) that fold the section; the state is kept in
   localStorage per project and section (`data-collapse-key` "files:<slug>:project|mine|others").
 - "Berkas Anda" and "Berkas anggota lain" (one list, owner under each file) show 5 files at a time
   (`FileListPageSize`, `GET /projects/{id}/my-files|member-files?q=&g=&offset=`, `Handler.fileList`, partial
-  `file_rows`) sorted by last edit (`catalogs.updated_at`, newest first) with search and the same module group filter: a file is in a group when its module
+  `file_rows`) with the same "Urutkan" select (`service.FileListSorts`: the project file orders plus "Terakhir disunting" = `recent`, last
+  edit first; default `remaining`), search and the same module group filter: a file is in a group when its module
   (`service.ModuleOf`) is among that group's project files (`GlossaryService.ModuleGroups`); `g=0` = no group.
   Managers get "Sinkronkan dengan upstream" (in Berkas proyek; beside "Tambah berkas manual" in Berkas Anda the same
   button is labelled "Sinkronkan status upstream" / "Sync upstream status", `files.sync_status`, since there it only shows new states;
@@ -265,6 +268,12 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - Editor: "Konteks" toolbar button right of Praterjemah opens `#context-dialog`; saved with
   `POST /catalogs/{cid}/context` (JSON). A dot on the button shows that the file has a note.
 - Project tab "Konteks" (`/projects/{id}/contexts`) lists modules with a note and their files, searchable.
+- **General items** (migration 054, `module_contexts.title`): a Konteks item that belongs to no module (style, agreed terms…).
+  Stored as a row whose module is "~" + 12 random hex chars (`ModuleContext.IsGeneral`/`GeneralKey`), with a title
+  (required, at most 120). Members add them with "+ Konteks baru" on the Konteks tab (`POST /projects/{id}/contexts`,
+  `ContextService.CreateGeneral`) and edit them in place (`POST /projects/{id}/contexts/{key}`, `SaveGeneral`, carries
+  `version`; a stale save answers 409 and reopens the form with the person's text). Emptying the note hides the item.
+  Not sent to the AI yet (only the file's module note is).
 - AI pre-translation puts the file's note into the system prompt (`ai.SystemPrompt(..., fileContext)`,
   capped at `ai.MaxFileContext`); it counts in the cost estimate. The note outranks the glossary for
   the words it talks about: glossary terms containing a word the note writes in quotes or backticks (3+ letters,
@@ -296,6 +305,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
   chosen with the same `group_filter` dropdown (none = all; several are added up per hour, `sumByHour`);
   ranges Hari ini (last 24 h, hourly points) / 7 / 30 days / all (daily points, `lastPerBucket`). Lines (translated green, fuzzy orange, untranslated red) share one scale with tidy value labels by default (`niceStep`), so distances are real; "Skala per garis" (`cs=each`) zooms each line to its own range and shows [min–max] in the legend; a
   floating card (app.js) shows the nearest point. History starts on the day it was deployed.
+- The "Templat sumber (POT)" section on Penerjemahan is hidden for now (`showTemplateSection` in handler/web/project.go);
+  its template upload/merge code stays so it can come back.
 - Penerjemahan (`/projects/{id}/files`) is the first tab and the landing page: `/projects/{id}` redirects
   there (`ProjectHome`, query kept); the glossary lives at `/projects/{id}/glossary`.
 
@@ -390,6 +401,10 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
   fully translated, deleted ones included (a soft delete never takes a badge away). The page: head with streak, tiles, a 53-week calendar (`buildHeatmap`, levels `heatLevels`),
   badges (earned first, pips, progress to the next tier) and projects. Work before the activity log began is not counted.
 
+- **AI and hand-work badges** (group "work"): "Mitra AI" / "AI Partner" (`ai`, robot icon) counts AI drafts the person
+  reviewed and saved (`evAI`: entry saves whose machine origin was ai); "Racikan Tangan" / "Handcrafted" (`manual`, keyboard
+  icon) counts empty strings translated by hand with no AI, glossary or memory draft (`evManual` = `evNew` with no origin).
+  Both come from `ProfileDay.AI` / `Manual` and have badge details like the other counting badges.
 - **Medals:** `partials/badge_medal.html` (`badge_medal`, `medal_defs` gradients): an earned medal has a tier-coloured rim,
   shaded face and white icon; an unearned badge is an empty dashed slot. Icons live once in `badgecard.Icons`
   (template func `badgeIcon`); tier colours in `badgecard.Tiers` and the `.tier-*` CSS must stay in step.
@@ -473,7 +488,7 @@ steps. It is always shown (no hide button).
 
 ## Footer
 
-`layouts/base.html`: "Sebuah proyek dari" / "A project by" with the BlankOn Foundation logo (linking to blankon.id) on
+`layouts/base.html` (a fine line on top, `.site-footer` border-top): "Sebuah proyek dari" / "A project by" with the BlankOn Foundation logo (linking to blankon.id) on
 top, then the site name and tagline and the Tentang/Lisensi links. The logo (`static/img/blankon-foundation.png`, the light version: dark letters) shows when
 `static/img/blankon-foundation.svg` (or `.png`) exists
 (`PageData.ByLogo`, checked at start-up); otherwise the name is written in text.
@@ -556,7 +571,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   `GlossaryService.ProjectFiles` loads all matching rows and pages in Go) and in "Berkas Anda" / "Berkas anggota
   lain" (`file_filter`, `fileList`). Shown when a module group is a release upstream (`HasUpstream`). Both lists show the
   badge (`upstream_badge` partial) under the file name.
-- "Berkas Anda" order (`fileList`, `ownFileRank`): upstream state "ToReview" (labelled "Requested rework" /
+- The module group filter is hidden when the project has only one module group (file lists and the Statistik chart).
+- "Berkas Anda" order with "Terakhir disunting" (`fileList`, `ownFileRank`): upstream state "ToReview" (labelled "Requested rework" /
   "Diminta perbaikan"), then Proofreading, then Translating, then everything else; last edit (newest first)
   within each group, also across "Muat lagi" pages and with search/filters. "Berkas anggota lain" sorts by last
   edit only.

@@ -143,6 +143,17 @@ func funcMap() template.FuncMap {
 			}
 			return out
 		},
+		// fileSortOptions are the orders of the members' file lists
+		"fileSortOptions": func(res any) []string {
+			reservations, _ := res.(bool) // missing = off
+			var out []string
+			for _, s := range service.FileListSorts {
+				if reservations || s != "reserved" && s != "free" {
+					out = append(out, s)
+				}
+			}
+			return out
+		},
 		"dict": func(kv ...any) (map[string]any, error) {
 			if len(kv)%2 != 0 {
 				return nil, errors.New("dict needs key/value pairs")

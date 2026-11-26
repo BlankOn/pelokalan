@@ -16,6 +16,8 @@ const (
 	evNew        = `(kind = 'entry.saved' AND status_before = 'untranslated' AND status_after <> 'untranslated')`
 	evReviewed   = `(kind = 'entry.saved' AND status_before = 'fuzzy' AND status_after = 'translated')`
 	evEdited     = `(kind = 'entry.saved' AND status_before = 'translated' AND text_changed)`
+	evManual     = `(` + evNew + ` AND origin = '')`
+	evAI         = `(kind = 'entry.saved' AND origin = 'ai')`
 	evContribute = `(kind = 'entry.saved' AND (` + evNew + ` OR ` + evReviewed + ` OR ` + evEdited + ` OR origin <> ''))`
 )
 
@@ -30,6 +32,8 @@ func (r *activityRepository) UserDays(ctx context.Context, userID int64, tz stri
 		       COALESCE(SUM(words) FILTER (WHERE `+evContribute+`), 0),
 		       COUNT(*) FILTER (WHERE `+evReviewed+`),
 		       COUNT(*) FILTER (WHERE `+evEdited+`),
+		       COUNT(*) FILTER (WHERE `+evManual+`),
+		       COUNT(*) FILTER (WHERE `+evAI+`),
 		       COUNT(*) FILTER (WHERE `+evContribute+` AND EXTRACT(HOUR FROM t) < 5),
 		       COUNT(*) FILTER (WHERE `+evContribute+` AND EXTRACT(HOUR FROM t) BETWEEN 5 AND 6)
 		FROM ev GROUP BY 1 HAVING COUNT(*) FILTER (WHERE `+evContribute+`) > 0 ORDER BY 1`, userID, tz)
@@ -40,7 +44,7 @@ func (r *activityRepository) UserDays(ctx context.Context, userID int64, tz stri
 	var out []models.ProfileDay
 	for rows.Next() {
 		var d models.ProfileDay
-		if err := rows.Scan(&d.Day, &d.Contributions, &d.Translated, &d.Words, &d.Reviewed, &d.Edited, &d.Night, &d.Early); err != nil {
+		if err := rows.Scan(&d.Day, &d.Contributions, &d.Translated, &d.Words, &d.Reviewed, &d.Edited, &d.Manual, &d.AI, &d.Night, &d.Early); err != nil {
 			return nil, err
 		}
 		out = append(out, d)
@@ -125,6 +129,8 @@ var moduleWorkKinds = map[string][2]string{ // kind: {filter, count}
 	"words":    {evContribute, "COALESCE(SUM(a.words), 0)"},
 	"reviewed": {evReviewed, "COUNT(*)"},
 	"edited":   {evEdited, "COUNT(*)"},
+	"ai":       {evAI, "COUNT(*)"},
+	"manual":   {evManual, "COUNT(*)"},
 	"night":    {evContribute + ` AND EXTRACT(HOUR FROM a.created_at AT TIME ZONE $2) < 5`, "COUNT(*)"},
 	"early":    {evContribute + ` AND EXTRACT(HOUR FROM a.created_at AT TIME ZONE $2) BETWEEN 5 AND 6`, "COUNT(*)"},
 	"weekend":  {evContribute + ` AND EXTRACT(ISODOW FROM a.created_at AT TIME ZONE $2) >= 6`, "COUNT(*)"},
@@ -135,7 +141,7 @@ func scanModuleWork(rows *sql.Rows) ([]*models.ModuleWork, error) {
 	var out []*models.ModuleWork
 	for rows.Next() {
 		m := &models.ModuleWork{}
-		if err := rows.Scan(&m.ProjectSlug, &m.ProjectName, &m.Module, &m.Filename, &m.Count, &m.First, &m.Last); err != nil {
+		if err := rows.Scan(&m.ProjectSlug, &m.ProjectName, &m.Module, &m.Filename, &m.Count, &m.First, &m.Last, &m.AI); err != nil {
 			return nil, err
 		}
 		out = append(out, m)
@@ -152,7 +158,7 @@ func (r *activityRepository) UserModuleWork(ctx context.Context, userID int64, t
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT p.slug, p.name, split_part(lower(COALESCE(c.filename, '')), '.', 1) AS module,
 		       (array_agg(COALESCE(c.filename, '') ORDER BY a.created_at DESC))[1],
-		       `+k[1]+`, MIN(a.created_at), MAX(a.created_at)
+		       `+k[1]+`, MIN(a.created_at), MAX(a.created_at), COALESCE(bool_or(a.origin = 'ai'), false)
 		FROM activity_events a
 		JOIN projects p ON p.id = a.project_id
 		LEFT JOIN catalogs c ON c.id = a.catalog_id
@@ -169,7 +175,7 @@ func (r *activityRepository) UserModuleWork(ctx context.Context, userID int64, t
 func (r *activityRepository) UserLandingWork(ctx context.Context, userID int64, limit int) ([]*models.ModuleWork, error) {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT p.slug, p.name, l.module, (array_agg(l.filename ORDER BY l.landed_at DESC))[1],
-		       COUNT(*), MIN(l.landed_at), MAX(l.landed_at)
+		       COUNT(*), MIN(l.landed_at), MAX(l.landed_at), false
 		FROM upstream_landings l JOIN projects p ON p.id = l.project_id
 		WHERE l.user_id = $1
 		GROUP BY p.slug, p.name, l.module ORDER BY 5 DESC, 7 DESC LIMIT $2`, userID, limit)
@@ -194,7 +200,7 @@ func (r *activityRepository) UserCommunityWork(ctx context.Context, userID int64
 		return nil, nil
 	}
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT p.slug, p.name, '', '', COUNT(*), MIN(w.created_at), MAX(w.created_at)
+		SELECT p.slug, p.name, '', '', COUNT(*), MIN(w.created_at), MAX(w.created_at), false
 		FROM (`+q+`) w(project_id, created_at) JOIN projects p ON p.id = w.project_id
 		GROUP BY p.slug, p.name ORDER BY 5 DESC, 7 DESC LIMIT $2`, userID, limit)
 	if err != nil {

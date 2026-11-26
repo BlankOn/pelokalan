@@ -33,6 +33,8 @@ var badgeKind = map[string]struct {
 	"words":      {"words", "words", func(d models.ProfileDay) int { return d.Words }},
 	"reviewed":   {"reviewed", "strings", func(d models.ProfileDay) int { return d.Reviewed }},
 	"edited":     {"edited", "strings", func(d models.ProfileDay) int { return d.Edited }},
+	"manual":     {"manual", "strings", func(d models.ProfileDay) int { return d.Manual }},
+	"ai":         {"ai", "strings", func(d models.ProfileDay) int { return d.AI }},
 	"night":      {"night", "strings", func(d models.ProfileDay) int { return d.Night }},
 	"early":      {"early", "strings", func(d models.ProfileDay) int { return d.Early }},
 	"best_day":   {"contrib", "strings", nil},

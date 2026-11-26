@@ -119,6 +119,10 @@ func (h *Handler) loadProject(w http.ResponseWriter, r *http.Request) (*models.P
 }
 
 // loadMemberProject loads a project the signed-in user belongs to
+// showTemplateSection shows the "Templat sumber (POT)" section on Penerjemahan. Hidden for now; the
+// template upload and merge code stays so the section can come back by turning this on.
+const showTemplateSection = false
+
 func (h *Handler) loadMemberProject(w http.ResponseWriter, r *http.Request) (*models.Project, bool) {
 	p, ok := h.loadProject(w, r)
 	if ok && !p.Role.IsMember() {
@@ -162,6 +166,7 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Data["Project"] = p
 	data.Data["Template"] = template
 	data.Data["IsGit"] = h.glossary.IsGitProject(r.Context(), p)
+	data.Data["ShowTemplate"] = showTemplateSection
 	data.Data["Reviews"], _ = h.reviews.Open(r.Context(), p) // requests waiting for an owner/manager
 	h.glossary.AttachUpstreamToCatalogs(r.Context(), p, catalogs)
 	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, nil, 0)
@@ -965,10 +970,11 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 			list = append(list, c)
 		}
 	}
-	// most recently edited first (entry saves bump catalogs.updated_at), so the order is stable
-	// between pages and the file someone just worked on is on top. The user's own files whose
-	// upstream state needs them come first: requested rework, proofreading, translating.
-	sort.SliceStable(list, func(i, j int) bool {
+	// the order picked in "Urutkan" (s, service.FileListSorts; default most left). "recent" = most recently edited
+	// first (entry saves bump catalogs.updated_at), with the user's own files whose upstream state needs them on
+	// top: requested rework, proofreading, translating. "reserved" / "free" put reserved (or free) modules first.
+	order := r.URL.Query().Get("s")
+	recent := func(i, j int) bool {
 		if mine {
 			if a, b := ownFileRank(list[i]), ownFileRank(list[j]); a != b {
 				return a < b
@@ -976,6 +982,30 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 		}
 		if !list[i].UpdatedAt.Equal(list[j].UpdatedAt) {
 			return list[i].UpdatedAt.After(list[j].UpdatedAt)
+		}
+		return list[i].ID > list[j].ID
+	}
+	progress := func(c *models.Catalog) service.FileProgress {
+		return service.FileProgress{Total: c.Stats.Total, Translated: c.Stats.Translated, Name: c.Filename}
+	}
+	sort.SliceStable(list, func(i, j int) bool {
+		switch order {
+		case "recent":
+			return recent(i, j)
+		case "reserved", "free":
+			if v.Res.On {
+				a, b := list[i].Reservation != nil, list[j].Reservation != nil
+				if a != b {
+					return a == (order == "reserved")
+				}
+			}
+			if c := service.CompareProgress("remaining", progress(list[i]), progress(list[j])); c != 0 {
+				return c < 0
+			}
+			return list[i].ID > list[j].ID
+		}
+		if c := service.CompareProgress(order, progress(list[i]), progress(list[j])); c != 0 {
+			return c < 0
 		}
 		return list[i].ID > list[j].ID
 	})

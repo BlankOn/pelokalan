@@ -217,7 +217,11 @@ func TestProfileAndBadges(t *testing.T) {
 			url.Values{"version": {strconv.Itoa(ver)}, "msgstr0": {pair[1]}}).status(http.StatusOK)
 	}
 
-	// improving a translated string is work too: its words count ("Kata dikerjakan" = every string worked on)
+	// improving a translated string is work too: its words count ("Kata dikerjakan" = every string worked on);
+	// it was an AI draft, so the badge details mark the module as AI-assisted
+	if _, err := env.DB.Exec(`UPDATE entries SET origin = 'ai' WHERE catalog_id = $1 AND msgid = 'One'`, cid); err != nil {
+		t.Fatal(err)
+	}
 	eid, ver := entry(t, cid, "One")
 	mira.post("/catalogs/"+strconv.FormatInt(cid, 10)+"/entries/"+strconv.FormatInt(eid, 10),
 		url.Values{"version": {strconv.Itoa(ver)}, "msgstr0": {"Satu saja"}}).status(http.StatusOK)
@@ -225,11 +229,18 @@ func TestProfileAndBadges(t *testing.T) {
 	page := visitor(t).get("/users/" + mira.Username).status(http.StatusOK)
 	page.contains("@"+mira.Username, "Profil", "<strong>3</strong><span>Kata dikerjakan</span>",
 		"<strong>2</strong><span>String diterjemahkan dari kosong</span>").lacks(mira.Email)
+	// two strings typed by hand, one AI draft reviewed: progress towards "Racikan Tangan" and "Mitra AI"
+	for name, progress := range map[string]string{"Racikan Tangan": "2 / 50", "Mitra AI": "1 / 25"} {
+		i := strings.Index(page.Body, name)
+		if i < 0 || !strings.Contains(page.Body[i:min(len(page.Body), i+1500)], progress) {
+			t.Errorf("badge %q does not show %s", name, progress)
+		}
+	}
 	visitor(t).get("/users/nobody-here").status(http.StatusNotFound)
 
 	// a fully translated file earns the bronze "completed" badge: share page and PNG
 	share := visitor(t).get("/users/" + mira.Username + "/badges/completed/1").status(http.StatusOK)
-	share.contains(`property="og:image"`)
+	share.contains(`property="og:image"`, "Dibantu AI")
 	img := visitor(t).get("/users/" + mira.Username + "/badges/completed/1.png").status(http.StatusOK)
 	if img.Header.Get("Content-Type") != "image/png" || len(img.Body) < 1000 {
 		t.Fatalf("badge image: %s, %d bytes", img.Header.Get("Content-Type"), len(img.Body))

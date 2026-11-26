@@ -782,8 +782,12 @@ func KeepStates(states map[string]bool) func(*models.ProjectFile) bool {
 // ProjectFiles pages a project's project files, least complete first: query (every word in name, language or group label),
 // groupIDs (none = all) and keep, a filter on the file with its upstream state attached (upstream states,
 // reservations; nil = all). A filter needs every matching file, so it pages here.
-// ProjectFileSorts are the orders of the project file list ("" = least complete first)
-var ProjectFileSorts = []string{"incomplete", "complete", "most", "fewest", "remaining", "name", "reserved", "free"}
+// ProjectFileSorts are the orders of the project file list, the default first ("" = most left: files with work
+// left, then files nobody started, then complete ones). The members' file lists add FileListSorts.
+var ProjectFileSorts = []string{"remaining", "incomplete", "complete", "most", "fewest", "name", "reserved", "free"}
+
+// FileListSorts are the orders of "Berkas Anda" / "Berkas anggota lain": the project file orders plus last edit
+var FileListSorts = []string{"remaining", "incomplete", "complete", "most", "fewest", "name", "recent", "reserved", "free"}
 
 // ProjectFileOrder orders the project file list: Sort is done by the database (repository.ProjectFileSort),
 // Rank (lower first, ties keep that order) after loading every matching row, for orders the database

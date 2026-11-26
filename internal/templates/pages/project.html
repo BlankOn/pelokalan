@@ -36,7 +36,7 @@
     <div class="context-search pf-toolbar" data-stick>
         <form id="pf-filter" class="pf-filter" hx-get="{{.Project.Path}}/project-files" hx-trigger="input changed delay:300ms from:find input[name=q], search from:find input[name=q], change[target.type!='search'], submit" hx-target="#project-file-rows" hx-swap="innerHTML">
         <input type="search" name="q" placeholder="{{t $.Lang "files.project_search"}}" aria-label="{{t $.Lang "files.project_search"}}" autocomplete="off">
-        {{if .Groups}}{{template "group_filter" (dict "Lang" $.Lang "Groups" .Groups "NoGroup" false)}}{{end}}
+        {{if and .Groups (gt (len .Groups) 1)}}{{template "group_filter" (dict "Lang" $.Lang "Groups" .Groups "NoGroup" false)}}{{end}}
         {{if .Upstream}}{{template "upstream_filter" (dict "Lang" $.Lang)}}{{end}}
         {{if .Res.On}}{{template "reserve_filter" (dict "Lang" $.Lang)}}{{end}}
         <select name="s" class="pf-sort" aria-label="{{t $.Lang "files.sort"}}" title="{{t $.Lang "files.sort"}}">
@@ -92,7 +92,7 @@
     {{end}}
 </section>
 
-{{if not .Data.IsGit}}
+{{if and .Data.ShowTemplate (not .Data.IsGit)}}
 <section class="card">
     <div class="card-head">
         <h2>{{t .Lang "project.template"}}</h2>

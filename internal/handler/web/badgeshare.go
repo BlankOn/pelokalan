@@ -133,6 +133,7 @@ type badgeDetailRow struct {
 	ProjectName, ProjectPath, Module, Filename string
 	Count                                      int
 	When                                       string // "3 Nov 2026" or "3 Nov – 9 Nov 2026"
+	AI                                         bool   // AI-assisted (an AI draft was saved)
 }
 
 // badgeDetailView is a badge's details as the share page shows them
@@ -140,6 +141,7 @@ type badgeDetailView struct {
 	Earned, Period string
 	CountKey       string // badges.count_<…>
 	Modules        bool
+	AnyAI          bool // some row was AI-assisted: the table gets the AI column
 	Rows           []badgeDetailRow
 }
 
@@ -165,8 +167,9 @@ func (h *Handler) badgeDetailView(lang string, d *service.BadgeDetail) *badgeDet
 	}
 	for _, m := range d.Work {
 		v.Rows = append(v.Rows, badgeDetailRow{ProjectName: m.ProjectName, ProjectPath: m.ProjectPath(),
-			Module: m.Module, Filename: m.Filename, Count: m.Count,
+			Module: m.Module, Filename: m.Filename, Count: m.Count, AI: m.AI,
 			When: dateRange(lang, m.First.In(siteLocation), m.Last.In(siteLocation))})
+		v.AnyAI = v.AnyAI || m.AI
 	}
 	return v
 }

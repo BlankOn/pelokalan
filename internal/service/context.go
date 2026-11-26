@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"errors"
 	"strings"
 
@@ -93,7 +95,68 @@ func (s *ContextService) Save(ctx context.Context, user *models.User, p *models.
 	return n, nil
 }
 
+// maxContextTitle is the longest title of a Konteks item without a module
+const maxContextTitle = 120
+
+// CreateGeneral adds a Konteks item that belongs to no module (members only)
+func (s *ContextService) CreateGeneral(ctx context.Context, user *models.User, p *models.Project, title, note string) (*models.ModuleContext, error) {
+	if user == nil || !p.Role.IsMember() {
+		return nil, ErrForbidden
+	}
+	title = strings.Join(strings.Fields(title), " ")
+	note = strings.TrimRight(strings.ReplaceAll(note, "\r\n", "\n"), " \n")
+	if title == "" || len([]rune(title)) > maxContextTitle {
+		return nil, userErr("err.context_title", maxContextTitle)
+	}
+	if strings.TrimSpace(note) == "" || len([]rune(note)) > maxContextLen {
+		return nil, userErr("err.context_length", maxContextLen)
+	}
+	n := &models.ModuleContext{ProjectID: p.ID, Module: "~" + randomHex(6), Title: title, Note: note, UpdatedBy: &user.ID,
+		UpdaterName: user.DisplayName()}
+	if err := s.repo.Save(ctx, n, 0); err != nil {
+		return nil, err
+	}
+	return n, nil
+}
+
+// SaveGeneral changes a Konteks item without a module (members only; an empty note hides it). version is the
+// version the form started from; ErrContextConflict with the latest when someone saved in between.
+func (s *ContextService) SaveGeneral(ctx context.Context, user *models.User, p *models.Project, key, title, note string, version int64) (*models.ModuleContext, error) {
+	if user == nil || !p.Role.IsMember() {
+		return nil, ErrForbidden
+	}
+	cur, err := s.ForModule(ctx, p.ID, key)
+	if err != nil || cur == nil || !cur.IsGeneral() {
+		return nil, ErrNotFound
+	}
+	title = strings.Join(strings.Fields(title), " ")
+	note = strings.TrimRight(strings.ReplaceAll(note, "\r\n", "\n"), " \n")
+	if title == "" || len([]rune(title)) > maxContextTitle {
+		return nil, userErr("err.context_title", maxContextTitle)
+	}
+	if len([]rune(note)) > maxContextLen {
+		return nil, userErr("err.context_length", maxContextLen)
+	}
+	if cur.Version == version && cur.Note == note && cur.Title == title {
+		return cur, nil
+	}
+	n := &models.ModuleContext{ProjectID: p.ID, Module: key, Title: title, Note: note, UpdatedBy: &user.ID, UpdaterName: user.DisplayName()}
+	err = s.repo.Save(ctx, n, version)
+	if errors.Is(err, repository.ErrConflict) {
+		latest, _ := s.ForModule(ctx, p.ID, key)
+		return latest, ErrContextConflict
+	}
+	return n, err
+}
+
 // List returns the project's Konteks notes, most recently changed first
 func (s *ContextService) List(ctx context.Context, p *models.Project, q string) ([]*models.ModuleContext, error) {
 	return s.repo.ListForProject(ctx, p.ID, q)
+}
+
+// randomHex returns n random bytes as hex
+func randomHex(n int) string {
+	b := make([]byte, n)
+	_, _ = rand.Read(b)
+	return hex.EncodeToString(b)
 }
