@@ -288,6 +288,9 @@ func (s *ReviewService) PushNow(ctx context.Context, manager *models.User, p *mo
 	if !p.Role.CanManage() {
 		return nil, ErrForbidden
 	}
+	if p.ReviewRequired { // the project sends files only through an approved review
+		return nil, userErr("err.review_required")
+	}
 	if c.DeletedAt != nil || c.ProjectID != p.ID {
 		return nil, ErrNotFound
 	}

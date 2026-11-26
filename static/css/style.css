@@ -351,7 +351,14 @@ h1 .ai-badge { font-size: 12px; }
 }
 .list-header > div { padding: 5px 8px; }
 .list-header .cell-tr { border-left: 1px solid var(--border-soft); }
-.entry-list { height: var(--list-height); overflow-y: auto; flex-shrink: 0; }
+.entry-list { height: var(--list-height); overflow-y: scroll; flex-shrink: 0; }
+/* the entry table always shows its scroll bar (overlay scroll bars of macOS, iPadOS and Chrome on touch screens
+   otherwise hide it until scrolling): a styled bar is drawn as a classic, always-visible one */
+.entry-list::-webkit-scrollbar { width: 12px; }
+.entry-list::-webkit-scrollbar-track { background: var(--surface-2); border-left: 1px solid var(--border-soft); }
+.entry-list::-webkit-scrollbar-thumb { background: #b8bec9; border-radius: 6px; border: 3px solid var(--surface-2); min-height: 40px; }
+.entry-list::-webkit-scrollbar-thumb:hover { background: #8f97a5; }
+@supports not selector(::-webkit-scrollbar) { .entry-list { scrollbar-width: auto; scrollbar-color: #b8bec9 var(--surface-2); } }
 .entry-row { cursor: default; user-select: none; border-bottom: 1px solid #f0f1f3; }
 .entry-row:nth-child(even) { background: #fafbfc; }
 .entry-row > div { padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
@@ -765,13 +772,13 @@ h1 .ai-badge { font-size: 12px; }
 .ai-cancelled { background: var(--surface-2); }
 
 /* ---------- Machine translation origin ---------- */
-.mark-ai { width: 15px; height: 15px; fill: none; stroke: #e8780c; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; vertical-align: -2px; }
-.mark-ai .eye { fill: #e8780c; stroke: none; }
-.mark-ai.is-fuzzy rect { fill: #fff1e0; }
+.mark-ai { width: 15px; height: 15px; fill: none; stroke: #7a3fd1; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; vertical-align: -2px; }
+.mark-ai .eye { fill: #7a3fd1; stroke: none; }
+.mark-ai.is-fuzzy rect { fill: #f3e8ff; }
 .entry-row.selected .mark-ai { stroke: #fff; }
 .entry-row.selected .mark-ai .eye { fill: #fff; }
 .entry-row.selected .mark-ai.is-fuzzy rect { fill: rgba(255,255,255,.2); }
-.c-ai { color: #c2620a; display: inline-flex; align-items: center; gap: 3px; }
+.c-ai { color: #7a3fd1; display: inline-flex; align-items: center; gap: 3px; }
 /* glossary (green book) and memory (blue cards) origin markers */
 .mark-origin { width: 15px; height: 15px; fill: none; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; vertical-align: -2px; }
 .mark-glossary { stroke: #1a7f5a; }
@@ -788,7 +795,7 @@ h1 .ai-badge { font-size: 12px; }
 .origin-memory { color: #4a5d9e; border-color: #cfd7f3; background: #f3f5fd; }
 .ed-alert-ai { background: #fff1e0; color: #8a4204; display: flex; align-items: center; gap: 6px; }
 .origin-tag { text-transform: none; letter-spacing: 0; font-weight: 600; font-size: 11px; background: var(--surface-2); border: 1px solid var(--border-soft); color: var(--muted); border-radius: 4px; padding: 0 6px; display: inline-flex; align-items: center; gap: 3px; }
-.origin-ai { background: #fff1e0; border-color: #f6cf9f; color: #c2620a; }
+.origin-ai { background: #f3e8ff; border-color: #dcc6f7; color: #7a3fd1; }
 
 /* ---------- Version history ---------- */
 .tb-btn { position: relative; }
@@ -940,7 +947,13 @@ h1 .ai-badge { font-size: 12px; }
 .comment-form { display: flex; flex-direction: column; gap: 8px; }
 .comment-form textarea, .comment-edit textarea { width: 100%; }
 .comment-form-foot { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
-.mention-chips { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+/* @mention suggestions while typing a comment (app.js) */
+.mention-pop { position: fixed; z-index: 1000; min-width: 180px; max-width: 280px; max-height: 240px; overflow-y: auto; padding: 4px;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 8px; box-shadow: 0 6px 20px rgba(0, 0, 0, .16); }
+.mention-pop button { display: block; width: 100%; text-align: left; border: 0; background: none; padding: 6px 10px; border-radius: 5px;
+    font: inherit; font-size: 13px; color: var(--text); cursor: pointer; }
+.mention-pop button.active, .mention-pop button:hover { background: var(--accent-soft); color: var(--accent); }
+.mention-pop b { font-weight: 700; }
 .chip { border: 1px solid var(--border-soft); background: var(--surface); border-radius: 10px; padding: 0 8px; font: inherit; font-size: 12px; cursor: pointer; color: var(--accent-dark); }
 .chip:hover { border-color: var(--accent); }
 .comment-count { font-size: 12px; color: var(--accent-dark); white-space: nowrap; }
@@ -1681,8 +1694,11 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .comment-review-open { border-left: 3px solid #d93025; padding-left: 8px; }
 .rv-resolve { margin-top: 6px; }
 .rv-resolved { margin-top: 4px; }
-/* the review editor: list (or diff) and sidebar, no edit pane or status bar */
-.review-mode #splitter, .review-mode #editor, .review-mode .statusbar { display: none; }
+/* the review editor: list (or diff) and sidebar, no edit pane */
+.review-mode #splitter, .review-mode #editor { display: none; }
+/* the status bar stays (file progress), without editing shortcuts; its filter links need the editor's filter bar */
+.review-mode .sb-shortcuts { display: none; }
+.review-mode .statusbar a { pointer-events: none; text-decoration: none; }
 /* reviewers: the sidebar always shows (comments live there); no suggestions or translator's note */
 .review-mode .sb-suggestions, .review-mode .sb-tcomment { display: none; }
 /* "Lihat" on another member's file: only reading, so no discussion either */

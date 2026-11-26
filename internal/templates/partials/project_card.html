@@ -152,7 +152,7 @@
                 {{if .CanPush}}{{if and .Review (eq .Review.Status "requested")}}<a href="{{$v.Project.Path}}/reviews/{{.Review.ID}}">{{t $v.Lang "review.view"}}</a>
                 <form method="post" action="{{$v.Project.Path}}/reviews/{{.Review.ID}}/withdraw" data-confirm="{{t $v.Lang "review.withdraw_confirm"}}"><button class="linklike">{{t $v.Lang "review.withdraw"}}</button></form>
                 {{else}}<button type="button" class="linklike" data-review="/catalogs/{{.ID}}/review" data-review-name="{{.RepoPath}}" title="{{t $v.Lang "review.request_help"}}">{{t $v.Lang "review.request"}}</button>{{end}}
-                {{if $v.Reviewer}}<form method="post" action="/catalogs/{{.ID}}/push" data-confirm="{{t $v.Lang "review.push_confirm" .RepoPath}}" data-confirm-ok="{{t $v.Lang "review.push"}}"><button class="linklike">{{t $v.Lang "review.push"}}</button></form>{{end}}{{end}}
+                {{if and $v.Reviewer (not $v.Project.ReviewRequired)}}<form method="post" action="/catalogs/{{.ID}}/push" data-confirm="{{t $v.Lang "review.push_confirm" .RepoPath}}" data-confirm-ok="{{t $v.Lang "review.push"}}"><button class="linklike">{{t $v.Lang "review.push"}}</button></form>{{end}}{{end}}
                 <a href="/catalogs/{{.ID}}/download">{{t $v.Lang "action.download_po"}}</a>
                 <a href="/catalogs/{{.ID}}/download.mo">{{t $v.Lang "action.download_mo"}}</a>
                 {{if $v.HasTemplate}}
@@ -168,7 +168,7 @@
         </details>
         {{else}}
         {{if and $v.Res.Manager .Reservation (ne .Reservation.UserID $v.Res.UserID)}}{{template "res_release" (dict "Lang" $v.Lang "R" .Reservation "Project" $v.Project)}}{{end}}
-        {{if and $v.Reviewer .CanPush}}<form method="post" action="/catalogs/{{.ID}}/push" class="inline-form" data-confirm="{{t $v.Lang "review.push_confirm_member" .RepoPath .OwnerUsername}}" data-confirm-ok="{{t $v.Lang "review.push"}}"><button class="btn btn-small" title="{{t $v.Lang "review.push_help"}}">{{t $v.Lang "review.push"}}</button></form>{{end}}
+        {{if and $v.Reviewer .CanPush (not $v.Project.ReviewRequired)}}<form method="post" action="/catalogs/{{.ID}}/push" class="inline-form" data-confirm="{{t $v.Lang "review.push_confirm_member" .RepoPath .OwnerUsername}}" data-confirm-ok="{{t $v.Lang "review.push"}}"><button class="btn btn-small" title="{{t $v.Lang "review.push_help"}}">{{t $v.Lang "review.push"}}</button></form>{{end}}
         {{if and $v.Reviewer .Review (eq .Review.Status "requested")}}<a class="btn btn-small btn-primary" href="{{$v.Project.Path}}/reviews/{{.Review.ID}}">{{t $v.Lang "review.open"}}</a>
         {{else}}<a class="btn btn-small" href="{{.URL}}?view=1">{{t $v.Lang "action.view"}}</a>{{end}}
         <a class="btn btn-small btn-icon" href="/catalogs/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>

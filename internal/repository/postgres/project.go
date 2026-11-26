@@ -44,10 +44,10 @@ func (r *projectRepository) Create(ctx context.Context, p *models.Project) error
 func (r *projectRepository) GetByID(ctx context.Context, id int64) (*models.Project, error) {
 	p := &models.Project{}
 	err := r.db.QueryRowContext(ctx,
-		`SELECT id, name, slug, description, source_language, language, open, reservations, reservation_days, owner_id, created_at, updated_at,
+		`SELECT id, name, slug, description, source_language, language, open, reservations, reservation_days, review_required, owner_id, created_at, updated_at,
 		        EXISTS (SELECT 1 FROM project_ai_settings s WHERE s.project_id = projects.id AND s.api_key_enc <> '')
 		 FROM projects WHERE id = $1`, id,
-	).Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.Language, &p.Open, &p.Reservations, &p.ReservationDays,
+	).Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.Language, &p.Open, &p.Reservations, &p.ReservationDays, &p.ReviewRequired,
 		&p.OwnerID, &p.CreatedAt, &p.UpdatedAt, &p.AIEnabled)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
@@ -123,8 +123,8 @@ func (r *projectRepository) ListAll(ctx context.Context, userID int64) ([]*model
 func (r *projectRepository) Update(ctx context.Context, p *models.Project) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE projects SET name = $2, description = $3, source_language = $4, slug = $5, language = $6, open = $7,
-		        reservations = $8, reservation_days = $9, updated_at = NOW() WHERE id = $1`,
-		p.ID, p.Name, p.Description, p.SourceLanguage, p.Slug, p.Language, p.Open, p.Reservations, p.ReservationDays)
+		        reservations = $8, reservation_days = $9, review_required = $10, updated_at = NOW() WHERE id = $1`,
+		p.ID, p.Name, p.Description, p.SourceLanguage, p.Slug, p.Language, p.Open, p.Reservations, p.ReservationDays, p.ReviewRequired)
 	return err
 }
 

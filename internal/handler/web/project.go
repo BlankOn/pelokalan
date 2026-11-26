@@ -435,6 +435,7 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 		Language:       r.FormValue("language"),
 		Open:           r.FormValue("access") == "open",
 		Reservations:   r.FormValue("reservations") == "on",
+		ReviewRequired: r.FormValue("review_required") == "on",
 	}
 	in.ReservationDays, _ = strconv.Atoi(r.FormValue("reservation_days"))
 	if err := h.projectService.Update(r.Context(), p, in); err != nil {

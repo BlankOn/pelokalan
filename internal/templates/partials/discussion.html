@@ -1,5 +1,5 @@
 {{define "discussion_thread"}}{{$t := .Thread}}{{$s := $t.Subject}}
-<section id="{{.ID}}" class="thread" data-review-open="{{.OpenReview}}" data-lb-open="{{t .Lang "discuss.image_open"}}" data-lb-zoom="{{t .Lang "discuss.image_zoom"}}" data-lb-close="{{t .Lang "action.close"}}">
+<section id="{{.ID}}" class="thread" data-review-open="{{.OpenReview}}"{{if and .CanComment .Members}} data-members="{{toJSON .Members}}"{{with .User}} data-me="{{.Username}}"{{end}}{{end}} data-lb-open="{{t .Lang "discuss.image_open"}}" data-lb-zoom="{{t .Lang "discuss.image_zoom"}}" data-lb-close="{{t .Lang "action.close"}}">
     <h3 class="thread-title">💬 {{t .Lang "discuss.title"}}{{with $t.Discussion}} <span class="muted">({{.CommentCount}})</span>{{end}}
         {{if .CanDelete}}<button type="button" class="linklike small danger thread-delete" hx-post="{{.Project.Path}}/discussions/{{$s.Type}}/{{$s.Key}}/delete" hx-target="#{{.ID}}" hx-swap="outerHTML" hx-confirm="{{t .Lang "discuss.delete_confirm"}}" data-confirm-ok="{{t .Lang "action.delete"}}">{{t .Lang "discuss.delete"}}</button>{{end}}</h3>
     {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
@@ -62,12 +62,10 @@
         <textarea name="body" rows="3" maxlength="5000" placeholder="{{t .Lang "discuss.placeholder"}}" aria-label="{{t .Lang "discuss.placeholder"}}"></textarea>
         <div class="att-picker small">
             <label class="att-add">📎 {{t .Lang "discuss.attach"}}<input type="file" name="files" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" data-max="5" data-max-bytes="10485760" data-err-type="{{t .Lang "err.attachment_type"}}" data-err-size="{{t .Lang "err.attachment_size" 10}}" data-err-count="{{t .Lang "err.attachments_count" 5}}"></label>
-            <span class="muted">{{t .Lang "discuss.attach_help"}}</span>
             <ul class="att-pending"></ul>
             <div class="att-error c-err" role="alert" hidden></div>
         </div>
         <div class="comment-form-foot">
-            {{if .Members}}<div class="mention-chips small"><span class="muted">{{t .Lang "discuss.mention"}}</span>{{range .Members}}{{if ne . $.User.Username}}<button type="button" class="chip" data-mention="{{.}}">@{{.}}</button>{{end}}{{end}}</div>{{end}}
             <button type="submit" class="btn btn-small btn-primary">{{t .Lang "discuss.send"}}</button>
         </div>
     </form>

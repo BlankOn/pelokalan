@@ -41,11 +41,13 @@ type Project struct {
 	Open bool `json:"open"`
 	// Reservations: members reserve a module while working on it (others cannot change it);
 	// ReservationDays releases one after that many days without saves (0 = never)
-	Reservations    bool      `json:"reservations"`
-	ReservationDays int       `json:"reservation_days"`
-	OwnerID         int64     `json:"owner_id"`
-	CreatedAt       time.Time `json:"created_at"`
-	UpdatedAt       time.Time `json:"updated_at"`
+	Reservations    bool `json:"reservations"`
+	ReservationDays int  `json:"reservation_days"`
+	// ReviewRequired: files go to a repository only through an approved review (no direct sending)
+	ReviewRequired bool      `json:"review_required"`
+	OwnerID        int64     `json:"owner_id"`
+	CreatedAt      time.Time `json:"created_at"`
+	UpdatedAt      time.Time `json:"updated_at"`
 
 	// Filled by listing queries
 	Role         ProjectRole `json:"role,omitempty"`

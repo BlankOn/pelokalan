@@ -159,6 +159,13 @@ func TestGitHubReviews(t *testing.T) {
 	// nothing new: nothing to send; a newer change can be sent by the owner straight away
 	kiki.post(fmt.Sprintf("/catalogs/%d/review", kc), nil).status(http.StatusBadRequest).contains("Tidak ada perubahan")
 	save("Open the file", "Buka berkas")
+	// with "Wajibkan tinjauan" on, files go only through an approved review: no direct sending
+	owner.post(base+"/settings", url.Values{"name": {"Docs"}, "slug": {slug}, "source_language": {"en"}, "access": {"private"},
+		"review_required": {"on"}}).redirectsTo(base)
+	owner.get(base + "/member-files").status(http.StatusOK).lacks(fmt.Sprintf("/catalogs/%d/push", kc))
+	owner.post(fmt.Sprintf("/catalogs/%d/push", kc), nil).status(http.StatusBadRequest).contains("mewajibkan tinjauan")
+	owner.post(base+"/settings", url.Values{"name": {"Docs"}, "slug": {slug}, "source_language": {"en"}, "access": {"private"}}).redirectsTo(base)
+	owner.get(base + "/member-files").status(http.StatusOK).contains(fmt.Sprintf("/catalogs/%d/push", kc))
 	kiki.post(fmt.Sprintf("/catalogs/%d/push", kc), nil).status(http.StatusForbidden)
 	owner.post(fmt.Sprintf("/catalogs/%d/push", kc), nil).redirectsTo(base + "/files")
 	if n := len(ghFake.LastCommits()); n != 2 {

@@ -216,7 +216,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
   `emailButton` (small).
 - Comments: project members only; readable publicly. Deletion is soft (`deleted_at`, `deleted_by`): the
   author, username and time stay visible with a note saying who deleted it and when. `@username` mentions of members are
-  stored and emailed. Authors edit/delete their own; owners/managers can delete any. Bodies are
+  stored and emailed. Typing "@" in a comment box opens a small member popup (app.js, the thread's `data-members`;
+  arrows, Enter/Tab picks, Esc or typing on ignores it), so a plain "@" stays possible. Authors edit/delete their own; owners/managers can delete any. Bodies are
   Markdown rendered by `commentHTML` (goldmark GFM + hard wraps, safe mode: raw HTML and
   javascript: links dropped; bare URLs auto-linked; mentions outside a/code/pre).
 - Project descriptions are plain text; `linkify` escapes them and links bare http(s) URLs.
@@ -645,7 +646,9 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan; `/projects/{id}/reviews/{rid}` shows the
   changes (`ReviewService.Changes`: `CatalogService.ChangedTargets` = the git patch rule, against the last synced file)
   with "Setujui & commit" / "Kembalikan dengan catatan" (note required, emailed). Nobody approves their own request.
-  Owners/managers may also "Kirim ke repositori" any file directly (`PushNow`). One open request per file.
+  Owners/managers may also "Kirim ke repositori" any file directly (`PushNow`), unless the project setting "Wajibkan
+  tinjauan" (Settings → Umum, `projects.review_required`, migration 050) is on: then the button is hidden and
+  `PushNow` refuses (`err.review_required`). One open request per file.
 - Commit (`ReviewService.commit`): reads the branch's current file, `gitpatch.Apply` (the whole file with only the
   member's changed entries rewritten), `PutFile` (one retry on conflict), author = translator's credit identity,
   message "Update translation of <path>" + count + note + `Reviewed-by:` + project link. The committed file is kept
@@ -655,8 +658,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - File rows show `review_chip` (Menunggu tinjauan / Perlu perbaikan · N (open review comments) / Masuk repositori · sha
   linking the commit).
 - **Review editor** (`/projects/{id}/reviews/{rid}` = `editorPage` with the review, `reviewData`; class `review-mode`):
-  read-only, lists only the review's strings (`EntryFilter.Only`, `ReviewService.ChangedHashes`), no edit pane or
-  status bar, toolbar `review_toolbar` (back, file + requester, Tabel/Diff `[data-review-view]` toggling
+  read-only, lists only the review's strings (`EntryFilter.Only`, `ReviewService.ChangedHashes`), no edit pane (the
+  status bar stays, without shortcuts or filter links), toolbar `review_toolbar` (back, file + requester, Tabel/Diff `[data-review-view]` toggling
   `#review-diff`, "Setujui & commit" disabled while review comments are open), banner
   `review_banner` (translator's note, open comments, last commit error). The sidebar works as usual. The file's owner
   (the translator) is redirected from the review page to their full editor, filtered to open review comments
@@ -760,7 +763,7 @@ in Validasi (`service.EditorStatuses`). In the editor the review box is ticked a
 "Lepas pratinjau, simpan & lanjut" approves it (clears fuzzy and origin). Translation memory skips AI drafts
 (`origin <> 'ai'`). Diffs compare "needs review" (fuzzy or AI) so older snapshots with the flag show no change. The
 activity log records an AI draft's status as "fuzzy" (`logStatus`) so its counting rules stay as before. The
-pre-translation checkbox `mark_fuzzy` now only applies to memory and glossary results. The editor marks 'ai' with an orange bot, 'glossary' with a green book and
+pre-translation checkbox `mark_fuzzy` now only applies to memory and glossary results. The editor marks 'ai' with a purple bot (the colour of AI draft text), 'glossary' with a green book and
 'memory' with blue cards (`icon_origin` in entry_list.html), with status-bar counts and filters for each. Snapshots keep it as an `x-origin-*` flag, stripped from downloads.
 
 ## Version history
@@ -840,6 +843,8 @@ deploys never run stale JS/CSS.
   shows the file's open review comments; app.js keeps it in step from each thread's `data-review-open`.
   The review editor always shows the sidebar on wide screens (no handle) and hides suggestions and the translator's
   note (`.sb-suggestions`, `.sb-tcomment`).
+- The entry table always shows its scroll bar (`overflow-y: scroll` with a styled `::-webkit-scrollbar`, so overlay
+  scroll bars on macOS/iPadOS/touch Chrome do not hide it).
 - Plain Up/Down move between entries, also from the translation box (Left/Right stay there);
   in multi-line text they only leave the entry from the first/last line (`arrowNavigates`).
 - While a pre-translation job runs (`#ai-job.ai-running`), the editor is read-only (`applyLock` in

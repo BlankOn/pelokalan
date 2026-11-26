@@ -1787,17 +1787,6 @@ document.addEventListener("click", function (ev) {
     }, true);
 
     document.addEventListener("click", function (ev) {
-        var chip = ev.target.closest("[data-mention]");
-        if (chip) {
-            var ta = chip.closest("form").querySelector("textarea");
-            var text = "@" + chip.dataset.mention + " ";
-            var pos = ta.selectionStart || ta.value.length;
-            var before = ta.value.slice(0, pos);
-            if (before && !/\s$/.test(before)) text = " " + text;
-            ta.setRangeText(text, pos, ta.selectionEnd || pos, "end");
-            ta.focus();
-            return;
-        }
         var edit = ev.target.closest("[data-edit-comment]");
         if (edit) {
             var li = document.getElementById("comment-" + edit.dataset.editComment);
@@ -2889,6 +2878,106 @@ document.addEventListener("htmx:load", function (ev) {
         dot.remove();
     }
 });
+
+// @mentions: typing "@" in a comment box offers the project's members (the thread's data-members) in a small popup.
+// Arrow keys move, Enter or Tab picks, Esc (or simply typing on) ignores it, so a plain "@" stays possible.
+(function () {
+    var pop = null, state = null;
+    function close() {
+        if (pop) pop.remove();
+        pop = null;
+        state = null;
+    }
+    function membersOf(ta) {
+        var host = ta.closest && ta.closest("[data-members]");
+        if (!host) return null;
+        try {
+            var me = host.dataset.me || "";
+            return JSON.parse(host.dataset.members).filter(function (n) { return n !== me; });
+        } catch (e) { return null; }
+    }
+    // the "@word" right before the caret, when the @ starts a word
+    function queryAt(ta) {
+        if (ta.selectionStart !== ta.selectionEnd) return null;
+        var before = ta.value.slice(0, ta.selectionStart);
+        var m = /(^|[\s(\[{"'>])@([a-z0-9._-]{0,29})$/i.exec(before);
+        return m ? { start: ta.selectionStart - m[2].length - 1, text: m[2].toLowerCase() } : null;
+    }
+    function choose(name) {
+        if (!state) return;
+        var ta = state.ta, start = state.start;
+        close();
+        ta.focus();
+        ta.setRangeText("@" + name + " ", start, ta.selectionStart, "end");
+        ta.dispatchEvent(new Event("input", { bubbles: true }));
+    }
+    function highlight(i) {
+        var items = pop.querySelectorAll("button");
+        state.active = (i + items.length) % items.length;
+        items.forEach(function (b, j) { b.classList.toggle("active", j === state.active); });
+        items[state.active].scrollIntoView({ block: "nearest" });
+    }
+    function show(ta, q, names) {
+        if (!pop) {
+            pop = document.createElement("div");
+            pop.className = "mention-pop";
+            pop.setAttribute("role", "listbox");
+            document.body.appendChild(pop);
+        }
+        pop.textContent = "";
+        names.forEach(function (n) {
+            var b = document.createElement("button");
+            b.type = "button";
+            b.setAttribute("role", "option");
+            var at = n.indexOf(q.text);
+            b.appendChild(document.createTextNode("@" + n.slice(0, at)));
+            var strong = document.createElement("b");
+            strong.textContent = n.slice(at, at + q.text.length);
+            b.appendChild(strong);
+            b.appendChild(document.createTextNode(n.slice(at + q.text.length)));
+            // mousedown keeps the focus in the comment box
+            b.addEventListener("mousedown", function (ev) { ev.preventDefault(); choose(n); });
+            pop.appendChild(b);
+        });
+        state = { ta: ta, start: q.start, active: 0 };
+        var r = ta.getBoundingClientRect();
+        var top = r.bottom + 4;
+        pop.style.left = Math.max(8, Math.min(r.left, window.innerWidth - 290)) + "px";
+        pop.style.top = top + "px";
+        var h = pop.offsetHeight;
+        if (top + h > window.innerHeight - 8) pop.style.top = Math.max(8, r.top - h - 4) + "px"; // no room below: above
+        highlight(0);
+    }
+    document.addEventListener("input", function (ev) {
+        var ta = ev.target;
+        if (!ta.matches || !ta.matches("textarea")) return;
+        var names = membersOf(ta), q = names && queryAt(ta);
+        if (!q) { if (state && state.ta === ta) close(); return; }
+        // names starting with what was typed first, then names containing it
+        var starts = names.filter(function (n) { return n.indexOf(q.text) === 0; });
+        var inside = names.filter(function (n) { return n.indexOf(q.text) > 0; });
+        var list = starts.concat(inside).slice(0, 8);
+        if (!list.length) { close(); return; }
+        show(ta, q, list);
+    });
+    document.addEventListener("keydown", function (ev) {
+        if (!state || ev.target !== state.ta || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+        if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+            ev.preventDefault(); ev.stopPropagation();
+            highlight(state.active + (ev.key === "ArrowDown" ? 1 : -1));
+        } else if (ev.key === "Enter" || ev.key === "Tab") {
+            ev.preventDefault(); ev.stopPropagation();
+            var b = pop.querySelectorAll("button")[state.active];
+            choose(b.textContent.slice(1));
+        } else if (ev.key === "Escape") {
+            ev.preventDefault(); ev.stopPropagation();
+            close();
+        }
+    }, true);
+    document.addEventListener("focusout", function (ev) { if (state && ev.target === state.ta) close(); });
+    window.addEventListener("resize", close);
+    document.addEventListener("scroll", function () { if (state) close(); }, true);
+})();
 
 // "Ajukan tinjauan" in a file's menu: one popup for every file (an optional note for the reviewer)
 document.addEventListener("click", function (ev) {

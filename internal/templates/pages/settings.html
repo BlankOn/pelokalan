@@ -80,6 +80,10 @@
                 </select>
                 <p class="muted small field-help">{{t .Lang "reserve.settings_days_help"}}</p>
             </fieldset>
+            <fieldset class="access-choice" id="review-required">
+                <legend>{{t .Lang "review.settings_title"}}</legend>
+                <label class="check"><input type="checkbox" name="review_required" {{if $p.ReviewRequired}}checked{{end}}> <span><strong>{{t .Lang "review.settings_on"}}</strong> <span class="muted small">{{t .Lang "review.settings_help"}}</span></span></label>
+            </fieldset>
             <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
         </fieldset>
     </form>
