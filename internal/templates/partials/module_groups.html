@@ -16,7 +16,7 @@
     {{if $g.GitAccessError}}<div class="feed-error small">{{errText .Lang $g.GitAccessError}}</div>{{end}}
     {{with $g.GitCheckedAt}}<div class="muted small">{{t $.Lang "github.checked" (timeAgo $.Lang .)}}</div>{{end}}
     <div class="row-actions">
-        {{if not $g.GitWrite}}<a class="btn btn-small btn-primary" href="{{.Install}}" target="_blank" rel="noopener">{{t .Lang "github.install"}} ↗</a>{{end}}
+        <a class="btn btn-small{{if not $g.GitWrite}} btn-primary{{end}}" href="{{.Install}}" target="_blank" rel="noopener" title="{{t .Lang "github.install_help"}}">{{t .Lang "github.install"}} ↗</a>
         <form method="post" action="{{.P.Path}}/module-groups/{{$g.ID}}/github/check"><button class="btn btn-small" type="submit">{{t .Lang "github.check"}}</button></form>
         {{if $g.GitDirect}}<form method="post" action="{{.P.Path}}/module-groups/{{$g.ID}}/github/direct" data-confirm="{{t .Lang "github.off_confirm"}}"><input type="hidden" name="on" value="0"><button class="btn btn-small" type="submit">{{t .Lang "github.turn_off"}}</button></form>
         {{else if $g.GitWrite}}<form method="post" action="{{.P.Path}}/module-groups/{{$g.ID}}/github/direct" data-confirm="{{t .Lang "github.on_confirm" $g.GitRepo $g.GitBranch}}" data-confirm-ok="{{t .Lang "github.turn_on"}}"><input type="hidden" name="on" value="1"><button class="btn btn-small btn-primary" type="submit">{{t .Lang "github.turn_on"}}</button></form>{{end}}

@@ -79,6 +79,8 @@ func TestGitHubReviews(t *testing.T) {
 
 	// the owner sees the queue and the change; kiki cannot decide on her own request
 	owner.get(base+"/files").status(http.StatusOK).contains("Menunggu tinjauan", page)
+	// in Berkas anggota lain the owner gets "Tinjau" for a file waiting for review
+	owner.get(base + "/member-files").status(http.StatusOK).contains(`href="` + page + `">Tinjau`)
 	// the review editor: the review's strings only, the diff, the note, the approval button; no edit pane tools
 	owner.get(page).status(http.StatusOK).contains("review-mode", `&#43;msgstr &#34;Tutup jendela&#34;`, "Mohon dicek istilahnya.",
 		"Setujui &amp; commit", `data-review-view="diff"`, "Close the window").lacks("Open the file", "tb-commit")
@@ -144,6 +146,11 @@ func TestGitHubReviews(t *testing.T) {
 	}
 	mails.waitFor(t, kiki.Email, "masuk repositori")
 	kiki.get(base+"/my-files").status(http.StatusOK).contains("Masuk repositori", cm.SHA[:7])
+	// "Lihat" opens another member's file view-only: the review layout without actions or discussion
+	owner.get(base + "/member-files").status(http.StatusOK).contains("library__os.po?view=1")
+	owner.get(base+"/"+kiki.Username+"/po/library__os.po?view=1").status(http.StatusOK).
+		contains("view-mode", "Hanya lihat", "Remove the directory").lacks("rv-approve", "tb-commit", "filter-form")
+	owner.get(base + "/" + kiki.Username + "/po/library__os.po").status(http.StatusOK).lacks("view-mode")
 	if st := scalar[string](t, `SELECT status FROM module_reviews WHERE id = $1`, rid); st != "pushed" {
 		t.Fatalf("status = %s", st)
 	}

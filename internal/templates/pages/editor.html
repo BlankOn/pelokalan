@@ -1,11 +1,11 @@
 {{define "content"}}{{$c := .Data.Catalog}}{{$p := .Data.Project}}{{$f := .Data.Filter}}
-<div class="editor-app{{if .Data.Review}} review-mode{{end}}" id="editor-app" data-catalog="{{$c.ID}}" data-readonly="{{.Data.ReadOnly}}" data-initial-entry="{{.Data.InitialEntry}}"
+<div class="editor-app{{if or .Data.Review .Data.ViewOnly}} review-mode{{end}}{{if .Data.ViewOnly}} view-mode{{end}}" id="editor-app" data-catalog="{{$c.ID}}" data-readonly="{{.Data.ReadOnly}}" data-initial-entry="{{.Data.InitialEntry}}"
      {{if .Data.Owned}}data-spell="/catalogs/{{$c.ID}}/spell" data-spell-suggest="{{$p.Path}}/spell/suggest" data-spell-dict="{{$p.Path}}/dictionary" data-sp-title="{{t .Lang "spelling.popup_title"}}" data-sp-add="{{t .Lang "spelling.add"}}" data-sp-none="{{t .Lang "spelling.no_suggestions"}}"{{end}}
      {{if .Data.Owned}}data-thesaurus="{{$p.Path}}/thesaurus?v={{.Asset}}" data-th-title="{{t .Lang "thesaurus.synonyms"}}" data-th-antonyms="{{t .Lang "thesaurus.antonyms"}}" data-th-none="{{t .Lang "thesaurus.none"}}" data-th-source="{{t .Lang "thesaurus.source"}}" data-th-tags="{{t .Lang "thesaurus.tags"}}" data-th-as-form="{{t .Lang "thesaurus.as_form"}}" data-ai-working="{{t .Lang "ai.entry_working"}}" data-locked-msg="{{t .Lang "ai.editor_locked"}}"{{end}}
      data-msg-unsaved="{{t .Lang "editor.unsaved_changes"}}"
      data-msg-error="{{t .Lang "editor.request_failed"}}"
      data-msg-save-failed="{{t .Lang "editor.save_failed_move"}}">
-    {{with .Data.Review}}{{template "review_toolbar" $}}{{else}}
+    {{if .Data.Review}}{{template "review_toolbar" .}}{{else if .Data.ViewOnly}}{{template "view_toolbar" .}}{{else}}
     <div class="toolbar">
         <a class="tb-btn" href="{{$p.Path}}/files" title="{{t .Lang "editor.back_to_project"}}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
@@ -147,7 +147,7 @@
                 <div class="cell-tr">{{if $c.IsTemplate}}{{t .Lang "editor.translation"}}{{else}}{{t .Lang "editor.translation"}} — {{$c.LanguageName}}{{end}}</div>
             </div>
             {{template "entry_list" .Data.List}}
-            {{if .Data.Review}}<div id="review-diff" class="review-diff-wrap" hidden>
+            {{if or .Data.Review .Data.ViewOnly}}<div id="review-diff" class="review-diff-wrap" hidden>
                 {{with .Data.Diff}}<pre class="review-diff">{{range .}}<span class="rd-{{if .Kind}}{{.Kind}}{{else}}ctx{{end}}">{{.Text}}</span>{{end}}</pre>
                 <p class="muted small review-diff-help">{{t $.Lang "review.diff_help"}}</p>
                 {{else}}<p class="muted review-diff-help">{{t $.Lang "review.no_changes"}}</p>{{end}}
@@ -384,4 +384,26 @@
 {{if and (eq $r.Status "requested") $r.OpenComments}}<div class="editor-flash review-open-flash"><span class="mark-review"></span> {{t .Lang "review.open_comments" $r.OpenComments}}</div>{{end}}
 {{if and (eq $r.Status "requested") $r.Error}}<div class="editor-flash editor-hold">{{t .Lang "review.failed"}}: {{errText .Lang $r.Error}}</div>{{end}}
 {{if $r.ReviewNote}}<div class="editor-flash review-note-flash"><strong>{{t .Lang "review.note_back" $r.ReviewerUsername}}:</strong> {{$r.ReviewNote}}</div>{{end}}
+{{end}}
+
+{{/* "Lihat" on another member's file: the review layout, only to read (no actions, no discussion) */}}
+{{define "view_toolbar"}}{{$c := .Data.Catalog}}{{$p := .Data.Project}}
+<div class="toolbar review-toolbar">
+    <a class="tb-btn" href="{{$p.Path}}/files" title="{{t .Lang "editor.back_to_project"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        <span>{{t .Lang "editor.project"}}</span>
+    </a>
+    <div class="tb-sep"></div>
+    <div class="rv-tb-info">
+        <strong>{{$c.Filename}}</strong>
+        <span class="muted small">@{{$c.OwnerUsername}} · {{$c.LanguageName}}{{with .Data.Changed}} · {{t $.Lang "view.changed" .}}{{end}}</span>
+    </div>
+    {{if .Data.Diff}}<div class="rv-view" role="group" aria-label="{{t .Lang "review.view_label"}}">
+        <button type="button" class="rv-view-btn active" data-review-view="table">{{t .Lang "review.view_table"}}</button>
+        <button type="button" class="rv-view-btn" data-review-view="diff">{{t .Lang "review.view_diff"}}</button>
+    </div>{{end}}
+    <div class="spacer"></div>
+    <span class="rv-chip">{{t .Lang "view.only"}}</span>
+    <input type="hidden" id="filter-selected" value="">
+</div>
 {{end}}

@@ -107,6 +107,21 @@ func (h *Handler) ReviewPage(w http.ResponseWriter, r *http.Request) {
 	h.editorPage(w, r, c, p, rv)
 }
 
+// viewData is the view-only layout of another member's file: the review editor's look without decisions or
+// discussion; repository files also get the diff of the member's changes against the last synced file
+func (h *Handler) viewData(r *http.Request, p *models.Project, c *models.Catalog, data *PageData) {
+	data.Data["ViewOnly"] = true
+	data.Data["ReadOnly"] = true
+	data.Data["Owned"] = false
+	if c.RepoPath == "" {
+		return
+	}
+	if d, err := h.reviews.Changes(r.Context(), p, c); err == nil && d != nil {
+		data.Data["Diff"] = diffLines(d.Hunks)
+		data.Data["Changed"] = d.Changed
+	}
+}
+
 // reviewData adds what the review editor needs: the request, the decision rights and the diff
 func (h *Handler) reviewData(r *http.Request, p *models.Project, c *models.Catalog, rv *models.ModuleReview, data *PageData) {
 	user := middleware.GetUser(r.Context())
@@ -126,8 +141,14 @@ func (h *Handler) reviewData(r *http.Request, p *models.Project, c *models.Catal
 	if err != nil || d == nil {
 		return
 	}
+	data.Data["Diff"] = diffLines(d.Hunks)
+	data.Data["Changed"] = d.Changed
+}
+
+// diffLines splits unified diff hunks into lines classed for display
+func diffLines(hunks string) []diffLine {
 	var lines []diffLine
-	for _, l := range strings.Split(strings.TrimRight(d.Hunks, "\n"), "\n") {
+	for _, l := range strings.Split(strings.TrimRight(hunks, "\n"), "\n") {
 		kind := ""
 		switch {
 		case strings.HasPrefix(l, "@@"):
@@ -139,8 +160,7 @@ func (h *Handler) reviewData(r *http.Request, p *models.Project, c *models.Catal
 		}
 		lines = append(lines, diffLine{kind, l})
 	}
-	data.Data["Diff"] = lines
-	data.Data["Changed"] = d.Changed
+	return lines
 }
 
 // ApproveReview commits a requested file: POST /projects/{id}/reviews/{rid}/approve

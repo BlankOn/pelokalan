@@ -562,9 +562,9 @@ h1 .ai-badge { font-size: 12px; }
 @media (max-width: 1000px) {
     .sb-shortcuts { display: none; }
 }
-/* tablets (iPad mini portrait 744px and landscape 1133px): the sidebar floats over the table instead of
-   narrowing it; it starts closed (app.js) and its handle stays at the right edge */
-@media (min-width: 701px) and (max-width: 1180px) {
+/* tablets (iPad mini portrait 744px and landscape 1133px) and phones: the sidebar floats over the table instead
+   of narrowing it; it starts closed (app.js) and its handle stays at the right edge */
+@media (max-width: 1180px) {
     .workspace { position: relative; }
     .sidebar { position: absolute; top: 0; right: 0; bottom: 0; width: min(360px, 82vw); z-index: 20;
         box-shadow: -8px 0 24px rgba(0, 0, 0, .16); }
@@ -573,10 +573,10 @@ h1 .ai-badge { font-size: 12px; }
     .side-splitter:hover { background: transparent; }
     .sidebar-hidden .side-splitter { right: 0; }
 }
-/* phones: no sidebar; the glossary shows in the editor pane */
+/* phones: the floating sidebar takes most of the width */
 @media (max-width: 700px) {
-    .sidebar, .side-splitter { display: none; }
-    .ed-glossary-narrow { display: block; }
+    .sidebar { width: min(340px, 88vw); }
+    .side-splitter { right: min(340px, 88vw); }
 }
 /* tablets (e.g. iPad mini portrait, 744px): the file tables drop the three count columns,
    the progress bar and percentage already show them, so name, progress, date and buttons fit */
@@ -1669,6 +1669,11 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .review-mode #splitter, .review-mode #editor, .review-mode .statusbar { display: none; }
 /* reviewers: the sidebar always shows (comments live there); no suggestions or translator's note */
 .review-mode .sb-suggestions, .review-mode .sb-tcomment { display: none; }
+/* "Lihat" on another member's file: only reading, so no discussion either */
+.view-mode .sb-thread { display: none; }
+/* long strings (documentation paragraphs) wrap instead of being cut off */
+.review-mode .entry-row > div { white-space: pre-wrap; overflow-wrap: anywhere; text-overflow: clip; }
+.review-mode .entry-row .cell-icon { align-items: flex-start; padding-top: 6px; }
 @media (min-width: 1181px) { .review-mode .side-toggle { display: none; } }
 .review-mode .entry-list { height: auto; flex: 1; }
 .review-mode.show-diff .list-header, .review-mode.show-diff #entry-list { display: none; }

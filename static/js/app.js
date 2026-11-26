@@ -1091,8 +1091,8 @@
         document.documentElement.style.setProperty("--sidebar-width", px + "px");
         return px;
     }
-    // tablets (iPad mini portrait and landscape): the sidebar floats over the table and starts closed
-    var floating = window.matchMedia("(min-width: 701px) and (max-width: 1180px)");
+    // tablets (iPad mini portrait and landscape) and phones: the sidebar floats over the table and starts closed
+    var floating = window.matchMedia("(max-width: 1180px)"); // tablets and phones
     // the review editor always shows the sidebar on wide screens: review comments are written there
     var reviewMode = !!(workspace && workspace.closest(".review-mode"));
     function setSideHidden(hidden, keep) {

@@ -129,7 +129,7 @@
 {{define "file_rows"}}{{$v := .}}
 {{range .Files}}
 <tr>
-    <td><a class="lang-link" href="{{.URL}}"><strong>{{.Filename}}</strong></a>{{with .Reservation}}{{template "res_lock" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID)}}{{end}}
+    <td><a class="lang-link" href="{{.URL}}{{if not $v.Mine}}?view=1{{end}}"><strong>{{.Filename}}</strong></a>{{with .Reservation}}{{template "res_lock" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID)}}{{end}}
         <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div>
         {{if .RepoPath}}<div class="small muted repo-path" title="{{t $v.Lang "git.repo_path"}}">{{.RepoPath}}</div>{{end}}
         {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}{{template "tp_badge" (dict "Lang" $v.Lang "D" .TP)}}{{with .Review}}{{template "review_chip" (dict "Lang" $v.Lang "R" . "P" $v.Project)}}{{end}}
@@ -169,7 +169,8 @@
         {{else}}
         {{if and $v.Res.Manager .Reservation (ne .Reservation.UserID $v.Res.UserID)}}{{template "res_release" (dict "Lang" $v.Lang "R" .Reservation "Project" $v.Project)}}{{end}}
         {{if and $v.Reviewer .CanPush}}<form method="post" action="/catalogs/{{.ID}}/push" class="inline-form" data-confirm="{{t $v.Lang "review.push_confirm_member" .RepoPath .OwnerUsername}}" data-confirm-ok="{{t $v.Lang "review.push"}}"><button class="btn btn-small" title="{{t $v.Lang "review.push_help"}}">{{t $v.Lang "review.push"}}</button></form>{{end}}
-        <a class="btn btn-small" href="{{.URL}}">{{t $v.Lang "action.view"}}</a>
+        {{if and $v.Reviewer .Review (eq .Review.Status "requested")}}<a class="btn btn-small btn-primary" href="{{$v.Project.Path}}/reviews/{{.Review.ID}}">{{t $v.Lang "review.open"}}</a>
+        {{else}}<a class="btn btn-small" href="{{.URL}}?view=1">{{t $v.Lang "action.view"}}</a>{{end}}
         <a class="btn btn-small btn-icon" href="/catalogs/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
         {{end}}
     </td>

@@ -185,6 +185,8 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 // editorPage renders the editor; with a review it is the review editor (reviewPage): read-only, only the
 // review's strings, a trimmed toolbar (back, approval, table/diff) and no edit pane
 func (h *Handler) editorPage(w http.ResponseWriter, r *http.Request, c *models.Catalog, p *models.Project, rv *models.ModuleReview) {
+	// "Lihat" on another member's file (?view=1): the review layout without actions or discussion
+	view := rv == nil && !c.Owned && !c.IsTemplate && !c.IsDeleted() && r.URL.Query().Get("view") == "1"
 	hold := h.applyLock(r, p, c) // a module another member holds opens read-only
 	f := filterFromRequest(r)
 	open := h.reviewComments(r, p, c, &f)
@@ -274,6 +276,8 @@ func (h *Handler) editorPage(w http.ResponseWriter, r *http.Request, c *models.C
 	}
 	if rv != nil {
 		h.reviewData(r, p, c, rv, &data)
+	} else if view {
+		h.viewData(r, p, c, &data)
 	}
 	if n := r.URL.Query().Get("pretranslated"); n != "" {
 		data.Flash = i18n.T(data.Lang, "flash.pretranslated", n)

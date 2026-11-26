@@ -659,6 +659,14 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   status bar, toolbar `review_toolbar` (back, file + requester, Tabel/Diff `[data-review-view]` toggling
   `#review-diff`, "Setujui & commit" disabled while review comments are open; the requester gets "Batalkan"), banner
   `review_banner` (translator's note, open comments, last commit error). The sidebar works as usual.
+- **View-only layout** ("Lihat" on another member's file, `?view=1`; `viewData`, `view_toolbar`, class `view-mode`
+  with `review-mode`): the review layout without decisions or discussion (`.sb-thread` hidden): back, file + owner,
+  "Hanya lihat", and for repository files the Tabel/Diff toggle with the member's changes against the last synced file.
+  Links without `?view=1` (discussion emails, `?entry=`) still open the normal read-only editor. For owners/managers a
+  file waiting for review shows "Tinjau" (to the review editor) instead of "Lihat". In review and view layouts long
+  strings wrap in the table.
+- The GitHub integration block always shows the app's install link (to install it on more repositories or change
+  its access); it is the main button only until write access is confirmed.
 - **Review comments** (migration 049, `comments.review_id/resolved_at/resolved_by`): a comment by an owner/manager
   (not the requester) on an entry of a file with an open request is tied to it (`ReviewService.OpenFor` via
   `DiscussionService.SetReviews`). It is open until resolved ("Selesaikan", `POST /projects/{id}/comments/{cid}/resolve`,
@@ -822,9 +830,9 @@ deploys never run stale JS/CSS.
   140px or clicking the small `#side-toggle` handle in the middle of the divider hides it (`.workspace.sidebar-hidden`);
   the same handle, then at the right edge, brings it back. Width and state live in localStorage (`sidebarWidth`,
   `sidebarHidden`). While hidden, the glossary shows in the editor pane (`.ed-glossary-narrow`).
-  Tablets (701–1180px: iPad mini portrait and landscape): the sidebar floats over the table (absolute, shadow), starts
-  closed and is opened with the same handle (no dragging, state not stored: `floating` media query in app.js).
-  Phones (≤700px) have no sidebar. While the sidebar is closed, a red count beside the handle (`#side-review-badge`)
+  Tablets and phones (≤1180px: iPad mini portrait and landscape, phones): the sidebar floats over the table (absolute,
+  shadow; 88% of the width on phones), starts closed and is opened with the same handle (no dragging, state not
+  stored: `floating` media query in app.js). While the sidebar is closed, a red count beside the handle (`#side-review-badge`)
   shows the file's open review comments; app.js keeps it in step from each thread's `data-review-open`.
   The review editor always shows the sidebar on wide screens (no handle) and hides suggestions and the translator's
   note (`.sb-suggestions`, `.sb-tcomment`).
