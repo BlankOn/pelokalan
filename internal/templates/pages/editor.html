@@ -158,7 +158,7 @@
             </div>
         </div>
         <div class="side-splitter" id="side-splitter" role="separator" aria-orientation="vertical" tabindex="0" title="{{t .Lang "sidebar.resize"}}">
-            <button type="button" class="side-toggle" id="side-toggle" data-hide="{{t .Lang "sidebar.hide"}}" data-show="{{t .Lang "sidebar.show"}}" title="{{t .Lang "sidebar.hide"}}" aria-label="{{t .Lang "sidebar.hide"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+            <button type="button" class="side-toggle" id="side-toggle" data-hide="{{t .Lang "sidebar.hide"}}" data-show="{{t .Lang "sidebar.show"}}" title="{{t .Lang "sidebar.hide"}}" aria-label="{{t .Lang "sidebar.hide"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>{{if not .Data.Review}}<span class="side-badge" id="side-review-badge" data-n="{{.Data.List.Listing.ReviewComments}}" title="{{t .Lang "review.sidebar_badge"}}">{{.Data.List.Listing.ReviewComments}}</span>{{end}}</button>
         </div>
         <aside id="sidebar" class="sidebar"></aside>
     </div>

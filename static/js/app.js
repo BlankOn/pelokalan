@@ -1091,26 +1091,39 @@
         document.documentElement.style.setProperty("--sidebar-width", px + "px");
         return px;
     }
-    function setSideHidden(hidden) {
+    // tablets (iPad mini portrait and landscape): the sidebar floats over the table and starts closed
+    var floating = window.matchMedia("(min-width: 701px) and (max-width: 1180px)");
+    // the review editor always shows the sidebar on wide screens: review comments are written there
+    var reviewMode = !!(workspace && workspace.closest(".review-mode"));
+    function setSideHidden(hidden, keep) {
+        if (reviewMode && hidden && !floating.matches) return;
         workspace.classList.toggle("sidebar-hidden", hidden);
         var label = hidden ? sideToggle.dataset.show : sideToggle.dataset.hide;
         sideToggle.title = label;
         sideToggle.setAttribute("aria-label", label);
+        if (keep === false || floating.matches) return; // a floating panel's state is not the wide layout's choice
         try { localStorage.setItem("sidebarHidden", hidden ? "1" : ""); } catch (e) { /* storage unavailable */ }
     }
     if (sideSplit) {
         try {
             var sw = parseInt(localStorage.getItem("sidebarWidth"), 10);
             if (sw) setSideWidth(sw);
-            if (localStorage.getItem("sidebarHidden") === "1") setSideHidden(true);
+            if (localStorage.getItem("sidebarHidden") === "1" && !reviewMode) setSideHidden(true);
         } catch (e) { /* storage unavailable */ }
+        if (floating.matches) setSideHidden(true, false);
+        // turning the tablet: closed when it starts floating, the remembered state when it docks again
+        floating.addEventListener && floating.addEventListener("change", function (m) {
+            var stored = false;
+            try { stored = localStorage.getItem("sidebarHidden") === "1"; } catch (e) { /* storage unavailable */ }
+            setSideHidden(m.matches ? true : stored && !reviewMode, false);
+        });
         sideToggle.addEventListener("click", function (ev) {
             ev.stopPropagation();
             setSideHidden(!workspace.classList.contains("sidebar-hidden"));
         });
         sideToggle.addEventListener("pointerdown", function (ev) { ev.stopPropagation(); });
         sideSplit.addEventListener("pointerdown", function (ev) {
-            if (ev.button !== 0 || workspace.classList.contains("sidebar-hidden")) return;
+            if (ev.button !== 0 || workspace.classList.contains("sidebar-hidden") || floating.matches) return;
             ev.preventDefault();
             try { sideSplit.setPointerCapture(ev.pointerId); } catch (e) { /* not capturable */ }
             sideSplit.classList.add("dragging");
@@ -2858,6 +2871,15 @@ document.addEventListener("htmx:load", function (ev) {
     var row = document.querySelector(".entry-row.selected");
     if (!th || !row || !th.closest("#sidebar, #editor")) return;
     var n = parseInt(th.dataset.reviewOpen || "0", 10);
+    // the count beside the sidebar handle follows this entry's change
+    var before = parseInt(row.dataset.reviewOpen || "0", 10);
+    row.dataset.reviewOpen = String(n);
+    var badge = document.getElementById("side-review-badge");
+    if (badge && n !== before) {
+        var total = Math.max(0, parseInt(badge.dataset.n || "0", 10) + n - before);
+        badge.dataset.n = String(total);
+        badge.textContent = String(total);
+    }
     var icon = row.querySelector(".cell-icon"), dot = icon && icon.querySelector(".mark-review");
     if (n > 0 && icon && !dot) {
         dot = document.createElement("span");

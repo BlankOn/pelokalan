@@ -2,7 +2,7 @@
 <aside id="sidebar" class="sidebar" {{if .OOB}}hx-swap-oob="true"{{end}}>
     {{if .Glossary}}<section class="sb-section sb-glossary">{{template "entry_glossary" .}}</section>{{end}}
     {{if not .ReadOnly}}
-    <section class="sb-section">
+    <section class="sb-section sb-suggestions">
         <h3>{{t .Lang "sidebar.suggestions"}}</h3>
         {{range $i, $s := .Suggestions}}
         <button type="button" class="suggestion" data-text="{{$s.Text}}" data-index="{{add $i 1}}">
@@ -29,7 +29,7 @@
     </section>
     {{end}}
 
-    <section class="sb-section">
+    <section class="sb-section sb-tcomment">
         <h3>{{t .Lang "sidebar.comment"}}</h3>
         {{if .ReadOnly}}
         {{if $e.TranslatorComments}}<div class="sb-text">{{$e.TranslatorComments}}</div>{{else}}<p class="muted small">—</p>{{end}}

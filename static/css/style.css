@@ -550,14 +550,33 @@ h1 .ai-badge { font-size: 12px; }
 .sidebar-hidden .side-toggle svg { transform: rotate(180deg); }
 .sidebar-hidden .side-splitter { cursor: default; }
 .sidebar-hidden .sidebar { display: none; }
+/* open review comments while the sidebar is closed: a red count beside its handle */
+.side-badge { display: none; position: absolute; right: calc(100% + 3px); top: 50%; transform: translateY(-50%); min-width: 18px; height: 18px;
+    padding: 0 5px; border-radius: 9px; background: #d93025; color: #fff; font-size: 11px; font-weight: 700; line-height: 18px;
+    align-items: center; justify-content: center; box-shadow: 0 1px 3px rgba(0,0,0,.2); }
+.sidebar-hidden .side-badge:not([data-n="0"]) { display: inline-flex; }
 /* with the sidebar hidden, the glossary shows in the editor pane */
 .sidebar-hidden .ed-glossary-narrow { display: block; }
 
 /* ---------- Responsive ---------- */
 @media (max-width: 1000px) {
+    .sb-shortcuts { display: none; }
+}
+/* tablets (iPad mini portrait 744px and landscape 1133px): the sidebar floats over the table instead of
+   narrowing it; it starts closed (app.js) and its handle stays at the right edge */
+@media (min-width: 701px) and (max-width: 1180px) {
+    .workspace { position: relative; }
+    .sidebar { position: absolute; top: 0; right: 0; bottom: 0; width: min(360px, 82vw); z-index: 20;
+        box-shadow: -8px 0 24px rgba(0, 0, 0, .16); }
+    .side-splitter { position: absolute; top: 0; bottom: 0; right: min(360px, 82vw); width: 0; border-left: 0;
+        background: transparent; cursor: default; z-index: 21; }
+    .side-splitter:hover { background: transparent; }
+    .sidebar-hidden .side-splitter { right: 0; }
+}
+/* phones: no sidebar; the glossary shows in the editor pane */
+@media (max-width: 700px) {
     .sidebar, .side-splitter { display: none; }
     .ed-glossary-narrow { display: block; }
-    .sb-shortcuts { display: none; }
 }
 /* tablets (e.g. iPad mini portrait, 744px): the file tables drop the three count columns,
    the progress bar and percentage already show them, so name, progress, date and buttons fit */
@@ -1648,6 +1667,9 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .rv-resolved { margin-top: 4px; }
 /* the review editor: list (or diff) and sidebar, no edit pane or status bar */
 .review-mode #splitter, .review-mode #editor, .review-mode .statusbar { display: none; }
+/* reviewers: the sidebar always shows (comments live there); no suggestions or translator's note */
+.review-mode .sb-suggestions, .review-mode .sb-tcomment { display: none; }
+@media (min-width: 1181px) { .review-mode .side-toggle { display: none; } }
 .review-mode .entry-list { height: auto; flex: 1; }
 .review-mode.show-diff .list-header, .review-mode.show-diff #entry-list { display: none; }
 .review-diff-wrap { flex: 1; overflow: auto; padding: 12px; min-height: 0; }

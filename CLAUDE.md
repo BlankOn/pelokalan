@@ -728,8 +728,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 
 ## Editor glossary section
 
-At the top of the right sidebar (`entry_glossary` partial in editor.html, rendered by sidebar.html; below
-1000px, where the sidebar is hidden, the copy in the editor pane above the source text shows instead) the editor lists glossary terms found in the entry (`GlossaryService.ForEntry`,
+At the top of the right sidebar (`entry_glossary` partial in editor.html, rendered by sidebar.html; while the
+sidebar is closed, and on phones, the copy in the editor pane above the source text shows instead) the editor lists glossary terms found in the entry (`GlossaryService.ForEntry`,
 all versions, preferred translation + share). Chips insert the translation at the cursor; ↗ opens
 the term page. Orange text when nothing matches or the language has no glossary. Chips the project AI
 context or the file's Konteks talks about (`ai.Mentioned`, same rule as pre-translation) are orange
@@ -822,6 +822,12 @@ deploys never run stale JS/CSS.
   140px or clicking the small `#side-toggle` handle in the middle of the divider hides it (`.workspace.sidebar-hidden`);
   the same handle, then at the right edge, brings it back. Width and state live in localStorage (`sidebarWidth`,
   `sidebarHidden`). While hidden, the glossary shows in the editor pane (`.ed-glossary-narrow`).
+  Tablets (701–1180px: iPad mini portrait and landscape): the sidebar floats over the table (absolute, shadow), starts
+  closed and is opened with the same handle (no dragging, state not stored: `floating` media query in app.js).
+  Phones (≤700px) have no sidebar. While the sidebar is closed, a red count beside the handle (`#side-review-badge`)
+  shows the file's open review comments; app.js keeps it in step from each thread's `data-review-open`.
+  The review editor always shows the sidebar on wide screens (no handle) and hides suggestions and the translator's
+  note (`.sb-suggestions`, `.sb-tcomment`).
 - Plain Up/Down move between entries, also from the translation box (Left/Right stay there);
   in multi-line text they only leave the entry from the first/last line (`arrowNavigates`).
 - While a pre-translation job runs (`#ai-job.ai-running`), the editor is read-only (`applyLock` in

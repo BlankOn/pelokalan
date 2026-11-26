@@ -113,6 +113,10 @@ func TestGitHubReviews(t *testing.T) {
 	}
 	owner.get(page).status(http.StatusOK).contains("1 komentar tinjauan belum diselesaikan", "rv-approve", "disabled")
 	kiki.get(base + "/my-files").status(http.StatusOK).contains("Perlu perbaikan · 1")
+	// the translator's editor counts open review comments beside the sidebar handle; the review editor has none
+	kiki.get(fmt.Sprintf("%s/%s/po/library__os.po", base, kiki.Username)).status(http.StatusOK).
+		contains(`id="side-review-badge" data-n="1"`, `data-review-open="1"`)
+	owner.get(page).status(http.StatusOK).lacks("side-review-badge")
 	kiki.get(fmt.Sprintf("/catalogs/%d/list?status=review", kc)).status(http.StatusOK).contains("Remove the directory", "mark-review").lacks("Open the file")
 	cmt := scalar[int64](t, `SELECT id FROM comments WHERE review_id = $1`, rid)
 	visitor(t).post(fmt.Sprintf("%s/comments/%d/resolve", base, cmt), nil)

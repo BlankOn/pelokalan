@@ -6,7 +6,7 @@
 {{end}}
 
 {{define "entry_row"}}{{$e := .E}}
-<div id="row-{{$e.ID}}" class="entry-row st-{{$e.Status}}{{if $e.HasIssues}} has-issues{{end}}{{if .Selected}} selected{{end}}" data-id="{{$e.ID}}" role="row" {{if .OOB}}hx-swap-oob="true"{{end}}>
+<div id="row-{{$e.ID}}" class="entry-row st-{{$e.Status}}{{if $e.HasIssues}} has-issues{{end}}{{if .Selected}} selected{{end}}" data-id="{{$e.ID}}" data-review-open="{{$e.ReviewOpen}}" role="row" {{if .OOB}}hx-swap-oob="true"{{end}}>
     <div class="cell-icon">{{if $e.ReviewOpen}}<span class="mark-review" title="{{t .Lang "review.row_open" $e.ReviewOpen}}"></span>{{end}}{{if $e.HasIssues}}<span class="mark-err" title="{{range $e.Issues}}{{issueName $.Lang .}}. {{end}}">!</span>{{else if $e.Origin}}{{template "icon_origin" (dict "O" $e.Origin "Lang" .Lang "Fuzzy" (or (eq $e.Status "fuzzy") (eq $e.Status "ai")) "Title" true)}}{{else if eq $e.Status "fuzzy"}}<span class="mark-fuzzy" title="{{t .Lang "filter.fuzzy"}}"></span>{{end}}</div>
     <div class="cell-src">{{if $e.Context}}<span class="ctx-tag">{{$e.ContextValue}}</span>{{end}}<span class="txt">{{$e.MsgID}}</span>{{if $e.IsPlural}}<span class="plural-tag" title="{{t .Lang "editor.plural"}}">⁺</span>{{end}}</div>
     <div class="cell-tr"><span class="txt">{{$e.FirstTranslation}}</span>{{if $e.Comments}}<span class="row-comments" title="{{t .Lang "discuss.title"}}">💬 {{$e.Comments}}</span>{{end}}</div>
