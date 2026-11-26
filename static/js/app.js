@@ -1266,7 +1266,12 @@ document.addEventListener("change", function (ev) {
         ta.parentNode.insertBefore(l, ta);
         ta.classList.add("spell-on");
         ta.addEventListener("scroll", function () { l.scrollTop = ta.scrollTop; });
-        if (window.ResizeObserver) new ResizeObserver(function () { place(ta, l); }).observe(ta);
+        if (window.ResizeObserver) {
+            new ResizeObserver(function () { place(ta, l); }).observe(ta);
+            // the box can move without changing size (AI alternatives or a warning appear above it): its container
+            // then changes size, so the layer follows instead of staying behind as a white box
+            new ResizeObserver(function () { place(ta, l); }).observe(ta.parentNode);
+        }
         return l;
     }
     // the layer copies the textarea's box and font so the text wraps at the same places

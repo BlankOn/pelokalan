@@ -340,7 +340,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
   (no issue, no warning box, not counted in "bermasalah"): the underline and its popup are the only marks.
 - Editor (owner's files): the browser's spellcheck is off (`spellcheck="false"`). app.js posts the boxes' text to
   `POST /catalogs/{cid}/spell` (debounced) and draws `.spell-layer` behind each transparent `.tr-input` (metrics
-  copied, scroll mirrored) with unknown words in `.typo` (red wavy underline). Clicking inside one opens `.spell-pop`
+  copied, scroll mirrored; re-placed when the box or its container resizes, so it follows the box when AI alternatives or
+  warnings appear above it) with unknown words in `.typo` (red wavy underline). Clicking inside one opens `.spell-pop`
   (`GET /projects/{id}/spell/suggest?w=`): suggestions replace the word keeping its case (undoable), and
   "Tambahkan ke kamus proyek" posts `POST /projects/{id}/dictionary` (any member). Settings lists the words
   (`#dictionary`, every member); owners/managers remove them (`/dictionary/delete`).
