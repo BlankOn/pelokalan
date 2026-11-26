@@ -17,10 +17,13 @@ type User struct {
 	// they apply to every file the user opens
 	ChecksOff []string `json:"checks_off,omitempty"`
 	// BadgeEmailsOff: no emails about new badges (profile page)
-	BadgeEmailsOff bool       `json:"badge_emails_off"`
-	LastLoginAt    *time.Time `json:"last_login_at,omitempty"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      time.Time  `json:"updated_at"`
+	BadgeEmailsOff bool `json:"badge_emails_off"`
+	// Public profile extras (/users/{username}): a short description and links by kind (LinkKinds)
+	Bio         string            `json:"bio"`
+	Links       map[string]string `json:"links,omitempty"`
+	LastLoginAt *time.Time        `json:"last_login_at,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 // DisplayName returns the name, or the email when the name is empty

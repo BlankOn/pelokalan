@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"strings"
 
@@ -19,13 +20,16 @@ func NewUserRepository(db *sql.DB) repository.UserRepository {
 	return &userRepository{db: db}
 }
 
-const userColumns = `id, email, username, name, lang, translator_name, translator_email, language_team, editor_checks_off, badge_emails_off, last_login_at, created_at, updated_at`
+const userColumns = `id, email, username, name, lang, translator_name, translator_email, language_team, editor_checks_off, badge_emails_off, bio, links, last_login_at, created_at, updated_at`
 
 func scanUser(row interface{ Scan(...any) error }) (*models.User, error) {
 	u := &models.User{}
-	var off string
+	var off, links string
 	err := row.Scan(&u.ID, &u.Email, &u.Username, &u.Name, &u.Lang, &u.TranslatorName, &u.TranslatorEmail, &u.LanguageTeam,
-		&off, &u.BadgeEmailsOff, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
+		&off, &u.BadgeEmailsOff, &u.Bio, &links, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt)
+	if links != "" && links != "{}" {
+		_ = json.Unmarshal([]byte(links), &u.Links)
+	}
 	if off != "" {
 		u.ChecksOff = strings.Split(off, ",")
 	}
@@ -60,6 +64,15 @@ func (r *userRepository) Update(ctx context.Context, u *models.User) error {
 		`UPDATE users SET name = $2, lang = $3, translator_name = $4, translator_email = $5, language_team = $6,
 		        username = $7, editor_checks_off = $8, updated_at = NOW() WHERE id = $1`,
 		u.ID, u.Name, u.Lang, u.TranslatorName, u.TranslatorEmail, u.LanguageTeam, u.Username, strings.Join(u.ChecksOff, ","))
+	return err
+}
+
+func (r *userRepository) SetPublicProfile(ctx context.Context, id int64, bio string, links map[string]string) error {
+	data, err := json.Marshal(links)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx, `UPDATE users SET bio = $2, links = $3, updated_at = NOW() WHERE id = $1`, id, bio, string(data))
 	return err
 }
 

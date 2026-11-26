@@ -362,6 +362,15 @@ shows it only to members), role, joined_at. Documented in README.md.
   longer lists held modules. In the ⋯ menu the review items (Ajukan/Lihat/Batalkan tinjauan, Kirim ke repositori) follow
   the reservation items.
 
+## Profile page
+
+`/profile` (pages/profile.html) is one form with one "Simpan" beside the title (`AuthService.UpdateAccount` checks
+every field first and saves only when all are valid): Akun, Identitas penerjemah, Profil publik and Email lencana, in
+two columns from 1000px. Profil publik: a short description (`users.bio`, `MaxBio` 300) and links (`users.links`, JSON
+kind → URL, migration 053; `models.LinkKinds` website, github, x, linkedin, mastodon). `service.NormalizeLink` accepts
+a handle or an address and stores the full https address (else `err.link_invalid`). The public page shows them under
+the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` and `/profile/badge-emails` routes stay.
+
 ## Public profiles and badges
 
 - `/users/{username}` (public, `Handler.UserPage`, pages/user.html; "users" is a reserved username): a person's work
@@ -370,7 +379,9 @@ shows it only to members), role, joined_at. Documented in README.md.
   Asia/Jakarta; `siteLocation`; main.go embeds time/tzdata) and `UserTotals` (projects, files, languages, completed
   files, comments, topics, wiki/Konteks edits, manual commits) in repository/postgres/profile.go. A **contribution** =
   an entry save that translated, reviewed (fuzzy/AI → translated), changed a translated string, or saved a machine
-  draft (`evContribute`, the Statistik rules); streaks count days with at least one.
+  draft (`evContribute`, the Statistik rules); streaks count days with at least one. Words ("Kata dikerjakan", the
+  Statistik "Kata" column and the Juru Kata badge) are the source words of every contribution; "String diterjemahkan dari
+  kosong" counts only strings filled from empty.
 - `service/profile.go`: `ComputeProfileStats` (current/best streaks of days, Monday–Sunday weeks and months; the period
   not over yet does not break a streak; active days, best day, night 00–05 / early 05–07, weekends, member days) and the
   badge catalog `Badges`: groups (streak, work, reach, community, habits) of badges with up to 5 tiers

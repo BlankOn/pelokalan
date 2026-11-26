@@ -1742,6 +1742,22 @@ select.role-locked, form[action$="/role"] select[name="role"] { min-width: 150px
     text-decoration: none; font-size: 12px; }
 .footer-by:hover { text-decoration: none; color: var(--text); }
 .footer-by img { height: 34px; width: auto; display: block; }
+/* the profile page: one form, one save button beside the title, two columns when there is room */
+.profile-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.profile-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 520px; }
+.profile-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.profile-col .card { margin: 0; }
+.profile-page .page-head { max-width: 520px; }
+@media (min-width: 1000px) {
+    .profile-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); max-width: 1080px; align-items: start; }
+    .profile-page .page-head { max-width: 1080px; }
+}
+/* public page: description and links under the name */
+.user-bio { margin: 6px 0 0; white-space: pre-wrap; max-width: 640px; }
+.user-links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 13px; }
+.user-links a { display: inline-flex; align-items: center; gap: 5px; color: var(--muted); text-decoration: none; }
+.user-links a:hover { color: var(--accent); }
+.user-links svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 @media (max-width: 700px) {
     .home-intro { padding: 22px 16px 18px; border-radius: 12px; }
     .home-hero h1 { font-size: 23px; }

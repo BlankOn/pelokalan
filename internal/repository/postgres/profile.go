@@ -27,7 +27,7 @@ func (r *activityRepository) UserDays(ctx context.Context, userID int64, tz stri
 		SELECT t::date,
 		       COUNT(*) FILTER (WHERE `+evContribute+`),
 		       COUNT(*) FILTER (WHERE `+evNew+`),
-		       COALESCE(SUM(words) FILTER (WHERE `+evNew+`), 0),
+		       COALESCE(SUM(words) FILTER (WHERE `+evContribute+`), 0),
 		       COUNT(*) FILTER (WHERE `+evReviewed+`),
 		       COUNT(*) FILTER (WHERE `+evEdited+`),
 		       COUNT(*) FILTER (WHERE `+evContribute+` AND EXTRACT(HOUR FROM t) < 5),
@@ -122,7 +122,7 @@ func (r *activityRepository) AddLandings(ctx context.Context, landings []models.
 var moduleWorkKinds = map[string][2]string{ // kind: {filter, count}
 	"contrib":  {evContribute, "COUNT(*)"},
 	"new":      {evNew, "COUNT(*)"},
-	"words":    {evNew, "COALESCE(SUM(a.words), 0)"},
+	"words":    {evContribute, "COALESCE(SUM(a.words), 0)"},
 	"reviewed": {evReviewed, "COUNT(*)"},
 	"edited":   {evEdited, "COUNT(*)"},
 	"night":    {evContribute + ` AND EXTRACT(HOUR FROM a.created_at AT TIME ZONE $2) < 5`, "COUNT(*)"},

@@ -25,6 +25,8 @@ type UserRepository interface {
 	TouchLogin(ctx context.Context, id int64) error
 	// SetBadgeEmails turns the emails about new badges off (true) or on
 	SetBadgeEmails(ctx context.Context, id int64, off bool) error
+	// SetPublicProfile stores the public profile's description and links (kind → URL)
+	SetPublicProfile(ctx context.Context, id int64, bio string, links map[string]string) error
 }
 
 // OTPRepository defines methods for one-time code data access

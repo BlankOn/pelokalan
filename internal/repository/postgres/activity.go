@@ -36,7 +36,7 @@ func (r *activityRepository) Summary(ctx context.Context, projectID int64, since
 		SELECT * FROM (
 		SELECT a.user_id, u.username, u.name,
 		       COUNT(*) FILTER (WHERE kind = 'entry.saved' AND status_before = 'untranslated' AND status_after <> 'untranslated'),
-		       COALESCE(SUM(words) FILTER (WHERE kind = 'entry.saved' AND status_before = 'untranslated' AND status_after <> 'untranslated'), 0),
+		       COALESCE(SUM(words) FILTER (WHERE `+evContribute+`), 0), -- words of every string worked on
 		       COUNT(*) FILTER (WHERE kind = 'entry.saved' AND status_before = 'fuzzy' AND status_after = 'translated'),
 		       COUNT(*) FILTER (WHERE kind = 'entry.saved' AND status_before = 'translated' AND text_changed),
 		       COUNT(*) FILTER (WHERE kind = 'entry.saved' AND origin <> '' AND NOT text_changed),

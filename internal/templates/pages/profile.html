@@ -1,48 +1,71 @@
 {{define "content"}}
-<div class="page-head"><h1>{{t .Lang "title.profile"}}</h1></div>
-<div class="card narrow">
-    <form method="post" action="/profile" class="form">
-        <label>{{t .Lang "field.email"}}</label>
-        <input type="email" value="{{.User.Email}}" disabled>
-                <label for="username">{{t .Lang "field.username"}}</label>
-        <div class="username-input"><span>@</span><input id="username" type="text" name="username" value="{{.User.Username}}" required
-               minlength="3" maxlength="30" pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{1,28}[a-zA-Z0-9]" autocapitalize="none" spellcheck="false"></div>
-        <p class="muted small field-help">{{t .Lang "field.username_help"}} {{t .Lang "field.username_change"}}</p>
-        <label for="name">{{t .Lang "field.name"}}</label>
-        <input id="name" type="text" name="name" value="{{.User.Name}}" required maxlength="100">
-        <label for="lang">{{t .Lang "field.ui_language"}}</label>
-        <select id="lang" name="lang">
-            {{range uiLanguages}}<option value="{{.Code}}" {{if eq .Code $.User.Lang}}selected{{end}}>{{.Name}}</option>{{end}}
-        </select>
-        <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
-    </form>
+<form method="post" action="/profile" class="profile-page" id="profile-form">
+<div class="page-head profile-head">
+    <h1>{{t .Lang "title.profile"}}</h1>
+    <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
 </div>
+<div class="profile-grid">
+    <div class="profile-col">
+        <section class="card form">
+            <h2>{{t .Lang "profile.account_title"}}</h2>
+            <label>{{t .Lang "field.email"}}</label>
+            <input type="email" value="{{.User.Email}}" disabled>
+            <label for="username">{{t .Lang "field.username"}}</label>
+            <div class="username-input"><span>@</span><input id="username" type="text" name="username" value="{{.User.Username}}" required
+                   minlength="3" maxlength="30" pattern="[a-zA-Z0-9][a-zA-Z0-9._\-]{1,28}[a-zA-Z0-9]" autocapitalize="none" spellcheck="false"></div>
+            <p class="muted small field-help">{{t .Lang "field.username_help"}} {{t .Lang "field.username_change"}}</p>
+            <label for="name">{{t .Lang "field.name"}}</label>
+            <input id="name" type="text" name="name" value="{{.User.Name}}" required maxlength="100">
+            <label for="lang">{{t .Lang "field.ui_language"}}</label>
+            <select id="lang" name="lang">
+                {{range uiLanguages}}<option value="{{.Code}}" {{if eq .Code $.User.Lang}}selected{{end}}>{{.Name}}</option>{{end}}
+            </select>
+        </section>
 
-<div class="card narrow" id="identity">
-    <h2>{{t .Lang "identity.title"}}</h2>
-    <p class="muted small">{{t .Lang "identity.help"}}</p>
-    <form method="post" action="/profile/identity" class="form">
-        <label for="tr-name">{{t .Lang "identity.name"}}</label>
-        <input id="tr-name" name="translator_name" maxlength="100" value="{{.User.TranslatorName}}" placeholder="{{.User.DisplayName}}">
-        <label for="tr-email">{{t .Lang "identity.email"}}</label>
-        <input id="tr-email" type="email" name="translator_email" value="{{.User.TranslatorEmail}}" placeholder="{{.User.Email}}">
-        <label for="tr-team">{{t .Lang "identity.team"}}</label>
-        <input id="tr-team" name="language_team" maxlength="200" value="{{.User.LanguageTeam}}" placeholder="Indonesian &lt;gnome-l10n-id@googlegroups.com&gt;">
-        <div class="identity-preview small">
-            <div><span class="muted">Last-Translator:</span> <code>{{.User.TranslatorIdentity}}</code></div>
-            {{if .User.LanguageTeam}}<div><span class="muted">Language-Team:</span> <code>{{.User.LanguageTeam}}</code></div>{{end}}
-            <div><span class="muted">{{t .Lang "identity.credit_line"}}:</span> <code># {{.User.CreditName}} &lt;{{.User.CreditEmail}}&gt;, {{.Data.Year}}.</code></div>
-        </div>
-        <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
-    </form>
-</div>
+        <section class="card form" id="identity">
+            <h2>{{t .Lang "identity.title"}}</h2>
+            <p class="muted small">{{t .Lang "identity.help"}}</p>
+            <label for="tr-name">{{t .Lang "identity.name"}}</label>
+            <input id="tr-name" name="translator_name" maxlength="100" value="{{.User.TranslatorName}}" placeholder="{{.User.DisplayName}}">
+            <label for="tr-email">{{t .Lang "identity.email"}}</label>
+            <input id="tr-email" type="email" name="translator_email" value="{{.User.TranslatorEmail}}" placeholder="{{.User.Email}}">
+            <label for="tr-team">{{t .Lang "identity.team"}}</label>
+            <input id="tr-team" name="language_team" maxlength="200" value="{{.User.LanguageTeam}}" placeholder="Indonesian &lt;gnome-l10n-id@googlegroups.com&gt;">
+            <div class="identity-preview small">
+                <div><span class="muted">Last-Translator:</span> <code>{{.User.TranslatorIdentity}}</code></div>
+                {{if .User.LanguageTeam}}<div><span class="muted">Language-Team:</span> <code>{{.User.LanguageTeam}}</code></div>{{end}}
+                <div><span class="muted">{{t .Lang "identity.credit_line"}}:</span> <code># {{.User.CreditName}} &lt;{{.User.CreditEmail}}&gt;, {{.Data.Year}}.</code></div>
+            </div>
+        </section>
+    </div>
 
-<div class="card narrow" id="badge-emails">
-    <h2>{{t .Lang "profile.badge_emails_title"}}</h2>
-    <form method="post" action="/profile/badge-emails" class="form">
-        <label class="check"><input type="checkbox" name="badge_emails" {{if not .User.BadgeEmailsOff}}checked{{end}}> {{t .Lang "profile.badge_emails"}}</label>
-        <p class="muted small field-help">{{t .Lang "profile.badge_emails_help"}} <a href="/users/{{.User.Username}}">{{t .Lang "nav.my_page"}}</a></p>
-        <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
-    </form>
+    <div class="profile-col">
+        <section class="card form" id="public-profile">
+            <h2>{{t .Lang "profile.public_title"}}</h2>
+            <p class="muted small">{{t .Lang "profile.public_help"}} <a href="/users/{{.User.Username}}">{{t .Lang "nav.my_page"}}</a></p>
+            <label for="bio">{{t .Lang "profile.bio"}}</label>
+            <textarea id="bio" name="bio" rows="3" maxlength="300" placeholder="{{t .Lang "profile.bio_placeholder"}}">{{.User.Bio}}</textarea>
+            <label for="link-website">{{t .Lang "profile.link_website"}}</label>
+            <input id="link-website" name="link_website" value="{{.User.Link "website"}}" placeholder="https://blog.example.com" maxlength="300" spellcheck="false" autocapitalize="none">
+            <div class="grid-2">
+                <div><label for="link-github">{{t .Lang "profile.link_github"}}</label>
+                <input id="link-github" name="link_github" value="{{.User.Link "github"}}" placeholder="username" maxlength="200" spellcheck="false" autocapitalize="none"></div>
+                <div><label for="link-x">{{t .Lang "profile.link_x"}}</label>
+                <input id="link-x" name="link_x" value="{{.User.Link "x"}}" placeholder="@username" maxlength="200" spellcheck="false" autocapitalize="none"></div>
+                <div><label for="link-linkedin">{{t .Lang "profile.link_linkedin"}}</label>
+                <input id="link-linkedin" name="link_linkedin" value="{{.User.Link "linkedin"}}" placeholder="linkedin.com/in/…" maxlength="200" spellcheck="false" autocapitalize="none"></div>
+                <div><label for="link-mastodon">{{t .Lang "profile.link_mastodon"}}</label>
+                <input id="link-mastodon" name="link_mastodon" value="{{.User.Link "mastodon"}}" placeholder="@user@mastodon.social" maxlength="200" spellcheck="false" autocapitalize="none"></div>
+            </div>
+            <p class="muted small field-help">{{t .Lang "profile.links_help"}}</p>
+        </section>
+
+        <section class="card form" id="badge-emails">
+            <h2>{{t .Lang "profile.badge_emails_title"}}</h2>
+            <label class="check"><input type="checkbox" name="badge_emails" {{if not .User.BadgeEmailsOff}}checked{{end}}> {{t .Lang "profile.badge_emails"}}</label>
+            <p class="muted small field-help">{{t .Lang "profile.badge_emails_help"}}</p>
+        </section>
+    </div>
 </div>
+</form>
 {{end}}

@@ -217,8 +217,14 @@ func TestProfileAndBadges(t *testing.T) {
 			url.Values{"version": {strconv.Itoa(ver)}, "msgstr0": {pair[1]}}).status(http.StatusOK)
 	}
 
+	// improving a translated string is work too: its words count ("Kata dikerjakan" = every string worked on)
+	eid, ver := entry(t, cid, "One")
+	mira.post("/catalogs/"+strconv.FormatInt(cid, 10)+"/entries/"+strconv.FormatInt(eid, 10),
+		url.Values{"version": {strconv.Itoa(ver)}, "msgstr0": {"Satu saja"}}).status(http.StatusOK)
+
 	page := visitor(t).get("/users/" + mira.Username).status(http.StatusOK)
-	page.contains("@"+mira.Username, "Profil").lacks(mira.Email)
+	page.contains("@"+mira.Username, "Profil", "<strong>3</strong><span>Kata dikerjakan</span>",
+		"<strong>2</strong><span>String diterjemahkan dari kosong</span>").lacks(mira.Email)
 	visitor(t).get("/users/nobody-here").status(http.StatusNotFound)
 
 	// a fully translated file earns the bronze "completed" badge: share page and PNG

@@ -197,10 +197,19 @@ func (h *Handler) ProfilePage(w http.ResponseWriter, r *http.Request) {
 	h.render(w, "profile", h.page(r, "title.profile"))
 }
 
-// UpdateProfile saves the profile
+// UpdateProfile saves the whole profile page (account, translator identity, public profile, badge emails) at once
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUser(r.Context())
-	if err := h.authService.UpdateProfile(r.Context(), user, r.FormValue("username"), r.FormValue("name"), r.FormValue("lang")); err != nil {
+	in := service.AccountInput{
+		Username: r.FormValue("username"), Name: r.FormValue("name"), Lang: r.FormValue("lang"),
+		TranslatorName: r.FormValue("translator_name"), TranslatorEmail: r.FormValue("translator_email"),
+		LanguageTeam: r.FormValue("language_team"), Bio: r.FormValue("bio"), Links: map[string]string{},
+		BadgeEmails: r.FormValue("badge_emails") == "on",
+	}
+	for _, k := range models.LinkKinds {
+		in.Links[k] = r.FormValue("link_" + k)
+	}
+	if err := h.authService.UpdateAccount(r.Context(), user, in); err != nil {
 		data := h.page(r, "title.profile")
 		data.Error = h.errorMessage(r, err)
 		h.render(w, "profile", data)

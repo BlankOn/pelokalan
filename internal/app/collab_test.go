@@ -208,3 +208,41 @@ func formValue(t *testing.T, body, name string) string {
 	v := tag[j+7:]
 	return v[:strings.Index(v, `"`)]
 }
+
+// The profile page saves everything at once (only when every field is valid); the description and links
+// show on the public page
+func TestProfilePage(t *testing.T) {
+	skipWithoutDB(t)
+	u := signUp(t, "prof")
+	form := url.Values{"username": {u.Username}, "name": {"Prof Baru"}, "lang": {"id"},
+		"translator_name": {"Prof Penerjemah"}, "translator_email": {""}, "language_team": {""},
+		"bio": {"Penerjemah GNOME."}, "link_website": {"blog.example.org"}, "link_github": {"@prof-gh"},
+		"link_x": {"https://twitter.com/prof_x"}, "link_linkedin": {"linkedin.com/in/prof-li"},
+		"link_mastodon": {"@prof@mastodon.social"}, "badge_emails": {"on"}}
+	u.get("/profile").status(http.StatusOK).contains(`id="profile-form"`, `name="link_github"`)
+	u.post("/profile", form).redirectsTo("/profile")
+	page := visitor(t).get("/users/" + u.Username).status(http.StatusOK)
+	page.contains("Penerjemah GNOME.", "https://blog.example.org", "https://github.com/prof-gh", "https://x.com/prof_x",
+		"https://www.linkedin.com/in/prof-li", "https://mastodon.social/@prof")
+	if n := scalar[string](t, `SELECT translator_name FROM users WHERE id = $1`, u.ID); n != "Prof Penerjemah" {
+		t.Fatalf("translator name = %q", n)
+	}
+
+	// one bad link: nothing is saved
+	bad := url.Values{}
+	for k, v := range form {
+		bad[k] = v
+	}
+	bad.Set("name", "Tidak Tersimpan")
+	bad.Set("link_github", "https://gitlab.com/someone")
+	u.post("/profile", bad).status(http.StatusOK).contains("GitHub")
+	if n := scalar[string](t, `SELECT name FROM users WHERE id = $1`, u.ID); n != "Prof Baru" {
+		t.Fatalf("an invalid form saved the name: %q", n)
+	}
+	// badge emails off through the same form
+	form.Del("badge_emails")
+	u.post("/profile", form).redirectsTo("/profile")
+	if !scalar[bool](t, `SELECT badge_emails_off FROM users WHERE id = $1`, u.ID) {
+		t.Fatal("badge emails still on")
+	}
+}
