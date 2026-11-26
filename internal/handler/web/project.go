@@ -166,6 +166,7 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Data["Project"] = p
 	data.Data["Template"] = template
 	data.Data["IsGit"] = h.glossary.IsGitProject(r.Context(), p)
+	data.Data["HasGitRepo"] = h.glossary.HasGitRepo(r.Context(), p)
 	data.Data["ShowTemplate"] = showTemplateSection
 	data.Data["Reviews"], _ = h.reviews.Open(r.Context(), p) // requests waiting for an owner/manager
 	h.glossary.AttachUpstreamToCatalogs(r.Context(), p, catalogs)

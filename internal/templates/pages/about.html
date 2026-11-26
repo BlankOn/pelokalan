@@ -21,10 +21,13 @@
 <section class="card about">
     <h2>{{t .Lang "about.funding_title"}}</h2>
     <p>{{t .Lang "about.funding"}} <a href="https://blankon.id/en" rel="noopener" target="_blank">{{t .Lang "about.funding_name"}}</a>.</p>
+    <p>{{t .Lang "about.donate"}}</p>
+    <p><a class="btn btn-primary" href="https://blankon.id/{{if eq .Lang "en"}}en{{else}}id{{end}}/donate" rel="noopener" target="_blank">♥ {{t .Lang "about.donate_button"}}</a></p>
 </section>
 <section class="card about">
     <h2>{{t .Lang "about.source_title"}}</h2>
-    <p>{{t .Lang "about.source"}} <a href="https://github.com/BlankOn/pelokalan" rel="noopener" target="_blank">github.com/BlankOn/pelokalan</a>. {{t .Lang "about.source_contribute"}}</p>
+    <p>{{t .Lang "about.source"}} <a href="https://github.com/BlankOn/pelokalan" rel="noopener" target="_blank">github.com/BlankOn/pelokalan</a>.</p>
+    <p>{{t .Lang "about.source_contribute"}}</p>
+    <p><a href="/licenses">{{t .Lang "about.licenses_link"}}</a></p>
 </section>
-<p class="muted small"><a href="/licenses">{{t .Lang "about.licenses_link"}}</a></p>
 {{end}}

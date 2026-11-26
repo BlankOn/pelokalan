@@ -105,6 +105,21 @@ func (s *GlossaryService) IsGitProject(ctx context.Context, p *models.Project) b
 	return true
 }
 
+// HasGitRepo reports whether any of the project's module groups is synced from a GitHub repository: files then
+// come from the repository, so members do not add files by hand
+func (s *GlossaryService) HasGitRepo(ctx context.Context, p *models.Project) bool {
+	groups, err := s.Groups(ctx, p)
+	if err != nil {
+		return false
+	}
+	for _, g := range groups {
+		if g.IsGit() {
+			return true
+		}
+	}
+	return false
+}
+
 // GitGroupFor returns the module group a repository file was last synced from (nil = unknown)
 func (s *GlossaryService) GitGroupFor(ctx context.Context, p *models.Project, repoPath string) *models.ModuleGroup {
 	if repoPath == "" {

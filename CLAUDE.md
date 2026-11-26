@@ -491,8 +491,9 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
 
 ## Git-only projects
 
-- When every module group of a project is synced from GitHub (`GlossaryService.IsGitProject`), Penerjemahan hides the
-  template (POT) section and "Tambah berkas manual": files come from the repository.
+- When any module group of a project is synced from GitHub (`GlossaryService.HasGitRepo`), Penerjemahan hides
+  "Tambah berkas manual": files come from the repository. (`IsGitProject`, every group from GitHub, still hides the
+  template section.)
 
 ## Home page introduction
 
@@ -512,7 +513,8 @@ top, then the site name and tagline and the Tentang/Lisensi links. The logo (`st
 
 `/about` (footer link "Tentang", before Lisensi; `AboutPage`, pages/about.html, `about.*` strings) explains the
 goals (easy upstream contributions for newcomers, letting contributors focus on reviewing) and that the
-project is funded by the BlankOn Foundation, and links the source code (https://github.com/BlankOn/pelokalan, MIT License, see LICENSE).
+project is funded by the BlankOn Foundation, and links the source code (https://github.com/BlankOn/pelokalan, MIT License, see LICENSE). The Pendanaan card ends with a donation call
+and a button to the foundation's donate page (https://blankon.id/id/donate, or /en/donate in English).
 
 ## Licenses page
 
