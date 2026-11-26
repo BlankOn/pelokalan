@@ -5,17 +5,7 @@
         <form method="get" action="{{$p.Path}}/contexts" class="context-search">
             <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "context.search"}}" aria-label="{{t .Lang "context.search"}}">
         </form>
-        {{if $p.Role}}<details class="context-new"{{if and $d (not $d.Key)}} open{{end}}>
-            <summary class="btn btn-primary">+ {{t .Lang "context.new"}}</summary>
-            <form method="post" action="{{$p.Path}}/contexts" class="form context-form">
-                <p class="muted small">{{t .Lang "context.new_help"}}</p>
-                <label for="ctx-new-title">{{t .Lang "context.title_field"}}</label>
-                <input id="ctx-new-title" name="title" required maxlength="120"{{if and $d (not $d.Key)}} value="{{$d.Title}}"{{end}}>
-                <label for="ctx-new-note">{{t .Lang "context.note_field"}}</label>
-                <textarea id="ctx-new-note" name="note" rows="6" required>{{if and $d (not $d.Key)}}{{$d.Note}}{{end}}</textarea>
-                <div class="form-actions"><button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button></div>
-            </form>
-        </details>{{end}}
+        {{if $p.Role}}<button type="button" class="btn btn-primary context-new-btn" data-open-dialog="context-new">+ {{t .Lang "context.new"}}</button>{{end}}
     </div>
     {{if .Data.Items}}
     <ul class="context-list">
@@ -54,4 +44,20 @@
     <p class="muted">{{if .Data.Query}}{{t .Lang "context.no_results"}}{{else}}{{t .Lang "context.empty"}}{{end}}</p>
     {{end}}
 </section>
+{{if $p.Role}}
+<dialog id="context-new" class="dialog context-dialog" {{if and $d (not $d.Key)}}data-open-on-load{{end}}>
+    <form method="post" action="{{$p.Path}}/contexts" class="form">
+        <h2>{{t .Lang "context.new"}}</h2>
+        <p class="muted small">{{t .Lang "context.new_help"}}</p>
+        <label for="ctx-new-title">{{t .Lang "context.title_field"}}</label>
+        <input id="ctx-new-title" name="title" required maxlength="120"{{if and $d (not $d.Key)}} value="{{$d.Title}}"{{end}}>
+        <label for="ctx-new-note">{{t .Lang "context.note_field"}}</label>
+        <textarea id="ctx-new-note" name="note" rows="8" required>{{if and $d (not $d.Key)}}{{$d.Note}}{{end}}</textarea>
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+            <button type="submit" class="btn btn-primary">{{t .Lang "action.save"}}</button>
+        </div>
+    </form>
+</dialog>
+{{end}}
 {{end}}

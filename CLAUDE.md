@@ -272,7 +272,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - Project tab "Konteks" (`/projects/{id}/contexts`) lists modules with a note and their files, searchable.
 - **General items** (migration 054, `module_contexts.title`): a Konteks item that belongs to no module (style, agreed terms…).
   Stored as a row whose module is "~" + 12 random hex chars (`ModuleContext.IsGeneral`/`GeneralKey`), with a title
-  (required, at most 120). Members add them with "+ Konteks baru" on the Konteks tab (`POST /projects/{id}/contexts`,
+  (required, at most 120). Members add them with "+ Konteks baru" beside the search box on the Konteks tab (a popup, `#context-new`) (`POST /projects/{id}/contexts`,
   `ContextService.CreateGeneral`) and edit them in place (`POST /projects/{id}/contexts/{key}`, `SaveGeneral`, carries
   `version`; a stale save answers 409 and reopens the form with the person's text). Emptying the note hides the item.
   Not sent to the AI yet (only the file's module note is).
