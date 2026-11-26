@@ -1763,12 +1763,6 @@ select.role-locked, form[action$="/role"] select[name="role"] { min-width: 150px
 .context-new-btn { flex: none; height: 38px; box-sizing: border-box; white-space: nowrap; }
 .context-dialog { width: min(560px, calc(100vw - 32px)); }
 .context-dialog textarea { width: 100%; }
-.context-edit > summary { list-style: none; cursor: pointer; }
-.context-edit > summary::-webkit-details-marker { display: none; }
-.context-edit > summary { color: var(--accent); width: max-content; }
-.context-form { margin-top: 10px; max-width: 720px; }
-.context-form textarea { width: 100%; }
-.context-form .form-actions { margin-top: 10px; }
 .context-tag { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-dark); vertical-align: 1px; }
 /* the profile page: one form, one save button beside the title, two columns when there is room */
 .profile-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

@@ -16,18 +16,23 @@
             <div class="context-note">{{linkify .Note}}</div>
             <div class="muted small">{{t $.Lang "context.by" (or .UpdaterName "—") (timeAgo $.Lang .UpdatedAt)}}</div>
             {{$mine := and $d (eq $d.Key .GeneralKey)}}
-            {{if $p.Role}}<details class="context-edit"{{if $mine}} open{{end}}>
-                <summary class="small">{{t $.Lang "action.edit"}}</summary>
-                <form method="post" action="{{$p.Path}}/contexts/{{.GeneralKey}}" class="form context-form">
+            {{if $p.Role}}<div><button type="button" class="linklike small" data-open-dialog="ctx-edit-{{.GeneralKey}}">{{t $.Lang "action.edit"}}</button></div>
+            <dialog id="ctx-edit-{{.GeneralKey}}" class="dialog context-dialog" {{if $mine}}data-open-on-load{{end}}>
+                <form method="post" action="{{$p.Path}}/contexts/{{.GeneralKey}}" class="form">
+                    <h2>{{t $.Lang "context.edit_title"}}</h2>
+                    {{if and $mine $.Error}}<div class="alert alert-error">{{$.Error}}</div>{{end}}
                     <input type="hidden" name="version" value="{{.Version}}">
                     <label for="ctx-t-{{.GeneralKey}}">{{t $.Lang "context.title_field"}}</label>
                     <input id="ctx-t-{{.GeneralKey}}" name="title" required maxlength="120" value="{{if $mine}}{{$d.Title}}{{else}}{{.Title}}{{end}}">
                     <label for="ctx-n-{{.GeneralKey}}">{{t $.Lang "context.note_field"}}</label>
-                    <textarea id="ctx-n-{{.GeneralKey}}" name="note" rows="6">{{if $mine}}{{$d.Note}}{{else}}{{.Note}}{{end}}</textarea>
+                    <textarea id="ctx-n-{{.GeneralKey}}" name="note" rows="8">{{if $mine}}{{$d.Note}}{{else}}{{.Note}}{{end}}</textarea>
                     <p class="muted small">{{t $.Lang "context.empty_hides"}}</p>
-                    <div class="form-actions"><button type="submit" class="btn btn-primary">{{t $.Lang "action.save"}}</button></div>
+                    <div class="dialog-actions">
+                        <button type="button" class="btn" data-close-dialog>{{t $.Lang "action.cancel"}}</button>
+                        <button type="submit" class="btn btn-primary">{{t $.Lang "action.save"}}</button>
+                    </div>
                 </form>
-            </details>{{end}}
+            </dialog>{{end}}
         </li>
         {{else}}
         <li>
@@ -48,6 +53,7 @@
 <dialog id="context-new" class="dialog context-dialog" {{if and $d (not $d.Key)}}data-open-on-load{{end}}>
     <form method="post" action="{{$p.Path}}/contexts" class="form">
         <h2>{{t .Lang "context.new"}}</h2>
+        {{if and $d (not $d.Key) .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
         <p class="muted small">{{t .Lang "context.new_help"}}</p>
         <label for="ctx-new-title">{{t .Lang "context.title_field"}}</label>
         <input id="ctx-new-title" name="title" required maxlength="120"{{if and $d (not $d.Key)}} value="{{$d.Title}}"{{end}}>
