@@ -14,6 +14,7 @@ import (
 	"pelokalan/internal/gitpatch"
 	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
 )
 
@@ -306,6 +307,7 @@ func (s *ReviewService) PushNow(ctx context.Context, manager *models.User, p *mo
 		return nil, err
 	}
 	r := latest[c.ID]
+	created := false
 	if r == nil || r.Status != models.ReviewRequested { // no open request: one made by the manager's button
 		gid := g.ID
 		r = &models.ModuleReview{ProjectID: p.ID, CatalogID: c.ID, GroupID: &gid, Module: ModuleOf(c), RepoPath: c.RepoPath,
@@ -313,8 +315,16 @@ func (s *ReviewService) PushNow(ctx context.Context, manager *models.User, p *mo
 		if err := s.repo.Create(ctx, r); err != nil {
 			return nil, err
 		}
+		created = true
 	}
-	return r, s.push(ctx, manager, p, c, r)
+	err = s.push(ctx, manager, p, c, r)
+	if err != nil && created { // nobody asked for this review: do not leave it waiting in the queue
+		r.Status = models.ReviewWithdrawn
+		if uerr := s.repo.Update(ctx, r); uerr != nil {
+			log.Printf("reviews: withdraw failed direct send %d: %v", r.ID, uerr)
+		}
+	}
+	return r, err
 }
 
 // push commits the file's changes to the branch's current file; a failure stays on the open request
@@ -346,7 +356,8 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 	if err != nil {
 		return err
 	}
-	want, err := s.catalogs.ChangedTargets(ctx, c, s.lastSent(ctx, c.ID))
+	sent := s.lastSent(ctx, c.ID)
+	want, err := s.catalogs.ChangedTargets(ctx, c, sent)
 	if err != nil {
 		return err
 	}
@@ -354,6 +365,10 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 		f, err := gh.GetFile(ctx, g.GitInstallation, g.GitRepo, g.GitBranch, c.RepoPath)
 		if err != nil {
 			return gitHubErr(err, c.RepoPath)
+		}
+		// never overwrite what someone else changed upstream meanwhile: the member pulls it first
+		if conflicts := s.catalogs.UpstreamConflicts(ctx, c, f.Data, want, sent); len(conflicts) > 0 {
+			return userErr("err.review_upstream_conflict", len(conflicts), conflictList(conflicts))
 		}
 		data, n := gitpatch.Apply(f.Data, want)
 		if n == 0 {
@@ -370,7 +385,8 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 		}
 		now := time.Now()
 		r.Status, r.ReviewedBy, r.ReviewedAt = models.ReviewPushed, &reviewer.ID, &now
-		r.CommitSHA, r.CommitURL, r.Entries, r.Error, r.PushedData = cm.SHA, cm.URL, n, "", gzipBytes(data)
+		// remember only the strings Pelokalan rewrote: they are "ours" from now on, the rest stays upstream's
+		r.CommitSHA, r.CommitURL, r.Entries, r.Error, r.PushedData = cm.SHA, cm.URL, n, "", gzipBytes(sentEntries(f.Data, want))
 		if err := s.repo.Update(ctx, r); err != nil {
 			return err
 		}
@@ -383,6 +399,40 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 		}
 		return nil
 	}
+}
+
+// sentEntries is a PO file of the wanted entries that differ in the branch's file (what a commit rewrites)
+func sentEntries(branch []byte, want map[string]gitpatch.Target) []byte {
+	cat, err := po.ParseBytes(branch)
+	if err != nil {
+		return nil
+	}
+	out := &po.Catalog{Header: cat.Header}
+	for _, e := range cat.Entries {
+		t, ok := want[e.Key()]
+		if !ok || e.Obsolete || sameStrings(e.Translation, t.Translation) && e.Fuzzy == t.Fuzzy {
+			continue
+		}
+		out.Entries = append(out.Entries, &po.Entry{HasContext: e.HasContext, Context: e.Context, ID: e.ID,
+			IDPlural: e.IDPlural, Translation: t.Translation, Fuzzy: t.Fuzzy})
+	}
+	return out.Bytes()
+}
+
+// conflictList names the first few conflicting strings (shortened) for the error message
+func conflictList(ids []string) string {
+	var parts []string
+	for i, id := range ids {
+		if i == 3 {
+			parts = append(parts, "…")
+			break
+		}
+		if r := []rune(strings.ReplaceAll(id, "\n", " ")); len(r) > 40 {
+			id = string(r[:40]) + "…"
+		}
+		parts = append(parts, "“"+id+"”")
+	}
+	return strings.Join(parts, ", ")
 }
 
 func gitHubErr(err error, path string) error {

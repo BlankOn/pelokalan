@@ -949,3 +949,56 @@ func (s *GlossaryService) GroupStats(ctx context.Context, p *models.Project, gro
 	}
 	return s.repo.GroupStats(ctx, groupID, language, since)
 }
+
+// UpstreamData is the contents of the project file a member's file follows (UpstreamFor; nil = none)
+func (s *GlossaryService) UpstreamData(ctx context.Context, p *models.Project, c *models.Catalog) ([]byte, *models.ProjectFile, error) {
+	var f *models.ProjectFile
+	if c.RepoPath != "" { // a repository file: the newest copy of the same path
+		if pf, _, err := s.repo.ProjectFileByRepoPath(ctx, p.ID, c.RepoPath); err == nil {
+			f = pf
+		}
+	}
+	if f == nil {
+		up, err := s.UpstreamFor(ctx, p, c)
+		if err != nil || up == nil {
+			return nil, nil, err
+		}
+		if f, err = s.repo.GetProjectFile(ctx, p.ID, up.ID); err != nil {
+			return nil, nil, err
+		}
+	}
+	zr, err := gzip.NewReader(bytes.NewReader(f.Data))
+	if err != nil {
+		return nil, nil, err
+	}
+	data, err := io.ReadAll(io.LimitReader(zr, 50<<20))
+	return data, f, err
+}
+
+// ProjectFileForModule finds the project file a glossary module name comes from (glossary.ModuleName of its
+// file name), from the newest module group first; nil when none
+func (s *GlossaryService) ProjectFileForModule(ctx context.Context, p *models.Project, module string) (*models.ProjectFile, error) {
+	files, _, err := s.repo.ListProjectFiles(ctx, p.ID, "", nil, "", 1<<30, 0)
+	if err != nil {
+		return nil, err
+	}
+	groups, err := s.repo.ListGroups(ctx, p.ID)
+	if err != nil {
+		return nil, err
+	}
+	SortGroups(groups)
+	rank := make(map[int64]int, len(groups))
+	for i, g := range groups {
+		rank[g.ID] = i
+	}
+	var best *models.ProjectFile
+	for _, f := range files {
+		if glossary.ModuleName(f.Filename, f.Language) != module {
+			continue
+		}
+		if best == nil || rank[f.GroupID] < rank[best.GroupID] {
+			best = f
+		}
+	}
+	return best, nil
+}

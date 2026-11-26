@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"compress/gzip"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -62,6 +63,16 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 	visitor(t).get(base+"/glossary?q=open").status(http.StatusOK).contains("Open File", "Buka Berkas")
 	visitor(t).get(base+"/files").status(http.StatusOK).contains("calc.main.id.po", "edit.main.id.po")
 
+	// a project file opens read-only ("Lihat"); glossary module links open it at the term
+	calcID := scalar[int64](t, `SELECT id FROM project_files WHERE project_id = $1 AND filename = 'calc.main.id.po'`, pid)
+	view := fmt.Sprintf("%s/project-files/%d/view", base, calcID)
+	visitor(t).get(base + "/files").status(http.StatusOK).contains(view)
+	visitor(t).get(view).status(http.StatusOK).contains("view-mode", "Buka Berkas", "Close", "Hanya lihat").lacks("/take")
+	visitor(t).get(view + "?q=tutup").status(http.StatusOK).contains("Close").lacks("Open File")
+	kiki.get(view).status(http.StatusOK).contains("/project-files/"+strconv.FormatInt(calcID, 10)+"/take", "Ambil")
+	visitor(t).get(base + "/project-files/module/calc.main?q=Open").redirectsTo(view + "?q=Open")
+	visitor(t).get(base + "/glossary?q=open").status(http.StatusOK).contains("/project-files/module/calc.main?q=Open")
+
 	// turn reservations on (owner)
 	owner.post(base+"/settings", url.Values{"name": {"Gnome"}, "slug": {slug}, "source_language": {"en"}, "access": {"private"},
 		"reservations": {"on"}, "reservation_days": {"30"}}).redirectsTo(base)
@@ -71,6 +82,9 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 
 	// "Reservasi modul" asks first (the UI is in Indonesian by default), saying that it reserves the module and how it is released
 	kiki.get(base+"/files").status(http.StatusOK).contains(`data-confirm-ok="Reservasi modul"`, "Reservasi modul calc untuk dikerjakan?", "setelah 30 hari tanpa simpanan")
+
+	// with reservations on, the read-only view offers "Reservasi modul" while the module is free
+	kiki.get(view).status(http.StatusOK).contains(`data-confirm-ok="Reservasi modul"`)
 
 	// kiki takes calc: a copy in her files, and the module is hers
 	calc := scalar[int64](t, `SELECT id FROM project_files WHERE project_id = $1 AND filename = 'calc.main.id.po'`, pid)
@@ -100,6 +114,10 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 	owner.get(base+"/files").status(http.StatusOK).contains("res-release", "Lepas reservasi @"+kiki.Username)
 	owner.get(base + "/member-files").status(http.StatusOK).contains("res-release")
 	kiki.get(base + "/files").status(http.StatusOK).lacks("res-release")
+
+	// once held, the view shows who holds it; the holder gets "Buka berkas Anda"
+	owner.get(view).status(http.StatusOK).contains("Direservasi oleh @" + kiki.Username).lacks("/take")
+	kiki.get(view).status(http.StatusOK).contains("Buka berkas Anda")
 
 	// the owner cannot take it while kiki holds it, and sees who does
 	owner.post(base+"/project-files/"+strconv.FormatInt(calc, 10)+"/take", nil).status(http.StatusOK).contains("@" + kiki.Username)

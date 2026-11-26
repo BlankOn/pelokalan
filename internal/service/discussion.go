@@ -244,13 +244,13 @@ func (s *DiscussionService) entryCatalog(ctx context.Context, p *models.Project,
 	return c, hash, nil
 }
 
-// entryTitle names an entry discussion: its source text and file
+// entryTitle names an entry discussion: its file (owner/file name) first, then its source text
 func entryTitle(msgid string, c *models.Catalog) string {
 	src := strings.Join(strings.Fields(msgid), " ")
 	if r := []rune(src); len(r) > 80 {
 		src = string(r[:80]) + "…"
 	}
-	return src + " — " + c.OwnerUsername + "/" + c.Filename
+	return c.OwnerUsername + "/" + c.Filename + " — " + src
 }
 
 // SubjectURL returns the page of a stored discussion's subject

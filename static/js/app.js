@@ -2999,8 +2999,11 @@ document.addEventListener("click", function (ev) {
 // every part sticks right below the ones before it in the same section
 (function () {
     function layout() {
+        // the project tabs stick at the very top: sections stack below them
+        var tabs = document.querySelector(".tabs-nav");
+        var base = tabs && getComputedStyle(tabs).position === "sticky" ? Math.max(0, tabs.getBoundingClientRect().height - 1) : 0;
         document.querySelectorAll("[data-sticky-section]").forEach(function (sec) {
-            var top = 0;
+            var top = base;
             sec.querySelectorAll("[data-stick]").forEach(function (el) {
                 el.style.setProperty("--stick-top", top + "px");
                 if (getComputedStyle(el.tagName === "THEAD" ? el.querySelector("th") || el : el).position === "sticky") {

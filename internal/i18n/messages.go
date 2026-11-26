@@ -132,6 +132,7 @@ var messages = map[string]map[string]string{
 		"role.manager":         "Koordinator",
 		"role.translator":      "Penerjemah",
 		"role.reviewer":        "Peninjau",
+		"footer.by":            "Sebuah proyek dari",
 		"members.owner_locked": "Peran pemilik tidak dapat diubah",
 
 		// Projects
@@ -1127,6 +1128,11 @@ var messages = map[string]map[string]string{
 		"err.review_required":          "Proyek ini mewajibkan tinjauan: ajukan tinjauan, lalu pemilik atau koordinator lain yang menyetujuinya.",
 		"review.reviewer_note":         "Disetujui oleh pemilik atau koordinator",
 		"review.reviewer_help":         "Sebagai peninjau, Anda memberi komentar tinjauan; pemilik atau koordinator yang menyetujui dan mengirim berkas",
+		"upstream.new":                 "Pembaruan upstream · %d",
+		"upstream.new_help":            "Salinan upstream terbaru punya %d string yang belum ada di berkas ini: string baru, atau terjemahan yang berubah di upstream sejak Anda mengambil atau terakhir memperbarui berkas",
+		"err.review_upstream_conflict": "%d string diubah di repositori setelah penerjemah mengambil berkas (%s). Mengirimnya akan menimpa perubahan itu: penerjemah menarik pembaruan upstream dulu (Tarik upstream), lalu mengajukan tinjauan lagi.",
+		"view.open_mine":               "Buka berkas Anda",
+		"glossary.module_open":         "Buka modul ini (hanya lihat), langsung pada istilah ini",
 		"review.view_label":            "Tampilan tinjauan",
 		"review.view_table":            "Tabel",
 		"review.view_diff":             "Diff",
@@ -1628,6 +1634,7 @@ var messages = map[string]map[string]string{
 		"role.manager":         "Coordinator",
 		"role.translator":      "Translator",
 		"role.reviewer":        "Reviewer",
+		"footer.by":            "A project by",
 		"members.owner_locked": "The owner's role cannot be changed",
 
 		// Projects
@@ -2623,6 +2630,11 @@ var messages = map[string]map[string]string{
 		"err.review_required":          "This project requires review: ask for a review, then another owner or coordinator approves it.",
 		"review.reviewer_note":         "Approved by an owner or coordinator",
 		"review.reviewer_help":         "As a reviewer you leave review comments; an owner or coordinator approves and sends the file",
+		"upstream.new":                 "Upstream update · %d",
+		"upstream.new_help":            "The newest upstream copy has %d strings this file does not: new strings, or translations changed upstream since you took or last updated the file",
+		"err.review_upstream_conflict": "%d strings were changed in the repository after the translator took the file (%s). Sending would overwrite them: the translator pulls the upstream update first (Pull upstream), then asks for a review again.",
+		"view.open_mine":               "Open your file",
+		"glossary.module_open":         "Open this module read-only, at this term",
 		"review.view_label":            "Review view",
 		"review.view_table":            "Table",
 		"review.view_diff":             "Diff",

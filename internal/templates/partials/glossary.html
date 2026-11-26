@@ -30,7 +30,7 @@
                 <td><strong>{{.Text}}</strong>{{if .Contexts}}<div class="muted small">{{t $.Lang "editor.context"}}: {{join .Contexts ", "}}</div>{{end}}</td>
                 <td class="num">{{.Count}}</td>
                 {{if eq $.Group "all"}}<td>{{range .Groups}}<span class="version-badge">{{.}}</span> {{end}}</td>{{end}}
-                <td class="small gl-modules">{{range .Modules}}<code>{{.}}</code> {{end}}</td>
+                <td class="small gl-modules">{{range .Modules}}<a class="gl-mod" href="{{$.ProjectPath}}/project-files/module/{{pathEscape .}}?q={{urlquery $g.Source}}" title="{{t $.Lang "glossary.module_open"}}"><code>{{.}}</code></a> {{end}}</td>
             </tr>
             {{end}}
             </tbody>

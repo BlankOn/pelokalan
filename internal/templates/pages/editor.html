@@ -18,6 +18,7 @@
             <button type="submit" class="tb-btn" title="{{t $.Lang "editor.pull_upstream_help" .Filename .GroupLabel}}">
                 <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17H6.5a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 17.6 8a4 4 0 0 1-.1 9H17"/><path d="M12 11v9"/><path d="M9 17l3 3 3-3"/></svg>
                 <span>{{t $.Lang "editor.pull_upstream"}}</span>
+                {{with $.Data.UpstreamNew}}<span class="tb-badge tb-badge-up" title="{{t $.Lang "upstream.new_help" .}}">{{.}}</span>{{end}}
             </button>
         </form>
         {{end}}
@@ -404,7 +405,7 @@
         <button type="button" class="rv-view-btn" data-review-view="diff">{{t .Lang "review.view_diff"}}</button>
     </div>{{end}}
     <div class="spacer"></div>
-    <span class="rv-chip">{{t .Lang "view.only"}}</span>
+    {{template "view_action" .}}
     <input type="hidden" id="filter-selected" value="">
 </div>
 {{end}}

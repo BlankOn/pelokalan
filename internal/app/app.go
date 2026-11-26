@@ -236,6 +236,8 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Get("/projects/{id}/group-chart", h.GroupChart)
 		r.Get("/projects/{id}/member-files", h.MemberFiles)
 		r.Get("/projects/{id}/project-files/{fid}/download", h.ProjectFileDownload)
+		r.Get("/projects/{id}/project-files/{fid}/view", h.ProjectFileView)
+		r.Get("/projects/{id}/project-files/module/{name}", h.ProjectFileByModule)
 		r.Get("/projects/{id}/topics/{key}", h.TopicPage)
 		r.Get("/projects/{id}/threads/{type}/{key}", h.ThreadPage)
 		r.Get("/projects/{id}/wiki/files/{fid}/{filename}", h.WikiFile)

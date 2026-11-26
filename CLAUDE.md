@@ -129,9 +129,9 @@ make cover          # coverage of every package by every test (bin/coverage.html
   (= `ModuleGroup` with project files, e.g. gnome-51; `group_filter` partial, checkbox dropdown
   `[data-multi-filter]` with "Tampilkan semua" like the editor filter, shown when there is a group; `g` params).
   Search and filter live in `#pf-filter`; "Muat lagi" includes it (`hx-include`).
-- Each of the three sections (`.files-section[data-sticky-section]`) keeps its title, card head, filter bar and
-  column row on top while it scrolls (`[data-stick]`, position: sticky); app.js stacks them via `--stick-top` from
-  the heights above (re-measured on resize and htmx swaps). They let go when the section ends; off on phones.
+- The project tabs (`.tabs-nav`) stick at the top of every project page. Each of the three sections
+  (`.files-section[data-sticky-section]`) keeps its title, card head, filter bar and column row on top while it scrolls
+  (`[data-stick]`, position: sticky); app.js stacks them below the tabs via `--stick-top` from the heights above (re-measured on resize and htmx swaps). They let go when the section ends; off on phones.
   Section titles are buttons (`.section-toggle`, chevron down / right) that fold the section; the state is kept in
   localStorage per project and section (`data-collapse-key` "files:<slug>:project|mine|others").
 - "Berkas Anda" and "Berkas anggota lain" (one list, owner under each file) show 5 files at a time
@@ -154,6 +154,12 @@ make cover          # coverage of every package by every test (bin/coverage.html
   the same take route with `into` and the same confirm popup.
   Under the "Berkas proyek" heading: last sync time (newest `last_fetched_at` of module groups with a sync link,
   in the reader's time zone) and the automatic interval (`Handler.SetSyncInterval`).
+- **Upstream update status:** for the user's own files (Berkas Anda, `attachUpstreamNew`) and in the editor (badge on
+  "Tarik upstream"), `CatalogService.UpstreamChanges` compares the newest upstream copy (`GlossaryService.UpstreamData`:
+  the project file with the same repository path, else `UpstreamFor`) with the file: strings it does not have, and
+  strings whose upstream translation changed since the file's starting point (`reference`) and differs from the
+  member's. The member's own unsent work does not count. Shown as a blue chip "⟳ Pembaruan upstream · N" (`.up-new`).
+  Pulling is still "Perbarui"/"Tarik upstream" (replace, with a version saved first).
 - **Template merge only touches files of the same module:** `templateFits` requires at least half of
   a file's strings to be in the template; "Perbarui semua terjemahan" (and template re-upload) skips
   other modules and reports how many it skipped (`MergeResult.Skipped`).
@@ -196,7 +202,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - Discussions are generic: `discussions(project_id, subject_type, subject_key, title)` +
   `comments` + `comment_mentions`. Subject types are resolved in
   `DiscussionService.ResolveSubject` / `SubjectURL`: `glossary_term` (key = term hash) and
-  `po_entry` (key = "<catalog id>-<Entry.KeyHash()>", stable across restores/merges; page =
+  `po_entry` (key = "<catalog id>-<Entry.KeyHash()>", stable across restores/merges; title "owner/file — source
+  text", migration 052 turned older titles around; page =
   file URL + `?entry=<hash>`) and `topic` (free discussion: key = random 12 hex chars, title
   stored on the discussion, page `/projects/{id}/topics/{key}`, started from the Diskusi tab via
   `CreateTopic`, which stores nothing if the first post is invalid). Add a case there to attach
@@ -453,6 +460,13 @@ buttons (visitors: sign up / sign in; members: jump to the list), six feature ca
 icons), the connected sources (GNOME l10n.gnome.org, GitHub repositories and the Translation Project, `home.src_*`) and three "how it works"
 steps. It is always shown (no hide button).
 
+## Footer
+
+`layouts/base.html`: site name and tagline, Tentang/Lisensi links, and "Sebuah proyek dari" / "A project by" BlankOn
+Foundation linking to blankon.id. The logo (`static/img/blankon-foundation.png`, the light version: dark letters) shows when
+`static/img/blankon-foundation.svg` (or `.png`) exists
+(`PageData.ByLogo`, checked at start-up); otherwise the name is written in text.
+
 ## About page
 
 `/about` (footer link "Tentang", before Lisensi; `AboutPage`, pages/about.html, `about.*` strings) explains the
@@ -653,8 +667,12 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   `PushNow` refuses (`err.review_required`). One open request per file.
 - Commit (`ReviewService.commit`): reads the branch's current file, `gitpatch.Apply` (the whole file with only the
   member's changed entries rewritten), `PutFile` (one retry on conflict), author = translator's credit identity,
-  message "Update translation of <path>" + count + note + `Reviewed-by:` + project link. The committed file is kept
-  (`pushed_data`) and strings equal to it are never sent again, so later repository changes are not reverted. Then the
+  message "Update translation of <path>" + count + note + `Reviewed-by:` + project link. Only the strings a commit
+  rewrote are kept (`pushed_data`, `sentEntries`) and never sent again. Before committing, `UpstreamConflicts` refuses
+  (`err.review_upstream_conflict`, naming the strings) when the branch has a translation that differs from both the
+  member's starting point for that string (what Pelokalan last sent for it, else the reference version) and the
+  member's text: someone changed it upstream meanwhile and the member pulls first. A refused direct send withdraws the
+  request it created. Then the
   reservation is released quietly (`ReleasePushed`), the group re-synced (if it has a feed), and the translator emailed.
   A failure keeps the request open with `error` shown on the review page and in the queue.
 - File rows show `review_chip` (Menunggu tinjauan / Perlu perbaikan · N (open review comments) / ☑ Sudah masuk repositori · sha
@@ -672,6 +690,13 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   Links without `?view=1` (discussion emails, `?entry=`) still open the normal read-only editor. For owners, coordinators and
   reviewers a file waiting for review shows "Tinjau" (to the review editor) instead of "Lihat". In review and view layouts long
   strings wrap in the table.
+- **Project file viewer** (`/projects/{id}/project-files/{fid}/view`, public; "Lihat" in Berkas proyek; `ProjectFileView`,
+  pages/project_file.html): the stored file read-only in the view layout (table, `?q=` search, status bar, PO
+  download). Glossary module chips (list and term page) link to `/projects/{id}/project-files/module/{name}?q=<term>`
+  (`ProjectFileByModule`, `GlossaryService.ProjectFileForModule` matches `glossary.ModuleName`, newest group first).
+- View-only toolbars (project files and other members' files) end with `view_action` (partials/view_action.html,
+  `viewAction`): "Buka berkas Anda" when the viewer has the module, who holds it when reserved, else "Reservasi
+  modul" (reservations on, asks first) or "Ambil", which take the project file; visitors see "Hanya lihat".
 - The GitHub integration block always shows the app's install link (to install it on more repositories or change
   its access); it is the main button only until write access is confirmed.
 - **Review comments** (migration 049, `comments.review_id/resolved_at/resolved_by`): a comment by an owner, coordinator

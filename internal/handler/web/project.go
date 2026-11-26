@@ -985,6 +985,9 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 	v.Reviewer, v.CanSend = p.Role.CanReview(), p.Role.CanManage()
 	h.reviews.Attach(r.Context(), p, v.Files)
 	if mine {
+		h.attachUpstreamNew(r, p, v.Files)
+	}
+	if mine {
 		user := middleware.GetUser(r.Context())
 		for _, c := range v.Files {
 			if c.RepoPath == "" || user == nil {
@@ -999,6 +1002,20 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 		}
 	}
 	return v
+}
+
+// attachUpstreamNew counts, for the user's own files, the strings the newest upstream copy would bring
+func (h *Handler) attachUpstreamNew(r *http.Request, p *models.Project, files []*models.Catalog) {
+	for _, c := range files {
+		if c.IsTemplate || !c.Owned {
+			continue
+		}
+		data, _, err := h.glossary.UpstreamData(r.Context(), p, c)
+		if err != nil || data == nil {
+			continue
+		}
+		c.UpstreamNew, _ = h.catalogService.UpstreamChanges(r.Context(), c, data)
+	}
 }
 
 // ownFileRanks orders "Berkas Anda" by upstream state first; other states follow (ownFileRank 3)

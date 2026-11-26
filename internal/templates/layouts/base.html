@@ -40,6 +40,7 @@
     <footer class="site-footer">
         {{.SiteName}} · {{t .Lang "footer.tagline"}}
         <div class="footer-links"><a href="/about">{{t .Lang "footer.about"}}</a> · <a href="/licenses">{{t .Lang "footer.licenses"}}</a></div>
+        <a class="footer-by" href="https://blankon.id" target="_blank" rel="noopener"><span>{{t .Lang "footer.by"}}</span>{{if .ByLogo}}<img src="{{.ByLogo}}?v={{.Asset}}" alt="BlankOn Foundation" height="20">{{else}}<strong>BlankOn Foundation</strong>{{end}}</a>
     </footer>
     {{end}}
     <dialog id="confirm-dialog" class="dialog confirm-dialog" data-delete-label="{{t .Lang "action.delete"}}">

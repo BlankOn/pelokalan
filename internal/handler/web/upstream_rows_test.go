@@ -102,6 +102,14 @@ type emptyGlossaryRepo struct{ repository.GlossaryRepository }
 func (emptyGlossaryRepo) GroupsWithFiles(context.Context, int64) ([]*models.ModuleGroupOption, error) {
 	return nil, nil
 }
+func (emptyGlossaryRepo) ProjectFilesForLanguage(context.Context, int64, string) ([]*models.ProjectFile, error) {
+	return nil, nil
+}
+
+func (emptyGlossaryRepo) ProjectFileByRepoPath(context.Context, int64, string) (*models.ProjectFile, *models.ModuleGroup, error) {
+	return nil, nil, repository.ErrNotFound
+}
+
 func (emptyGlossaryRepo) ProjectFileNames(context.Context, int64) (map[int64][]string, error) {
 	return nil, nil
 }

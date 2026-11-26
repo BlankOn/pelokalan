@@ -209,3 +209,99 @@ func sameStrings(a, b []string) bool {
 	}
 	return true
 }
+
+// UpstreamChanges counts the strings the newest upstream file (a project file's contents) would bring to the
+// member's file: strings it does not have yet, and strings whose upstream translation changed since the file's
+// starting point (the newest "initial"/"from upstream" version) and differs from the member's. Differences that
+// are the member's own work (upstream unchanged since the starting point) do not count. Without a starting point
+// only new strings and translations of strings the member left empty count.
+func (s *CatalogService) UpstreamChanges(ctx context.Context, c *models.Catalog, upstream []byte) (int, error) {
+	cat, err := po.ParseBytes(upstream)
+	if err != nil {
+		return 0, err
+	}
+	entries, err := s.catalogs.ListEntries(ctx, c.ID, false)
+	if err != nil {
+		return 0, err
+	}
+	mine := make(map[string]poState, len(entries))
+	for _, e := range entries {
+		if !e.Obsolete {
+			mine[e.Key()] = poState{e.MsgStr, e.Fuzzy}
+		}
+	}
+	ref := s.reference(ctx, c)
+	n := 0
+	for _, e := range cat.Entries {
+		if e.Obsolete {
+			continue
+		}
+		k := e.Key()
+		up := poState{e.Translation, e.Fuzzy}
+		cur, ok := mine[k]
+		switch {
+		case !ok:
+			n++ // a new string upstream
+		case sameState(up, cur):
+		case ref != nil:
+			if r, ok := ref[k]; !ok || !sameState(r, up) {
+				n++ // upstream changed it since the file's starting point
+			}
+		case !translated(cur.tr) && translated(up.tr):
+			n++
+		}
+	}
+	return n, nil
+}
+
+func sameState(a, b poState) bool { return a.fuzzy == b.fuzzy && sameStrings(a.tr, b.tr) }
+
+func translated(tr []string) bool {
+	for _, t := range tr {
+		if t != "" {
+			return true
+		}
+	}
+	return false
+}
+
+// UpstreamConflicts lists (by source text) the wanted entries someone else changed upstream meanwhile: the
+// branch's current file (branch) has a translation that differs both from what the member started from and
+// from the member's. The member's starting point for an entry is what Pelokalan last committed for it (sent),
+// else the file's reference version. Committing would overwrite those, so the commit is refused until the
+// member pulls the upstream changes.
+func (s *CatalogService) UpstreamConflicts(ctx context.Context, c *models.Catalog, branch []byte, want map[string]gitpatch.Target, sent []byte) []string {
+	cat, err := po.ParseBytes(branch)
+	if err != nil {
+		return nil
+	}
+	base := s.reference(ctx, c)
+	var done map[string]poState
+	if sent != nil {
+		if sc, err := po.ParseBytes(sent); err == nil {
+			done = make(map[string]poState, len(sc.Entries))
+			for _, e := range sc.Entries {
+				done[e.Key()] = poState{e.Translation, e.Fuzzy}
+			}
+		}
+	}
+	var out []string
+	for _, e := range cat.Entries {
+		t, ok := want[e.Key()]
+		if !ok || e.Obsolete {
+			continue
+		}
+		start, known := done[e.Key()]
+		if !known {
+			start, known = base[e.Key()]
+		}
+		if !known {
+			continue // no starting point to compare with
+		}
+		up := poState{e.Translation, e.Fuzzy}
+		if !sameStrings(up.tr, start.tr) && !sameStrings(up.tr, t.Translation) {
+			out = append(out, e.ID)
+		}
+	}
+	return out
+}

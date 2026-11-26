@@ -124,6 +124,9 @@ func (h *Handler) viewData(r *http.Request, p *models.Project, c *models.Catalog
 	data.Data["ViewOnly"] = true
 	data.Data["ReadOnly"] = true
 	data.Data["Owned"] = false
+	if pf, err := h.glossary.UpstreamFor(r.Context(), p, c); err == nil && pf != nil { // reserve/take the module from here
+		h.viewAction(r, p, pf, data.Data)
+	}
 	if c.RepoPath == "" {
 		return
 	}

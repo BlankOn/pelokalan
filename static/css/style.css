@@ -119,6 +119,8 @@ code, kbd, pre { font-family: var(--mono); font-size: 12px; }
 .row-actions form { margin: 0; }
 
 .tabs-nav { display: flex; gap: 2px; border-bottom: 1px solid var(--border); margin-bottom: 16px; }
+/* the project tabs stay at the top while the page scrolls (section titles stack below them, app.js) */
+.tabs-nav { position: sticky; top: 0; z-index: 9; background: var(--bg); }
 .tabs-nav a { padding: 8px 14px; color: var(--muted); border-bottom: 2px solid transparent; margin-bottom: -1px; }
 .tabs-nav a.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
 .tabs-nav a:hover { text-decoration: none; color: var(--text); }
@@ -1678,6 +1680,10 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .rv-requested { background: #eef2ff; color: #3730a3; border-color: #c7d2fe; }
 .rv-rejected { background: #fdeaea; color: #b42318; border-color: #f5c2bf; }
 .rv-pushed { background: #e3f4ec; color: #15803d; border-color: #b7e2c8; }
+/* the newest upstream copy has strings the file does not (new, or changed upstream) */
+.up-new { background: #e8f0fe; color: #1d4ed8; border-color: #b9cdf3; }
+.rv-chip + .up-new, .tp-badge + .up-new, .up-badge + .up-new { margin-left: 4px; }
+.tb-badge-up { background: #2f6fd6; }
 .review-diff { margin: 0; padding: 10px 0; background: #fbfbfc; border: 1px solid var(--border-soft); border-radius: 6px; overflow-x: auto;
     font-size: 12.5px; line-height: 1.5; max-height: 60vh; }
 .review-diff span { display: block; padding: 0 12px; white-space: pre; }
@@ -1725,6 +1731,16 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 /* the owner's role on the members page: the same select as the others, locked */
 select.role-locked { cursor: not-allowed; opacity: 1; color: var(--muted); background-color: var(--surface-2); }
 select.role-locked, form[action$="/role"] select[name="role"] { min-width: 150px; }
+/* a project file read-only (Lihat in Berkas proyek, glossary module links) */
+.pfv-search input { width: 220px; }
+.project-file-view .entry-list { height: auto; flex: 1; }
+.gl-mod { text-decoration: none; }
+.gl-mod code { cursor: pointer; }
+.gl-mod:hover code { background: var(--accent-soft); color: var(--accent); }
+/* footer: "A project by" with the BlankOn Foundation logo */
+.footer-by { display: inline-flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--muted); text-decoration: none; font-size: 12px; }
+.footer-by:hover { text-decoration: none; color: var(--text); }
+.footer-by img { height: 20px; width: auto; display: block; }
 @media (max-width: 700px) {
     .home-intro { padding: 22px 16px 18px; border-radius: 12px; }
     .home-hero h1 { font-size: 23px; }

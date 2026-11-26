@@ -272,6 +272,9 @@ func (h *Handler) editorPage(w http.ResponseWriter, r *http.Request, c *models.C
 		}
 		if up, err := h.glossary.UpstreamFor(r.Context(), p, c); err == nil && up != nil {
 			data.Data["Upstream"] = up
+			if raw, _, err := h.glossary.UpstreamData(r.Context(), p, c); err == nil && raw != nil {
+				data.Data["UpstreamNew"], _ = h.catalogService.UpstreamChanges(r.Context(), c, raw)
+			}
 		}
 	}
 	if rv != nil {

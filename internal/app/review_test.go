@@ -162,7 +162,7 @@ func TestGitHubReviews(t *testing.T) {
 	// "Lihat" opens another member's file view-only: the review layout without actions or discussion
 	owner.get(base + "/member-files").status(http.StatusOK).contains("library__os.po?view=1")
 	owner.get(base+"/"+kiki.Username+"/po/library__os.po?view=1").status(http.StatusOK).
-		contains("view-mode", "Hanya lihat", "Remove the directory").lacks("rv-approve", "tb-commit", "filter-form")
+		contains("view-mode", "/take", "Remove the directory").lacks("rv-approve", "tb-commit", "filter-form")
 	owner.get(base + "/" + kiki.Username + "/po/library__os.po").status(http.StatusOK).lacks("view-mode")
 	if st := scalar[string](t, `SELECT status FROM module_reviews WHERE id = $1`, rid); st != "pushed" {
 		t.Fatalf("status = %s", st)
@@ -179,11 +179,29 @@ func TestGitHubReviews(t *testing.T) {
 	owner.post(base+"/settings", url.Values{"name": {"Docs"}, "slug": {slug}, "source_language": {"en"}, "access": {"private"}}).redirectsTo(base)
 	owner.get(base + "/member-files").status(http.StatusOK).contains(fmt.Sprintf("/catalogs/%d/push", kc))
 	kiki.post(fmt.Sprintf("/catalogs/%d/push", kc), nil).status(http.StatusForbidden)
-	owner.post(fmt.Sprintf("/catalogs/%d/push", kc), nil).redirectsTo(base + "/files")
-	if n := len(ghFake.LastCommits()); n != 2 {
-		t.Fatalf("commits after push = %d", n)
+	// "Open the file" was changed on the branch by someone else after kiki took the file ("Buka berkas tersebut"):
+	// sending kiki's "Buka berkas" would overwrite it, so it is refused until she pulls the upstream change
+	owner.post(fmt.Sprintf("/catalogs/%d/push", kc), nil).status(http.StatusBadRequest).
+		contains("diubah di repositori", "Open the file")
+	if n := len(ghFake.LastCommits()); n != 1 {
+		t.Fatalf("commits after a refused push = %d", n)
 	}
-	if got := string(ghFake.File(repo, "3.14", "library/os.po")); !strings.Contains(got, `msgstr "Buka berkas"`) || !strings.Contains(got, `msgstr "Tutup jendelanya"`) {
-		t.Fatalf("branch file:\n%s", got)
+	if n := scalar[int](t, `SELECT count(*) FROM module_reviews WHERE catalog_id = $1 AND status = 'requested'`, kc); n != 0 {
+		t.Fatalf("a refused direct send left %d open requests", n)
 	}
+	if got := string(ghFake.File(repo, "3.14", "library/os.po")); !strings.Contains(got, `msgstr "Buka berkas tersebut"`) {
+		t.Fatalf("the upstream change was overwritten:\n%s", got)
+	}
+	// the first commit only counts kiki's own strings as sent: the other translator's string stays theirs
+	if n := scalar[int](t, `SELECT entries FROM module_reviews WHERE id = $1`, rid); n != 2 {
+		t.Fatalf("pushed entries = %d, want 2", n)
+	}
+
+	// a newer upstream copy: one translation changed upstream, one new string; kiki's own work does not count
+	kiki.get(base + "/my-files").status(http.StatusOK).lacks("Pembaruan upstream")
+	newer := poFile("os", "Open the file", "Buka berkasnya", "Close the window", "", "Remove the directory", "Hapus folder", "Rename the file", "")
+	owner.upload(base+"/module-groups/import", url.Values{"name": {"docs"}, "version_name": {"3.14"}, "language": {"id"}},
+		"docs.tar.gz", targz(t, map[string][]byte{"library/os.po": newer})).redirectsTo(base + "/settings?")
+	kiki.get(base + "/my-files").status(http.StatusOK).contains("Pembaruan upstream · 2")
+	kiki.get(base + "/" + kiki.Username + "/po/library__os.po").status(http.StatusOK).contains("tb-badge-up")
 }

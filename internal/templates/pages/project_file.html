@@ -1,0 +1,49 @@
+{{define "content"}}{{$p := .Data.Project}}{{$f := .Data.File}}{{$s := .Data.Stats}}
+<div class="editor-app review-mode view-mode project-file-view">
+    <div class="toolbar review-toolbar">
+        <a class="tb-btn" href="{{$p.Path}}/files" title="{{t .Lang "editor.back_to_project"}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+            <span>{{t .Lang "editor.project"}}</span>
+        </a>
+        <div class="tb-sep"></div>
+        <div class="rv-tb-info">
+            <strong>{{$f.Filename}}</strong>
+            <span class="muted small">{{t .Lang "files.project"}} · {{$f.GroupLabel}} · {{langName $f.Language}}</span>
+        </div>
+        <form method="get" class="pfv-search">
+            <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "editor.search"}}" aria-label="{{t .Lang "editor.search"}}">
+        </form>
+        <div class="spacer"></div>
+        {{template "view_action" .}}
+        <a class="tb-btn" href="{{$p.Path}}/project-files/{{$f.ID}}/download" title="{{t .Lang "action.download"}} {{$f.Filename}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+            <span>PO</span>
+        </a>
+    </div>
+    <div class="workspace">
+        <div class="main-col">
+            <div class="list-header" role="row">
+                <div class="cell-icon"></div>
+                <div class="cell-src">{{t .Lang "editor.source_text"}} — {{langName $p.SourceLanguage}}</div>
+                <div class="cell-tr">{{t .Lang "editor.translation"}} — {{langName $f.Language}}</div>
+            </div>
+            <div class="entry-list" role="grid" aria-label="{{t .Lang "editor.entries"}}">
+                {{range .Data.Rows}}
+                <div class="entry-row st-{{.Status}}" role="row">
+                    <div class="cell-icon">{{if eq .Status "fuzzy"}}<span class="mark-fuzzy" title="{{t $.Lang "filter.fuzzy"}}"></span>{{end}}</div>
+                    <div class="cell-src">{{if .Context}}<span class="ctx-tag">{{.Context}}</span>{{end}}<span class="txt">{{.ID}}</span>{{if .Plural}}<span class="plural-tag" title="{{t $.Lang "editor.plural"}}">⁺</span>{{end}}</div>
+                    <div class="cell-tr"><span class="txt">{{.Translation}}</span></div>
+                </div>
+                {{else}}<div class="list-empty muted">{{t .Lang "editor.no_entries"}}</div>{{end}}
+            </div>
+        </div>
+    </div>
+    <footer class="statusbar">
+        <span>{{t .Lang "status.translated" $s.Translated $s.Total $s.Percent}}</span>
+        <span class="sb-sep">·</span><span class="c-fuzzy">{{t .Lang "status.fuzzy" $s.Fuzzy}}</span>
+        <span class="sb-sep">·</span><span>{{t .Lang "status.untranslated" $s.Untranslated}}</span>
+        <div class="spacer"></div>
+        {{template "progress" (dict "Stats" $s "Lang" .Lang)}}
+    </footer>
+</div>
+{{end}}

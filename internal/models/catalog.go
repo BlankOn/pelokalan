@@ -17,8 +17,10 @@ type Catalog struct {
 	Reservation *ModuleReservation `json:"-"`
 	// Review is the newest review request of the file for a repository Pelokalan writes to, and CanPush
 	// whether its module group commits approved files to the repository (set by ReviewService.Attach)
-	Review        *ModuleReview `json:"-"`
-	CanPush       bool          `json:"-"`
+	Review  *ModuleReview `json:"-"`
+	CanPush bool          `json:"-"`
+	// UpstreamNew: strings the newest upstream copy would bring (new or changed upstream; not stored)
+	UpstreamNew   int `json:"-"`
 	ID            int64
 	ProjectID     int64
 	OwnerID       int64

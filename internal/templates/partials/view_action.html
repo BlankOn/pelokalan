@@ -1,0 +1,8 @@
+{{/* the right side of a view-only toolbar: your own copy, take/reserve the free module, who holds it, or only viewing */}}
+{{define "view_action"}}{{$p := .Data.Project}}{{$f := .Data.ViewFile}}
+{{if .Data.ViewMine}}<a class="btn btn-primary" href="{{.Data.ViewMine.URL}}">{{t .Lang "view.open_mine"}}</a>
+{{else if .Data.ViewHeld}}<span class="res-locked small" title="{{t .Lang "reserve.locked_help"}}">{{template "lock_icon"}}{{t .Lang "reserve.by"}} @{{.Data.ViewHeld.Username}}</span>
+{{else if $f}}<form method="post" action="{{$p.Path}}/project-files/{{$f.ID}}/take"{{if $p.Reservations}} data-confirm="{{t .Lang "reserve.take_confirm" .Data.ViewModule}}{{with .Data.ViewRes.Days}} {{t $.Lang "reserve.take_confirm_days" .}}{{end}}" data-confirm-ok="{{t .Lang "reserve.take"}}"{{end}}>
+    <button type="submit" class="btn btn-primary" title="{{if $p.Reservations}}{{t .Lang "reserve.take_help"}}{{else}}{{t .Lang "files.take_help"}}{{end}}">{{if $p.Reservations}}{{t .Lang "reserve.take"}}{{else}}{{t .Lang "files.take"}}{{end}}</button></form>
+{{else}}<span class="rv-chip">{{t .Lang "view.only"}}</span>{{end}}
+{{end}}

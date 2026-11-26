@@ -53,6 +53,7 @@ type Handler struct {
 	reservations   *service.ReservationService // module reservations (nil-safe: off)
 	reviews        *service.ReviewService      // reviews and commits to repositories (nil-safe: off)
 	assetVersion   string
+	byLogo         string
 }
 
 // NewHandler creates a new web handler
@@ -86,7 +87,14 @@ func NewHandler(
 		contexts:       contextService,
 	}
 	// static/ sits two levels above internal/templates (the project root)
-	h.assetVersion = assetVersion(filepath.Join(filepath.Dir(filepath.Dir(templatesDir)), "static"))
+	staticDir := filepath.Join(filepath.Dir(filepath.Dir(templatesDir)), "static")
+	h.assetVersion = assetVersion(staticDir)
+	for _, name := range []string{"blankon-foundation.svg", "blankon-foundation.png"} { // footer "A project by"
+		if _, err := os.Stat(filepath.Join(staticDir, "img", name)); err == nil {
+			h.byLogo = "/static/img/" + name
+			break
+		}
+	}
 	if err := h.loadTemplates(); err != nil {
 		return nil, err
 	}
@@ -110,6 +118,7 @@ type PageData struct {
 	SiteName string
 	Path     string
 	Asset    string // cache-busting version of static files
+	ByLogo   string // the BlankOn Foundation logo in static/img ("" = none: the footer names it in text)
 	Error    string
 	Flash    string
 	Data     map[string]any
@@ -360,6 +369,7 @@ func (h *Handler) page(r *http.Request, titleKey string) PageData {
 		SiteName: h.siteConfig.Name,
 		Path:     r.URL.RequestURI(),
 		Asset:    h.assetVersion,
+		ByLogo:   h.byLogo,
 		Data:     map[string]any{"Year": time.Now().Year()},
 	}
 	if h.authService != nil {

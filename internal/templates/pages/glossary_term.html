@@ -37,7 +37,7 @@
         {{end}}
         <section class="card">
             <h2>{{t .Lang "glossary.modules"}} <span class="muted small">({{len $sum.Modules}})</span></h2>
-            <div class="gl-modules">{{range $sum.Modules}}<code>{{.}}</code> {{end}}</div>
+            <div class="gl-modules">{{range $sum.Modules}}<a class="gl-mod" href="{{$p.Path}}/project-files/module/{{pathEscape .}}?q={{urlquery $.Data.Thread.Thread.Subject.Title}}" title="{{t $.Lang "glossary.module_open"}}"><code>{{.}}</code></a> {{end}}</div>
         </section>
         {{with .Data.Related}}
         <section class="card">

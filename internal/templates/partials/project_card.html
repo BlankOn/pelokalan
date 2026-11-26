@@ -35,6 +35,7 @@
             <input type="hidden" name="into" value="{{.Mine.ID}}">
             <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
         {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"{{if $v.Res.On}} data-confirm="{{t $v.Lang "reserve.take_confirm" (module .Filename)}}{{if $v.Res.Days}} {{t $v.Lang "reserve.take_confirm_days" $v.Res.Days}}{{end}}" data-confirm-ok="{{t $v.Lang "reserve.take"}}"{{end}}><button class="btn btn-small btn-primary" title="{{if $v.Res.On}}{{t $v.Lang "reserve.take_help"}}{{else}}{{t $v.Lang "files.take_help"}}{{end}}">{{if $v.Res.On}}{{t $v.Lang "reserve.take"}}{{else}}{{t $v.Lang "files.take"}}{{end}}</button></form>{{end}}{{end}}
+        <a class="btn btn-small" href="{{$v.Project.Path}}/project-files/{{.ID}}/view">{{t $v.Lang "action.view"}}</a>
         <a class="btn btn-small btn-icon" href="{{$v.Project.Path}}/project-files/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
     </div></td>
 </tr>
@@ -132,7 +133,7 @@
     <td><a class="lang-link" href="{{.URL}}{{if not $v.Mine}}?view=1{{end}}"><strong>{{.Filename}}</strong></a>{{with .Reservation}}{{template "res_lock" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID)}}{{end}}
         <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div>
         {{if .RepoPath}}<div class="small muted repo-path" title="{{t $v.Lang "git.repo_path"}}">{{.RepoPath}}</div>{{end}}
-        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}{{template "tp_badge" (dict "Lang" $v.Lang "D" .TP)}}{{with .Review}}{{template "review_chip" (dict "Lang" $v.Lang "R" . "P" $v.Project)}}{{end}}
+        {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}{{template "tp_badge" (dict "Lang" $v.Lang "D" .TP)}}{{with .Review}}{{template "review_chip" (dict "Lang" $v.Lang "R" . "P" $v.Project)}}{{end}}{{if .UpstreamNew}}<a class="rv-chip up-new" href="{{.URL}}" title="{{t $v.Lang "upstream.new_help" .UpstreamNew}}">⟳ {{t $v.Lang "upstream.new" .UpstreamNew}}</a>{{end}}
         {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}</td>
     <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>{{end}}</td>
     <td class="num">{{if not .IsTemplate}}{{.Stats.Translated}}{{end}}</td>
