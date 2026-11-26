@@ -756,7 +756,7 @@ h1 .ai-badge { font-size: 12px; }
 .form fieldset.access-choice label.check { align-items: baseline; margin-top: 4px; }
 .join-form { margin: 0; }
 #my-files { scroll-margin-top: 100px; }
-.head-member { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.project-contribute { position: relative; z-index: 1; } /* above the card's stretched link */
 .join-private { white-space: nowrap; }
 .form [data-source] { display: flex; flex-direction: column; gap: 6px; }
 

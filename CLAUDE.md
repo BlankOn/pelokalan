@@ -233,7 +233,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
   Markdown rendered by `commentHTML` (goldmark GFM + hard wraps, safe mode: raw HTML and
   javascript: links dropped; bare URLs auto-linked; mentions outside a/code/pre).
 - Project descriptions are plain text; `linkify` escapes them and links bare http(s) URLs.
-  Project cards use a stretched link (`.project-card-link::after`) so description links stay clickable.
+  Project cards use a stretched link (`.project-card-link::after`) so description links stay clickable. Members' cards
+  on /projects have a "Kontribusi" button beside the role badge (to `files#my-files`, Berkas Anda).
 
 ## Comment attachments
 

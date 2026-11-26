@@ -3,7 +3,8 @@
     <div class="project-card-head">
         <h2><a class="project-card-link" href="{{$p.Path}}">{{$p.Name}}</a>{{if $p.AIEnabled}} {{template "ai_badge" .Lang}}{{end}}</h2>
         <div class="project-badges">
-            {{if $p.Role.IsMember}}<span class="role-badge role-{{$p.Role}}">{{roleName .Lang $p.Role}}</span>{{end}}
+            {{if $p.Role.IsMember}}<span class="role-badge role-{{$p.Role}}">{{roleName .Lang $p.Role}}</span>
+            <a class="btn btn-primary btn-small project-contribute" href="{{$p.Path}}/files#my-files" title="{{t .Lang "project.contribute_help"}}">{{t .Lang "project.contribute"}}</a>{{end}}
         </div>
     </div>
     {{if $p.Description}}<p class="muted project-desc">{{linkify $p.Description}}</p>{{end}}
