@@ -589,6 +589,10 @@ h1 .ai-badge { font-size: 12px; }
     .workspace:not(.sidebar-hidden) .side-close-icon { display: block; }
     .workspace:not(.sidebar-hidden) .sidebar > .sb-section:first-child { padding-right: 58px; }
     .workspace:not(.sidebar-hidden) .sidebar > .sb-section:first-child:not(.sb-glossary) { padding-top: 16px; }
+    /* the open sidebar gets the whole screen: no toolbar, banners or status bar above or below it */
+    .editor-app:has(.workspace:not(.sidebar-hidden)) > .toolbar,
+    .editor-app:has(.workspace:not(.sidebar-hidden)) > .editor-flash,
+    .editor-app:has(.workspace:not(.sidebar-hidden)) > .statusbar { display: none; }
 }
 /* tablets (e.g. iPad mini portrait, 744px): the file tables drop the three count columns,
    the progress bar and percentage already show them, so name, progress, date and buttons fit */

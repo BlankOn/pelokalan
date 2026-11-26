@@ -833,7 +833,8 @@ deploys never run stale JS/CSS.
   Tablets and phones (≤1180px: iPad mini portrait and landscape, phones): the sidebar floats over the table (absolute,
   shadow), starts closed and is opened with the same handle, which is bigger and bluish there (no dragging, state not
   stored: `floating` media query in app.js). On phones (≤700px) the open sidebar covers the whole width and the
-  handle becomes a round × close button at its top right (`.side-close-icon`). While the sidebar is closed, a red count beside the handle (`#side-review-badge`)
+  handle becomes a round × close button at its top right (`.side-close-icon`); the toolbar (also the review/view
+  toolbar), banners and status bar are hidden while it is open. While the sidebar is closed, a red count beside the handle (`#side-review-badge`)
   shows the file's open review comments; app.js keeps it in step from each thread's `data-review-open`.
   The review editor always shows the sidebar on wide screens (no handle) and hides suggestions and the translator's
   note (`.sb-suggestions`, `.sb-tcomment`).
