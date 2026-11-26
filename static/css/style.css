@@ -1759,10 +1759,10 @@ select.role-locked, form[action$="/role"] select[name="role"] { min-width: 150px
 .context-tag { display: inline-block; font-size: 11px; padding: 0 7px; border-radius: 9px; background: var(--accent-soft); color: var(--accent-dark); vertical-align: 1px; }
 /* the profile page: one form, one save button beside the title, two columns when there is room */
 .profile-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-.profile-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 520px; }
+.profile-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; max-width: 1080px; }
 .profile-col { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 .profile-col .card { margin: 0; }
-.profile-page .page-head { max-width: 520px; }
+.profile-page .page-head { max-width: 1080px; }
 @media (min-width: 1000px) {
     .profile-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); max-width: 1080px; align-items: start; }
     .profile-page .page-head { max-width: 1080px; }

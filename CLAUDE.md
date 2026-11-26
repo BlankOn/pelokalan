@@ -377,7 +377,7 @@ shows it only to members), role, joined_at. Documented in README.md.
 
 `/profile` (pages/profile.html) is one form with one "Simpan" beside the title (`AuthService.UpdateAccount` checks
 every field first and saves only when all are valid): Akun, Identitas penerjemah, Profil publik and Email lencana, in
-two columns from 1000px. Profil publik: a short description (`users.bio`, `MaxBio` 300) and links (`users.links`, JSON
+two columns from 1000px, one full-width column below (iPad). Profil publik: a short description (`users.bio`, `MaxBio` 300) and links (`users.links`, JSON
 kind → URL, migration 053; `models.LinkKinds` website, github, x, linkedin, mastodon). `service.NormalizeLink` accepts
 a handle or an address and stores the full https address (else `err.link_invalid`). The public page shows them under
 the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` and `/profile/badge-emails` routes stay.
