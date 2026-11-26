@@ -1544,6 +1544,8 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .project-files td.actions .btn { height: 30px; box-sizing: border-box; }
 .project-files td.actions { white-space: nowrap; }
 .btn-icon { display: inline-flex; align-items: center; justify-content: center; padding-left: 8px; padding-right: 8px; vertical-align: middle; }
+.btn-share { display: inline-flex; align-items: center; gap: 5px; }
+.btn-share svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .btn-icon svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 .pf-more td { padding: 8px 0 0; border: 0; }
 

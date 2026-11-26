@@ -7,13 +7,14 @@
         {{if $.Data.Crumbs}}<div class="crumbs">{{range $.Data.Crumbs}}<a href="{{$p.Path}}/wiki/{{.Slug}}">{{.Title}}</a> / {{end}}</div>{{end}}
         <div class="wiki-head">
             <h1>{{$pg.Title}}</h1>
-            {{if $.Data.CanEdit}}
             <div class="row-actions">
+                <button type="button" class="btn btn-small btn-share" data-copy="" data-copy-here data-copied="{{t $.Lang "links.copied"}}" title="{{t $.Lang "wiki.share_help"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/></svg><span>{{t $.Lang "wiki.share"}}</span></button>
+                {{if $.Data.CanEdit}}
                 {{if $.Data.CanDelete}}<form method="post" action="{{$p.Path}}/wiki/{{$pg.Slug}}/delete" data-confirm="{{t $.Lang "wiki.confirm_delete"}}"><button class="btn btn-small btn-danger">{{t $.Lang "wiki.delete"}}</button></form>{{end}}
                 {{if lt $.Data.Depth $.Data.MaxDepth}}<a class="btn btn-small" href="{{$p.Path}}/wiki/new?parent={{$pg.ID}}">{{t $.Lang "wiki.new_subpage"}}</a>{{end}}
                 <a class="btn btn-small btn-primary" href="{{$p.Path}}/wiki/{{$pg.Slug}}/edit">{{t $.Lang "wiki.edit"}}</a>
+                {{end}}
             </div>
-            {{end}}
         </div>
         <p class="muted small wiki-meta">{{t $.Lang "wiki.updated" (timeAgo $.Lang $pg.UpdatedAt) (or $pg.UpdaterName "—")}}</p>
         <div class="wiki-body">{{if $pg.Body}}{{wikiHTML $pg.Body}}{{else}}<p class="muted">{{t $.Lang "wiki.preview_empty"}}</p>{{end}}</div>

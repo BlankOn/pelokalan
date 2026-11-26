@@ -530,6 +530,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   (3) levels via `parent_id`, ordered by `position`. Slugs are unique per project, derived from the
   title on create (`wikiSlug`) and can be edited; old addresses keep redirecting
   (`wiki_redirects`, migration 020). "new", "files", "preview" are reserved.
+- Every page has "Bagikan" (copies the page address, `data-copy-here` on the shared `[data-copy]` handler in app.js,
+  with a hidden-field fallback where the clipboard API is missing).
 - Readable publicly; members create/edit; owners, managers and the page author delete (pages
   with subpages cannot be deleted). Edits carry the page `Version()`; if someone saved in
   between, the save is refused (409) and the editor keeps the user's text with steps to resolve:

@@ -2066,21 +2066,33 @@ document.addEventListener("click", function (ev) {
     });
 })();
 
-// Copy buttons (e.g. invite links)
+// Copy buttons (e.g. invite links); data-copy-here copies this page's address (without #…)
 document.addEventListener("click", function (ev) {
     var btn = ev.target.closest && ev.target.closest("[data-copy]");
     if (!btn) return;
-    var text = btn.getAttribute("data-copy");
+    var text = btn.hasAttribute("data-copy-here") ? location.origin + location.pathname + location.search : btn.getAttribute("data-copy");
     var done = function () {
-        var old = btn.textContent;
-        btn.textContent = btn.getAttribute("data-copied") || "✓";
-        setTimeout(function () { btn.textContent = old; }, 1500);
+        var label = btn.querySelector("span") || btn; // keep an icon in place
+        var old = label.textContent;
+        label.textContent = btn.getAttribute("data-copied") || "✓";
+        setTimeout(function () { label.textContent = old; }, 1500);
+    };
+    var fallback = function () { // no clipboard API (plain http): copy through a hidden field
+        var inp = btn.parentNode.querySelector("input");
+        var tmp = null;
+        if (!inp) {
+            tmp = inp = document.createElement("textarea");
+            inp.value = text; inp.setAttribute("readonly", ""); inp.style.cssText = "position:fixed;opacity:0;top:0;left:0";
+            document.body.appendChild(inp);
+        }
+        inp.select();
+        try { document.execCommand("copy"); done(); } catch (e) { /* nothing more to try */ }
+        if (tmp) tmp.remove();
     };
     if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(text).then(done, function () {});
+        navigator.clipboard.writeText(text).then(done, fallback);
     } else {
-        var inp = btn.parentNode.querySelector("input");
-        if (inp) { inp.select(); try { document.execCommand("copy"); done(); } catch (e) {} }
+        fallback();
     }
 });
 
