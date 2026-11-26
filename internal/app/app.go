@@ -280,6 +280,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Post("/projects/{id}/reservations", h.ReserveModule)
 		r.Post("/projects/{id}/contexts", h.CreateGeneralContext)
 		r.Post("/projects/{id}/contexts/{key}", h.SaveGeneralContext)
+		r.Post("/projects/{id}/contexts/{key}/delete", h.DeleteGeneralContext)
 		r.Get("/projects/{id}/reviews/{rid}", h.ReviewPage)
 		r.Post("/projects/{id}/reviews/{rid}/approve", h.ApproveReview)
 		r.Post("/projects/{id}/reviews/{rid}/reject", h.RejectReview)

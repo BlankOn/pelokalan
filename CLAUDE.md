@@ -274,7 +274,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
   Stored as a row whose module is "~" + 12 random hex chars (`ModuleContext.IsGeneral`/`GeneralKey`), with a title
   (required, at most 120). Members add them with "+ Konteks baru" beside the search box on the Konteks tab (a popup, `#context-new`) (`POST /projects/{id}/contexts`,
   `ContextService.CreateGeneral`) and edit them in a popup per item ("Sunting", `#ctx-edit-<key>`; `POST /projects/{id}/contexts/{key}`, `SaveGeneral`, carries
-  `version`; a stale save answers 409 and reopens the popup with the person's text and the message). Emptying the note hides the item.
+  `version`; a stale save answers 409 and reopens the popup with the person's text and the message). Emptying the note, or the red "Hapus" after Sunting (`POST …/contexts/{key}/delete`, `DeleteGeneral`, asks first), hides
+  the item; its edits stay recorded.
   Not sent to the AI yet (only the file's module note is).
 - AI pre-translation puts the file's note into the system prompt (`ai.SystemPrompt(..., fileContext)`,
   capped at `ai.MaxFileContext`); it counts in the cost estimate. The note outranks the glossary for

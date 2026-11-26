@@ -233,6 +233,16 @@ func TestGeneralContexts(t *testing.T) {
 	v = formValue(t, owner.get(base+"/contexts").Body, "version")
 	owner.post(base+"/contexts/"+key, url.Values{"title": {"Gaya bahasa"}, "note": {""}, "version": {v}}).status(http.StatusSeeOther)
 	owner.get(base + "/contexts").status(http.StatusOK).lacks("Gaya bahasa")
+
+	// "Hapus" removes an item; strangers cannot
+	owner.post(base+"/contexts", url.Values{"title": {"Tanda baca"}, "note": {"Pakai tanda kutip lurus."}}).status(http.StatusSeeOther)
+	key2 := scalar[string](t, `SELECT substr(x.module, 2) FROM module_contexts x JOIN projects p ON p.id = x.project_id WHERE p.slug = $1 AND x.title = 'Tanda baca'`, slug)
+	owner.get(base+"/contexts").status(http.StatusOK).contains("Tanda baca", "/contexts/"+key2+"/delete")
+	if stranger.post(base+"/contexts/"+key2+"/delete", nil).Status == http.StatusSeeOther {
+		t.Fatal("a non-member deleted a context")
+	}
+	owner.post(base+"/contexts/"+key2+"/delete", nil).redirectsTo(base + "/contexts?flash=context_deleted")
+	owner.get(base + "/contexts").status(http.StatusOK).lacks("Tanda baca")
 }
 
 // formValue reads the value of a named input from a page

@@ -149,6 +149,27 @@ func (s *ContextService) SaveGeneral(ctx context.Context, user *models.User, p *
 	return n, err
 }
 
+// DeleteGeneral removes an item without a module (like emptying its note: it leaves the list, its edits stay)
+func (s *ContextService) DeleteGeneral(ctx context.Context, user *models.User, p *models.Project, key string) error {
+	if user == nil || !p.Role.IsMember() {
+		return ErrForbidden
+	}
+	cur, err := s.ForModule(ctx, p.ID, key)
+	if err != nil || cur == nil || !cur.IsGeneral() {
+		return ErrNotFound
+	}
+	if cur.Note == "" {
+		return nil
+	}
+	n := &models.ModuleContext{ProjectID: p.ID, Module: key, Title: cur.Title, Note: "", UpdatedBy: &user.ID, UpdaterName: user.DisplayName()}
+	if err := s.repo.Save(ctx, n, cur.Version); errors.Is(err, repository.ErrConflict) {
+		return ErrContextConflict
+	} else if err != nil {
+		return err
+	}
+	return nil
+}
+
 // List returns the project's Konteks notes, most recently changed first
 func (s *ContextService) List(ctx context.Context, p *models.Project, q string) ([]*models.ModuleContext, error) {
 	return s.repo.ListForProject(ctx, p.ID, q)

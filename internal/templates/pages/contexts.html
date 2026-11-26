@@ -16,7 +16,8 @@
             <div class="context-note">{{linkify .Note}}</div>
             <div class="muted small">{{t $.Lang "context.by" (or .UpdaterName "—") (timeAgo $.Lang .UpdatedAt)}}</div>
             {{$mine := and $d (eq $d.Key .GeneralKey)}}
-            {{if $p.Role}}<div><button type="button" class="linklike small" data-open-dialog="ctx-edit-{{.GeneralKey}}">{{t $.Lang "action.edit"}}</button></div>
+            {{if $p.Role}}<div class="context-actions"><button type="button" class="linklike small" data-open-dialog="ctx-edit-{{.GeneralKey}}">{{t $.Lang "action.edit"}}</button>
+                <form method="post" action="{{$p.Path}}/contexts/{{.GeneralKey}}/delete" data-confirm="{{t $.Lang "context.delete_confirm" .Title}}"><button type="submit" class="linklike small danger">{{t $.Lang "action.delete"}}</button></form></div>
             <dialog id="ctx-edit-{{.GeneralKey}}" class="dialog context-dialog" {{if $mine}}data-open-on-load{{end}}>
                 <form method="post" action="{{$p.Path}}/contexts/{{.GeneralKey}}" class="form">
                     <h2>{{t $.Lang "context.edit_title"}}</h2>

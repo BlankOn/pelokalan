@@ -1300,6 +1300,8 @@ h1 .ai-badge { font-size: 12px; }
 
 /* Konteks */
 .tb-dot { position: absolute; top: 4px; right: 12px; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); }
+.context-actions { display: flex; gap: 14px; align-items: center; }
+.context-actions form { margin: 0; }
 .context-dialog { width: min(640px, calc(100vw - 24px)); }
 .context-dialog textarea { width: 100%; resize: vertical; }
 .context-status { margin: 0; }

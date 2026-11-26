@@ -139,6 +139,24 @@ func (h *Handler) CreateGeneralContext(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, p.Path()+"/contexts?flash=context_saved#ctx-"+n.Module[1:], http.StatusSeeOther)
 }
 
+// DeleteGeneralContext removes a Konteks item without a module: POST /projects/{id}/contexts/{key}/delete
+func (h *Handler) DeleteGeneralContext(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadMemberProject(w, r)
+	if !ok {
+		return
+	}
+	err := h.contexts.DeleteGeneral(r.Context(), middleware.GetUser(r.Context()), p, "~"+chi.URLParam(r, "key"))
+	if err != nil {
+		if errors.Is(err, service.ErrNotFound) || errors.Is(err, service.ErrForbidden) {
+			h.fail(w, r, err)
+			return
+		}
+		h.contextsPageWith(w, r, p, h.errorMessage(r, err), nil)
+		return
+	}
+	http.Redirect(w, r, p.Path()+"/contexts?flash=context_deleted", http.StatusSeeOther)
+}
+
 // SaveGeneralContext changes a Konteks item without a module: POST /projects/{id}/contexts/{key} (title, note, version)
 func (h *Handler) SaveGeneralContext(w http.ResponseWriter, r *http.Request) {
 	p, ok := h.loadMemberProject(w, r)
