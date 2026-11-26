@@ -89,6 +89,7 @@
                         <option value="manager" {{if eq .Role "manager"}}selected{{end}}>{{roleName $.Lang "manager"}}</option>
                     </select>
                 </form>
+                {{else if $canManage}}<select class="role-locked" disabled aria-label="{{t $.Lang "field.role"}}" title="{{t $.Lang "members.owner_locked"}}"><option selected>{{roleName $.Lang .Role}}</option></select>
                 {{else}}<span class="role-badge role-{{.Role}}">{{roleName $.Lang .Role}}</span>{{end}}
             </td>
             <td class="small muted member-joined">{{timeAgo $.Lang .CreatedAt}}</td>
