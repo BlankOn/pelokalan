@@ -3091,3 +3091,156 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
     });
 })();
 
+
+// Profile picture: pick a file, crop it to a square in #avatar-dialog (drag to move, slider/wheel/keys to zoom),
+// upload a 512px JPEG (the server makes the stored 256px copy) and update every avatar of the page
+(function () {
+    var box = document.querySelector("[data-avatar-edit]");
+    var dlg = document.getElementById("avatar-dialog");
+    if (!box || !dlg) return;
+    var input = box.querySelector("#avatar-file");
+    var canvas = dlg.querySelector("canvas");
+    var ctx = canvas.getContext("2d");
+    var zoom = dlg.querySelector('input[type="range"]');
+    var S = canvas.width, OUT = 512, MAX = 10 * 1024 * 1024;
+    var img = null, base = 1, z = 1, ox = 0, oy = 0, url = null;
+
+    function scale() { return base * z; }
+    function clamp() { // the picture always covers the square
+        var s = scale(), hw = (img.width * s - S) / 2, hh = (img.height * s - S) / 2;
+        ox = Math.max(-hw, Math.min(hw, ox));
+        oy = Math.max(-hh, Math.min(hh, oy));
+    }
+    function draw() {
+        if (!img) return;
+        clamp();
+        var s = scale(), w = img.width * s, h = img.height * s;
+        ctx.fillStyle = "#fff";
+        ctx.fillRect(0, 0, S, S);
+        ctx.drawImage(img, (S - w) / 2 + ox, (S - h) / 2 + oy, w, h);
+        // dim the corners outside the round picture
+        ctx.save();
+        ctx.fillStyle = "rgba(0,0,0,.45)";
+        ctx.beginPath();
+        ctx.rect(0, 0, S, S);
+        ctx.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
+        ctx.fill("evenodd");
+        ctx.strokeStyle = "rgba(255,255,255,.9)";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(S / 2, S / 2, S / 2 - 1, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+    }
+    function setZoom(nz) {
+        var old = scale();
+        z = Math.max(1, Math.min(4, nz));
+        var k = scale() / old; // keep the middle of the view where it is
+        ox *= k; oy *= k;
+        zoom.value = z;
+        draw();
+    }
+    function close() {
+        if (dlg.open) dlg.close();
+        if (url) URL.revokeObjectURL(url);
+        url = null; img = null; input.value = "";
+    }
+    input.addEventListener("change", function () {
+        var f = input.files && input.files[0];
+        if (!f) return;
+        if (!/^image\/(png|jpeg|gif|webp)$/.test(f.type)) { window.showMessage(box.dataset.notImage); input.value = ""; return; }
+        if (f.size > MAX) { window.showMessage(box.dataset.tooBig); input.value = ""; return; }
+        url = URL.createObjectURL(f);
+        var im = new Image();
+        im.onload = function () {
+            img = im; base = Math.max(S / im.width, S / im.height); z = 1; ox = 0; oy = 0; zoom.value = 1;
+            dlg.showModal();
+            draw();
+            canvas.focus();
+        };
+        im.onerror = function () { window.showMessage(box.dataset.notImage); close(); };
+        im.src = url;
+    });
+    zoom.addEventListener("input", function () { setZoom(parseFloat(zoom.value)); });
+    canvas.addEventListener("wheel", function (e) { e.preventDefault(); setZoom(z * (e.deltaY < 0 ? 1.08 : 1 / 1.08)); }, { passive: false });
+    var drag = null;
+    canvas.addEventListener("pointerdown", function (e) { drag = { x: e.clientX, y: e.clientY, ox: ox, oy: oy }; canvas.setPointerCapture(e.pointerId); });
+    canvas.addEventListener("pointermove", function (e) {
+        if (!drag) return;
+        var k = S / canvas.getBoundingClientRect().width; // the canvas may be drawn smaller than its pixels
+        ox = drag.ox + (e.clientX - drag.x) * k; oy = drag.oy + (e.clientY - drag.y) * k;
+        draw();
+    });
+    canvas.addEventListener("pointerup", function () { drag = null; });
+    canvas.addEventListener("pointercancel", function () { drag = null; });
+    canvas.addEventListener("keydown", function (e) {
+        var step = e.shiftKey ? 30 : 8, used = true;
+        if (e.key === "ArrowLeft") ox += step; else if (e.key === "ArrowRight") ox -= step;
+        else if (e.key === "ArrowUp") oy += step; else if (e.key === "ArrowDown") oy -= step;
+        else if (e.key === "+" || e.key === "=") setZoom(z * 1.1); else if (e.key === "-") setZoom(z / 1.1);
+        else used = false;
+        if (used) { e.preventDefault(); draw(); }
+    });
+    dlg.querySelector("[data-avatar-cancel]").addEventListener("click", close);
+    dlg.addEventListener("cancel", function () { close(); });
+
+    function showAvatar(src) { // the preview, the top bar and every other avatar of this person on the page
+        var prev = box.querySelector(".avatar-preview");
+        prev.innerHTML = "";
+        if (src) {
+            var i = document.createElement("img");
+            i.className = "user-avatar"; i.alt = ""; i.src = src;
+            prev.appendChild(i);
+        } else {
+            var d = document.createElement("div");
+            d.className = "user-avatar"; d.setAttribute("aria-hidden", "true");
+            d.textContent = (document.querySelector(".usermenu .avatar") || {}).textContent || "?";
+            prev.appendChild(d);
+        }
+        var nav = document.querySelector(".usermenu summary .avatar");
+        if (nav) {
+            var n;
+            if (src) { n = document.createElement("img"); n.className = "avatar"; n.alt = ""; n.src = src; }
+            else { n = document.createElement("span"); n.className = "avatar"; n.setAttribute("aria-hidden", "true"); n.textContent = prev.textContent.trim(); }
+            nav.replaceWith(n);
+        }
+        box.querySelector("[data-avatar-remove]").hidden = !src;
+    }
+    var saveBtn = dlg.querySelector("[data-avatar-save]");
+    saveBtn.addEventListener("click", function () {
+        if (!img) return;
+        clamp();
+        var s = scale(), side = S / s;
+        var sx = (img.width - side) / 2 - ox / s, sy = (img.height - side) / 2 - oy / s;
+        var out = document.createElement("canvas");
+        out.width = out.height = OUT;
+        var o = out.getContext("2d");
+        o.fillStyle = "#fff";
+        o.fillRect(0, 0, OUT, OUT);
+        o.imageSmoothingQuality = "high";
+        o.drawImage(img, sx, sy, side, side, 0, 0, OUT, OUT);
+        saveBtn.disabled = true;
+        out.toBlob(function (blob) {
+            var fd = new FormData();
+            fd.append("avatar", blob, "avatar.jpg");
+            fetch(box.dataset.upload, { method: "POST", body: fd, credentials: "same-origin" })
+                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+                .then(function (res) {
+                    if (!res.ok) throw new Error(res.j.error || "");
+                    showAvatar(res.j.url);
+                    close();
+                    if (window.toast) window.toast(box.dataset.saved);
+                })
+                .catch(function (err) { window.showMessage(err.message || box.dataset.notImage); })
+                .finally(function () { saveBtn.disabled = false; });
+        }, "image/jpeg", 0.9);
+    });
+    box.querySelector("[data-avatar-remove]").addEventListener("click", function () {
+        window.askConfirm(box.dataset.removeConfirm, { danger: true }).then(function (ok) {
+            if (!ok) return;
+            fetch(box.dataset.delete, { method: "POST", credentials: "same-origin" })
+                .then(function (r) { if (!r.ok) throw new Error(); showAvatar(""); if (window.toast) window.toast(box.dataset.removed); })
+                .catch(function () { window.showMessage(box.dataset.notImage); });
+        });
+    });
+})();

@@ -87,6 +87,7 @@ html { scroll-padding-top: 60px; }
     width: 28px; height: 28px; border-radius: 50%;
     background: var(--accent); color: #fff; font-weight: 600; font-size: 13px; text-transform: uppercase;
 }
+img.avatar, img.user-avatar { object-fit: cover; background: var(--surface-2); display: inline-block; }
 .avatar-sm { width: 22px; height: 22px; font-size: 11px; vertical-align: middle; }
 .avatars { display: flex; gap: 6px; flex-wrap: wrap; }
 .menu {
@@ -754,6 +755,8 @@ h1 .ai-badge { font-size: 12px; }
 .form fieldset.access-choice legend { font-weight: 600; font-size: 13px; margin: 8px 0 2px; padding: 0; }
 .form fieldset.access-choice label.check { align-items: baseline; margin-top: 4px; }
 .join-form { margin: 0; }
+#my-files { scroll-margin-top: 100px; }
+.head-member { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
 .join-private { white-space: nowrap; }
 .form [data-source] { display: flex; flex-direction: column; gap: 6px; }
 
@@ -1767,6 +1770,17 @@ select.role-locked, form[action$="/role"] select[name="role"] { min-width: 150px
     .profile-grid { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); max-width: 1080px; align-items: start; }
     .profile-page .page-head { max-width: 1080px; }
 }
+/* profile picture: preview and controls, crop dialog */
+.avatar-edit { display: flex; gap: 14px; align-items: center; margin-bottom: 6px; }
+.avatar-preview .user-avatar { width: 72px; height: 72px; }
+.avatar-actions { min-width: 0; }
+.avatar-actions .field-help { margin: 6px 0 0; }
+.avatar-dialog { width: min(380px, calc(100vw - 32px)); }
+.crop-stage { display: flex; justify-content: center; }
+.crop-stage canvas { width: min(320px, 100%); aspect-ratio: 1; border-radius: 8px; cursor: grab; touch-action: none; background: var(--surface-2); }
+.crop-stage canvas:active { cursor: grabbing; }
+.crop-zoom { display: flex; align-items: center; gap: 10px; margin: 12px 0 0; color: var(--muted); }
+.crop-zoom input { flex: 1; }
 /* public page: description and links under the name */
 .user-bio { margin: 6px 0 0; white-space: pre-wrap; max-width: 640px; }
 .user-links { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 8px; font-size: 13px; }
@@ -1801,10 +1815,16 @@ select.role-locked, form[action$="/role"] select[name="role"] { min-width: 150px
     .members-table td.actions { margin-left: auto; }
     .members-table td:empty { display: none; }
     .members-table select { font-size: 16px; }
-    /* Berkas proyek: search (and version filter) on its own row, Sinkronkan below */
+    /* file list toolbars: the search box on its own row, the filters two by two below it, the sort select last;
+       filter popups open across the whole bar */
     .pf-toolbar { flex-wrap: wrap; }
-    .pf-filter { flex-basis: 100%; }
-    .pf-filter .mf-pop { left: auto; right: 0; }
+    .pf-filter { flex-basis: 100%; flex-wrap: wrap; position: relative; }
+    .pf-filter input[type=search] { flex: 1 1 100%; height: 40px; }
+    .pf-filter .multi-filter { flex: 1 1 calc(50% - 4px); min-width: 0; position: static; }
+    .pf-filter .mf-btn { width: 100%; max-width: none; height: 40px; }
+    .pf-filter .mf-btn .combo-caret { margin-left: auto; }
+    .pf-filter .mf-pop { left: 0; right: 0; min-width: 0; }
+    .pf-filter .pf-sort { flex: 1 1 100%; min-width: 0; height: 40px; font-size: 16px; }
     /* AI alternatives stack on phones */
     .ai-alts-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }

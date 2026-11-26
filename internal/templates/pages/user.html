@@ -1,7 +1,7 @@
 {{define "content"}}{{$pr := .Data.Profile}}{{$u := $pr.User}}{{$s := $pr.Stats}}{{$hm := .Data.Heatmap}}
 <div class="user-page">{{template "medal_defs"}}
 <section class="card user-head">
-    <div class="user-avatar" aria-hidden="true">{{initial $u.DisplayName}}</div>
+    {{if $u.Avatar}}<img class="user-avatar" src="{{avatarURL $u.Avatar}}" alt="">{{else}}<div class="user-avatar" aria-hidden="true">{{initial $u.DisplayName}}</div>{{end}}
     <div class="user-id">
         <h1>{{$u.DisplayName}}</h1>
         <div class="muted">@{{$u.Username}}</div>

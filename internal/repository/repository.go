@@ -27,6 +27,10 @@ type UserRepository interface {
 	SetBadgeEmails(ctx context.Context, id int64, off bool) error
 	// SetPublicProfile stores the public profile's description and links (kind → URL)
 	SetPublicProfile(ctx context.Context, id int64, bio string, links map[string]string) error
+	// SetAvatar stores the blob key of the user's profile picture ("" = none)
+	SetAvatar(ctx context.Context, id int64, key string) error
+	// AvatarInUse reports whether some user's profile picture is that blob
+	AvatarInUse(ctx context.Context, key string) bool
 }
 
 // OTPRepository defines methods for one-time code data access

@@ -1,0 +1,2 @@
+{{/* a person's profile picture, or their initial when they have none: dict Key (blob key), Name, Class */}}
+{{define "avatar"}}{{if .Key}}<img class="avatar{{with .Class}} {{.}}{{end}}" src="{{avatarURL .Key}}" alt="" loading="lazy" decoding="async">{{else}}<span class="avatar{{with .Class}} {{.}}{{end}}" aria-hidden="true">{{initial .Name}}</span>{{end}}{{end}}

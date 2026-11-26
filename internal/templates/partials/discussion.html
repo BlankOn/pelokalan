@@ -8,7 +8,7 @@
         <li id="comment-{{.ID}}" class="comment{{if .IsDeleted}} comment-deleted{{end}}{{if .ReviewID}} comment-review{{if .OpenReview}} comment-review-open{{end}}{{end}}">
             {{if .IsDeleted}}
             <div class="comment-head">
-                <span class="avatar avatar-sm">{{initial .AuthorName}}</span>
+                {{template "avatar" (dict "Key" .AuthorAvatar "Name" .AuthorName "Class" "avatar-sm")}}
                 <strong>{{or .AuthorName "—"}}</strong>
                 {{if .AuthorUsername}}<a class="muted small" href="/users/{{.AuthorUsername}}">@{{.AuthorUsername}}</a>{{end}}
                 <a class="muted small" href="#comment-{{.ID}}">{{timeAgo $.Lang .CreatedAt}}</a>
@@ -16,7 +16,7 @@
             <p class="comment-body comment-removed">{{if .DeletedByOther}}{{t $.Lang "discuss.deleted_by" .DeleterName (timeAgo $.Lang (derefTime .DeletedAt))}}{{else}}{{t $.Lang "discuss.deleted_at" (timeAgo $.Lang (derefTime .DeletedAt))}}{{end}}</p>
             {{else}}
             <div class="comment-head">
-                <span class="avatar avatar-sm">{{initial .AuthorName}}</span>
+                {{template "avatar" (dict "Key" .AuthorAvatar "Name" .AuthorName "Class" "avatar-sm")}}
                 <strong>{{.AuthorName}}</strong>
                 {{if .AuthorUsername}}<a class="muted small" href="/users/{{.AuthorUsername}}">@{{.AuthorUsername}}</a>{{end}}
                 <a class="muted small" href="#comment-{{.ID}}">{{timeAgo $.Lang .CreatedAt}}</a>

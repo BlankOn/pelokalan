@@ -5,8 +5,9 @@
         <h1>{{$p.Name}}{{if $p.AIEnabled}} {{template "ai_badge" .Lang}}{{end}}</h1>
         {{if $p.Description}}<p class="muted project-desc">{{linkify $p.Description}}</p>{{end}}
     </div>
-    {{if $p.Role.IsMember}}<span class="role-badge role-{{$p.Role}}">{{roleName .Lang $p.Role}}</span>
-    {{else if not .User}}<a class="btn btn-small" href="/login?next={{$p.Path}}">{{t .Lang "project.login_to_contribute"}}</a>
+    {{if $p.Role.IsMember}}<div class="head-member"><span class="role-badge role-{{$p.Role}}">{{roleName .Lang $p.Role}}</span>
+        <a class="btn btn-primary btn-small" href="{{$p.Path}}/files#my-files" title="{{t .Lang "project.contribute_help"}}">{{t .Lang "project.contribute"}}</a></div>
+    {{else if not .User}}{{/* visitors: the sign-in notice under the tabs says it */}}
     {{else if $p.Open}}<form method="post" action="{{$p.Path}}/join" class="join-form"><input type="hidden" name="next" value="{{.Path}}"><button class="btn btn-primary btn-small" type="submit" title="{{t .Lang "project.join_help"}}">{{t .Lang "project.join"}}</button></form>
     {{else}}<span class="muted small join-private" title="{{t .Lang "project.private_help"}}">🔒 {{t .Lang "project.private"}}</span>{{end}}
 </div>

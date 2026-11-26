@@ -54,7 +54,7 @@
 {{end}}{{end}}
 
 {{if $canManage}}
-<div class="files-section" data-sticky-section data-collapse-key="files:{{$p.Slug}}:mine">
+<div class="files-section" id="my-files" data-sticky-section data-collapse-key="files:{{$p.Slug}}:mine">
 <h2 class="section-title" data-stick><button type="button" class="section-toggle" aria-expanded="true"><svg class="st-chevron" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg><span>{{t $.Lang "files.mine"}}</span> <span class="muted small">({{.Data.MyFiles.All}})</span></button></h2>
 <section class="card">
     {{if $canManage}}

@@ -169,7 +169,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - **Invitations:** stored by email; accepted from `/invitations` after signing in
   with that email (no tokens in links).
 - **Open or private projects** (`projects.open`, migration 037; private by default): chosen under "Keanggotaan" in
-  Settings → Umum (`access` = open|private). Signed-in non-members see "Gabung" in the project header on open projects
+  Settings → Umum (`access` = open|private). Visitors see no button in the project header (the sign-in notice under the tabs asks them). Signed-in non-members see "Gabung" in the project header on open projects
   (`POST /projects/{id}/join` → `ProjectService.JoinOpen`, joins as translator and returns to the same page) and
   "🔒 Privat" on private ones; a pending email invitation to the project is accepted instead (its role wins), so it also
   works on private projects. Private projects refuse with `err.project_private`.
@@ -381,6 +381,21 @@ two columns from 1000px, one full-width column below (iPad). Profil publik: a sh
 kind → URL, migration 053; `models.LinkKinds` website, github, x, linkedin, mastodon). `service.NormalizeLink` accepts
 a handle or an address and stores the full https address (else `err.link_invalid`). The public page shows them under
 the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` and `/profile/badge-emails` routes stay.
+
+## Profile pictures
+
+- `users.avatar` (migration 055) = blob key of a 256×256 JPEG in the Postgres blob store ('' = none: the initial shows).
+  Profile page (Profil publik): "Pilih foto…" opens `#avatar-dialog` (app.js): a square canvas with a round mask, drag to
+  move, slider / wheel / arrow and +/- keys to zoom; "Simpan foto" uploads a 512px JPEG (`POST /profile/avatar`, multipart
+  `avatar`, JSON answer) and swaps every avatar on the page; "Hapus foto" (`POST /profile/avatar/delete`, asks first).
+  Saved right away, apart from the profile form's Simpan.
+- The server never trusts the upload: `service.MakeAvatar` checks size (10 MB) and dimensions before decoding (JPEG, PNG,
+  GIF, WebP), cuts a centred square, scales with CatmullRom and encodes JPEG q85 (`AuthService.SetAvatar`). The old blob is
+  left to `blobs.GC`, which keeps blobs referenced by `users.avatar`.
+- Served publicly at `/avatars/{key}.jpg` (`Handler.Avatar`; immutable cache, ETag, sandbox CSP) only while some user uses
+  that key, so the address never serves other blobs. "avatars" is a reserved username.
+- Shown with the `avatar` partial (dict Key, Name, Class; template func `avatarURL`): top bar, comments
+  (`Comment.AuthorAvatar`), members page, and the public page head.
 
 ## Public profiles and badges
 
@@ -860,7 +875,8 @@ search box fills the space after the buttons, followed by the filter (funnel) an
 
 ## Phones
 
-All phone rules live in one `@media (max-width: 700px)` block at the end of style.css (it must
+File list toolbars on phones: search on its own row, filters two per row, the sort select last, filter popups as wide
+as the bar. All phone rules live in one `@media (max-width: 700px)` block at the end of style.css (it must
 stay last to override). Rules of thumb: nothing may be wider than the screen (tabs scroll
 sideways, tables become stacked blocks: `.files-table`, `.gl-table`), grid tracks use
 `minmax(0, 1fr)`, and fields use 16px text so iOS does not zoom in. Tablets (701–960px, e.g. iPad mini

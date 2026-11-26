@@ -190,14 +190,14 @@ func (r *discussionRepository) AddComment(ctx context.Context, c *models.Comment
 	return tx.Commit()
 }
 
-const commentColumns = `c.id, c.discussion_id, c.author_id, COALESCE(NULLIF(u.name, ''), u.username, ''), COALESCE(u.username, ''),
+const commentColumns = `c.id, c.discussion_id, c.author_id, COALESCE(NULLIF(u.name, ''), u.username, ''), COALESCE(u.username, ''), COALESCE(u.avatar, ''),
 	c.body, c.created_at, c.edited_at, c.deleted_at, c.deleted_by,
 	COALESCE((SELECT COALESCE(NULLIF(x.name, ''), x.username) FROM users x WHERE x.id = c.deleted_by), ''),
 	c.review_id, c.resolved_at, COALESCE((SELECT COALESCE(NULLIF(x.name, ''), x.username) FROM users x WHERE x.id = c.resolved_by), '')`
 
 func scanComment(row interface{ Scan(...any) error }) (*models.Comment, error) {
 	c := &models.Comment{}
-	err := row.Scan(&c.ID, &c.DiscussionID, &c.AuthorID, &c.AuthorName, &c.AuthorUsername, &c.Body, &c.CreatedAt,
+	err := row.Scan(&c.ID, &c.DiscussionID, &c.AuthorID, &c.AuthorName, &c.AuthorUsername, &c.AuthorAvatar, &c.Body, &c.CreatedAt,
 		&c.EditedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName, &c.ReviewID, &c.ResolvedAt, &c.ResolverName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound

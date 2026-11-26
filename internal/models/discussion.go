@@ -36,6 +36,7 @@ type Comment struct {
 	AuthorID       *int64
 	AuthorName     string
 	AuthorUsername string
+	AuthorAvatar   string // blob key of the author's profile picture
 	Body           string
 	CreatedAt      time.Time
 	EditedAt       *time.Time

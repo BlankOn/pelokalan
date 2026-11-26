@@ -127,6 +127,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.Reservations = service.NewReservationService(repos.Reserve, repos.Project, repos.User, mailer, cfg.Site)
 	a.Catalogs.SetReservations(a.Reservations)
 	a.Auth.SetActivity(a.Activity)
+	a.Auth.SetBlobs(a.Blobs)
 	a.Glossary.SetProjects(repos.Project)
 	a.Glossary.SetLandings(a.Catalogs) // members' work accepted upstream, after each import
 	if !opts.Offline {
@@ -222,6 +223,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Get("/projects/{id}/glossary/search", h.GlossarySearch)
 		r.Get("/projects/{id}/members", h.MembersPage)
 		r.Get("/api/projects/{id}/members", h.APIMembers)                // public JSON, no key
+		r.Get("/avatars/{file}", h.Avatar)                               // profile pictures (content-addressed)
 		r.Get("/users/{username}", h.UserPage)                           // public profile: stats and badges
 		r.Get("/users/{username}/badges/{key}/{tier}", h.BadgeSharePage) // share page, or its preview (.png)
 		r.Get("/git/{token}", h.GitPatchByLink)                          // signed patch link for curl | git am
@@ -271,6 +273,8 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 
 		r.Get("/profile", h.ProfilePage)
 		r.Post("/profile", h.UpdateProfile)
+		r.Post("/profile/avatar", h.UploadAvatar)
+		r.Post("/profile/avatar/delete", h.DeleteAvatar)
 		r.Post("/profile/identity", h.UpdateIdentity)
 		r.Post("/profile/badge-emails", h.UpdateBadgeEmails)
 		r.Post("/projects/{id}/reservations", h.ReserveModule)

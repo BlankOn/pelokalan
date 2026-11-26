@@ -43,6 +43,19 @@
         <section class="card form" id="public-profile">
             <h2>{{t .Lang "profile.public_title"}}</h2>
             <p class="muted small">{{t .Lang "profile.public_help"}} <a href="/users/{{.User.Username}}">{{t .Lang "nav.my_page"}}</a></p>
+            <label>{{t .Lang "profile.avatar"}}</label>
+            <div class="avatar-edit" data-avatar-edit data-upload="/profile/avatar" data-delete="/profile/avatar/delete"
+                 data-remove-confirm="{{t .Lang "profile.avatar_remove_confirm"}}" data-too-big="{{t .Lang "avatar.too_big"}}" data-not-image="{{t .Lang "err.avatar_invalid"}}" data-saved="{{t .Lang "avatar.saved"}}" data-removed="{{t .Lang "avatar.removed"}}">
+                <div class="avatar-preview">{{if .User.Avatar}}<img class="user-avatar" src="{{.User.AvatarURL}}" alt="">{{else}}<div class="user-avatar" aria-hidden="true">{{.User.Initial}}</div>{{end}}</div>
+                <div class="avatar-actions">
+                    <div class="row-actions">
+                        <label class="btn" for="avatar-file">{{t .Lang "profile.avatar_change"}}</label>
+                        <input type="file" id="avatar-file" accept="image/png,image/jpeg,image/gif,image/webp" hidden>
+                        <button type="button" class="btn btn-danger" data-avatar-remove {{if not .User.Avatar}}hidden{{end}}>{{t .Lang "profile.avatar_remove"}}</button>
+                    </div>
+                    <p class="muted small field-help">{{t .Lang "profile.avatar_help"}}</p>
+                </div>
+            </div>
             <label for="bio">{{t .Lang "profile.bio"}}</label>
             <textarea id="bio" name="bio" rows="3" maxlength="300" placeholder="{{t .Lang "profile.bio_placeholder"}}">{{.User.Bio}}</textarea>
             <label for="link-website">{{t .Lang "profile.link_website"}}</label>
@@ -68,4 +81,14 @@
     </div>
 </div>
 </form>
+<dialog id="avatar-dialog" class="dialog avatar-dialog">
+    <h2>{{t .Lang "avatar.crop_title"}}</h2>
+    <div class="crop-stage"><canvas width="320" height="320" tabindex="0" aria-label="{{t .Lang "avatar.drag_help"}}"></canvas></div>
+    <label class="crop-zoom"><span aria-hidden="true">−</span><input type="range" min="1" max="4" step="0.01" value="1" aria-label="{{t .Lang "avatar.zoom"}}"><span aria-hidden="true">+</span></label>
+    <p class="muted small">{{t .Lang "avatar.drag_help"}}</p>
+    <div class="dialog-actions">
+        <button type="button" class="btn" data-avatar-cancel>{{t .Lang "action.cancel"}}</button>
+        <button type="button" class="btn btn-primary" data-avatar-save>{{t .Lang "avatar.save"}}</button>
+    </div>
+</dialog>
 {{end}}

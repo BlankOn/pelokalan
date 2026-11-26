@@ -24,7 +24,7 @@ type Store interface {
 	Get(ctx context.Context, key string) ([]byte, error)
 	// Delete removes a key
 	Delete(ctx context.Context, key string) error
-	// GC removes blobs that no comment attachment or wiki file references and that are older than the age
+	// GC removes blobs that no comment attachment, wiki file or profile picture references and that are older than the age
 	GC(ctx context.Context, olderThan time.Duration) (int64, error)
 }
 
@@ -68,7 +68,8 @@ func (p *Postgres) GC(ctx context.Context, olderThan time.Duration) (int64, erro
 	res, err := p.db.ExecContext(ctx,
 		`DELETE FROM blobs b WHERE b.created_at < $1
 		 AND NOT EXISTS (SELECT 1 FROM attachments a WHERE a.blob_key = b.key)
-		 AND NOT EXISTS (SELECT 1 FROM wiki_files f WHERE f.blob_key = b.key)`,
+		 AND NOT EXISTS (SELECT 1 FROM wiki_files f WHERE f.blob_key = b.key)
+		 AND NOT EXISTS (SELECT 1 FROM users u WHERE u.avatar = b.key)`,
 		time.Now().Add(-olderThan))
 	if err != nil {
 		return 0, err

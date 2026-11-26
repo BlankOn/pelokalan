@@ -77,7 +77,7 @@
         <tbody>
         {{range .Data.Members}}
         <tr>
-            <td class="member-cell"><span class="avatar avatar-sm">{{.User.Initial}}</span>
+            <td class="member-cell">{{template "avatar" (dict "Key" .User.Avatar "Name" .User.DisplayName "Class" "avatar-sm")}}
                 <div class="member-id"><strong>{{.User.DisplayName}}</strong> <a class="muted small" href="/users/{{.User.Username}}">@{{.User.Username}}</a>{{if and $.User (eq .User.ID $.User.ID)}} <span class="muted small">({{t $.Lang "members.you"}})</span>{{end}}
                 {{if $p.Role.IsMember}}<div class="muted small member-email">{{.User.Email}}</div>{{end}}</div></td>
             <td>

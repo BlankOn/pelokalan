@@ -20,6 +20,7 @@ type User struct {
 	BadgeEmailsOff bool `json:"badge_emails_off"`
 	// Public profile extras (/users/{username}): a short description and links by kind (LinkKinds)
 	Bio         string            `json:"bio"`
+	Avatar      string            `json:"-"` // blob key of the profile picture, "" = none
 	Links       map[string]string `json:"links,omitempty"`
 	LastLoginAt *time.Time        `json:"last_login_at,omitempty"`
 	CreatedAt   time.Time         `json:"created_at"`
@@ -56,6 +57,18 @@ func (u *User) CreditEmail() string {
 // TranslatorIdentity returns "Name <email>" for the Last-Translator header
 func (u *User) TranslatorIdentity() string {
 	return u.CreditName() + " <" + u.CreditEmail() + ">"
+}
+
+// AvatarURL is the address of the profile picture ("" = none: show the initial)
+func (u *User) AvatarURL() string { return AvatarURL(u.Avatar) }
+
+// AvatarURL is the address of a profile picture by its blob key ("" for none); the key is the content hash,
+// so the address never changes for the same picture
+func AvatarURL(key string) string {
+	if key == "" {
+		return ""
+	}
+	return "/avatars/" + key + ".jpg"
 }
 
 // Initial returns the first letter of the display name, for avatars

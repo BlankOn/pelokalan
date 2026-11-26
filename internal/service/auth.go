@@ -23,6 +23,7 @@ import (
 	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
 	"pelokalan/internal/repository"
+	"pelokalan/internal/blobstore"
 )
 
 // AuthService handles passwordless registration and sign in with one-time codes
@@ -35,6 +36,7 @@ type AuthService struct {
 	jwtSecret []byte
 	jwtExpiry time.Duration
 	activity  *ActivityService
+	blobs     blobstore.Store // profile pictures
 }
 
 // Claims represents JWT claims
@@ -46,6 +48,9 @@ type Claims struct {
 
 // SetActivity makes the service record sign-ups in the activity log
 func (s *AuthService) SetActivity(a *ActivityService) { s.activity = a }
+
+// SetBlobs gives the service the blob store that keeps profile pictures
+func (s *AuthService) SetBlobs(b blobstore.Store) { s.blobs = b }
 
 // NewAuthService creates a new auth service
 func NewAuthService(users repository.UserRepository, otps repository.OTPRepository, mailer Mailer,
@@ -104,7 +109,7 @@ var reservedUsernames = map[string]bool{
 	"glossary": true, "members": true, "settings": true, "files": true, "upload": true, "translations": true,
 	"update-all": true, "invitations": true, "ai": true, "delete": true, "po": true, "api": true, "static": true,
 	"login": true, "logout": true, "register": true, "verify": true, "profile": true, "projects": true,
-	"catalogs": true, "lang": true, "join": true, "invite-links": true, "root": true, "system": true, "null": true, "undefined": true, "me": true, "users": true,
+	"catalogs": true, "lang": true, "join": true, "invite-links": true, "root": true, "system": true, "null": true, "undefined": true, "me": true, "users": true, "avatars": true,
 }
 
 // NormalizeUsername lowercases and trims a username ("@Ani " -> "ani")

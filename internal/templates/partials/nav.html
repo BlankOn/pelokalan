@@ -22,7 +22,7 @@
     </div>
     {{if .User}}
     <details class="usermenu">
-        <summary><span class="avatar" aria-hidden="true">{{.User.Initial}}</span><span class="sr-only">{{t .Lang "nav.account"}}</span></summary>
+        <summary>{{template "avatar" (dict "Key" .User.Avatar "Name" .User.DisplayName)}}<span class="sr-only">{{t .Lang "nav.account"}}</span></summary>
         <div class="menu">
             <div class="menu-head">
                                 <strong>{{.User.DisplayName}}</strong>

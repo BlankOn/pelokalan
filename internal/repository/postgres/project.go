@@ -146,7 +146,7 @@ func (r *projectRepository) GetMemberRole(ctx context.Context, projectID, userID
 
 func (r *projectRepository) ListMembers(ctx context.Context, projectID int64) ([]*models.ProjectMember, error) {
 	rows, err := r.db.QueryContext(ctx,
-		`SELECT m.project_id, m.role, m.created_at, u.id, u.email, u.username, u.name, u.lang, u.last_login_at, u.created_at, u.updated_at
+		`SELECT m.project_id, m.role, m.created_at, u.id, u.email, u.username, u.name, u.lang, u.avatar, u.last_login_at, u.created_at, u.updated_at
 		 FROM project_members m JOIN users u ON u.id = m.user_id
 		 WHERE m.project_id = $1
 		 ORDER BY CASE m.role WHEN 'owner' THEN 0 WHEN 'manager' THEN 1 ELSE 2 END, u.name, u.email`, projectID)
@@ -160,7 +160,7 @@ func (r *projectRepository) ListMembers(ctx context.Context, projectID int64) ([
 		m := &models.ProjectMember{}
 		u := &m.User
 		if err := rows.Scan(&m.ProjectID, &m.Role, &m.CreatedAt,
-			&u.ID, &u.Email, &u.Username, &u.Name, &u.Lang, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
+			&u.ID, &u.Email, &u.Username, &u.Name, &u.Lang, &u.Avatar, &u.LastLoginAt, &u.CreatedAt, &u.UpdatedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, m)

@@ -154,6 +154,7 @@ func funcMap() template.FuncMap {
 			}
 			return out
 		},
+		"avatarURL": models.AvatarURL,
 		"dict": func(kv ...any) (map[string]any, error) {
 			if len(kv)%2 != 0 {
 				return nil, errors.New("dict needs key/value pairs")
