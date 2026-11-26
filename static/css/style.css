@@ -572,11 +572,23 @@ h1 .ai-badge { font-size: 12px; }
         background: transparent; cursor: default; z-index: 21; }
     .side-splitter:hover { background: transparent; }
     .sidebar-hidden .side-splitter { right: 0; }
+    /* a bigger, bluish handle that is easy to find and tap */
+    .side-toggle { width: 28px; height: 68px; border-color: #b9cdf3; background: #e8f0fe; color: var(--accent);
+        box-shadow: -2px 0 8px rgba(47, 111, 214, .18); }
+    .side-toggle:hover { background: #d6e4fd; }
+    .side-toggle svg { width: 18px; height: 18px; }
 }
-/* phones: the floating sidebar takes most of the width */
+.side-close-icon { display: none; }
+/* phones: open, the sidebar covers the whole width; its handle becomes a round close button at the top right */
 @media (max-width: 700px) {
-    .sidebar { width: min(340px, 88vw); }
-    .side-splitter { right: min(340px, 88vw); }
+    .sidebar { width: 100%; box-shadow: none; }
+    .workspace:not(.sidebar-hidden) .side-splitter { right: 0; bottom: auto; height: 0; }
+    .workspace:not(.sidebar-hidden) .side-toggle { top: 8px; right: 10px; transform: none; width: 38px; height: 38px;
+        border: 1px solid #b9cdf3; border-radius: 50%; }
+    .workspace:not(.sidebar-hidden) .side-toggle > svg:first-child { display: none; }
+    .workspace:not(.sidebar-hidden) .side-close-icon { display: block; }
+    .workspace:not(.sidebar-hidden) .sidebar > .sb-section:first-child { padding-right: 58px; }
+    .workspace:not(.sidebar-hidden) .sidebar > .sb-section:first-child:not(.sb-glossary) { padding-top: 16px; }
 }
 /* tablets (e.g. iPad mini portrait, 744px): the file tables drop the three count columns,
    the progress bar and percentage already show them, so name, progress, date and buttons fit */
