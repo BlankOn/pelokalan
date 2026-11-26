@@ -368,10 +368,11 @@
         <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/approve" data-confirm="{{t .Lang "review.approve_confirm" $r.RepoPath}}" data-confirm-ok="{{t .Lang "review.approve"}}" data-busy="{{t .Lang "review.pushing"}}">
             <button type="submit" class="btn btn-primary rv-approve"{{if $r.OpenComments}} disabled title="{{t .Lang "err.review_open_comments" $r.OpenComments}}"{{end}}>{{t .Lang "review.approve"}}</button>
         </form>
+        {{else if and $p.Role.CanReview (not $p.Role.CanManage)}}<span class="muted small" title="{{t .Lang "review.reviewer_help"}}">{{t .Lang "review.reviewer_note"}}</span>
         {{else if .Data.CanWithdraw}}
         <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/withdraw" data-confirm="{{t .Lang "review.withdraw_confirm"}}"><button type="submit" class="btn">{{t .Lang "review.withdraw"}}</button></form>
         {{end}}
-    {{else if eq $r.Status "pushed"}}<a class="rv-chip rv-pushed" href="{{$r.CommitURL}}" target="_blank" rel="noopener">{{t .Lang "review.state_pushed"}} · {{$r.ShortSHA}} ↗</a>
+    {{else if eq $r.Status "pushed"}}<a class="rv-chip rv-pushed" href="{{$r.CommitURL}}" target="_blank" rel="noopener">☑ {{t .Lang "review.state_pushed"}} · {{$r.ShortSHA}} ↗</a>
     {{else if eq $r.Status "rejected"}}<span class="rv-chip rv-rejected">{{t .Lang "review.state_rejected"}}</span>
     {{else}}<span class="rv-chip">{{t .Lang "review.state_withdrawn"}}</span>{{end}}
     <input type="hidden" id="filter-selected" value="">

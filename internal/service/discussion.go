@@ -619,14 +619,14 @@ func (s *DiscussionService) EditComment(ctx context.Context, user *models.User, 
 	return d, s.repo.UpdateComment(ctx, id, body, ids(s.resolveMentions(body, members)))
 }
 
-// DeleteComment removes a comment (its author, or a project owner/manager)
+// DeleteComment removes a comment (its author, or the project owner)
 func (s *DiscussionService) DeleteComment(ctx context.Context, user *models.User, p *models.Project, id int64) (*models.Discussion, error) {
 	c, d, err := s.projectComment(ctx, p, id)
 	if err != nil {
 		return nil, err
 	}
 	own := c.AuthorID != nil && *c.AuthorID == user.ID
-	if !own && !p.Role.CanManage() {
+	if !own && !p.Role.IsOwner() { // only its author or the project owner
 		return nil, ErrForbidden
 	}
 	return d, s.repo.DeleteComment(ctx, id, user.ID)
@@ -699,10 +699,23 @@ func CanDeleteDiscussion(user *models.User, p *models.Project, t *Thread) bool {
 	if user == nil || t == nil || t.Discussion == nil || t.Subject.ReadOnly || !p.Role.IsMember() {
 		return false
 	}
-	return p.Role.CanManage() || (t.Discussion.CreatedBy != nil && *t.Discussion.CreatedBy == user.ID)
+	if p.Role.IsOwner() {
+		return true
+	}
+	// its starter, only while every comment in it is theirs: other people's comments are removed only by
+	// themselves or the project owner
+	if t.Discussion.CreatedBy == nil || *t.Discussion.CreatedBy != user.ID {
+		return false
+	}
+	for _, c := range t.Comments {
+		if !c.IsDeleted() && (c.AuthorID == nil || *c.AuthorID != user.ID) {
+			return false
+		}
+	}
+	return true
 }
 
-// DeleteDiscussion removes a whole discussion (its starter, or an owner/manager)
+// DeleteDiscussion removes a whole discussion (the project owner, or its starter when all comments are theirs)
 func (s *DiscussionService) DeleteDiscussion(ctx context.Context, user *models.User, p *models.Project, subjectType, key string) (*Subject, error) {
 	t, err := s.Thread(ctx, p, subjectType, key)
 	if err != nil {

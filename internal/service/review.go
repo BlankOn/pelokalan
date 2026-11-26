@@ -48,9 +48,9 @@ func (s *ReviewService) SetDiscussions(d *DiscussionService) {
 }
 
 // OpenFor is the open review a comment by user on the file belongs to: the file waits for review and the
-// user is an owner/manager who did not ask for it (nil = a plain comment)
+// user is an owner, coordinator or reviewer who did not ask for it (nil = a plain comment)
 func (s *ReviewService) OpenFor(ctx context.Context, p *models.Project, catalogID int64, user *models.User) *int64 {
-	if s == nil || !p.Role.CanManage() {
+	if s == nil || !p.Role.CanReview() {
 		return nil
 	}
 	latest, err := s.repo.Latest(ctx, []int64{catalogID})
@@ -119,9 +119,9 @@ func (s *ReviewService) Attach(ctx context.Context, p *models.Project, catalogs 
 	}
 }
 
-// Open lists the project's requests waiting for review (owners and managers)
+// Open lists the project's requests waiting for review (owners, coordinators and reviewers)
 func (s *ReviewService) Open(ctx context.Context, p *models.Project) ([]*models.ModuleReview, error) {
-	if s == nil || !p.Role.CanManage() {
+	if s == nil || !p.Role.CanReview() {
 		return nil, nil
 	}
 	list, err := s.repo.Open(ctx, p.ID)
@@ -432,7 +432,7 @@ func (s *ReviewService) notifyReviewers(ctx context.Context, p *models.Project, 
 	}
 	link := strings.TrimRight(s.site.BaseURL, "/") + p.Path() + "/reviews/" + fmt.Sprint(r.ID)
 	for _, m := range members {
-		if !m.Role.CanManage() || m.User.ID == from.ID {
+		if !m.Role.CanReview() || m.User.ID == from.ID {
 			continue
 		}
 		u := m.User

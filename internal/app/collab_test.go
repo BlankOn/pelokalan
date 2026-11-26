@@ -136,6 +136,15 @@ func TestDiscussions(t *testing.T) {
 	if b := scalar[string](t, `SELECT body FROM comments WHERE id = $1`, cid); b != "Setuju sekali." {
 		t.Fatalf("author's edit: %q", b)
 	}
+	// a coordinator cannot remove someone else's comment: only its author or the project owner
+	koor := signUp(t, "koor")
+	owner.post(base+"/members/invite", url.Values{"email": {koor.Email}, "role": {"manager"}}).redirectsTo(base)
+	kinv := scalar[int64](t, `SELECT id FROM project_invitations WHERE email = $1`, koor.Email)
+	koor.post("/invitations/"+strconv.FormatInt(kinv, 10)+"/accept", nil).redirectsTo("/projects")
+	koor.post(base+"/comments/"+strconv.FormatInt(cid, 10)+"/delete", nil)
+	if scalar[bool](t, `SELECT deleted_at IS NOT NULL FROM comments WHERE id = $1`, cid) {
+		t.Fatalf("a coordinator deleted someone else's comment")
+	}
 	owner.post(base+"/comments/"+strconv.FormatInt(cid, 10)+"/delete", nil)
 	if !scalar[bool](t, `SELECT deleted_at IS NOT NULL FROM comments WHERE id = $1`, cid) {
 		t.Fatalf("comment not soft-deleted")

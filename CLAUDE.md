@@ -70,8 +70,10 @@ make cover          # coverage of every package by every test (bin/coverage.html
   members are served with optional auth. `ProjectService.GetPublic` fills `Project.Role`
   (empty for visitors); handlers use `loadProject` (public) or `loadMemberProject`.
   Member emails and pending invitations are only shown to members/managers.
-- **Roles:** `owner` (one per project), `manager` (glossary + members), `translator`.
-  Checked in services via `Project.Role`.
+- **Roles:** `owner` (one per project), `manager` (shown as "Koordinator" / "Coordinator": glossary, members, approving and
+  sending files to repositories), `reviewer` ("Peninjau", migration 051: translates like a translator and reviews: sees the
+  review queue and review editor, leaves review comments, but does not approve or send; `ProjectRole.CanReview`),
+  `translator`. Checked in services via `Project.Role`.
 - **Project slugs:** `projects.slug` (unique, lowercase/digits/dashes, must contain a letter).
   The `{id}` route segment is the slug; `loadProject` also accepts numeric ids and 301-redirects
   page views to the slug URL. Use `Project.Path()` / `Catalog.URL()` for links.
@@ -95,8 +97,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
   history and discussions are kept. It opens read-only for everyone at `/catalogs/{cid}` (`Catalog.URL()`;
   `CatalogRedirect` renders it instead of redirecting) with a banner. `Catalog.WritableBy` (owner and not
   deleted) guards every write; `Owned` is false for deleted files. Its entry discussions are `ReadOnly`.
-- **Deleting a discussion:** its starter (`discussions.created_by`) or an owner/manager can delete a whole
-  discussion with its comments (`DiscussionService.DeleteDiscussion`, `POST .../discussions/{type}/{key}/delete`);
+- **Deleting a discussion:** the project owner, or its starter (`discussions.created_by`) while every comment in it is
+  theirs, can delete a whole discussion with its comments (`DiscussionService.DeleteDiscussion`, `POST .../discussions/{type}/{key}/delete`);
   not on read-only discussions. A deleted topic sends the user back to the Diskusi list.
 - **PO files ("Berkas PO") are shared read-only:** anyone who can read the project can open,
   download and view the history of any file; only the owner changes it. `CatalogService.Get`
@@ -217,7 +219,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - Comments: project members only; readable publicly. Deletion is soft (`deleted_at`, `deleted_by`): the
   author, username and time stay visible with a note saying who deleted it and when. `@username` mentions of members are
   stored and emailed. Typing "@" in a comment box opens a small member popup (app.js, the thread's `data-members`;
-  arrows, Enter/Tab picks, Esc or typing on ignores it), so a plain "@" stays possible. Authors edit/delete their own; owners/managers can delete any. Bodies are
+  arrows, Enter/Tab picks, Esc or typing on ignores it), so a plain "@" stays possible. Authors edit/delete their own; only the project owner deletes someone else's. Bodies are
   Markdown rendered by `commentHTML` (goldmark GFM + hard wraps, safe mode: raw HTML and
   javascript: links dropped; bare URLs auto-linked; mentions outside a/code/pre).
 - Project descriptions are plain text; `linkify` escapes them and links bare http(s) URLs.
@@ -655,7 +657,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   (`pushed_data`) and strings equal to it are never sent again, so later repository changes are not reverted. Then the
   reservation is released quietly (`ReleasePushed`), the group re-synced (if it has a feed), and the translator emailed.
   A failure keeps the request open with `error` shown on the review page and in the queue.
-- File rows show `review_chip` (Menunggu tinjauan / Perlu perbaikan · N (open review comments) / Masuk repositori · sha
+- File rows show `review_chip` (Menunggu tinjauan / Perlu perbaikan · N (open review comments) / ☑ Sudah masuk repositori · sha
   linking the commit).
 - **Review editor** (`/projects/{id}/reviews/{rid}` = `editorPage` with the review, `reviewData`; class `review-mode`):
   read-only, lists only the review's strings (`EntryFilter.Only`, `ReviewService.ChangedHashes`), no edit pane (the
@@ -667,13 +669,13 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - **View-only layout** ("Lihat" on another member's file, `?view=1`; `viewData`, `view_toolbar`, class `view-mode`
   with `review-mode`): the review layout without decisions or discussion (`.sb-thread` hidden): back, file + owner,
   "Hanya lihat", and for repository files the Tabel/Diff toggle with the member's changes against the last synced file.
-  Links without `?view=1` (discussion emails, `?entry=`) still open the normal read-only editor. For owners/managers a
-  file waiting for review shows "Tinjau" (to the review editor) instead of "Lihat". In review and view layouts long
+  Links without `?view=1` (discussion emails, `?entry=`) still open the normal read-only editor. For owners, coordinators and
+  reviewers a file waiting for review shows "Tinjau" (to the review editor) instead of "Lihat". In review and view layouts long
   strings wrap in the table.
 - The GitHub integration block always shows the app's install link (to install it on more repositories or change
   its access); it is the main button only until write access is confirmed.
-- **Review comments** (migration 049, `comments.review_id/resolved_at/resolved_by`): a comment by an owner/manager
-  (not the requester) on an entry of a file with an open request is tied to it (`ReviewService.OpenFor` via
+- **Review comments** (migration 049, `comments.review_id/resolved_at/resolved_by`): a comment by an owner, coordinator
+  or reviewer (not the requester) on an entry of a file with an open request is tied to it (`ReviewService.OpenFor` via
   `DiscussionService.SetReviews`). It is open until resolved (green "Sudah diselesaikan" button with a check, `POST /projects/{id}/comments/{cid}/resolve`,
   file owner, the author or a manager): red dot on the entry row (`Entry.ReviewOpen`, `mark-review`, kept in sync by
   app.js from the thread's `data-review-open`), a "Komentar tinjauan" status filter (`EntryFilter.Review`) and status bar

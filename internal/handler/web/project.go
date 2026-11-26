@@ -888,7 +888,8 @@ type fileListView struct {
 	Searched    bool
 	PatchCmds   map[int64]string // the git patch command per own repository file on this page
 	Res         reservationView  // module reservations
-	Reviewer    bool             // owner or manager: may send files to the repository
+	Reviewer    bool             // owner, coordinator or reviewer: reviews files waiting for review ("Tinjau")
+	CanSend     bool             // owner or coordinator: approves and sends files to the repository
 }
 
 // fileList filters a project's PO files: the user's own (mine) or the other members'.
@@ -981,7 +982,7 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 	end := min(offset+FileListPageSize, len(list))
 	v.Files = list[offset:end]
 	v.Next = end
-	v.Reviewer = p.Role.CanManage()
+	v.Reviewer, v.CanSend = p.Role.CanReview(), p.Role.CanManage()
 	h.reviews.Attach(r.Context(), p, v.Files)
 	if mine {
 		user := middleware.GetUser(r.Context())

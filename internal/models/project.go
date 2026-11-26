@@ -6,18 +6,27 @@ import "time"
 type ProjectRole string
 
 const (
-	RoleOwner      ProjectRole = "owner"
-	RoleManager    ProjectRole = "manager"
+	RoleOwner   ProjectRole = "owner"
+	RoleManager ProjectRole = "manager" // shown as "Koordinator" / "Coordinator"
+	// RoleReviewer translates like a translator and also reviews: sees the review queue and leaves review
+	// comments, but does not approve or send files to a repository (owners and coordinators do)
+	RoleReviewer   ProjectRole = "reviewer"
 	RoleTranslator ProjectRole = "translator"
 )
 
 // IsValid reports whether the role is known
 func (r ProjectRole) IsValid() bool {
-	return r == RoleOwner || r == RoleManager || r == RoleTranslator
+	return r == RoleOwner || r == RoleManager || r == RoleReviewer || r == RoleTranslator
 }
 
 // IsInvitable reports whether the role can be given through an invitation
-func (r ProjectRole) IsInvitable() bool { return r == RoleManager || r == RoleTranslator }
+func (r ProjectRole) IsInvitable() bool {
+	return r == RoleManager || r == RoleReviewer || r == RoleTranslator
+}
+
+// CanReview reports whether the role reviews files sent to a repository (comments that block approval until
+// resolved); approving and sending stay with CanManage
+func (r ProjectRole) CanReview() bool { return r == RoleReviewer || r.CanManage() }
 
 // CanManage reports whether the role may manage files and members
 func (r ProjectRole) CanManage() bool { return r == RoleOwner || r == RoleManager }

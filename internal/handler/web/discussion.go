@@ -38,6 +38,7 @@ type threadView struct {
 	ID         string          // DOM id of the component
 	Error      string
 	FileOwner  int64 // a file entry's discussion: the file's owner, who resolves review comments
+	IsOwner    bool  // the project owner (deletes any comment)
 	OpenReview int   // open review comments in this thread
 }
 
@@ -49,6 +50,7 @@ func (h *Handler) threadView(r *http.Request, p *models.Project, t *service.Thre
 		User:       middleware.GetUser(r.Context()),
 		CanComment: p.Role.IsMember() && !t.Subject.ReadOnly,
 		CanManage:  p.Role.CanManage() && !t.Subject.ReadOnly,
+		IsOwner:    p.Role.IsOwner() && !t.Subject.ReadOnly,
 		Known:      map[string]bool{},
 		ID:         "thread-" + t.Subject.Type + "-" + t.Subject.Key[:min(12, len(t.Subject.Key))],
 		CanDelete:  service.CanDeleteDiscussion(middleware.GetUser(r.Context()), p, t),

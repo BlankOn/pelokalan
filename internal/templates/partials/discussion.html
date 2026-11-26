@@ -25,7 +25,7 @@
                 <div class="spacer"></div>
                 {{$own := and $.User .AuthorID (eq (deref .AuthorID) $.User.ID)}}
                 {{if and $own $.CanComment}}<button type="button" class="linklike small" data-edit-comment="{{.ID}}">{{t $.Lang "action.edit"}}</button>{{end}}
-                {{if and (or $own $.CanManage) (not $.Thread.Subject.ReadOnly)}}{{if $.User}}
+                {{if and (or $own $.IsOwner) (not $.Thread.Subject.ReadOnly)}}{{if $.User}}
                 <button type="button" class="linklike small danger" hx-post="{{$.Project.Path}}/comments/{{.ID}}/delete" hx-target="#{{$.ID}}" hx-swap="outerHTML" hx-confirm="{{t $.Lang "confirm.delete_comment"}}">{{t $.Lang "action.delete"}}</button>
                 {{end}}{{end}}
             </div>

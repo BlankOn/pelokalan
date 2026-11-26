@@ -9,6 +9,7 @@
         <input type="email" name="email" required placeholder="{{t .Lang "field.email"}}" value="{{.Data.InviteEmail}}" aria-label="{{t .Lang "field.email"}}">
         <select name="role" aria-label="{{t .Lang "field.role"}}">
             <option value="translator">{{roleName .Lang "translator"}}</option>
+            <option value="reviewer">{{roleName .Lang "reviewer"}}</option>
             <option value="manager">{{roleName .Lang "manager"}}</option>
         </select>
         <button type="submit" class="btn btn-primary">{{t .Lang "action.invite"}}</button>
@@ -22,6 +23,7 @@
         <label class="small">{{t .Lang "field.role"}}
             <select name="role">
                 <option value="translator">{{roleName .Lang "translator"}}</option>
+                <option value="reviewer">{{roleName .Lang "reviewer"}}</option>
                 <option value="manager">{{roleName .Lang "manager"}}</option>
             </select>
         </label>
@@ -83,6 +85,7 @@
                 <form method="post" action="{{$p.Path}}/members/{{.User.ID}}/role">
                     <select name="role" data-autosubmit aria-label="{{t $.Lang "field.role"}}">
                         <option value="translator" {{if eq .Role "translator"}}selected{{end}}>{{roleName $.Lang "translator"}}</option>
+                        <option value="reviewer" {{if eq .Role "reviewer"}}selected{{end}}>{{roleName $.Lang "reviewer"}}</option>
                         <option value="manager" {{if eq .Role "manager"}}selected{{end}}>{{roleName $.Lang "manager"}}</option>
                     </select>
                 </form>

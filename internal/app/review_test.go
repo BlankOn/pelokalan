@@ -77,6 +77,18 @@ func TestGitHubReviews(t *testing.T) {
 	rid := scalar[int64](t, `SELECT id FROM module_reviews WHERE catalog_id = $1 AND status = 'requested'`, kc)
 	page := fmt.Sprintf("%s/reviews/%d", base, rid)
 
+	// a reviewer sees the queue and the review editor, but approving stays with owners and coordinators
+	rina := signUp(t, "rvrina")
+	addMember(t, owner, slug, rina, "reviewer")
+	rina.get(base+"/files").status(http.StatusOK).contains("Menunggu tinjauan", page)
+	rina.get(page).status(http.StatusOK).contains("review-mode", "Disetujui oleh pemilik atau koordinator").lacks("rv-approve")
+	rina.post(page+"/approve", nil).status(http.StatusForbidden)
+	rkey := fmt.Sprintf("%d-%s", kc, models.KeyHashOf("Close the window"))
+	rina.hx(base+"/discussions/po_entry/"+rkey+"/comments", url.Values{"body": {"Sudah pas."}}).status(http.StatusOK).
+		contains(`data-review-open="1"`)
+	rc := scalar[int64](t, `SELECT id FROM comments WHERE review_id = $1`, rid)
+	rina.hx(fmt.Sprintf("%s/comments/%d/resolve", base, rc), nil).status(http.StatusOK).contains(`data-review-open="0"`)
+
 	// the owner sees the queue and the change; kiki cannot decide on her own request
 	owner.get(base+"/files").status(http.StatusOK).contains("Menunggu tinjauan", page)
 	// in Berkas anggota lain the owner gets "Tinjau" for a file waiting for review
@@ -107,7 +119,7 @@ func TestGitHubReviews(t *testing.T) {
 	owner.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Pakai \"direktorinya\"?"}}).status(http.StatusOK).
 		contains("Sudah diselesaikan", "btn-approve rv-resolve", `data-review-open="1"`)
 	kiki.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Sudah saya pikirkan."}}).status(http.StatusOK)
-	if n := scalar[int](t, `SELECT count(*) FROM comments WHERE review_id = $1`, rid); n != 1 {
+	if n := scalar[int](t, `SELECT count(*) FROM comments WHERE review_id = $1 AND resolved_at IS NULL`, rid); n != 1 {
 		t.Fatalf("review comments = %d, want 1 (the translator's reply is a plain comment)", n)
 	}
 	owner.post(page+"/approve", nil).redirectsTo(page)
@@ -146,7 +158,7 @@ func TestGitHubReviews(t *testing.T) {
 		}
 	}
 	mails.waitFor(t, kiki.Email, "masuk repositori")
-	kiki.get(base+"/my-files").status(http.StatusOK).contains("Masuk repositori", cm.SHA[:7])
+	kiki.get(base+"/my-files").status(http.StatusOK).contains("☑ Sudah masuk repositori", cm.SHA[:7])
 	// "Lihat" opens another member's file view-only: the review layout without actions or discussion
 	owner.get(base + "/member-files").status(http.StatusOK).contains("library__os.po?view=1")
 	owner.get(base+"/"+kiki.Username+"/po/library__os.po?view=1").status(http.StatusOK).
