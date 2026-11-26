@@ -45,16 +45,24 @@ type EntryFilter struct {
 	Statuses []string
 	Query    string
 	Order    string // "", "file", "source", "translation", "todo_first"
+	// Review: "review" was ticked (entries with open review comments, by key hash in ReviewHashes, set by the
+	// handler); it counts like one more status
+	Review       bool
+	ReviewHashes map[string]bool
+	// Only keeps just these entries (key hashes; nil = all): the strings of a review
+	Only map[string]bool
 }
 
 // EntryListing is the result of listing entries
 type EntryListing struct {
-	Entries  []*models.Entry
-	Stats    models.CatalogStats
-	Issues   int
-	AI       int // AI drafts not yet saved by a person (status "ai", "AI perlu ditinjau")
-	Glossary int // entries pre-translated from the glossary, not yet saved by a person
-	Memory   int // entries pre-translated from translation memory, not yet saved by a person
+	Entries []*models.Entry
+	Stats   models.CatalogStats
+	Issues  int
+	AI      int // AI drafts not yet saved by a person (status "ai", "AI perlu ditinjau")
+	// ReviewComments: open review comments on the file (set by the handler, for the status bar)
+	ReviewComments int
+	Glossary       int // entries pre-translated from the glossary, not yet saved by a person
+	Memory         int // entries pre-translated from translation memory, not yet saved by a person
 }
 
 // FuzzyOnly is the fuzzy entries without the AI drafts (Stats.Fuzzy counts both as needing review)
@@ -636,7 +644,12 @@ func (s *CatalogService) Entries(ctx context.Context, c *models.Catalog, f Entry
 		case models.OriginMemory:
 			l.Memory++
 		}
-		if !matchAnyStatus(e, f.Statuses) || (q != "" && !matchQuery(e, q)) {
+		inStatus := matchAnyStatus(e, f.Statuses)
+		if f.Review { // "review" is one more status: open review comments
+			inReview := f.ReviewHashes[e.KeyHash()]
+			inStatus = inReview || len(f.Statuses) > 0 && inStatus
+		}
+		if !inStatus || (q != "" && !matchQuery(e, q)) || f.Only != nil && !f.Only[e.KeyHash()] {
 			continue
 		}
 		l.Entries = append(l.Entries, e)

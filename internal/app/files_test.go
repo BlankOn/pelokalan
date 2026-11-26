@@ -96,6 +96,11 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 	}
 	owner.get(base+"/files").status(http.StatusOK).contains(`name="s"`, "Direservasi dulu", "String terbanyak")
 
+	// the owner (a manager) gets a Lepas button where kiki's reservation shows; kiki just sees who holds it
+	owner.get(base+"/files").status(http.StatusOK).contains("res-release", "Lepas reservasi @"+kiki.Username)
+	owner.get(base + "/member-files").status(http.StatusOK).contains("res-release")
+	kiki.get(base + "/files").status(http.StatusOK).lacks("res-release")
+
 	// the owner cannot take it while kiki holds it, and sees who does
 	owner.post(base+"/project-files/"+strconv.FormatInt(calc, 10)+"/take", nil).status(http.StatusOK).contains("@" + kiki.Username)
 	if n := scalar[int](t, `SELECT count(*) FROM catalogs WHERE project_id = $1 AND created_by = $2`, pid, owner.ID); n != 0 {
@@ -132,7 +137,7 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 	visitor(t).get(base + "/files").status(http.StatusOK).contains(`class="res-lock-wrap" title="Direservasi oleh @` + owner.Username + `"`)
 
 	// Settings lists the held module for managers
-	owner.get(base+"/settings").status(http.StatusOK).contains("Reservasi modul untuk dikerjakan", "held-modules", "calc")
+	owner.get(base + "/settings").status(http.StatusOK).contains("Reservasi modul untuk dikerjakan").lacks("held-modules")
 
 	// the reservation filter on Berkas proyek
 	visitor(t).get(base + "/project-files?rv=free").status(http.StatusOK).contains("edit.main.id.po").lacks("calc.main.id.po")

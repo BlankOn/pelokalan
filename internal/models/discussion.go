@@ -43,7 +43,17 @@ type Comment struct {
 	DeletedBy      *int64
 	DeleterName    string // who deleted it
 
+	// A review comment (by an owner/manager on a file waiting for review) stays open until resolved
+	ReviewID     *int64
+	ResolvedAt   *time.Time
+	ResolverName string
+
 	Attachments []*Attachment
+}
+
+// OpenReview reports whether this is a review comment nobody resolved yet
+func (c *Comment) OpenReview() bool {
+	return c.ReviewID != nil && c.ResolvedAt == nil && c.DeletedAt == nil
 }
 
 // DeletedByOther reports whether someone other than the author (a moderator) deleted it

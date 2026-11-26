@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"strings"
 
 	"pelokalan/internal/models"
@@ -165,8 +166,8 @@ func (r *discussionRepository) AddComment(ctx context.Context, c *models.Comment
 	}
 	defer tx.Rollback()
 	if err := tx.QueryRowContext(ctx,
-		`INSERT INTO comments (discussion_id, author_id, body) VALUES ($1, $2, $3) RETURNING id, created_at`,
-		c.DiscussionID, c.AuthorID, c.Body).Scan(&c.ID, &c.CreatedAt); err != nil {
+		`INSERT INTO comments (discussion_id, author_id, body, review_id) VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
+		c.DiscussionID, c.AuthorID, c.Body, c.ReviewID).Scan(&c.ID, &c.CreatedAt); err != nil {
 		return err
 	}
 	if err := insertMentions(ctx, tx, c.ID, mentions); err != nil {
@@ -191,12 +192,13 @@ func (r *discussionRepository) AddComment(ctx context.Context, c *models.Comment
 
 const commentColumns = `c.id, c.discussion_id, c.author_id, COALESCE(NULLIF(u.name, ''), u.username, ''), COALESCE(u.username, ''),
 	c.body, c.created_at, c.edited_at, c.deleted_at, c.deleted_by,
-	COALESCE((SELECT COALESCE(NULLIF(x.name, ''), x.username) FROM users x WHERE x.id = c.deleted_by), '')`
+	COALESCE((SELECT COALESCE(NULLIF(x.name, ''), x.username) FROM users x WHERE x.id = c.deleted_by), ''),
+	c.review_id, c.resolved_at, COALESCE((SELECT COALESCE(NULLIF(x.name, ''), x.username) FROM users x WHERE x.id = c.resolved_by), '')`
 
 func scanComment(row interface{ Scan(...any) error }) (*models.Comment, error) {
 	c := &models.Comment{}
 	err := row.Scan(&c.ID, &c.DiscussionID, &c.AuthorID, &c.AuthorName, &c.AuthorUsername, &c.Body, &c.CreatedAt,
-		&c.EditedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName)
+		&c.EditedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName, &c.ReviewID, &c.ResolvedAt, &c.ResolverName)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, repository.ErrNotFound
 	}
@@ -318,4 +320,32 @@ func (r *discussionRepository) DeleteComment(ctx context.Context, id, byUserID i
 func (r *discussionRepository) DeleteDiscussion(ctx context.Context, id int64) error {
 	_, err := r.db.ExecContext(ctx, `DELETE FROM discussions WHERE id = $1`, id)
 	return err
+}
+
+func (r *discussionRepository) ResolveComment(ctx context.Context, id, byUserID int64) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE comments SET resolved_at = NOW(), resolved_by = $2
+		WHERE id = $1 AND review_id IS NOT NULL AND resolved_at IS NULL`, id, byUserID)
+	return err
+}
+
+func (r *discussionRepository) OpenReviewComments(ctx context.Context, projectID, catalogID int64) (map[string]int, error) {
+	prefix := fmt.Sprintf("%d-", catalogID)
+	rows, err := r.db.QueryContext(ctx, `SELECT d.subject_key, COUNT(*) FROM comments c JOIN discussions d ON d.id = c.discussion_id
+		WHERE d.project_id = $1 AND d.subject_type = 'po_entry' AND left(d.subject_key, length($2)) = $2
+		  AND c.review_id IS NOT NULL AND c.resolved_at IS NULL AND c.deleted_at IS NULL
+		GROUP BY d.subject_key`, projectID, prefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]int{}
+	for rows.Next() {
+		var key string
+		var n int
+		if err := rows.Scan(&key, &n); err != nil {
+			return nil, err
+		}
+		out[strings.TrimPrefix(key, prefix)] = n
+	}
+	return out, rows.Err()
 }

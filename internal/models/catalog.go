@@ -136,7 +136,8 @@ type Entry struct {
 	UpdatedByName      string
 	UpdatedAt          time.Time
 	// Comments in the entry's discussion (filled by handlers)
-	Comments int
+	Comments   int
+	ReviewOpen int // open review comments on the entry (not stored)
 	// Origin of a machine translation not yet saved by a person: "ai", "glossary", "memory"
 	Origin string
 	// ReplacedMsgStr is the translation a machine replaced, kept until a person saves (nil = none)
@@ -183,8 +184,11 @@ const (
 
 // KeyHash is a stable short id of the entry inside its file (context + source),
 // used to attach discussions; it survives restores and template merges
-func (e *Entry) KeyHash() string {
-	sum := sha256.Sum256([]byte(e.Key()))
+func (e *Entry) KeyHash() string { return KeyHashOf(e.Key()) }
+
+// KeyHashOf is the short hash of an entry key (context + source), as used in addresses and discussions
+func KeyHashOf(key string) string {
+	sum := sha256.Sum256([]byte(key))
 	return hex.EncodeToString(sum[:8])
 }
 

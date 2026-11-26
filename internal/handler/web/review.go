@@ -88,7 +88,7 @@ type diffLine struct {
 	Text string
 }
 
-// ReviewPage shows a request with the changes it sends: GET /projects/{id}/reviews/{rid}
+// ReviewPage is the review editor of a request: GET /projects/{id}/reviews/{rid}
 func (h *Handler) ReviewPage(w http.ResponseWriter, r *http.Request) {
 	p, ok := h.loadMemberProject(w, r)
 	if !ok {
@@ -99,40 +99,48 @@ func (h *Handler) ReviewPage(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	user := middleware.GetUser(r.Context())
-	c, _, err := h.catalogService.Get(r.Context(), user, rv.CatalogID)
+	c, _, err := h.catalogService.Get(r.Context(), middleware.GetUser(r.Context()), rv.CatalogID)
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
-	data := h.page(r, "")
+	h.editorPage(w, r, c, p, rv)
+}
+
+// reviewData adds what the review editor needs: the request, the decision rights and the diff
+func (h *Handler) reviewData(r *http.Request, p *models.Project, c *models.Catalog, rv *models.ModuleReview, data *PageData) {
+	user := middleware.GetUser(r.Context())
 	data.Title = i18n.T(data.Lang, "review.title", rv.RepoPath) + " · " + p.Name
-	data.Data["Project"] = p
-	data.Data["Tab"] = "files"
 	data.Data["Review"] = rv
-	data.Data["Catalog"] = c
-	data.Data["CanDecide"] = rv.Status == models.ReviewRequested && p.Role.CanManage() && rv.RequestedBy != user.ID
-	data.Data["CanWithdraw"] = rv.Status == models.ReviewRequested && rv.RequestedBy == user.ID
+	data.Data["ReadOnly"] = true
+	data.Data["Owned"] = false
 	if rv.Status == models.ReviewRequested {
-		if d, err := h.reviews.Changes(r.Context(), p, c); err == nil && d != nil {
-			var lines []diffLine
-			for _, l := range strings.Split(strings.TrimRight(d.Hunks, "\n"), "\n") {
-				kind := ""
-				switch {
-				case strings.HasPrefix(l, "@@"):
-					kind = "hunk"
-				case strings.HasPrefix(l, "+"):
-					kind = "add"
-				case strings.HasPrefix(l, "-"):
-					kind = "del"
-				}
-				lines = append(lines, diffLine{kind, l})
-			}
-			data.Data["Diff"] = lines
-			data.Data["Changed"] = d.Changed
-		}
+		rv.OpenComments = h.reviewComments(r, p, c, nil)
 	}
-	h.render(w, "review", data)
+	data.Data["CanDecide"] = rv.Status == models.ReviewRequested && p.Role.CanManage() && user != nil && rv.RequestedBy != user.ID
+	data.Data["CanWithdraw"] = rv.Status == models.ReviewRequested && user != nil && rv.RequestedBy == user.ID
+	if rv.Status != models.ReviewRequested {
+		return
+	}
+	d, err := h.reviews.Changes(r.Context(), p, c)
+	if err != nil || d == nil {
+		return
+	}
+	var lines []diffLine
+	for _, l := range strings.Split(strings.TrimRight(d.Hunks, "\n"), "\n") {
+		kind := ""
+		switch {
+		case strings.HasPrefix(l, "@@"):
+			kind = "hunk"
+		case strings.HasPrefix(l, "+"):
+			kind = "add"
+		case strings.HasPrefix(l, "-"):
+			kind = "del"
+		}
+		lines = append(lines, diffLine{kind, l})
+	}
+	data.Data["Diff"] = lines
+	data.Data["Changed"] = d.Changed
 }
 
 // ApproveReview commits a requested file: POST /projects/{id}/reviews/{rid}/approve
@@ -178,4 +186,9 @@ func (h *Handler) WithdrawReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	http.Redirect(w, r, p.Path()+"/files?flash=review_withdrawn", http.StatusSeeOther)
+}
+
+// reviewHashes are the entries a review of the file sends
+func (h *Handler) reviewHashes(r *http.Request, p *models.Project, c *models.Catalog) map[string]bool {
+	return h.reviews.ChangedHashes(r.Context(), c)
 }

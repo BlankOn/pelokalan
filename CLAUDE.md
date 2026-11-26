@@ -346,8 +346,11 @@ shows it only to members), role, joined_at. Documented in README.md.
 - Released as "merged" by `CatalogService.landingsIn` after each sync (GNOME archive or GitHub branch) when every string
   the holder changed is upstream word for word. Lists: a red lock (`res_lock`, `.res-lock`: red circle, white lock; tooltip "Direservasi oleh @user") right after the file name (blue `.res-lock-mine` when the viewer holds it) and `res_chip` under it, "Reservasi modul" (takes the file; asks first: it reserves the module) / "Sedang direservasi"
   in Berkas proyek, "Reservasi modul" / "Lepas reservasi tugas" in the ⋯ menu, "Reservasi & Terjemahkan" instead of "Terjemahkan" on free modules in Berkas Anda (asks, reserves, opens the editor), `reserve_filter` (`rv` = mine, other, free; Berkas
-  proyek uses `GlossaryService.ProjectFiles` with a keep filter, `KeepStates` for upstream states). Settings lists held
-  modules (`#held-modules`) for owners/managers.
+  proyek uses `GlossaryService.ProjectFiles` with a keep filter, `KeepStates` for upstream states). Owners/managers release
+  someone else's reservation with a "Lepas" button (`res_release`, holder emailed) in the action column of Berkas proyek
+  (instead of "Sedang direservasi") and Berkas anggota lain, and from the ⋯ menu ("Lepas reservasi @user"); Settings no
+  longer lists held modules. In the ⋯ menu the review items (Ajukan/Lihat/Batalkan tinjauan, Kirim ke repositori) follow
+  the reservation items.
 
 ## Public profiles and badges
 
@@ -649,7 +652,20 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   (`pushed_data`) and strings equal to it are never sent again, so later repository changes are not reverted. Then the
   reservation is released quietly (`ReleasePushed`), the group re-synced (if it has a feed), and the translator emailed.
   A failure keeps the request open with `error` shown on the review page and in the queue.
-- File rows show `review_chip` (Menunggu tinjauan / Perlu perbaikan / Masuk repositori · sha linking the commit).
+- File rows show `review_chip` (Menunggu tinjauan / Perlu perbaikan · N (open review comments) / Masuk repositori · sha
+  linking the commit).
+- **Review editor** (`/projects/{id}/reviews/{rid}` = `editorPage` with the review, `reviewData`; class `review-mode`):
+  read-only, lists only the review's strings (`EntryFilter.Only`, `ReviewService.ChangedHashes`), no edit pane or
+  status bar, toolbar `review_toolbar` (back, file + requester, Tabel/Diff `[data-review-view]` toggling
+  `#review-diff`, "Setujui & commit" disabled while review comments are open; the requester gets "Batalkan"), banner
+  `review_banner` (translator's note, open comments, last commit error). The sidebar works as usual.
+- **Review comments** (migration 049, `comments.review_id/resolved_at/resolved_by`): a comment by an owner/manager
+  (not the requester) on an entry of a file with an open request is tied to it (`ReviewService.OpenFor` via
+  `DiscussionService.SetReviews`). It is open until resolved ("Selesaikan", `POST /projects/{id}/comments/{cid}/resolve`,
+  file owner, the author or a manager): red dot on the entry row (`Entry.ReviewOpen`, `mark-review`, kept in sync by
+  app.js from the thread's `data-review-open`), a "Komentar tinjauan" status filter (`EntryFilter.Review`) and status bar
+  count in the translator's editor. Approving or sending (`push`/`PushNow`) waits until none is open
+  (`err.review_open_comments`). The reject route stays but the UI works through comments.
 
 ## Module groups UI
 

@@ -8,6 +8,8 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+
+	"pelokalan/internal/models"
 )
 
 // Full GitHub integration: the app's access is checked, the integration turned on; a member asks for a review,
@@ -77,7 +79,9 @@ func TestGitHubReviews(t *testing.T) {
 
 	// the owner sees the queue and the change; kiki cannot decide on her own request
 	owner.get(base+"/files").status(http.StatusOK).contains("Menunggu tinjauan", page)
-	owner.get(page).status(http.StatusOK).contains(`&#43;msgstr &#34;Tutup jendela&#34;`, "Mohon dicek istilahnya.", "Setujui &amp; commit")
+	// the review editor: the review's strings only, the diff, the note, the approval button; no edit pane tools
+	owner.get(page).status(http.StatusOK).contains("review-mode", `&#43;msgstr &#34;Tutup jendela&#34;`, "Mohon dicek istilahnya.",
+		"Setujui &amp; commit", `data-review-view="diff"`, "Close the window").lacks("Open the file", "tb-commit")
 	kiki.get(page).status(http.StatusOK).lacks("Setujui &amp; commit").contains("Batalkan permintaan tinjauan")
 	kiki.post(page+"/approve", nil).status(http.StatusForbidden)
 
@@ -94,6 +98,28 @@ func TestGitHubReviews(t *testing.T) {
 	rid = scalar[int64](t, `SELECT id FROM module_reviews WHERE catalog_id = $1 AND status = 'requested'`, kc)
 	page = fmt.Sprintf("%s/reviews/%d", base, rid)
 	ghFake.SetFile(repo, "3.14", "library/os.po", poFile("os", "Open the file", "Buka berkas tersebut", "Close the window", "", "Remove the directory", ""))
+
+	// a review comment on a string: approval waits until it is resolved
+	key := fmt.Sprintf("%d-%s", kc, models.KeyHashOf("Remove the directory"))
+	owner.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Pakai \"direktorinya\"?"}}).status(http.StatusOK).
+		contains("Selesaikan", `data-review-open="1"`)
+	kiki.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Sudah saya pikirkan."}}).status(http.StatusOK)
+	if n := scalar[int](t, `SELECT count(*) FROM comments WHERE review_id = $1`, rid); n != 1 {
+		t.Fatalf("review comments = %d, want 1 (the translator's reply is a plain comment)", n)
+	}
+	owner.post(page+"/approve", nil).redirectsTo(page)
+	if len(ghFake.LastCommits()) != 0 {
+		t.Fatal("approved with an open review comment")
+	}
+	owner.get(page).status(http.StatusOK).contains("1 komentar tinjauan belum diselesaikan", "rv-approve", "disabled")
+	kiki.get(base + "/my-files").status(http.StatusOK).contains("Perlu perbaikan · 1")
+	kiki.get(fmt.Sprintf("/catalogs/%d/list?status=review", kc)).status(http.StatusOK).contains("Remove the directory", "mark-review").lacks("Open the file")
+	cmt := scalar[int64](t, `SELECT id FROM comments WHERE review_id = $1`, rid)
+	visitor(t).post(fmt.Sprintf("%s/comments/%d/resolve", base, cmt), nil)
+	if scalar[bool](t, `SELECT resolved_at IS NOT NULL FROM comments WHERE id = $1`, cmt) {
+		t.Fatal("a visitor resolved a review comment")
+	}
+	kiki.hx(fmt.Sprintf("%s/comments/%d/resolve", base, cmt), nil).status(http.StatusOK).contains("Diselesaikan oleh", `data-review-open="0"`)
 
 	owner.post(page+"/approve", nil).redirectsTo(page)
 	commits := ghFake.LastCommits()

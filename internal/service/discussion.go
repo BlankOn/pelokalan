@@ -58,6 +58,30 @@ type DiscussionService struct {
 	site     config.SiteConfig
 	notifs   repository.NotificationRepository // members' email choices (nil: email everyone)
 	activity *ActivityService
+
+	// reviewFor returns the open review a comment by user on a file's entry belongs to (nil = a plain comment)
+	reviewFor func(ctx context.Context, p *models.Project, catalogID int64, user *models.User) *int64
+}
+
+// SetReviews makes comments by reviewers on files waiting for review into review comments
+func (s *DiscussionService) SetReviews(f func(ctx context.Context, p *models.Project, catalogID int64, user *models.User) *int64) {
+	s.reviewFor = f
+}
+
+// entryCatalog is the file of a po_entry subject key ("<catalog id>-<entry key hash>"; 0 = not one)
+func entryCatalog(subjectType, key string) int64 {
+	if subjectType != models.SubjectPOEntry {
+		return 0
+	}
+	id, _, ok := strings.Cut(key, "-")
+	if !ok {
+		return 0
+	}
+	n, err := strconv.ParseInt(id, 10, 64)
+	if err != nil {
+		return 0
+	}
+	return n
 }
 
 // SetNotifications connects the members' notification settings
@@ -403,6 +427,9 @@ func (s *DiscussionService) post(ctx context.Context, user *models.User, p *mode
 	}
 	mentioned := s.resolveMentions(body, members)
 	c := &models.Comment{DiscussionID: d.ID, AuthorID: &user.ID, Body: body}
+	if cid := entryCatalog(subj.Type, subj.Key); cid > 0 && s.reviewFor != nil {
+		c.ReviewID = s.reviewFor(ctx, p, cid, user) // a reviewer's comment on a file waiting for review
+	}
 	if err := s.repo.AddComment(ctx, c, ids(mentioned), attachments); err != nil {
 		return nil, err
 	}
@@ -603,6 +630,39 @@ func (s *DiscussionService) DeleteComment(ctx context.Context, user *models.User
 		return nil, ErrForbidden
 	}
 	return d, s.repo.DeleteComment(ctx, id, user.ID)
+}
+
+// ResolveComment closes an open review comment: the file's owner (the translator), the comment's author or an
+// owner/manager may
+func (s *DiscussionService) ResolveComment(ctx context.Context, user *models.User, p *models.Project, id int64) (*models.Discussion, error) {
+	c, d, err := s.projectComment(ctx, p, id)
+	if err != nil {
+		return nil, err
+	}
+	if !c.OpenReview() {
+		return d, nil
+	}
+	allowed := p.Role.CanManage() || c.AuthorID != nil && *c.AuthorID == user.ID
+	if !allowed {
+		if cid := entryCatalog(d.SubjectType, d.SubjectKey); cid > 0 {
+			if cat, err := s.catalogs.GetByID(ctx, cid); err == nil && cat.OwnerID == user.ID {
+				allowed = true
+			}
+		}
+	}
+	if !allowed {
+		return nil, ErrForbidden
+	}
+	return d, s.repo.ResolveComment(ctx, id, user.ID)
+}
+
+// OpenReviewComments counts a file's open review comments by entry key hash
+func (s *DiscussionService) OpenReviewComments(ctx context.Context, p *models.Project, catalogID int64) map[string]int {
+	out, err := s.repo.OpenReviewComments(ctx, p.ID, catalogID)
+	if err != nil {
+		return map[string]int{}
+	}
+	return out
 }
 
 // List returns the discussions of a project, newest activity first

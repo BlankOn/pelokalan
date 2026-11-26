@@ -37,6 +37,8 @@ type threadView struct {
 	Known      map[string]bool // usernames rendered as mentions
 	ID         string          // DOM id of the component
 	Error      string
+	FileOwner  int64 // a file entry's discussion: the file's owner, who resolves review comments
+	OpenReview int   // open review comments in this thread
 }
 
 func (h *Handler) threadView(r *http.Request, p *models.Project, t *service.Thread) threadView {
@@ -50,6 +52,20 @@ func (h *Handler) threadView(r *http.Request, p *models.Project, t *service.Thre
 		Known:      map[string]bool{},
 		ID:         "thread-" + t.Subject.Type + "-" + t.Subject.Key[:min(12, len(t.Subject.Key))],
 		CanDelete:  service.CanDeleteDiscussion(middleware.GetUser(r.Context()), p, t),
+	}
+	if t.Subject.Type == models.SubjectPOEntry {
+		if id, _, ok := strings.Cut(t.Subject.Key, "-"); ok {
+			if cid, err := strconv.ParseInt(id, 10, 64); err == nil {
+				if c, _, err := h.catalogService.Get(r.Context(), v.User, cid); err == nil {
+					v.FileOwner = c.OwnerID
+				}
+			}
+		}
+	}
+	for _, c := range t.Comments {
+		if c.OpenReview() {
+			v.OpenReview++
+		}
 	}
 	if members, err := h.discuss.Members(r.Context(), p); err == nil {
 		for name := range members {
@@ -393,6 +409,20 @@ func (h *Handler) EditComment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := h.discuss.EditComment(r.Context(), middleware.GetUser(r.Context()), p, idParam(r, "cid"), r.FormValue("body"))
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	h.renderThread(w, r, p, d.SubjectType, d.SubjectKey, "")
+}
+
+// ResolveComment closes a review comment: POST /projects/{id}/comments/{cid}/resolve
+func (h *Handler) ResolveComment(w http.ResponseWriter, r *http.Request) {
+	p, ok := h.loadProject(w, r)
+	if !ok {
+		return
+	}
+	d, err := h.discuss.ResolveComment(r.Context(), middleware.GetUser(r.Context()), p, idParam(r, "cid"))
 	if err != nil {
 		h.fail(w, r, err)
 		return

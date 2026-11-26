@@ -280,6 +280,10 @@ type DiscussionRepository interface {
 	Attachment(ctx context.Context, id int64) (*models.Attachment, int64, error)
 	Comments(ctx context.Context, discussionID int64) ([]*models.Comment, error)
 	GetComment(ctx context.Context, id int64) (*models.Comment, error)
+	// ResolveComment marks an open review comment resolved
+	ResolveComment(ctx context.Context, id, byUserID int64) error
+	// OpenReviewComments counts the open review comments on a file's entries, by entry key hash
+	OpenReviewComments(ctx context.Context, projectID, catalogID int64) (map[string]int, error)
 	UpdateComment(ctx context.Context, id int64, body string, mentions []int64) error
 	DeleteComment(ctx context.Context, id, byUserID int64) error
 	// DeleteDiscussion removes a discussion with its comments, mentions and attachment links

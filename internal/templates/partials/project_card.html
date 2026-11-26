@@ -30,7 +30,7 @@
     <td>{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · <span class="c-fuzzy">{{t $v.Lang "files.fuzzy_count" .Fuzzy}}</span>{{end}}</span></td>
     <td class="small"><span class="version-badge">{{.GroupLabel}}</span></td>
     <td class="actions"><div class="pf-actions">
-        {{if $v.CanTake}}{{if and $v.Res.On .Reservation (ne .Reservation.UserID $v.Res.UserID)}}<span class="res-locked small" title="{{t $v.Lang "reserve.locked_help"}}">{{template "lock_icon"}}{{t $v.Lang "reserve.locked"}}</span>
+        {{if $v.CanTake}}{{if and $v.Res.On .Reservation (ne .Reservation.UserID $v.Res.UserID)}}{{if $v.Res.Manager}}{{template "res_release" (dict "Lang" $v.Lang "R" .Reservation "Project" $v.Project)}}{{else}}<span class="res-locked small" title="{{t $v.Lang "reserve.locked_help"}}">{{template "lock_icon"}}{{t $v.Lang "reserve.locked"}}</span>{{end}}
         {{else if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .GroupLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
             <input type="hidden" name="into" value="{{.Mine.ID}}">
             <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
@@ -117,10 +117,13 @@
 {{/* lock after a file name when its module is reserved: red for someone else, blue for the viewer; the tooltip names the holder */}}
 {{define "res_lock"}}{{$label := ""}}{{if eq .R.UserID .Me}}{{$label = t .Lang "reserve.by_me"}}{{else}}{{$label = printf "%s @%s" (t .Lang "reserve.by") .R.Username}}{{end}}<span class="res-lock-wrap{{if eq .R.UserID .Me}} res-lock-mine{{end}}" title="{{$label}}" role="img" aria-label="{{$label}}">{{template "lock_icon"}}</span>{{end}}
 {{/* a file's newest review for the repository Pelokalan writes to */}}
-{{define "review_chip"}}{{$r := .R}}{{if eq $r.Status "requested"}}<a class="rv-chip rv-requested" href="{{.P.Path}}/reviews/{{$r.ID}}">{{t .Lang "review.state_requested"}}</a>
+{{define "review_chip"}}{{$r := .R}}{{if and (eq $r.Status "requested") $r.OpenComments}}<a class="rv-chip rv-rejected" href="{{.P.Path}}/reviews/{{$r.ID}}" title="{{t .Lang "review.open_comments" $r.OpenComments}}"><span class="mark-review"></span> {{t .Lang "review.state_changes" $r.OpenComments}}</a>
+{{else if eq $r.Status "requested"}}<a class="rv-chip rv-requested" href="{{.P.Path}}/reviews/{{$r.ID}}">{{t .Lang "review.state_requested"}}</a>
 {{else if eq $r.Status "rejected"}}<a class="rv-chip rv-rejected" href="{{.P.Path}}/reviews/{{$r.ID}}" title="{{$r.ReviewNote}}">{{t .Lang "review.state_rejected"}}</a>
 {{else if eq $r.Status "pushed"}}<a class="rv-chip rv-pushed" href="{{$r.CommitURL}}" target="_blank" rel="noopener" title="{{t .Lang "review.pushed_help" $r.Entries}}">{{t .Lang "review.state_pushed"}} · {{$r.ShortSHA}}</a>{{end}}{{end}}
-{{define "res_chip"}}<div class="res-chip small{{if eq .R.UserID .Me}} res-mine{{end}}" title="{{t .Lang "reserve.since" (timeAgo .Lang .R.ReservedAt)}}">{{if eq .R.UserID .Me}}{{t .Lang "reserve.by_me"}}{{else}}{{t .Lang "reserve.by"}} <a href="/users/{{.R.Username}}">@{{.R.Username}}</a>{{end}} · {{timeAgo .Lang .R.ReservedAt}}{{if and .Manager (ne .R.UserID .Me)}}<form method="post" action="{{.Project.Path}}/reservations/release" class="inline-form" data-confirm="{{t .Lang "reserve.release_other_confirm" .R.Module .R.Username}}"><input type="hidden" name="module" value="{{.R.Module}}"><button class="linklike">{{t .Lang "reserve.release"}}</button></form>{{end}}</div>{{end}}
+{{/* an owner/manager releases someone else's reservation (the holder is emailed) */}}
+{{define "res_release"}}<form method="post" action="{{.Project.Path}}/reservations/release" class="inline-form" data-confirm="{{t .Lang "reserve.release_other_confirm" .R.Module .R.Username}}" data-confirm-ok="{{t .Lang "reserve.release"}}"><input type="hidden" name="module" value="{{.R.Module}}"><button class="btn btn-small res-release" title="{{t .Lang "reserve.release_other_help" .R.Username}}">{{template "lock_icon"}}{{t .Lang "reserve.release"}}</button></form>{{end}}
+{{define "res_chip"}}<div class="res-chip small{{if eq .R.UserID .Me}} res-mine{{end}}" title="{{t .Lang "reserve.since" (timeAgo .Lang .R.ReservedAt)}}">{{if eq .R.UserID .Me}}{{t .Lang "reserve.by_me"}}{{else}}{{t .Lang "reserve.by"}} <a href="/users/{{.R.Username}}">@{{.R.Username}}</a>{{end}} · {{timeAgo .Lang .R.ReservedAt}}</div>{{end}}
 
 {{/* a page of PO files: the user's own (Mine) or other members' (read-only) */}}
 {{define "file_rows"}}{{$v := .}}
@@ -144,17 +147,18 @@
             <summary class="btn btn-small" aria-label="{{t $v.Lang "action.more"}}">⋯</summary>
             <div class="menu">
                 {{if and $v.Res.On (not .IsTemplate)}}{{if not .Reservation}}<form method="post" action="{{$v.Project.Path}}/reservations"><input type="hidden" name="module" value="{{module .Filename}}"><button class="linklike" title="{{t $v.Lang "reserve.reserve_help"}}">{{t $v.Lang "reserve.reserve"}}</button></form>
-                {{else if eq .Reservation.UserID $v.Res.UserID}}<form method="post" action="{{$v.Project.Path}}/reservations/release" data-confirm="{{t $v.Lang "reserve.release_confirm" .Reservation.Module}}"><input type="hidden" name="module" value="{{.Reservation.Module}}"><button class="linklike">{{t $v.Lang "reserve.release_mine"}}</button></form>{{end}}{{end}}
+                {{else if eq .Reservation.UserID $v.Res.UserID}}<form method="post" action="{{$v.Project.Path}}/reservations/release" data-confirm="{{t $v.Lang "reserve.release_confirm" .Reservation.Module}}"><input type="hidden" name="module" value="{{.Reservation.Module}}"><button class="linklike">{{t $v.Lang "reserve.release_mine"}}</button></form>
+                {{else if $v.Res.Manager}}<form method="post" action="{{$v.Project.Path}}/reservations/release" data-confirm="{{t $v.Lang "reserve.release_other_confirm" .Reservation.Module .Reservation.Username}}" data-confirm-ok="{{t $v.Lang "reserve.release"}}"><input type="hidden" name="module" value="{{.Reservation.Module}}"><button class="linklike">{{t $v.Lang "reserve.release_other" .Reservation.Username}}</button></form>{{end}}{{end}}
+                {{if .CanPush}}{{if and .Review (eq .Review.Status "requested")}}<a href="{{$v.Project.Path}}/reviews/{{.Review.ID}}">{{t $v.Lang "review.view"}}</a>
+                <form method="post" action="{{$v.Project.Path}}/reviews/{{.Review.ID}}/withdraw" data-confirm="{{t $v.Lang "review.withdraw_confirm"}}"><button class="linklike">{{t $v.Lang "review.withdraw"}}</button></form>
+                {{else}}<button type="button" class="linklike" data-review="/catalogs/{{.ID}}/review" data-review-name="{{.RepoPath}}" title="{{t $v.Lang "review.request_help"}}">{{t $v.Lang "review.request"}}</button>{{end}}
+                {{if $v.Reviewer}}<form method="post" action="/catalogs/{{.ID}}/push" data-confirm="{{t $v.Lang "review.push_confirm" .RepoPath}}" data-confirm-ok="{{t $v.Lang "review.push"}}"><button class="linklike">{{t $v.Lang "review.push"}}</button></form>{{end}}{{end}}
                 <a href="/catalogs/{{.ID}}/download">{{t $v.Lang "action.download_po"}}</a>
                 <a href="/catalogs/{{.ID}}/download.mo">{{t $v.Lang "action.download_mo"}}</a>
                 {{if $v.HasTemplate}}
                 <form method="post" action="/catalogs/{{.ID}}/update"><button class="linklike">{{t $v.Lang "action.update_from_template"}}</button></form>
                 {{end}}
                 <button type="button" class="linklike" data-replace="/catalogs/{{.ID}}/replace" data-replace-name="{{.Filename}}" data-replace-url="{{.SourceURL}}" data-replace-page="{{.UpstreamPage}}">{{t $v.Lang "action.update_file"}}</button>
-                {{if .CanPush}}{{if and .Review (eq .Review.Status "requested")}}<a href="{{$v.Project.Path}}/reviews/{{.Review.ID}}">{{t $v.Lang "review.view"}}</a>
-                <form method="post" action="{{$v.Project.Path}}/reviews/{{.Review.ID}}/withdraw" data-confirm="{{t $v.Lang "review.withdraw_confirm"}}"><button class="linklike">{{t $v.Lang "review.withdraw"}}</button></form>
-                {{else}}<button type="button" class="linklike" data-review="/catalogs/{{.ID}}/review" data-review-name="{{.RepoPath}}" title="{{t $v.Lang "review.request_help"}}">{{t $v.Lang "review.request"}}</button>{{end}}
-                {{if $v.Reviewer}}<form method="post" action="/catalogs/{{.ID}}/push" data-confirm="{{t $v.Lang "review.push_confirm" .RepoPath}}" data-confirm-ok="{{t $v.Lang "review.push"}}"><button class="linklike">{{t $v.Lang "review.push"}}</button></form>{{end}}{{end}}
                 {{$cid := .ID}}{{with .TP}}<a href="/catalogs/{{$cid}}/tp" title="{{.SubmitName}}">{{t $v.Lang "tp.download"}}</a>
                 <a href="mailto:robot@translationproject.org?subject={{urlquery .SubmitName}}&amp;body={{urlquery (t $v.Lang "tp.mail_body" .SubmitName)}}" title="{{t $v.Lang "tp.mail_help"}}{{if .Restricted}} {{t $v.Lang "tp.mail_restricted"}}{{end}}">{{t $v.Lang "tp.mail"}}</a>{{end}}
                 {{if .RepoPath}}<a href="/catalogs/{{.ID}}/patch" title="{{.RepoPath}}">{{t $v.Lang "git.patch_file"}}</a>
@@ -163,6 +167,7 @@
             </div>
         </details>
         {{else}}
+        {{if and $v.Res.Manager .Reservation (ne .Reservation.UserID $v.Res.UserID)}}{{template "res_release" (dict "Lang" $v.Lang "R" .Reservation "Project" $v.Project)}}{{end}}
         {{if and $v.Reviewer .CanPush}}<form method="post" action="/catalogs/{{.ID}}/push" class="inline-form" data-confirm="{{t $v.Lang "review.push_confirm_member" .RepoPath .OwnerUsername}}" data-confirm-ok="{{t $v.Lang "review.push"}}"><button class="btn btn-small" title="{{t $v.Lang "review.push_help"}}">{{t $v.Lang "review.push"}}</button></form>{{end}}
         <a class="btn btn-small" href="{{.URL}}">{{t $v.Lang "action.view"}}</a>
         <a class="btn btn-small btn-icon" href="/catalogs/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>

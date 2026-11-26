@@ -142,6 +142,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		a.Glossary.SetGitHub(gh)
 	}
 	a.Reviews = service.NewReviewService(repos.Review, a.Catalogs, a.Glossary, a.Reservations, repos.Project, repos.User, mailer, cfg.Site)
+	a.Reviews.SetDiscussions(a.Discussions) // reviewers' comments on files waiting for review stay open until resolved
 	a.Catalogs.SetActivity(a.Activity)
 	a.Discussions.SetActivity(a.Activity)
 	a.Discussions.SetNotifications(postgres.NewNotificationRepository(db))
@@ -325,6 +326,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Post("/projects/{id}/discussions/{type}/{key}/delete", h.DeleteDiscussion)
 		r.Post("/projects/{id}/comments/{cid}/edit", h.EditComment)
 		r.Post("/projects/{id}/comments/{cid}/delete", h.DeleteComment)
+		r.Post("/projects/{id}/comments/{cid}/resolve", h.ResolveComment)
 		r.Post("/projects/{id}/members/invite", h.Invite)
 		r.Post("/projects/{id}/members/{uid}/role", h.ChangeMemberRole)
 		r.Post("/projects/{id}/members/{uid}/remove", h.RemoveMember)

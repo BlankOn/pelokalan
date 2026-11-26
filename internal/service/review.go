@@ -37,6 +37,42 @@ type ReviewService struct {
 	users        repository.UserRepository
 	mailer       Mailer
 	site         config.SiteConfig
+	discuss      *DiscussionService // review comments (nil = none)
+}
+
+// SetDiscussions connects review comments: comments by reviewers on a file waiting for review stay open
+// until resolved, and approval waits for them
+func (s *ReviewService) SetDiscussions(d *DiscussionService) {
+	s.discuss = d
+	d.SetReviews(s.OpenFor)
+}
+
+// OpenFor is the open review a comment by user on the file belongs to: the file waits for review and the
+// user is an owner/manager who did not ask for it (nil = a plain comment)
+func (s *ReviewService) OpenFor(ctx context.Context, p *models.Project, catalogID int64, user *models.User) *int64 {
+	if s == nil || !p.Role.CanManage() {
+		return nil
+	}
+	latest, err := s.repo.Latest(ctx, []int64{catalogID})
+	if err != nil {
+		return nil
+	}
+	if r := latest[catalogID]; r != nil && r.Status == models.ReviewRequested && r.RequestedBy != user.ID {
+		return &r.ID
+	}
+	return nil
+}
+
+// openComments counts a file's open review comments
+func (s *ReviewService) openComments(ctx context.Context, p *models.Project, catalogID int64) int {
+	if s.discuss == nil {
+		return 0
+	}
+	n := 0
+	for _, c := range s.discuss.OpenReviewComments(ctx, p, catalogID) {
+		n += c
+	}
+	return n
 }
 
 // NewReviewService creates the review service
@@ -77,6 +113,9 @@ func (s *ReviewService) Attach(ctx context.Context, p *models.Project, catalogs 
 	}
 	for _, c := range catalogs {
 		c.Review = latest[c.ID]
+		if c.Review != nil && c.Review.Status == models.ReviewRequested {
+			c.Review.OpenComments = s.openComments(ctx, p, c.ID)
+		}
 	}
 }
 
@@ -85,7 +124,11 @@ func (s *ReviewService) Open(ctx context.Context, p *models.Project) ([]*models.
 	if s == nil || !p.Role.CanManage() {
 		return nil, nil
 	}
-	return s.repo.Open(ctx, p.ID)
+	list, err := s.repo.Open(ctx, p.ID)
+	for _, r := range list {
+		r.OpenComments = s.openComments(ctx, p, r.CatalogID)
+	}
+	return list, err
 }
 
 // Get returns a review of the project
@@ -125,6 +168,19 @@ func (s *ReviewService) Changes(ctx context.Context, p *models.Project, c *model
 		return nil, err
 	}
 	return gitpatch.Diff(c.RepoPath, base, want), nil
+}
+
+// ChangedHashes are the key hashes of the entries a review of the file would send (the review editor lists them)
+func (s *ReviewService) ChangedHashes(ctx context.Context, c *models.Catalog) map[string]bool {
+	out := map[string]bool{}
+	want, err := s.catalogs.ChangedTargets(ctx, c, s.lastSent(ctx, c.ID))
+	if err != nil {
+		return out
+	}
+	for k := range want {
+		out[models.KeyHashOf(k)] = true
+	}
+	return out
 }
 
 func cleanNote(note string) string {
@@ -239,6 +295,9 @@ func (s *ReviewService) PushNow(ctx context.Context, manager *models.User, p *mo
 	if g == nil {
 		return nil, userErr("err.review_unavailable")
 	}
+	if n := s.openComments(ctx, p, c.ID); n > 0 {
+		return nil, userErr("err.review_open_comments", n)
+	}
 	latest, err := s.repo.Latest(ctx, []int64{c.ID})
 	if err != nil {
 		return nil, err
@@ -276,6 +335,9 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 	gh := s.glossary.GitHubApp()
 	if g == nil || gh == nil {
 		return userErr("err.review_unavailable")
+	}
+	if n := s.openComments(ctx, p, c.ID); n > 0 {
+		return userErr("err.review_open_comments", n) // review comments must be resolved first
 	}
 	owner, err := s.users.GetByID(ctx, c.OwnerID)
 	if err != nil {

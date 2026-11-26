@@ -33,6 +33,7 @@ type ModuleReview struct {
 	Error       string // last failed attempt to commit (the request stays open)
 
 	// Filled by queries
+	OpenComments      int // open review comments on the file (ReviewService.Attach/Open)
 	RequesterUsername string
 	RequesterName     string
 	ReviewerUsername  string

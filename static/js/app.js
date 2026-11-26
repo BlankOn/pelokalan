@@ -2839,6 +2839,35 @@ document.addEventListener("click", function (ev) {
     (url ? dlg.querySelector("button[type=submit]") : dlg.querySelector("#r-url")).focus();
 });
 
+// Review editor: table (the review's strings) or diff (the lines that will be committed)
+document.addEventListener("click", function (ev) {
+    var btn = ev.target.closest && ev.target.closest("[data-review-view]");
+    var app = document.getElementById("editor-app");
+    if (!btn || !app) return;
+    var diff = btn.dataset.reviewView === "diff";
+    app.classList.toggle("show-diff", diff);
+    var pane = document.getElementById("review-diff");
+    if (pane) pane.hidden = !diff;
+    document.querySelectorAll("[data-review-view]").forEach(function (b) { b.classList.toggle("active", b === btn); });
+});
+
+// A thread's open review comments (data-review-open) mark the selected entry's row with a red dot, so
+// resolving the last one (or a reviewer's new comment) shows in the list at once
+document.addEventListener("htmx:load", function (ev) {
+    var th = ev.target && ev.target.matches && ev.target.matches(".thread") ? ev.target : null;
+    var row = document.querySelector(".entry-row.selected");
+    if (!th || !row || !th.closest("#sidebar, #editor")) return;
+    var n = parseInt(th.dataset.reviewOpen || "0", 10);
+    var icon = row.querySelector(".cell-icon"), dot = icon && icon.querySelector(".mark-review");
+    if (n > 0 && icon && !dot) {
+        dot = document.createElement("span");
+        dot.className = "mark-review";
+        icon.insertBefore(dot, icon.firstChild);
+    } else if (n === 0 && dot) {
+        dot.remove();
+    }
+});
+
 // "Ajukan tinjauan" in a file's menu: one popup for every file (an optional note for the reviewer)
 document.addEventListener("click", function (ev) {
     var btn = ev.target.closest && ev.target.closest("[data-review]");

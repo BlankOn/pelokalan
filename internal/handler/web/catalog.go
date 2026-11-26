@@ -73,9 +73,27 @@ func (h *Handler) attachComments(r *http.Request, p *models.Project, c *models.C
 	if err != nil {
 		return
 	}
+	open := h.discuss.OpenReviewComments(r.Context(), p, c.ID)
 	for i, e := range entries {
 		e.Comments = counts[keys[i]]
+		e.ReviewOpen = open[e.KeyHash()]
 	}
+}
+
+// reviewComments fills the filter's open review comments ("review" ticked) and returns their count
+func (h *Handler) reviewComments(r *http.Request, p *models.Project, c *models.Catalog, f *service.EntryFilter) int {
+	open := h.discuss.OpenReviewComments(r.Context(), p, c.ID)
+	if f != nil && f.Review {
+		f.ReviewHashes = map[string]bool{}
+		for k := range open {
+			f.ReviewHashes[k] = true
+		}
+	}
+	n := 0
+	for _, v := range open {
+		n += v
+	}
+	return n
 }
 
 func filterFromRequest(r *http.Request) service.EntryFilter {
@@ -91,7 +109,13 @@ func filterFromRequest(r *http.Request) service.EntryFilter {
 			}
 		}
 	}
-	return service.EntryFilter{Statuses: statuses, Query: q.Get("q"), Order: q.Get("order")}
+	f := service.EntryFilter{Query: q.Get("q"), Order: q.Get("order"), Review: seen["review"]}
+	for _, s := range statuses {
+		if s != "review" {
+			f.Statuses = append(f.Statuses, s)
+		}
+	}
+	return f
 }
 
 // editorView is the data of the editor partials
@@ -155,13 +179,27 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	h.editorPage(w, r, c, p, nil)
+}
+
+// editorPage renders the editor; with a review it is the review editor (reviewPage): read-only, only the
+// review's strings, a trimmed toolbar (back, approval, table/diff) and no edit pane
+func (h *Handler) editorPage(w http.ResponseWriter, r *http.Request, c *models.Catalog, p *models.Project, rv *models.ModuleReview) {
 	hold := h.applyLock(r, p, c) // a module another member holds opens read-only
 	f := filterFromRequest(r)
+	open := h.reviewComments(r, p, c, &f)
+	if rv != nil {
+		c.Owned = false // nothing is edited here
+		if rv.Status == models.ReviewRequested {
+			f.Only = h.reviewHashes(r, p, c)
+		}
+	}
 	listing, err := h.catalogService.Entries(r.Context(), c, f)
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
+	listing.ReviewComments = open
 	data := h.page(r, "")
 	name := c.Filename
 	if !c.IsTemplate {
@@ -234,6 +272,9 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 			data.Data["Upstream"] = up
 		}
 	}
+	if rv != nil {
+		h.reviewData(r, p, c, rv, &data)
+	}
 	if n := r.URL.Query().Get("pretranslated"); n != "" {
 		data.Flash = i18n.T(data.Lang, "flash.pretranslated", n)
 	}
@@ -250,11 +291,18 @@ func (h *Handler) EntryList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	f := filterFromRequest(r)
+	open := h.reviewComments(r, p, c, &f)
+	if rid, _ := strconv.ParseInt(r.URL.Query().Get("review"), 10, 64); rid > 0 { // the review editor's strings only
+		if rv, err := h.reviews.Get(r.Context(), p, rid); err == nil && rv.CatalogID == c.ID {
+			f.Only = h.reviewHashes(r, p, c)
+		}
+	}
 	listing, err := h.catalogService.Entries(r.Context(), c, f)
 	if err != nil {
 		h.fail(w, r, err)
 		return
 	}
+	listing.ReviewComments = open
 	lang := middleware.GetLang(r.Context())
 	h.attachComments(r, p, c, listing.Entries)
 	selected, _ := strconv.ParseInt(r.URL.Query().Get("selected"), 10, 64)
@@ -366,6 +414,10 @@ func (h *Handler) SaveEntry(w http.ResponseWriter, r *http.Request) {
 	}
 
 	stats, _ := h.catalogService.Entries(r.Context(), c, service.EntryFilter{})
+	if stats != nil {
+		stats.ReviewComments = h.reviewComments(r, p, c, nil)
+	}
+	h.attachComments(r, p, c, []*models.Entry{saved})
 	parts := []partial{
 		{"entry_row", map[string]any{"E": saved, "Lang": lang, "OOB": true}},
 		{"statusbar", map[string]any{"Lang": lang, "Listing": stats, "Catalog": c, "OOB": true}},

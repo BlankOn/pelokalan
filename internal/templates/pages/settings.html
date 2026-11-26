@@ -85,22 +85,6 @@
     </form>
 </section>
 
-{{if .Data.Held}}
-<section class="card" id="held-modules">
-    <h2>{{t .Lang "reserve.held_title"}}</h2>
-    <table class="table held-table">
-        <thead><tr><th>{{t .Lang "badges.col_module"}}</th><th>{{t .Lang "reserve.col_holder"}}</th><th>{{t .Lang "reserve.col_since"}}</th><th>{{t .Lang "reserve.col_last_save"}}</th><th></th></tr></thead>
-        <tbody>{{range .Data.Held}}<tr>
-            <td><strong>{{.Module}}</strong></td>
-            <td><a href="/users/{{.Username}}">@{{.Username}}</a></td>
-            <td class="small muted">{{timeAgo $.Lang .ReservedAt}}</td>
-            <td class="small muted">{{timeAgo $.Lang .LastSave}}</td>
-            <td class="actions"><form method="post" action="{{$p.Path}}/reservations/release" data-confirm="{{t $.Lang "reserve.release_other_confirm" .Module .Username}}"><input type="hidden" name="module" value="{{.Module}}"><input type="hidden" name="next" value="{{$p.Path}}/settings#held-modules"><button class="btn btn-small">{{t $.Lang "reserve.release"}}</button></form></td>
-        </tr>{{end}}</tbody>
-    </table>
-</section>
-{{end}}
-
 {{if $p.Role.CanManage}}
 <section class="card" id="module-groups">
     <h2>{{t .Lang "groups.title"}}</h2>
