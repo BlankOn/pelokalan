@@ -1617,6 +1617,9 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .home-intro { position: relative; background: linear-gradient(135deg, var(--accent-soft), #fff 55%); border: 1px solid var(--border-soft);
     border-radius: 16px; padding: 30px 30px 26px; margin-bottom: 26px; }
 .home-hero { max-width: 820px; }
+/* the illustration above the introduction card (static/img/home-hero.png: speech bubbles in many languages, background
+   cut out); the hands rise from the card's top edge */
+.home-art { display: block; width: 100%; height: auto; margin: 0 0 -1px; user-select: none; pointer-events: none; }
 .home-kicker { margin: 0 0 6px; font-weight: 700; color: var(--accent); }
 .home-hero h1 { margin: 0 0 10px; font-size: 30px; line-height: 1.2; }
 .home-lead { margin: 0 0 18px; font-size: 16px; color: #3f434b; max-width: 62ch; }

@@ -498,7 +498,8 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
 
 ## Home page introduction
 
-`/projects` starts with a landing introduction (`#home-intro`, pages/projects.html, `home.*` strings): headline, pitch,
+`/projects` starts with a landing introduction (`#home-intro`, pages/projects.html, `home.*` strings): an illustration
+right above the card (`static/img/home-hero.png`, transparent background, `.home-art`), headline, pitch,
 buttons (visitors: sign up / sign in; members: jump to the list), six feature cards (`homeFeatures`, badge
 icons), the connected sources (GNOME l10n.gnome.org, GitHub repositories and the Translation Project, `home.src_*`) and three "how it works"
 steps. It is always shown (no hide button).
