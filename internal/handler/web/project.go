@@ -799,6 +799,10 @@ func (h *Handler) ProjectFilesSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err := h.glossary.SyncAll(r.Context(), p)
+	if errors.Is(err, service.ErrForbidden) { // owners and coordinators only
+		h.fail(w, r, err)
+		return
+	}
 	if r.Header.Get("X-Sync") != "" { // app.js waits for the result (button spins)
 		w.Header().Set("Content-Type", "application/json")
 		if err != nil {

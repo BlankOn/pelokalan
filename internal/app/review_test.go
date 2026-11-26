@@ -83,6 +83,10 @@ func TestGitHubReviews(t *testing.T) {
 	rina.get(base+"/files").status(http.StatusOK).contains("Menunggu tinjauan", page)
 	rina.get(page).status(http.StatusOK).contains("review-mode", "Disetujui oleh pemilik atau koordinator").lacks("rv-approve")
 	rina.post(page+"/approve", nil).status(http.StatusForbidden)
+	// syncing with upstream is for owners and coordinators only
+	rina.post(base+"/project-files/sync", nil).status(http.StatusForbidden)
+	kiki.post(base+"/project-files/sync", nil).status(http.StatusForbidden)
+	kiki.get(base + "/files").status(http.StatusOK).lacks("/project-files/sync")
 	rkey := fmt.Sprintf("%d-%s", kc, models.KeyHashOf("Close the window"))
 	rina.hx(base+"/discussions/po_entry/"+rkey+"/comments", url.Values{"body": {"Sudah pas."}}).status(http.StatusOK).
 		contains(`data-review-open="1"`)
