@@ -162,6 +162,11 @@ type FileDiff struct {
 // patch of the entries that differ; nil when nothing changes. Entries the file does not have are
 // ignored: the repository decides which strings exist.
 func Diff(path string, base []byte, want map[string]Target) *FileDiff {
+	return DiffCredit(path, base, want, nil)
+}
+
+// DiffCredit is Diff that also credits the translator in the header (Credit) when any entry changes
+func DiffCredit(path string, base []byte, want map[string]Target, credit *Credit) *FileDiff {
 	lines, ended := splitLines(base)
 	var changes []change
 	entries := 0
@@ -184,6 +189,9 @@ func Diff(path string, base []byte, want map[string]Target) *FileDiff {
 	if len(changes) == 0 {
 		return nil
 	}
+	if hc := headerChange(lines, credit); hc != nil { // the header comes first in the file
+		changes = append(lineChanges(lines[hc.start:hc.end], hc.lines, hc.start), changes...)
+	}
 	d := &FileDiff{Path: path, Changed: entries}
 	d.Hunks, d.Added, d.Removed = hunks(lines, ended, changes)
 	return d
@@ -192,6 +200,11 @@ func Diff(path string, base []byte, want map[string]Target) *FileDiff {
 // Apply rewrites a repository file like Diff and returns the whole new file and how many entries
 // changed (0 = the file already has every wanted translation; data is then base itself)
 func Apply(base []byte, want map[string]Target) ([]byte, int) {
+	return ApplyCredit(base, want, nil)
+}
+
+// ApplyCredit is Apply that also credits the translator in the header (Credit) when any entry changes
+func ApplyCredit(base []byte, want map[string]Target, credit *Credit) ([]byte, int) {
 	lines, ended := splitLines(base)
 	var out []string
 	last, entries := 0, 0
@@ -212,6 +225,9 @@ func Apply(base []byte, want map[string]Target) ([]byte, int) {
 		return base, 0
 	}
 	out = append(out, lines[last:]...)
+	if hc := headerChange(lines, credit); hc != nil { // the header block precedes every entry: same line numbers in out
+		out = append(append(append([]string(nil), out[:hc.start]...), hc.lines...), out[hc.end:]...)
+	}
 	text := strings.Join(out, "\n")
 	if ended {
 		text += "\n"

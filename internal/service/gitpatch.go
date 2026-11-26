@@ -105,6 +105,15 @@ func gunzip(data []byte) ([]byte, error) {
 // the file go in, against the repository file as last synced, so newer translations in the repository
 // are never reverted. AI drafts nobody reviewed and emptied translations are left out. Files
 // changes (0 = nothing to send) tells whether there is anything.
+// TranslatorCredit is how a translator is credited in the header of files sent to a repository: their credit
+// identity (profile "Identitas penerjemah", else the account) and this year
+func TranslatorCredit(u *models.User) *gitpatch.Credit {
+	if u == nil {
+		return nil
+	}
+	return &gitpatch.Credit{Name: u.CreditName(), Email: u.CreditEmail(), Year: time.Now().Year()}
+}
+
 func (s *CatalogService) GitPatch(ctx context.Context, user *models.User, p *models.Project, catalogs []*models.Catalog, projectURL string) (*GitPatchResult, error) {
 	if s.projectFiles == nil {
 		return nil, ErrNotFound
@@ -130,7 +139,7 @@ func (s *CatalogService) GitPatch(ctx context.Context, user *models.User, p *mod
 		if err != nil {
 			return nil, err
 		}
-		d := gitpatch.Diff(c.RepoPath, base, want)
+		d := gitpatch.DiffCredit(c.RepoPath, base, want, TranslatorCredit(user))
 		if d == nil {
 			continue
 		}

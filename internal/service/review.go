@@ -168,7 +168,11 @@ func (s *ReviewService) Changes(ctx context.Context, p *models.Project, c *model
 	if err != nil {
 		return nil, err
 	}
-	return gitpatch.Diff(c.RepoPath, base, want), nil
+	var credit *gitpatch.Credit
+	if owner, err := s.users.GetByID(ctx, c.OwnerID); err == nil {
+		credit = TranslatorCredit(owner)
+	}
+	return gitpatch.DiffCredit(c.RepoPath, base, want, credit), nil
 }
 
 // ChangedHashes are the key hashes of the entries a review of the file would send (the review editor lists them)
@@ -370,7 +374,7 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 		if conflicts := s.catalogs.UpstreamConflicts(ctx, c, f.Data, want, sent); len(conflicts) > 0 {
 			return userErr("err.review_upstream_conflict", len(conflicts), conflictList(conflicts))
 		}
-		data, n := gitpatch.Apply(f.Data, want)
+		data, n := gitpatch.ApplyCredit(f.Data, want, TranslatorCredit(owner)) // the header credits the translator
 		if n == 0 {
 			return userErr("err.review_nothing")
 		}

@@ -716,8 +716,11 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   Owners/managers may also "Kirim ke repositori" any file directly (`PushNow`), unless the project setting "Wajibkan
   tinjauan" (Settings → Umum, `projects.review_required`, migration 050) is on: then the button is hidden and
   `PushNow` refuses (`err.review_required`). One open request per file.
-- Commit (`ReviewService.commit`): reads the branch's current file, `gitpatch.Apply` (the whole file with only the
-  member's changed entries rewritten), `PutFile` (one retry on conflict), author = translator's credit identity,
+- Commit (`ReviewService.commit`): reads the branch's current file, `gitpatch.ApplyCredit` (the whole file with only the
+  member's changed entries rewritten, and the header crediting the translator: their "Name <email>, year." line among
+  the header comments via `po.AddContributor`, and an existing Last-Translator field set to them; `TranslatorCredit`,
+  only when some string changes). The review diff and "Lihat" (`ReviewService.Changes`, `gitpatch.DiffCredit`) and the
+  git patch export show the same header lines. The member's other header edits in Pelokalan are not sent. `PutFile` (one retry on conflict), author = translator's credit identity,
   message "Update translation of <path>" + count + note + `Reviewed-by:` + project link. Only the strings a commit
   rewrote are kept (`pushed_data`, `sentEntries`) and never sent again. Before committing, `UpstreamConflicts` refuses
   (`err.review_upstream_conflict`, naming the strings) when the branch has a translation that differs from both the

@@ -8,6 +8,7 @@ import (
 	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"pelokalan/internal/models"
 )
@@ -144,6 +145,10 @@ func TestGitHubReviews(t *testing.T) {
 	}
 	kiki.hx(fmt.Sprintf("%s/comments/%d/resolve", base, cmt), nil).status(http.StatusOK).contains("Diselesaikan oleh", `data-review-open="0"`)
 
+	// the diff shows the header credit the commit adds for the translator
+	year := strconv.Itoa(time.Now().Year())
+	owner.get(page).status(http.StatusOK).contains(kiki.Email + "&gt;, " + year + ".")
+
 	owner.post(page+"/approve", nil).redirectsTo(page)
 	commits := ghFake.LastCommits()
 	if len(commits) != 1 {
@@ -156,7 +161,8 @@ func TestGitHubReviews(t *testing.T) {
 		t.Fatalf("commit: %+v", cm)
 	}
 	body := string(cm.Data)
-	for _, want := range []string{`msgstr "Tutup jendelanya"`, `msgstr "Hapus direktori"`, `msgstr "Buka berkas tersebut"`} {
+	for _, want := range []string{`msgstr "Tutup jendelanya"`, `msgstr "Hapus direktori"`, `msgstr "Buka berkas tersebut"`,
+		"<" + kiki.Email + ">, " + year + ".\nmsgid \"\""} { // credited in the header comments
 		if !strings.Contains(body, want) {
 			t.Errorf("committed file lacks %s:\n%s", want, body)
 		}
