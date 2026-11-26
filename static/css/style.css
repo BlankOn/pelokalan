@@ -517,7 +517,9 @@ h1 .ai-badge { font-size: 12px; }
 /* Penerjemahan: each section's title, card head, filters and column row stay on top while it scrolls,
    stacked (app.js sets --stick-top from the heights above); they let go when the section ends */
 .files-section [data-stick] { position: sticky; top: var(--stick-top, 0px); z-index: 6; }
-.files-section h2.section-title[data-stick] { background: var(--bg); margin-bottom: 0; padding: 6px 0 10px; }
+/* the title sticks within the whole section, the parts below within its card, which ends a little earlier: the title
+   stays above them so they slide under it (not over it) while the section scrolls away */
+.files-section h2.section-title[data-stick] { background: var(--bg); margin-bottom: 0; padding: 6px 0 10px; z-index: 8; }
 .files-section .card-head[data-stick] { background: var(--surface); margin: -10px 0 0; padding: 10px 0 12px; }
 .files-section .pf-toolbar[data-stick] { background: var(--surface); margin-bottom: 0; padding: 8px 0 14px; z-index: 7; }
 .files-section thead[data-stick] { position: static; }
