@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"pelokalan/internal/thesaurus"
+	"pelokalan/pkg/thesaurus"
 )
 
 // ThesaurusLookup returns synonyms and antonyms of a word as JSON (project members only)

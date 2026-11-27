@@ -14,8 +14,8 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
+	"pelokalan/pkg/po"
 )
 
 // CatalogService handles translation files and their entries

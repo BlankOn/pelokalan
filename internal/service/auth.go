@@ -11,7 +11,7 @@ import (
 	"log"
 	"math/big"
 	"net/mail"
-	"pelokalan/internal/po"
+	"pelokalan/pkg/po"
 	"regexp"
 	"slices"
 	"strings"

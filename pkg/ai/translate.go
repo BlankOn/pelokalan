@@ -11,8 +11,8 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"pelokalan/internal/glossary"
-	"pelokalan/internal/po"
+	"pelokalan/pkg/glossary"
+	"pelokalan/pkg/po"
 )
 
 // TermHint is a glossary term the translation must use

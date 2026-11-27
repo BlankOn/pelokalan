@@ -9,8 +9,8 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
+	"pelokalan/pkg/po"
 )
 
 // Messages of automatic commits are i18n keys, optionally followed by

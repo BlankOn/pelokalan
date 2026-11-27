@@ -7,8 +7,8 @@ import (
 	"regexp"
 	"strings"
 
-	"pelokalan/internal/glossary"
 	"pelokalan/internal/models"
+	"pelokalan/pkg/glossary"
 )
 
 // Module groups synced from a GitHub repository branch (e.g. python/python-docs-id, branch 3.14):

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
-	"pelokalan/internal/thesaurus"
+	"pelokalan/pkg/thesaurus"
 )
 
 // ErrNotFound is returned when a record does not exist

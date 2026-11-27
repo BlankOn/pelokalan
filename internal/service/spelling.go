@@ -7,11 +7,11 @@ import (
 	"strings"
 	"sync"
 
-	"pelokalan/internal/glossary"
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
-	"pelokalan/internal/spelling"
+	"pelokalan/pkg/glossary"
+	"pelokalan/pkg/po"
+	"pelokalan/pkg/spelling"
 )
 
 // SpellingService checks Indonesian translations against a word list taken from KBBI (downloaded

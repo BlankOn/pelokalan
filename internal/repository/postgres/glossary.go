@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/glossary"
 	"pelokalan/internal/models"
 	"pelokalan/internal/repository"
+	"pelokalan/pkg/glossary"
 )
 
 type glossaryRepository struct {

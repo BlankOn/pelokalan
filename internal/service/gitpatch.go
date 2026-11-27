@@ -11,10 +11,10 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/gitpatch"
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
+	"pelokalan/pkg/gitpatch"
+	"pelokalan/pkg/po"
 )
 
 // SetProjectFiles gives the service access to project files, for git patches against the repository's files

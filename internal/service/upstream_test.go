@@ -9,10 +9,10 @@ import (
 	"testing"
 	"time"
 
-	"pelokalan/internal/gnomel10n"
 	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
 	"pelokalan/internal/repository"
+	"pelokalan/pkg/gnomel10n"
 )
 
 // upstreamRepo keeps groups, project files and stored upstream states in memory;
@@ -106,7 +106,7 @@ func upstreamSite(t *testing.T) (*httptest.Server, *int) {
 			http.NotFound(w, r)
 			return
 		}
-		data, err := os.ReadFile("../gnomel10n/testdata/" + name)
+		data, err := os.ReadFile("../../pkg/gnomel10n/testdata/" + name)
 		if err != nil {
 			t.Error(err)
 		}
@@ -257,7 +257,7 @@ func TestUpstreamStateKeys(t *testing.T) {
 // The release page fills every state with one request; the API's po_file is kept and
 // files the page does not list are stored as not upstream
 func TestUpstreamWarmFromPage(t *testing.T) {
-	page, err := os.ReadFile("../gnomel10n/testdata/page_gnome-51_id_ui.html")
+	page, err := os.ReadFile("../../pkg/gnomel10n/testdata/page_gnome-51_id_ui.html")
 	if err != nil {
 		t.Fatal(err)
 	}

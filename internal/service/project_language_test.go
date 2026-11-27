@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
+	"pelokalan/pkg/po"
 )
 
 func TestCheckProjectLanguage(t *testing.T) {

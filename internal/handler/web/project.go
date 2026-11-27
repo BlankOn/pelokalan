@@ -16,11 +16,11 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/glossary"
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
 	"pelokalan/internal/service"
+	"pelokalan/pkg/glossary"
 )
 
 // Projects lists all projects (public) and the user's pending invitations

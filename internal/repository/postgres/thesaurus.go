@@ -6,7 +6,7 @@ import (
 	"encoding/json"
 
 	"pelokalan/internal/repository"
-	"pelokalan/internal/thesaurus"
+	"pelokalan/pkg/thesaurus"
 )
 
 type thesaurusRepository struct{ db *sql.DB }

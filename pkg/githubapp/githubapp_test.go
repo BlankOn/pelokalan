@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"pelokalan/internal/githubapp"
-	"pelokalan/internal/githubapp/githubtest"
+	"pelokalan/pkg/githubapp"
+	"pelokalan/pkg/githubapp/githubtest"
 )
 
 func TestClient(t *testing.T) {

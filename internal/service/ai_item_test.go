@@ -3,8 +3,8 @@ package service
 import (
 	"testing"
 
-	"pelokalan/internal/ai"
 	"pelokalan/internal/models"
+	"pelokalan/pkg/ai"
 )
 
 func TestBuildItemDraftMakesGlossaryOptional(t *testing.T) {

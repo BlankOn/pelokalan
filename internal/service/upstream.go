@@ -9,8 +9,8 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/gnomel10n"
 	"pelokalan/internal/models"
+	"pelokalan/pkg/gnomel10n"
 )
 
 // Upstream states (GNOME translation site). The site's API allows roughly a hundred

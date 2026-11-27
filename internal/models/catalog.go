@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/po"
+	"pelokalan/pkg/po"
 )
 
 // Catalog is one translation file of a project

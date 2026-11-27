@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/netsafe"
+	"pelokalan/pkg/netsafe"
 )
 
 // DefaultBaseURL is the OpenAI API endpoint

@@ -12,7 +12,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
-	"pelokalan/internal/tpsite"
+	"pelokalan/pkg/tpsite"
 )
 
 // a Translation Project team page with one translated domain and one only offered as a template

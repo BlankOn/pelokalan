@@ -15,17 +15,17 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"pelokalan/internal/ai"
 	"pelokalan/internal/blobstore"
 	"pelokalan/internal/config"
-	"pelokalan/internal/githubapp"
-	"pelokalan/internal/glossary"
-	"pelokalan/internal/gnomel10n"
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/handler/web"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/repository/postgres"
 	"pelokalan/internal/service"
+	"pelokalan/pkg/ai"
+	"pelokalan/pkg/githubapp"
+	"pelokalan/pkg/glossary"
+	"pelokalan/pkg/gnomel10n"
 )
 
 // Options changes how the application is put together

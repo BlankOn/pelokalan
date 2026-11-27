@@ -25,9 +25,9 @@ import (
 
 	"pelokalan/internal/app"
 	"pelokalan/internal/config"
-	"pelokalan/internal/githubapp/githubtest"
 	"pelokalan/internal/service"
 	"pelokalan/internal/testdb"
+	"pelokalan/pkg/githubapp/githubtest"
 )
 
 var (

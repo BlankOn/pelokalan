@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/po"
+	"pelokalan/pkg/po"
 )
 
 // Target is the wanted state of one entry (matched by context + source text)

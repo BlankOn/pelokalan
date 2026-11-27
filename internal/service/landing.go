@@ -7,9 +7,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"pelokalan/internal/glossary"
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
+	"pelokalan/pkg/glossary"
+	"pelokalan/pkg/po"
 )
 
 // Detecting work accepted upstream. Pelokalan re-downloads the upstream files at every sync (a GNOME

@@ -22,7 +22,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"pelokalan/internal/po"
+	"pelokalan/pkg/po"
 )
 
 // Base is the site's address (a variable so tests can serve recorded pages)

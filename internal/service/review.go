@@ -10,12 +10,12 @@ import (
 	"time"
 
 	"pelokalan/internal/config"
-	"pelokalan/internal/githubapp"
-	"pelokalan/internal/gitpatch"
 	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
+	"pelokalan/pkg/githubapp"
+	"pelokalan/pkg/gitpatch"
+	"pelokalan/pkg/po"
 )
 
 // Reviews of modules for repositories Pelokalan writes to (full GitHub integration). A member asks for a

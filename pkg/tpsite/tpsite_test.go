@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"pelokalan/internal/po"
+	"pelokalan/pkg/po"
 )
 
 // testdata/team_id.html: https://translationproject.org/team/id.html as saved on 2026-11-25

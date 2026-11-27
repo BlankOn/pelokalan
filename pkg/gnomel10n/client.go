@@ -21,7 +21,7 @@ import (
 	"sync"
 	"time"
 
-	"pelokalan/internal/netsafe"
+	"pelokalan/pkg/netsafe"
 )
 
 // DefaultBase is the GNOME translation site

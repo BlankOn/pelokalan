@@ -9,11 +9,11 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/ai"
-	"pelokalan/internal/glossary"
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
+	"pelokalan/pkg/ai"
+	"pelokalan/pkg/glossary"
+	"pelokalan/pkg/po"
 )
 
 // Defaults suggested when a project first configures AI. Prices are USD per

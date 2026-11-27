@@ -11,9 +11,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"pelokalan/internal/badgecard"
 	"pelokalan/internal/models"
 	"pelokalan/internal/service"
+	"pelokalan/pkg/badgecard"
 )
 
 // Sharing badges: every earned tier has its own page, /users/{username}/badges/{key}/{tier}, with Open Graph

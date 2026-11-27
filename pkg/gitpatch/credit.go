@@ -3,7 +3,7 @@ package gitpatch
 import (
 	"strings"
 
-	"pelokalan/internal/po"
+	"pelokalan/pkg/po"
 )
 
 // Credit is the translator a change credits in the file header: their "Name <email>, year." line in the header

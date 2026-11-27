@@ -5,8 +5,8 @@ import (
 	"errors"
 	"log"
 
-	"pelokalan/internal/githubapp"
 	"pelokalan/internal/models"
+	"pelokalan/pkg/githubapp"
 )
 
 // Full integration with GitHub repositories (option 3 of the GitHub integration): the Pelokalan GitHub App is

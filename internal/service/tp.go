@@ -10,10 +10,10 @@ import (
 	"log"
 	"time"
 
-	"pelokalan/internal/glossary"
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
-	"pelokalan/internal/tpsite"
+	"pelokalan/pkg/glossary"
+	"pelokalan/pkg/po"
+	"pelokalan/pkg/tpsite"
 )
 
 // Module groups synced from a Translation Project team page (internal/tpsite). The site has no API:

@@ -20,14 +20,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"pelokalan/internal/badgecard"
 	"pelokalan/internal/config"
-	"pelokalan/internal/glossary"
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
 	"pelokalan/internal/service"
+	"pelokalan/pkg/badgecard"
+	"pelokalan/pkg/glossary"
+	"pelokalan/pkg/po"
 )
 
 // Handler holds web handler dependencies

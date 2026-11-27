@@ -10,7 +10,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"pelokalan/internal/po"
+	"pelokalan/pkg/po"
 )
 
 // TermMaxWords is the longest source text (in words) treated as a term rather than a sentence

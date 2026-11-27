@@ -9,7 +9,7 @@ import (
 	"mime"
 	"net/http"
 	"net/url"
-	"pelokalan/internal/ai"
+	"pelokalan/pkg/ai"
 	"strconv"
 	"strings"
 

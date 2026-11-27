@@ -16,13 +16,13 @@ import (
 	"sync"
 	"time"
 
-	"pelokalan/internal/githubapp"
-	"pelokalan/internal/glossary"
-	"pelokalan/internal/gnomel10n"
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
 	"pelokalan/internal/repository"
-	"pelokalan/internal/tpsite"
+	"pelokalan/pkg/githubapp"
+	"pelokalan/pkg/glossary"
+	"pelokalan/pkg/gnomel10n"
+	"pelokalan/pkg/po"
+	"pelokalan/pkg/tpsite"
 )
 
 // GlossaryService builds and searches project glossaries

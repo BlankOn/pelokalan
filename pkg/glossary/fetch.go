@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/netsafe"
+	"pelokalan/pkg/netsafe"
 )
 
 // ErrBlockedAddress is returned when a URL resolves to a private or local address

@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log"
 
-	"pelokalan/internal/glossary"
 	"pelokalan/internal/models"
 	"pelokalan/internal/repository"
-	"pelokalan/internal/thesaurus"
+	"pelokalan/pkg/glossary"
+	"pelokalan/pkg/thesaurus"
 )
 
 // ThesaurusService offers Indonesian synonyms to project members in the editor. The data is

@@ -10,8 +10,8 @@ import (
 
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
-	"pelokalan/internal/po"
 	"pelokalan/internal/service"
+	"pelokalan/pkg/po"
 )
 
 // Read-only view of a project file ("Lihat" in Berkas proyek, module links in the glossary): the editor's

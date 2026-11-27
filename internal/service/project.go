@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"html"
 	"log"
-	"pelokalan/internal/po"
+	"pelokalan/pkg/po"
 	"regexp"
 	"strconv"
 	"strings"

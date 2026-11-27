@@ -7,8 +7,8 @@ import (
 	"sync"
 	"time"
 
-	"pelokalan/internal/ai"
-	"pelokalan/internal/glossary"
+	"pelokalan/pkg/ai"
+	"pelokalan/pkg/glossary"
 )
 
 // EntryTerm is a glossary term found in a source string, shown in the editor
