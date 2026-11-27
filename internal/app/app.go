@@ -15,6 +15,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/activity"
 	"pelokalan/internal/langtools"
 	"pelokalan/internal/modulecontext"
@@ -44,8 +45,8 @@ type Options struct {
 
 // Repositories are the Postgres stores the app was built with (main and tests use some directly)
 type Repositories struct {
-	User     repository.UserRepository
-	OTP      repository.OTPRepository
+	User     account.UserRepository
+	OTP      account.OTPRepository
 	Project  repository.ProjectRepository
 	Catalog  repository.CatalogRepository
 	Glossary repository.GlossaryRepository
@@ -65,7 +66,7 @@ type App struct {
 	Blobs  *blobstore.Postgres
 	Mailer mailer.Mailer
 
-	Auth         *service.AuthService
+	Auth         *account.Service
 	Projects     *service.ProjectService
 	Catalogs     *service.CatalogService
 	Glossary     *service.GlossaryService
@@ -108,8 +109,8 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	}
 	a := &App{DB: db}
 	a.Repos = &Repositories{
-		User:     postgres.NewUserRepository(db),
-		OTP:      postgres.NewOTPRepository(db),
+		User:     account.NewUserRepository(db),
+		OTP:      account.NewOTPRepository(db),
 		Project:  postgres.NewProjectRepository(db),
 		Catalog:  postgres.NewCatalogRepository(db),
 		Glossary: postgres.NewGlossaryRepository(db),
@@ -131,7 +132,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		a.Mailer = mailer.NewMailer(cfg.Mail)
 	}
 	mailer := a.Mailer
-	a.Auth = service.NewAuthService(repos.User, repos.OTP, mailer, cfg.Auth, cfg.Site, cfg.JWT)
+	a.Auth = account.New(repos.User, repos.OTP, mailer, cfg.Auth, cfg.Site, cfg.JWT)
 	a.Projects = service.NewProjectService(repos.Project, repos.User, mailer, a.Auth, cfg.Auth, cfg.Site)
 	a.Catalogs = service.NewCatalogService(repos.Catalog, repos.Commit, a.Projects)
 	fetcher := glossary.NewFetcher(cfg.Glossary.MaxDownloadMB<<20, cfg.Glossary.AllowPrivateHosts,

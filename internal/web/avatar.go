@@ -8,8 +8,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/platform/apperr"
-	"pelokalan/internal/service"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -17,14 +17,14 @@ import (
 // The browser crops it first; the server cuts a centred square anyway, scales and compresses it.
 func (h *Handler) UploadAvatar(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUser(r.Context())
-	r.Body = http.MaxBytesReader(w, r.Body, service.MaxAvatarUpload+1<<20)
+	r.Body = http.MaxBytesReader(w, r.Body, account.MaxAvatarUpload+1<<20)
 	f, _, err := r.FormFile("avatar")
 	if err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{"error": h.errorMessage(r, service.ErrAvatarInvalid)})
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": h.errorMessage(r, account.ErrAvatarInvalid)})
 		return
 	}
 	defer f.Close()
-	data, err := io.ReadAll(io.LimitReader(f, service.MaxAvatarUpload+1))
+	data, err := io.ReadAll(io.LimitReader(f, account.MaxAvatarUpload+1))
 	if err == nil {
 		err = h.authService.SetAvatar(r.Context(), user, data)
 	}

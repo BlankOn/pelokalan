@@ -1,4 +1,4 @@
-package service
+package account
 
 import (
 	"context"
@@ -27,21 +27,21 @@ type PatchLink struct {
 	CatalogID int64
 }
 
-func (s *AuthService) patchSig(payload string) string {
+func (s *Service) patchSig(payload string) string {
 	m := hmac.New(sha256.New, s.jwtSecret)
 	m.Write([]byte("git-patch|" + payload))
 	return base64.RawURLEncoding.EncodeToString(m.Sum(nil)[:18])
 }
 
 // PatchLinkToken signs a patch link for user: kind "c" (catalog) with its id
-func (s *AuthService) PatchLinkToken(user *models.User, kind string, id int64, now time.Time) string {
+func (s *Service) PatchLinkToken(user *models.User, kind string, id int64, now time.Time) string {
 	payload := fmt.Sprintf("%s%s-%s-%s", kind, strconv.FormatInt(id, 36), strconv.FormatInt(user.ID, 36),
 		strconv.FormatInt(now.Add(PatchLinkTTL).Unix(), 36))
 	return payload + "." + s.patchSig(payload) // base64url signatures never hold "."
 }
 
 // ParsePatchLink checks a patch link token and loads its user (who must still be allowed in)
-func (s *AuthService) ParsePatchLink(ctx context.Context, token string, now time.Time) (*PatchLink, error) {
+func (s *Service) ParsePatchLink(ctx context.Context, token string, now time.Time) (*PatchLink, error) {
 	i := strings.LastIndexByte(token, '.')
 	if i < 0 {
 		return nil, apperr.ErrInvalidToken

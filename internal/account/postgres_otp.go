@@ -1,4 +1,4 @@
-package postgres
+package account
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 type otpRepository struct {
@@ -15,7 +14,7 @@ type otpRepository struct {
 }
 
 // NewOTPRepository creates a new PostgreSQL one-time code repository
-func NewOTPRepository(db *sql.DB) repository.OTPRepository {
+func NewOTPRepository(db *sql.DB) OTPRepository {
 	return &otpRepository{db: db}
 }
 

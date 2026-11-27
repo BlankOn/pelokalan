@@ -1,4 +1,4 @@
-package postgres
+package account
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 type userRepository struct {
@@ -17,7 +16,7 @@ type userRepository struct {
 }
 
 // NewUserRepository creates a new PostgreSQL user repository
-func NewUserRepository(db *sql.DB) repository.UserRepository {
+func NewUserRepository(db *sql.DB) UserRepository {
 	return &userRepository{db: db}
 }
 

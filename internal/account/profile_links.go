@@ -1,4 +1,4 @@
-package service
+package account
 
 import (
 	"context"
@@ -148,7 +148,7 @@ type AccountInput struct {
 }
 
 // UpdateAccount checks every field of the profile page first and saves only when all are valid
-func (s *AuthService) UpdateAccount(ctx context.Context, user *models.User, in AccountInput) error {
+func (s *Service) UpdateAccount(ctx context.Context, user *models.User, in AccountInput) error {
 	name := strings.TrimSpace(in.Name)
 	if name == "" || len([]rune(name)) > 100 {
 		return apperr.ErrNameRequired

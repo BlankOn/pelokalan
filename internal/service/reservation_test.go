@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
@@ -94,7 +95,7 @@ type oneProject struct {
 
 func (o oneProject) GetByID(context.Context, int64) (*models.Project, error) { return o.p, nil }
 
-type someUsers struct{ repository.UserRepository }
+type someUsers struct{ account.UserRepository }
 
 func (someUsers) GetByID(_ context.Context, id int64) (*models.User, error) {
 	return &models.User{ID: id, Email: "u@example.com", Name: "U", Lang: "id"}, nil

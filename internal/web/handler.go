@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/activity"
 	"pelokalan/internal/langtools"
 	"pelokalan/internal/models"
@@ -41,7 +42,7 @@ type Handler struct {
 	templatesDir   string
 	siteConfig     config.SiteConfig
 	serverConfig   config.ServerConfig
-	authService    *service.AuthService
+	authService    *account.Service
 	projectService *service.ProjectService
 	catalogService *service.CatalogService
 	glossary       *service.GlossaryService
@@ -65,7 +66,7 @@ func NewHandler(
 	templatesDir string,
 	siteConfig config.SiteConfig,
 	serverConfig config.ServerConfig,
-	authService *service.AuthService,
+	authService *account.Service,
 	projectService *service.ProjectService,
 	catalogService *service.CatalogService,
 	glossaryService *service.GlossaryService,
@@ -186,7 +187,7 @@ func funcMap() template.FuncMap {
 		"srcWS": sourceWS,
 		// editor settings: every check, and the statuses Validasi ticks for the user
 		"editorChecks":   func() []string { return po.Checks },
-		"editorStatuses": func() []string { return service.EditorStatuses },
+		"editorStatuses": func() []string { return account.EditorStatuses },
 		"aiModels":       func() []string { return service.AIModels },
 		"aiPrice":        func(model string) service.AIPrice { return service.AIPrices[model] },
 		"validateStatuses": func(u *models.User) string {
@@ -197,7 +198,7 @@ func funcMap() template.FuncMap {
 					break
 				}
 			}
-			for _, st := range service.EditorStatuses {
+			for _, st := range account.EditorStatuses {
 				if u.CheckOn(st) {
 					out = append(out, st)
 				}

@@ -5,10 +5,10 @@ import (
 	"math"
 	"net/http"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -201,7 +201,7 @@ func (h *Handler) ProfilePage(w http.ResponseWriter, r *http.Request) {
 // UpdateProfile saves the whole profile page (account, translator identity, public profile, badge emails) at once
 func (h *Handler) UpdateProfile(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUser(r.Context())
-	in := service.AccountInput{
+	in := account.AccountInput{
 		Username: r.FormValue("username"), Name: r.FormValue("name"), Lang: r.FormValue("lang"),
 		TranslatorName: r.FormValue("translator_name"), TranslatorEmail: r.FormValue("translator_email"),
 		LanguageTeam: r.FormValue("language_team"), Bio: r.FormValue("bio"), Links: map[string]string{},

@@ -1,4 +1,4 @@
-package service
+package account
 
 import (
 	"context"
@@ -11,7 +11,7 @@ import (
 )
 
 func TestPatchLinkToken(t *testing.T) {
-	s := &AuthService{jwtSecret: []byte("secret")}
+	s := &Service{jwtSecret: []byte("secret")}
 	u := &models.User{ID: 42, Email: "a@example.com"}
 	now := time.Unix(1_800_000_000, 0)
 	tok := s.PatchLinkToken(u, "c", 1234, now)
@@ -27,23 +27,8 @@ func TestPatchLinkToken(t *testing.T) {
 	if _, err := s.ParsePatchLink(context.Background(), tok, now.Add(PatchLinkTTL+time.Second)); err != apperr.ErrInvalidToken {
 		t.Errorf("expired: err = %v", err)
 	}
-	other := &AuthService{jwtSecret: []byte("other")}
+	other := &Service{jwtSecret: []byte("other")}
 	if _, err := other.ParsePatchLink(context.Background(), tok, now); err != apperr.ErrInvalidToken {
 		t.Errorf("other secret: err = %v", err)
-	}
-}
-
-func TestGitBranchName(t *testing.T) {
-	for in, want := range map[string]string{
-		"library/os.po":        "pelokalan/library-os",
-		"library/os.path.po":   "pelokalan/library-os.path",
-		"whatsnew/3.14.po":     "pelokalan/whatsnew-3.14",
-		"c-api/init_config.po": "pelokalan/c-api-init_config",
-		"faq/a b..c.po":        "pelokalan/faq-a-b-c",
-		"..po":                 "pelokalan/file",
-	} {
-		if got := GitBranchName(in); got != want {
-			t.Errorf("GitBranchName(%q) = %q, want %q", in, got, want)
-		}
 	}
 }

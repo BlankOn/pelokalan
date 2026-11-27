@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"strings"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 )
 
 type contextKey string
@@ -26,11 +26,11 @@ const LangCookie = "lang"
 
 // Auth middleware for JWT cookie authentication
 type Auth struct {
-	authService *service.AuthService
+	authService *account.Service
 }
 
 // NewAuth creates a new Auth middleware
-func NewAuth(authService *service.AuthService) *Auth {
+func NewAuth(authService *account.Service) *Auth {
 	return &Auth{authService: authService}
 }
 

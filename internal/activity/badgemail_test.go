@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/mailer"
-	"pelokalan/internal/repository"
 )
 
 // badgeRepo: one person with 12 comments (Teman Diskusi, bronze at 10), awards kept in memory
@@ -41,7 +41,7 @@ func (f *badgeRepo) AddAwards(_ context.Context, _ int64, a []models.BadgeAward,
 }
 
 type oneUser struct {
-	repository.UserRepository
+	account.UserRepository
 	u *models.User
 }
 

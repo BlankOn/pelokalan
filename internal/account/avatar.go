@@ -1,4 +1,4 @@
-package service
+package account
 
 import (
 	"bytes"
@@ -57,7 +57,7 @@ func MakeAvatar(data []byte) ([]byte, error) {
 }
 
 // SetAvatar stores a new profile picture for the user (the old one is left to the blob GC)
-func (s *AuthService) SetAvatar(ctx context.Context, user *models.User, data []byte) error {
+func (s *Service) SetAvatar(ctx context.Context, user *models.User, data []byte) error {
 	if s.blobs == nil {
 		return ErrAvatarInvalid
 	}
@@ -77,7 +77,7 @@ func (s *AuthService) SetAvatar(ctx context.Context, user *models.User, data []b
 }
 
 // RemoveAvatar takes the profile picture away (initials show again)
-func (s *AuthService) RemoveAvatar(ctx context.Context, user *models.User) error {
+func (s *Service) RemoveAvatar(ctx context.Context, user *models.User) error {
 	if err := s.users.SetAvatar(ctx, user.ID, ""); err != nil {
 		return err
 	}
@@ -87,7 +87,7 @@ func (s *AuthService) RemoveAvatar(ctx context.Context, user *models.User) error
 
 // AvatarData returns a profile picture by its key, only while someone uses it (so the address never serves
 // other blobs, such as comment attachments)
-func (s *AuthService) AvatarData(ctx context.Context, key string) ([]byte, error) {
+func (s *Service) AvatarData(ctx context.Context, key string) ([]byte, error) {
 	if s.blobs == nil || !s.users.AvatarInUse(ctx, key) {
 		return nil, apperr.ErrNotFound
 	}

@@ -13,6 +13,7 @@ import (
 
 	"pelokalan/pkg/po"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
@@ -25,16 +26,16 @@ import (
 // ProjectService handles projects, members and invitations
 type ProjectService struct {
 	projects repository.ProjectRepository
-	users    repository.UserRepository
+	users    account.UserRepository
 	mailer   mailer.Mailer
-	auth     *AuthService
+	auth     *account.Service
 	cfg      config.AuthConfig
 	site     config.SiteConfig
 }
 
 // NewProjectService creates a new project service
-func NewProjectService(projects repository.ProjectRepository, users repository.UserRepository, mailer mailer.Mailer,
-	auth *AuthService, cfg config.AuthConfig, site config.SiteConfig) *ProjectService {
+func NewProjectService(projects repository.ProjectRepository, users account.UserRepository, mailer mailer.Mailer,
+	auth *account.Service, cfg config.AuthConfig, site config.SiteConfig) *ProjectService {
 	return &ProjectService{projects: projects, users: users, mailer: mailer, auth: auth, cfg: cfg, site: site}
 }
 
@@ -289,7 +290,7 @@ func (s *ProjectService) Invite(ctx context.Context, inviter *models.User, p *mo
 	if !role.IsInvitable() || (role == models.RoleManager && !p.Role.CanManage()) {
 		return nil, apperr.ErrInvalidRole
 	}
-	email, err := normalizeAndCheck(email)
+	email, err := account.CheckEmail(email)
 	if err != nil {
 		return nil, err
 	}

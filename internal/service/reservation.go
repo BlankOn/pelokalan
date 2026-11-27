@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
@@ -35,14 +36,14 @@ const ReminderDays = 3
 type ReservationService struct {
 	repo     repository.ReservationRepository
 	projects repository.ProjectRepository
-	users    repository.UserRepository
+	users    account.UserRepository
 	mailer   mailer.Mailer
 	site     config.SiteConfig
 }
 
 // NewReservationService creates the reservation service
 func NewReservationService(repo repository.ReservationRepository, projects repository.ProjectRepository,
-	users repository.UserRepository, mailer mailer.Mailer, site config.SiteConfig) *ReservationService {
+	users account.UserRepository, mailer mailer.Mailer, site config.SiteConfig) *ReservationService {
 	return &ReservationService{repo: repo, projects: projects, users: users, mailer: mailer, site: site}
 }
 

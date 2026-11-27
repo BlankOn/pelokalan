@@ -1,4 +1,4 @@
-package service
+package account
 
 import (
 	"context"
@@ -28,13 +28,12 @@ import (
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 // AuthService handles passwordless registration and sign in with one-time codes
-type AuthService struct {
-	users     repository.UserRepository
-	otps      repository.OTPRepository
+type Service struct {
+	users     UserRepository
+	otps      OTPRepository
 	mailer    mailer.Mailer
 	cfg       config.AuthConfig
 	site      config.SiteConfig
@@ -52,15 +51,15 @@ type Claims struct {
 }
 
 // SetActivity makes the service record sign-ups in the activity log
-func (s *AuthService) SetActivity(a *activity.Service) { s.activity = a }
+func (s *Service) SetActivity(a *activity.Service) { s.activity = a }
 
 // SetBlobs gives the service the blob store that keeps profile pictures
-func (s *AuthService) SetBlobs(b blobstore.Store) { s.blobs = b }
+func (s *Service) SetBlobs(b blobstore.Store) { s.blobs = b }
 
 // NewAuthService creates a new auth service
-func NewAuthService(users repository.UserRepository, otps repository.OTPRepository, mailer mailer.Mailer,
-	cfg config.AuthConfig, site config.SiteConfig, jwtCfg config.JWTConfig) *AuthService {
-	return &AuthService{
+func New(users UserRepository, otps OTPRepository, mailer mailer.Mailer,
+	cfg config.AuthConfig, site config.SiteConfig, jwtCfg config.JWTConfig) *Service {
+	return &Service{
 		users:     users,
 		otps:      otps,
 		mailer:    mailer,
@@ -73,7 +72,7 @@ func NewAuthService(users repository.UserRepository, otps repository.OTPReposito
 
 // ResendWait returns how long the address must wait before another code can be
 // sent (0 when it may ask now)
-func (s *AuthService) ResendWait(ctx context.Context, email string) time.Duration {
+func (s *Service) ResendWait(ctx context.Context, email string) time.Duration {
 	prev, err := s.otps.LatestForEmail(ctx, config.NormalizeEmail(email))
 	if err != nil {
 		return 0
@@ -85,18 +84,19 @@ func (s *AuthService) ResendWait(ctx context.Context, email string) time.Duratio
 }
 
 // WhitelistEnabled reports whether sign-up is limited to the email whitelist
-func (s *AuthService) WhitelistEnabled() bool { return s.cfg.Whitelist.Enabled() }
+func (s *Service) WhitelistEnabled() bool { return s.cfg.Whitelist.Enabled() }
 
 // IsAllowed reports whether the email is on the whitelist (always true when no whitelist is set)
-func (s *AuthService) IsAllowed(email string) bool { return s.cfg.Whitelist.IsAllowed(email) }
+func (s *Service) IsAllowed(email string) bool { return s.cfg.Whitelist.IsAllowed(email) }
 
 // TokenExpiry returns how long session tokens are valid
-func (s *AuthService) TokenExpiry() time.Duration { return s.jwtExpiry }
+func (s *Service) TokenExpiry() time.Duration { return s.jwtExpiry }
 
 // OTPExpiry returns how long one-time codes are valid
-func (s *AuthService) OTPExpiry() time.Duration { return s.cfg.OTPExpiration }
+func (s *Service) OTPExpiry() time.Duration { return s.cfg.OTPExpiration }
 
-func normalizeAndCheck(email string) (string, error) {
+// CheckEmail normalizes an email address and checks that it is one
+func CheckEmail(email string) (string, error) {
 	email = config.NormalizeEmail(email)
 	addr, err := mail.ParseAddress(email)
 	if err != nil || addr.Address != email || !strings.Contains(email, "@") {
@@ -132,7 +132,7 @@ func validUsername(u string) error {
 	return nil
 }
 
-func (s *AuthService) usernameAvailable(ctx context.Context, u string, selfID int64) error {
+func (s *Service) usernameAvailable(ctx context.Context, u string, selfID int64) error {
 	if err := validUsername(u); err != nil {
 		return err
 	}
@@ -149,8 +149,8 @@ func (s *AuthService) usernameAvailable(ctx context.Context, u string, selfID in
 }
 
 // StartRegistration validates the request and emails a registration code
-func (s *AuthService) StartRegistration(ctx context.Context, email, username, name, lang string) (string, error) {
-	email, err := normalizeAndCheck(email)
+func (s *Service) StartRegistration(ctx context.Context, email, username, name, lang string) (string, error) {
+	email, err := CheckEmail(email)
 	if err != nil {
 		return "", err
 	}
@@ -174,8 +174,8 @@ func (s *AuthService) StartRegistration(ctx context.Context, email, username, na
 }
 
 // StartLogin validates the request and emails a sign-in code
-func (s *AuthService) StartLogin(ctx context.Context, email, lang string) (string, error) {
-	email, err := normalizeAndCheck(email)
+func (s *Service) StartLogin(ctx context.Context, email, lang string) (string, error) {
+	email, err := CheckEmail(email)
 	if err != nil {
 		return "", err
 	}
@@ -191,7 +191,7 @@ func (s *AuthService) StartLogin(ctx context.Context, email, lang string) (strin
 }
 
 // ResendCode sends a fresh code for a pending registration or sign in
-func (s *AuthService) ResendCode(ctx context.Context, email, purpose, lang string) error {
+func (s *Service) ResendCode(ctx context.Context, email, purpose, lang string) error {
 	email = config.NormalizeEmail(email)
 	if !s.IsAllowed(email) {
 		return apperr.ErrNotWhitelisted
@@ -214,7 +214,7 @@ func (s *AuthService) ResendCode(ctx context.Context, email, purpose, lang strin
 	return s.sendCode(ctx, email, purpose, name, username, lang)
 }
 
-func (s *AuthService) sendCode(ctx context.Context, email, purpose, name, username, lang string) error {
+func (s *Service) sendCode(ctx context.Context, email, purpose, name, username, lang string) error {
 	// the wait is per email address, shared by sign-in and registration
 	if wait := s.ResendWait(ctx, email); wait > 0 {
 		return apperr.New("err.otp_too_soon", int(wait.Seconds()+0.999))
@@ -261,7 +261,7 @@ func (s *AuthService) sendCode(ctx context.Context, email, purpose, name, userna
 
 // Verify checks a code and returns the signed-in user, creating the account
 // for registration codes.
-func (s *AuthService) Verify(ctx context.Context, email, purpose, code, lang string) (*models.User, error) {
+func (s *Service) Verify(ctx context.Context, email, purpose, code, lang string) (*models.User, error) {
 	email = config.NormalizeEmail(email)
 	if !s.IsAllowed(email) {
 		return nil, apperr.ErrNotWhitelisted
@@ -317,7 +317,7 @@ func (s *AuthService) Verify(ctx context.Context, email, purpose, code, lang str
 	return user, nil
 }
 
-func (s *AuthService) hashCode(email, code string) string {
+func (s *Service) hashCode(email, code string) string {
 	m := hmac.New(sha256.New, s.jwtSecret)
 	m.Write([]byte(email + "\x00" + code))
 	return hex.EncodeToString(m.Sum(nil))
@@ -336,7 +336,7 @@ func randomDigits(n int) (string, error) {
 }
 
 // GenerateToken creates a JWT token for a user
-func (s *AuthService) GenerateToken(user *models.User) (string, error) {
+func (s *Service) GenerateToken(user *models.User) (string, error) {
 	claims := &Claims{
 		UserID: user.ID,
 		Email:  user.Email,
@@ -350,7 +350,7 @@ func (s *AuthService) GenerateToken(user *models.User) (string, error) {
 
 // Authenticate validates a token and returns the user. Users removed from the
 // whitelist lose access immediately.
-func (s *AuthService) Authenticate(ctx context.Context, tokenString string) (*models.User, error) {
+func (s *Service) Authenticate(ctx context.Context, tokenString string) (*models.User, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
 			return nil, apperr.ErrInvalidToken
@@ -375,7 +375,7 @@ func (s *AuthService) Authenticate(ctx context.Context, tokenString string) (*mo
 }
 
 // UserByUsername finds a person for their public profile page
-func (s *AuthService) UserByUsername(ctx context.Context, username string) (*models.User, error) {
+func (s *Service) UserByUsername(ctx context.Context, username string) (*models.User, error) {
 	u, err := s.users.GetByUsername(ctx, NormalizeUsername(username))
 	if err != nil {
 		return nil, apperr.ErrNotFound
@@ -384,7 +384,7 @@ func (s *AuthService) UserByUsername(ctx context.Context, username string) (*mod
 }
 
 // SetBadgeEmails turns the emails about new badges on or off for the user
-func (s *AuthService) SetBadgeEmails(ctx context.Context, user *models.User, on bool) error {
+func (s *Service) SetBadgeEmails(ctx context.Context, user *models.User, on bool) error {
 	if err := s.users.SetBadgeEmails(ctx, user.ID, !on); err != nil {
 		return err
 	}
@@ -393,7 +393,7 @@ func (s *AuthService) SetBadgeEmails(ctx context.Context, user *models.User, on 
 }
 
 // UpdateProfile changes the user's name and UI language
-func (s *AuthService) UpdateProfile(ctx context.Context, user *models.User, username, name, lang string) error {
+func (s *Service) UpdateProfile(ctx context.Context, user *models.User, username, name, lang string) error {
 	name = strings.TrimSpace(name)
 	if name == "" || len([]rune(name)) > 100 {
 		return apperr.ErrNameRequired
@@ -409,7 +409,7 @@ func (s *AuthService) UpdateProfile(ctx context.Context, user *models.User, user
 }
 
 // UpdateIdentity changes how the user is credited in PO headers
-func (s *AuthService) UpdateIdentity(ctx context.Context, user *models.User, name, email, team string) error {
+func (s *Service) UpdateIdentity(ctx context.Context, user *models.User, name, email, team string) error {
 	name = strings.TrimSpace(name)
 	team = strings.TrimSpace(team)
 	email = strings.TrimSpace(email)
@@ -431,7 +431,7 @@ var EditorStatuses = []string{"untranslated", "fuzzy", "ai"}
 
 // UpdateEditorChecks stores which editor checks are on (issue codes from po.Checks and
 // EditorStatuses); everything not in on is switched off for every file of the account
-func (s *AuthService) UpdateEditorChecks(ctx context.Context, user *models.User, on []string) error {
+func (s *Service) UpdateEditorChecks(ctx context.Context, user *models.User, on []string) error {
 	var off []string
 	for _, code := range append(append([]string(nil), po.Checks...), EditorStatuses...) {
 		if !slices.Contains(on, code) {
@@ -443,10 +443,10 @@ func (s *AuthService) UpdateEditorChecks(ctx context.Context, user *models.User,
 }
 
 // SetLang stores the user's preferred UI language
-func (s *AuthService) SetLang(ctx context.Context, user *models.User, lang string) error {
+func (s *Service) SetLang(ctx context.Context, user *models.User, lang string) error {
 	user.Lang = i18n.Normalize(lang)
 	return s.users.Update(ctx, user)
 }
 
 // Cleanup removes stale one-time codes
-func (s *AuthService) Cleanup(ctx context.Context) error { return s.otps.CleanupExpired(ctx) }
+func (s *Service) Cleanup(ctx context.Context) error { return s.otps.CleanupExpired(ctx) }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"pelokalan/internal/account"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
@@ -39,7 +40,7 @@ type ReviewService struct {
 	glossary     *GlossaryService
 	reservations *ReservationService
 	projects     repository.ProjectRepository
-	users        repository.UserRepository
+	users        account.UserRepository
 	mailer       mailer.Mailer
 	site         config.SiteConfig
 	discuss      *DiscussionService // review comments (nil = none)
@@ -82,7 +83,7 @@ func (s *ReviewService) openComments(ctx context.Context, p *models.Project, cat
 
 // NewReviewService creates the review service
 func NewReviewService(repo repository.ReviewRepository, catalogs *CatalogService, glossary *GlossaryService,
-	reservations *ReservationService, projects repository.ProjectRepository, users repository.UserRepository,
+	reservations *ReservationService, projects repository.ProjectRepository, users account.UserRepository,
 	mailer mailer.Mailer, site config.SiteConfig) *ReviewService {
 	return &ReviewService{repo: repo, catalogs: catalogs, glossary: glossary, reservations: reservations,
 		projects: projects, users: users, mailer: mailer, site: site}
