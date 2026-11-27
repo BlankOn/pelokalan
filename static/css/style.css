@@ -1419,7 +1419,8 @@ kbd { display: inline-block; min-width: 1.6em; text-align: center; font-family: 
 /* Diskusi: search on the left, filter and new-discussion button on the right */
 .discussions-head { flex-wrap: wrap; }
 .discussion-search { flex: 1 1 260px; margin: 0; }
-.discussion-snippet { color: var(--text); opacity: .8; overflow-wrap: anywhere; }
+/* the newest comment is as large as the title: it is what people come to read */
+.discussion-snippet { font-size: 15px; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
 
 /* editor: AI translate button for one entry, next to "Perlu ditinjau" */
 .ai-entry-btn { margin-left: auto; display: inline-flex; align-items: center; gap: 4px; padding: 2px 9px; border-radius: 12px; border: 1px solid #d9c2f7; background: #f6efff; color: #5b2aa8; font: inherit; font-size: 12px; font-weight: 600; text-transform: none; letter-spacing: 0; cursor: pointer; }

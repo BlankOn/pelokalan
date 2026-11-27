@@ -23,7 +23,7 @@
             <a class="discussion-row" href="{{.URL}}">
                 <span class="discussion-type">{{t $.Lang (printf "discuss.type_%s" $d.SubjectType)}}</span>
                 <strong class="discussion-title">{{$d.Title}}</strong>
-                {{if .Snippet}}<span class="discussion-snippet small">“{{.Snippet}}”</span>{{end}}
+                {{if .Snippet}}<span class="discussion-snippet">“{{.Snippet}}”</span>{{end}}
                 <span class="muted small">💬 {{$d.CommentCount}} · {{t $.Lang "discuss.participants" $d.Participants}}{{if $d.LastAuthor}} · {{t $.Lang "discuss.last_by" $d.LastAuthor}}{{end}} · {{timeAgo $.Lang $d.LastActivityAt}}</span>
             </a>
         </li>
