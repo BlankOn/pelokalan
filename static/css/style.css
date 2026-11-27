@@ -1791,6 +1791,8 @@ mark.rv-anchor.rv-done { background: none; border-bottom: 0; padding: 0; }
 .review-mode:not(.view-mode) mark.rv-anchor.rv-done { background: #d3f9d8; border-bottom: 2px solid #37b24d; padding: 0 1px; }
 .review-mode:not(.view-mode) .entry-row.rv-resolved:not(.selected) { background: #effaf1; }
 .review-mode:not(.view-mode) .entry-row.rv-resolved:not(.selected):hover { background: #e3f6e7; }
+.mark-resolved { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: #d3f9d8;
+    border: 1px solid #37b24d; vertical-align: -1px; }
 .comment-quote { margin: 4px 0 6px; padding: 2px 8px; border-left: 3px solid #e03131; background: #fff0f3; color: #5c1a26;
     font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
 .comment-anchor { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; padding: 4px 8px; border-left: 3px solid #e03131;

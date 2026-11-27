@@ -53,6 +53,10 @@ type EntryFilter struct {
 	// handler); it counts like one more status
 	Review       bool
 	ReviewHashes map[string]bool
+	// Resolved: "resolved" was ticked (review editor only: entries whose review comments are all resolved, the green
+	// rows, by key hash in ResolvedHashes, set by the handler); it counts like one more status too
+	Resolved       bool
+	ResolvedHashes map[string]bool
 	// Only keeps just these entries (key hashes; nil = all): the strings of a review
 	Only map[string]bool
 }
@@ -642,8 +646,8 @@ func (s *Service) Entries(ctx context.Context, c *models.Catalog, f EntryFilter)
 			l.Memory++
 		}
 		inStatus := matchAnyStatus(e, f.Statuses)
-		if f.Review { // "review" is one more status: open review comments
-			inReview := f.ReviewHashes[e.KeyHash()]
+		if f.Review || f.Resolved { // "review" and "resolved" are more statuses: open / all resolved review comments
+			inReview := f.Review && f.ReviewHashes[e.KeyHash()] || f.Resolved && f.ResolvedHashes[e.KeyHash()]
 			inStatus = inReview || len(f.Statuses) > 0 && inStatus
 		}
 		if !inStatus || (q != "" && !matchQuery(e, q)) || f.Only != nil && !f.Only[e.KeyHash()] {

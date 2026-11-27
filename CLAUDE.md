@@ -823,6 +823,10 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   is open on the row) and their passages a green mark (`discussion.ReviewAnchors` returns resolved anchors too,
   `rv-done`, unstyled elsewhere), so reviewers coming back see what they commented on. app.js turns the row green
   as soon as its last open comment is resolved.
+  The review editor's filter has "Komentar tinjauan selesai" (`status=resolved`, `EntryFilter.Resolved` /
+  `ResolvedHashes`: entries with resolved review comments and none open, i.e. the green rows; only with `Reviewer` in
+  `editor_filter`), and its Validasi button (`data-resolved`) ticks it too, so the green rows stay listed after
+  everything was resolved.
 - **Review comments** (migration 049, `comments.review_id/resolved_at/resolved_by`): a comment by an owner, coordinator
   or reviewer (not the requester) on an entry of a file with an open request is tied to it (`review.Service.OpenFor` via
   `discussion.Service.SetReviews`). It is open until resolved (green "Sudah diselesaikan" button with a check, `POST /projects/{id}/comments/{cid}/resolve`,

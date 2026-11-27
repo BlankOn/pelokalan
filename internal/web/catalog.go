@@ -88,13 +88,22 @@ func (h *Handler) attachComments(r *http.Request, p *models.Project, c *models.C
 	}
 }
 
-// reviewComments fills the filter's open review comments ("review" ticked) and returns their count
+// reviewComments fills the filter's open review comments ("review" ticked) and resolved ones ("resolved") and returns
+// the number of open ones
 func (h *Handler) reviewComments(r *http.Request, p *models.Project, c *models.Catalog, f *catalog.EntryFilter) int {
 	open := h.discuss.OpenReviewComments(r.Context(), p, c.ID)
 	if f != nil && f.Review {
 		f.ReviewHashes = map[string]bool{}
 		for k := range open {
 			f.ReviewHashes[k] = true
+		}
+	}
+	if f != nil && f.Resolved { // the green rows of the review editor: resolved comments, none open
+		f.ResolvedHashes = map[string]bool{}
+		for k := range h.discuss.ResolvedReviewEntries(r.Context(), p, c.ID) {
+			if open[k] == 0 {
+				f.ResolvedHashes[k] = true
+			}
 		}
 	}
 	n := 0
@@ -117,9 +126,9 @@ func filterFromRequest(r *http.Request) catalog.EntryFilter {
 			}
 		}
 	}
-	f := catalog.EntryFilter{Query: q.Get("q"), Order: q.Get("order"), Review: seen["review"]}
+	f := catalog.EntryFilter{Query: q.Get("q"), Order: q.Get("order"), Review: seen["review"], Resolved: seen["resolved"]}
 	for _, s := range statuses {
-		if s != "review" {
+		if s != "review" && s != "resolved" {
 			f.Statuses = append(f.Statuses, s)
 		}
 	}

@@ -972,6 +972,8 @@
     if (validate) validate.addEventListener("click", function () {
         var st = (validate.dataset.statuses || "issues,untranslated,fuzzy").split(",").filter(Boolean);
         if (st.indexOf("review") < 0) st.push("review");
+        // the review editor also shows the strings whose review comments were resolved (the green rows)
+        if (validate.dataset.resolved && st.indexOf("resolved") < 0) st.push("resolved");
         validating = filterBoxes().filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
         setFilter(st);
     });

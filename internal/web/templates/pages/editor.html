@@ -337,7 +337,7 @@
     </div>
     <div class="tb-sep"></div>
     {{$c := .Data.Catalog}}
-    <button type="button" class="tb-btn" id="btn-validate" data-statuses="{{if .User}}{{validateStatuses .User}}{{else}}issues,untranslated,fuzzy{{end}}" data-all-clear="{{t .Lang "editor.validate_all_clear"}}" title="{{t .Lang "editor.validate_help"}}">
+    <button type="button" class="tb-btn" id="btn-validate" data-resolved="1" data-statuses="{{if .User}}{{validateStatuses .User}}{{else}}issues,untranslated,fuzzy{{end}}" data-all-clear="{{t .Lang "editor.validate_all_clear"}}" title="{{t .Lang "editor.validate_help"}}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
         <span>{{t .Lang "editor.validate"}}</span>
     </button>
@@ -358,7 +358,7 @@
         <span>{{t .Lang "editor.pull_upstream"}}</span>
     </button>{{end}}
     <div class="tb-sep"></div>
-    {{template "editor_filter" (dict "Lang" .Lang "C" $c "F" .Data.Filter "Review" (or (and (eq $r.Status "requested") $r.ID) 0))}}
+    {{template "editor_filter" (dict "Lang" .Lang "C" $c "F" .Data.Filter "Review" (or (and (eq $r.Status "requested") $r.ID) 0) "Reviewer" true)}}
     {{if eq $r.Status "requested"}}
         {{if .Data.CanDecide}}
         <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/approve" data-confirm="{{t .Lang "review.approve_confirm" $r.RepoPath}}" data-confirm-ok="{{t .Lang "review.approve"}}" data-busy="{{t .Lang "review.pushing"}}">
@@ -432,6 +432,7 @@
                     <label class="mf-opt"><input type="checkbox" name="status" value="translated" {{if has $.F.Statuses "translated"}}checked{{end}}> {{t $.Lang "filter.translated"}}</label>
                     <label class="mf-opt"><input type="checkbox" name="status" value="issues" {{if has $.F.Statuses "issues"}}checked{{end}}> {{t $.Lang "filter.issues"}}</label>
                     <label class="mf-opt"><input type="checkbox" name="status" value="review" {{if $.F.Review}}checked{{end}}> <span class="mark-review"></span> {{t $.Lang "filter.review"}}</label>
+                    {{if $.Reviewer}}<label class="mf-opt"><input type="checkbox" name="status" value="resolved" {{if $.F.Resolved}}checked{{end}}> <span class="mark-resolved"></span> {{t $.Lang "filter.resolved"}}</label>{{end}}
                     <label class="mf-opt"><input type="checkbox" name="status" value="ai" {{if has $.F.Statuses "ai"}}checked{{end}}> 🤖 {{t $.Lang "filter.ai"}}</label>
                     <label class="mf-opt"><input type="checkbox" name="status" value="glossary" {{if has $.F.Statuses "glossary"}}checked{{end}}> 📖 {{t $.Lang "filter.glossary"}}</label>
                     <label class="mf-opt"><input type="checkbox" name="status" value="memory" {{if has $.F.Statuses "memory"}}checked{{end}}> 🗂 {{t $.Lang "filter.memory"}}</label>

@@ -178,6 +178,20 @@ func TestGitHubReviews(t *testing.T) {
 	// ...but the review editor keeps showing what was commented on: the row and the passage turn green there
 	owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d", kc, rid)).status(http.StatusOK).
 		contains("rv-resolved", `<mark class="rv-anchor rv-done"`, ">direktori</mark>")
+	// ...and has its own filter, which Validasi ticks there (the translator's editor has neither)
+	owner.get(page).status(http.StatusOK).contains(`value="resolved"`, `data-resolved="1"`)
+	kiki.get(fileURL).status(http.StatusOK).lacks(`value="resolved"`, `data-resolved="1"`)
+	// (both strings had a review comment, rina's on "Close the window" was resolved earlier)
+	res := owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d&status=resolved", kc, rid)).status(http.StatusOK)
+	res.contains("Remove the directory", "Close the window")
+	if n := strings.Count(res.Body, "rv-resolved"); n != 2 {
+		t.Fatalf("resolved rows = %d, want 2", n)
+	}
+	// Validasi's statuses with nothing open or wrong: the resolved strings are what is listed
+	owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d&status=review&status=issues&status=resolved", kc, rid)).status(http.StatusOK).
+		contains("Remove the directory", "Close the window")
+	owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d&status=review&status=issues", kc, rid)).status(http.StatusOK).
+		lacks("Remove the directory", "Close the window")
 	// every review comment resolved: the request says so in green (queue and the translator's list)
 	owner.get(base+"/files").status(http.StatusOK).contains("rv-fixed", "Sudah diperbaiki")
 	kiki.get(base+"/my-files").status(http.StatusOK).contains("rv-fixed", "Sudah diperbaiki").lacks("Perlu perbaikan")
