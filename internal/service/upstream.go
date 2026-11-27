@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/pkg/gnomel10n"
 )
 
@@ -51,11 +52,11 @@ func (s *GlossaryService) UpstreamPageURL(raw string) (string, error) {
 		return "", nil
 	}
 	if s.upstream == nil {
-		return "", userErr("err.upstream_page")
+		return "", apperr.New("err.upstream_page")
 	}
 	e, lang, ok := s.upstream.ParsePageURL(raw)
 	if !ok {
-		return "", userErr("err.upstream_page")
+		return "", apperr.New("err.upstream_page")
 	}
 	return s.upstream.PageURL(&gnomel10n.Stats{Module: e.Module, Branch: e.Branch, Domain: e.Domain, Language: lang}), nil
 }
@@ -307,7 +308,7 @@ func (l *upstreamLookup) projectFileFor(names map[int64][]string, filename strin
 // site (newer than the release archive). label names the source for the history.
 // The file's address comes from the stored state; when none is stored yet it is looked up.
 func (s *GlossaryService) UpstreamPO(ctx context.Context, p *models.Project, f *models.ProjectFile, maxBytes int64) ([]byte, string, error) {
-	unavailable := userErr("err.upstream_unavailable")
+	unavailable := apperr.New("err.upstream_unavailable")
 	l := s.newUpstreamLookup(ctx, p)
 	if l == nil {
 		return nil, "", unavailable

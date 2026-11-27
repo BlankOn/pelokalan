@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/go-chi/chi/v5"
 	"io"
 	"log"
 	"mime"
@@ -16,8 +15,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-chi/chi/v5"
+
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 	"pelokalan/pkg/glossary"
@@ -130,7 +132,7 @@ const showTemplateSection = false
 func (h *Handler) loadMemberProject(w http.ResponseWriter, r *http.Request) (*models.Project, bool) {
 	p, ok := h.loadProject(w, r)
 	if ok && !p.Role.IsMember() {
-		h.fail(w, r, service.ErrForbidden)
+		h.fail(w, r, apperr.ErrForbidden)
 		return nil, false
 	}
 	return p, ok
@@ -238,7 +240,7 @@ func (h *Handler) readUpload(w http.ResponseWriter, r *http.Request) (string, []
 	limit := h.serverConfig.MaxUploadMB << 20
 	r.Body = http.MaxBytesReader(w, r.Body, limit+1<<20)
 	if err := r.ParseMultipartForm(limit); err != nil {
-		return "", nil, &service.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
+		return "", nil, &apperr.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
 	}
 	f, hdr, err := r.FormFile("file")
 	if err != nil {
@@ -246,7 +248,7 @@ func (h *Handler) readUpload(w http.ResponseWriter, r *http.Request) (string, []
 		if u := strings.TrimSpace(r.FormValue("url")); u != "" {
 			return h.downloadPO(r, u)
 		}
-		return "", nil, &service.UserError{Key: "err.no_file"}
+		return "", nil, &apperr.UserError{Key: "err.no_file"}
 	}
 	defer f.Close()
 	body, err := io.ReadAll(io.LimitReader(f, limit+1))
@@ -254,7 +256,7 @@ func (h *Handler) readUpload(w http.ResponseWriter, r *http.Request) (string, []
 		return "", nil, err
 	}
 	if int64(len(body)) > limit {
-		return "", nil, &service.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
+		return "", nil, &apperr.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
 	}
 	return hdr.Filename, body, nil
 }
@@ -565,7 +567,7 @@ func (h *Handler) renderJoin(w http.ResponseWriter, r *http.Request, errMsg stri
 	data := h.page(r, "title.join")
 	data.Error = errMsg
 	if err != nil {
-		if !errors.Is(err, service.ErrInviteLinkInvalid) {
+		if !errors.Is(err, apperr.ErrInviteLinkInvalid) {
 			h.fail(w, r, err)
 			return
 		}
@@ -585,7 +587,7 @@ func (h *Handler) renderJoin(w http.ResponseWriter, r *http.Request, errMsg stri
 func (h *Handler) Join(w http.ResponseWriter, r *http.Request) {
 	p, err := h.projectService.JoinByInviteLink(r.Context(), middleware.GetUser(r.Context()), chi.URLParam(r, "token"))
 	if err != nil {
-		if _, ok := service.AsUserError(err); ok {
+		if _, ok := apperr.AsUserError(err); ok {
 			h.renderJoin(w, r, h.errorMessage(r, err))
 			return
 		}
@@ -599,24 +601,24 @@ func (h *Handler) Join(w http.ResponseWriter, r *http.Request) {
 // refused) with the same size limit as uploads
 func (h *Handler) downloadPO(r *http.Request, rawURL string) (string, []byte, error) {
 	if h.poFetcher == nil {
-		return "", nil, &service.UserError{Key: "err.no_file"}
+		return "", nil, &apperr.UserError{Key: "err.no_file"}
 	}
 	if _, err := glossary.ValidateURL(rawURL); err != nil {
-		return "", nil, &service.UserError{Key: "err.po_url"}
+		return "", nil, &apperr.UserError{Key: "err.po_url"}
 	}
 	res, err := h.poFetcher.Fetch(r.Context(), rawURL, "", "")
 	if errors.Is(err, glossary.ErrTooLarge) {
-		return "", nil, &service.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
+		return "", nil, &apperr.UserError{Key: "err.upload_too_large", Args: []any{h.serverConfig.MaxUploadMB}}
 	}
 	if err != nil {
 		log.Printf("PO download %s: %v", rawURL, err)
 		switch msg := err.Error(); {
 		case strings.Contains(msg, "address not allowed"):
-			return "", nil, &service.UserError{Key: "err.po_private"}
+			return "", nil, &apperr.UserError{Key: "err.po_private"}
 		case strings.HasPrefix(msg, "HTTP "):
-			return "", nil, &service.UserError{Key: "err.po_download", Args: []any{msg}}
+			return "", nil, &apperr.UserError{Key: "err.po_download", Args: []any{msg}}
 		default:
-			return "", nil, &service.UserError{Key: "err.po_unreachable"}
+			return "", nil, &apperr.UserError{Key: "err.po_unreachable"}
 		}
 	}
 	return res.Filename, res.Data, nil
@@ -766,7 +768,7 @@ func (h *Handler) ProjectFileTake(w http.ResponseWriter, r *http.Request) {
 	if into, _ := strconv.ParseInt(r.FormValue("into"), 10, 64); into > 0 {
 		c, cp, err := h.catalogService.Get(r.Context(), user, into)
 		if err == nil && cp.ID != p.ID {
-			err = service.ErrNotFound
+			err = apperr.ErrNotFound
 		}
 		if err == nil { // updating claims the module, unless another member holds it
 			err = h.reservations.Claim(r.Context(), user, p, service.ModuleOf(c))
@@ -809,7 +811,7 @@ func (h *Handler) ProjectFilesSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err := h.glossary.SyncAll(r.Context(), p)
-	if errors.Is(err, service.ErrForbidden) { // owners and coordinators only
+	if errors.Is(err, apperr.ErrForbidden) { // owners and coordinators only
 		h.fail(w, r, err)
 		return
 	}

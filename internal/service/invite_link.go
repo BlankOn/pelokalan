@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/repository"
 )
 
@@ -37,7 +38,7 @@ func newLinkToken() (string, error) {
 // InviteLinks lists a project's invite links (owners and managers)
 func (s *ProjectService) InviteLinks(ctx context.Context, p *models.Project) ([]*models.InviteLink, error) {
 	if !p.Role.CanManage() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	return s.projects.ListInviteLinks(ctx, p.ID)
 }
@@ -46,13 +47,13 @@ func (s *ProjectService) InviteLinks(ctx context.Context, p *models.Project) ([]
 // with the given role.
 func (s *ProjectService) CreateInviteLink(ctx context.Context, user *models.User, p *models.Project, role models.ProjectRole, days, maxUses int) (*models.InviteLink, error) {
 	if !p.Role.CanManage() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	if !role.IsInvitable() {
-		return nil, ErrInvalidRole
+		return nil, apperr.ErrInvalidRole
 	}
 	if !allowed(days, InviteLinkDays) || !allowed(maxUses, InviteLinkUses) {
-		return nil, ErrInviteLinkOptions
+		return nil, apperr.ErrInviteLinkOptions
 	}
 	token, err := newLinkToken()
 	if err != nil {
@@ -75,10 +76,10 @@ func (s *ProjectService) CreateInviteLink(ctx context.Context, user *models.User
 // DeleteInviteLink revokes a link; it stops working immediately
 func (s *ProjectService) DeleteInviteLink(ctx context.Context, p *models.Project, id int64) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	if err := s.projects.DeleteInviteLink(ctx, p.ID, id); errors.Is(err, repository.ErrNotFound) {
-		return ErrNotFound
+		return apperr.ErrNotFound
 	} else if err != nil {
 		return err
 	}
@@ -90,11 +91,11 @@ func (s *ProjectService) DeleteInviteLink(ctx context.Context, p *models.Project
 // page can say why they no longer work.
 func (s *ProjectService) InviteLink(ctx context.Context, user *models.User, token string) (*models.InviteLink, *models.Project, error) {
 	if len(token) < 16 || len(token) > 64 {
-		return nil, nil, ErrInviteLinkInvalid
+		return nil, nil, apperr.ErrInviteLinkInvalid
 	}
 	l, err := s.projects.GetInviteLinkByToken(ctx, token)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, nil, ErrInviteLinkInvalid
+		return nil, nil, apperr.ErrInviteLinkInvalid
 	} else if err != nil {
 		return nil, nil, err
 	}
@@ -116,10 +117,10 @@ func (s *ProjectService) JoinByInviteLink(ctx context.Context, user *models.User
 		return p, nil
 	}
 	if !l.IsActive() {
-		return nil, ErrInviteLinkInvalid
+		return nil, apperr.ErrInviteLinkInvalid
 	}
 	if err := s.projects.JoinByInviteLink(ctx, l.ID, user.ID); errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrInviteLinkInvalid
+		return nil, apperr.ErrInviteLinkInvalid
 	} else if err != nil {
 		return nil, err
 	}

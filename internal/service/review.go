@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/gitpatch"
@@ -36,7 +38,7 @@ type ReviewService struct {
 	reservations *ReservationService
 	projects     repository.ProjectRepository
 	users        repository.UserRepository
-	mailer       Mailer
+	mailer       mailer.Mailer
 	site         config.SiteConfig
 	discuss      *DiscussionService // review comments (nil = none)
 }
@@ -79,7 +81,7 @@ func (s *ReviewService) openComments(ctx context.Context, p *models.Project, cat
 // NewReviewService creates the review service
 func NewReviewService(repo repository.ReviewRepository, catalogs *CatalogService, glossary *GlossaryService,
 	reservations *ReservationService, projects repository.ProjectRepository, users repository.UserRepository,
-	mailer Mailer, site config.SiteConfig) *ReviewService {
+	mailer mailer.Mailer, site config.SiteConfig) *ReviewService {
 	return &ReviewService{repo: repo, catalogs: catalogs, glossary: glossary, reservations: reservations,
 		projects: projects, users: users, mailer: mailer, site: site}
 }
@@ -136,7 +138,7 @@ func (s *ReviewService) Open(ctx context.Context, p *models.Project) ([]*models.
 func (s *ReviewService) Get(ctx context.Context, p *models.Project, id int64) (*models.ModuleReview, error) {
 	r, err := s.repo.Get(ctx, id)
 	if errors.Is(err, repository.ErrNotFound) || err == nil && r.ProjectID != p.ID {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	return r, err
 }
@@ -199,24 +201,24 @@ func cleanNote(note string) string {
 // Request asks for a review of the user's file
 func (s *ReviewService) Request(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, note string) (*models.ModuleReview, error) {
 	if !c.WritableBy(user.ID) {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	g := s.DirectGroup(ctx, p, c)
 	if g == nil {
-		return nil, userErr("err.review_unavailable")
+		return nil, apperr.New("err.review_unavailable")
 	}
 	d, err := s.Changes(ctx, p, c)
 	if err != nil {
 		return nil, err
 	}
 	if d == nil {
-		return nil, userErr("err.review_nothing")
+		return nil, apperr.New("err.review_nothing")
 	}
 	gid := g.ID
 	r := &models.ModuleReview{ProjectID: p.ID, CatalogID: c.ID, GroupID: &gid, Module: ModuleOf(c), RepoPath: c.RepoPath,
 		Status: models.ReviewRequested, RequestedBy: user.ID, Note: cleanNote(note), Entries: d.Changed}
 	if err := s.repo.Create(ctx, r); errors.Is(err, repository.ErrConflict) {
-		return nil, userErr("err.review_open")
+		return nil, apperr.New("err.review_open")
 	} else if err != nil {
 		return nil, err
 	}
@@ -231,10 +233,10 @@ func (s *ReviewService) Withdraw(ctx context.Context, user *models.User, p *mode
 		return err
 	}
 	if r.RequestedBy != user.ID {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	if r.Status != models.ReviewRequested {
-		return userErr("err.review_closed")
+		return apperr.New("err.review_closed")
 	}
 	r.Status = models.ReviewWithdrawn
 	return s.repo.Update(ctx, r)
@@ -247,7 +249,7 @@ func (s *ReviewService) Reject(ctx context.Context, reviewer *models.User, p *mo
 		return err
 	}
 	if note = cleanNote(note); note == "" {
-		return userErr("err.review_note")
+		return apperr.New("err.review_note")
 	}
 	now := time.Now()
 	r.Status, r.ReviewedBy, r.ReviewedAt, r.ReviewNote = models.ReviewRejected, &reviewer.ID, &now, note
@@ -260,17 +262,17 @@ func (s *ReviewService) Reject(ctx context.Context, reviewer *models.User, p *mo
 
 func (s *ReviewService) reviewable(ctx context.Context, reviewer *models.User, p *models.Project, id int64) (*models.ModuleReview, error) {
 	if !p.Role.CanManage() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	r, err := s.Get(ctx, p, id)
 	if err != nil {
 		return nil, err
 	}
 	if r.RequestedBy == reviewer.ID {
-		return nil, userErr("err.review_own")
+		return nil, apperr.New("err.review_own")
 	}
 	if r.Status != models.ReviewRequested {
-		return nil, userErr("err.review_closed")
+		return nil, apperr.New("err.review_closed")
 	}
 	return r, nil
 }
@@ -291,20 +293,20 @@ func (s *ReviewService) Approve(ctx context.Context, reviewer *models.User, p *m
 // PushNow commits a file to the repository right away (owners and managers, any member's file)
 func (s *ReviewService) PushNow(ctx context.Context, manager *models.User, p *models.Project, c *models.Catalog) (*models.ModuleReview, error) {
 	if !p.Role.CanManage() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	if p.ReviewRequired { // the project sends files only through an approved review
-		return nil, userErr("err.review_required")
+		return nil, apperr.New("err.review_required")
 	}
 	if c.DeletedAt != nil || c.ProjectID != p.ID {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	g := s.DirectGroup(ctx, p, c)
 	if g == nil {
-		return nil, userErr("err.review_unavailable")
+		return nil, apperr.New("err.review_unavailable")
 	}
 	if n := s.openComments(ctx, p, c.ID); n > 0 {
-		return nil, userErr("err.review_open_comments", n)
+		return nil, apperr.New("err.review_open_comments", n)
 	}
 	latest, err := s.repo.Latest(ctx, []int64{c.ID})
 	if err != nil {
@@ -338,7 +340,7 @@ func (s *ReviewService) push(ctx context.Context, reviewer *models.User, p *mode
 		return nil
 	}
 	r.Error = err.Error()
-	if ue, ok := AsUserError(err); ok {
+	if ue, ok := apperr.AsUserError(err); ok {
 		r.Error = fetchErrorText(ue)
 	}
 	if uerr := s.repo.Update(ctx, r); uerr != nil {
@@ -351,10 +353,10 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 	g := s.DirectGroup(ctx, p, c)
 	gh := s.glossary.GitHubApp()
 	if g == nil || gh == nil {
-		return userErr("err.review_unavailable")
+		return apperr.New("err.review_unavailable")
 	}
 	if n := s.openComments(ctx, p, c.ID); n > 0 {
-		return userErr("err.review_open_comments", n) // review comments must be resolved first
+		return apperr.New("err.review_open_comments", n) // review comments must be resolved first
 	}
 	owner, err := s.users.GetByID(ctx, c.OwnerID)
 	if err != nil {
@@ -372,11 +374,11 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 		}
 		// never overwrite what someone else changed upstream meanwhile: the member pulls it first
 		if conflicts := s.catalogs.UpstreamConflicts(ctx, c, f.Data, want, sent); len(conflicts) > 0 {
-			return userErr("err.review_upstream_conflict", len(conflicts), conflictList(conflicts))
+			return apperr.New("err.review_upstream_conflict", len(conflicts), conflictList(conflicts))
 		}
 		data, n := gitpatch.ApplyCredit(f.Data, want, TranslatorCredit(owner)) // the header credits the translator
 		if n == 0 {
-			return userErr("err.review_nothing")
+			return apperr.New("err.review_nothing")
 		}
 		msg := s.commitMessage(p, c, owner, reviewer, r, n)
 		cm, err := gh.PutFile(ctx, g.GitInstallation, g.GitRepo, g.GitBranch, c.RepoPath, data, f.SHA, msg,
@@ -442,16 +444,16 @@ func conflictList(ids []string) string {
 func gitHubErr(err error, path string) error {
 	switch {
 	case errors.Is(err, githubapp.ErrNotInstalled):
-		return userErr("err.github_not_installed")
+		return apperr.New("err.github_not_installed")
 	case errors.Is(err, githubapp.ErrNoWrite):
-		return userErr("err.github_no_write")
+		return apperr.New("err.github_no_write")
 	case errors.Is(err, githubapp.ErrNotFound):
-		return userErr("err.github_file_missing", path)
+		return apperr.New("err.github_file_missing", path)
 	case errors.Is(err, githubapp.ErrConflict):
-		return userErr("err.github_conflict")
+		return apperr.New("err.github_conflict")
 	}
 	log.Printf("github: %v", err)
-	return userErr("err.github_unreachable")
+	return apperr.New("err.github_unreachable")
 }
 
 // commitMessage: what changed, who translated, who reviewed, where it was done
@@ -537,9 +539,9 @@ func (s *ReviewService) send(ctx context.Context, u *models.User, lang, subject,
 	text += link + "\n\n— " + s.site.Name + "\n"
 	htmlBody := fmt.Sprintf(`<meta charset="utf-8"><div style="font-family:sans-serif;max-width:560px;color:#1d1f24"><p>%s</p><p>%s</p>%s<p>%s</p>
 <p style="color:#888;font-size:12px">%s · %s</p></div>`,
-		html.EscapeString(hello), html.EscapeString(body), noteHTML, emailButton(link, button),
+		html.EscapeString(hello), html.EscapeString(body), noteHTML, mailer.Button(link, button),
 		html.EscapeString(s.site.Name), html.EscapeString(p.Name))
-	if err := s.mailer.Send(ctx, &Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: "review"}); err != nil {
+	if err := s.mailer.Send(ctx, &mailer.Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: "review"}); err != nil {
 		log.Printf("reviews: email to user %d: %v", u.ID, err)
 	}
 }

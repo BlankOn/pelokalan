@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/pkg/po"
 )
 
@@ -15,7 +16,7 @@ func TestCheckProjectLanguage(t *testing.T) {
 		}
 	}
 	err := checkProjectLanguage(p, "jv")
-	ue, isUser := AsUserError(err)
+	ue, isUser := apperr.AsUserError(err)
 	if !isUser || ue.Key != "err.language_mismatch" || ue.Args[0] != "jv" || ue.Args[1] != "id" {
 		t.Fatalf("jv in an id project: %v", err)
 	}

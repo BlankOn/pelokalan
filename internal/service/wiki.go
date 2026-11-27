@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/repository"
 )
@@ -19,13 +20,13 @@ const (
 )
 
 var (
-	ErrWikiTitle       = userErr("err.wiki_title", wikiMaxTitle)
-	ErrWikiBody        = userErr("err.wiki_body", wikiMaxBody)
-	ErrWikiSlug        = userErr("err.wiki_slug")
-	ErrWikiSlugTaken   = userErr("err.wiki_slug_taken")
-	ErrWikiParent      = userErr("err.wiki_parent", models.WikiMaxDepth)
-	ErrWikiConflict    = userErr("err.wiki_conflict")
-	ErrWikiHasChildren = userErr("err.wiki_has_children")
+	ErrWikiTitle       = apperr.New("err.wiki_title", wikiMaxTitle)
+	ErrWikiBody        = apperr.New("err.wiki_body", wikiMaxBody)
+	ErrWikiSlug        = apperr.New("err.wiki_slug")
+	ErrWikiSlugTaken   = apperr.New("err.wiki_slug_taken")
+	ErrWikiParent      = apperr.New("err.wiki_parent", models.WikiMaxDepth)
+	ErrWikiConflict    = apperr.New("err.wiki_conflict")
+	ErrWikiHasChildren = apperr.New("err.wiki_has_children")
 )
 
 // wikiReserved are page addresses that clash with wiki routes
@@ -166,7 +167,7 @@ func (t *WikiTree) Breadcrumbs(page *models.WikiPage) []*models.WikiPage {
 func (s *WikiService) Redirect(ctx context.Context, p *models.Project, slug string) (string, error) {
 	cur, err := s.repo.Redirect(ctx, p.ID, strings.ToLower(slug))
 	if errors.Is(err, repository.ErrNotFound) {
-		return "", ErrNotFound
+		return "", apperr.ErrNotFound
 	}
 	return cur, err
 }
@@ -183,7 +184,7 @@ func (s *WikiService) Edits(ctx context.Context, pg *models.WikiPage) ([]models.
 func (s *WikiService) Page(ctx context.Context, p *models.Project, slug string) (*models.WikiPage, error) {
 	pg, err := s.repo.GetPage(ctx, p.ID, strings.ToLower(slug))
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	return pg, err
 }
@@ -251,7 +252,7 @@ func wikiSlug(title string) string {
 // Create adds a page (project members)
 func (s *WikiService) Create(ctx context.Context, user *models.User, p *models.Project, in WikiInput) (*models.WikiPage, error) {
 	if !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	if err := s.validate(&in); err != nil {
 		return nil, err
@@ -299,7 +300,7 @@ func (s *WikiService) Create(ctx context.Context, user *models.User, p *models.P
 // Update saves a page (project members); a change made meanwhile by someone else is refused
 func (s *WikiService) Update(ctx context.Context, user *models.User, p *models.Project, slug string, in WikiInput) (*models.WikiPage, error) {
 	if !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	pg, err := s.Page(ctx, p, slug)
 	if err != nil {
@@ -335,7 +336,7 @@ func (s *WikiService) Update(ctx context.Context, user *models.User, p *models.P
 // the moved page together with its subpages.
 func (s *WikiService) Move(ctx context.Context, user *models.User, p *models.Project, slug string, targetID int64, mode string) error {
 	if !p.Role.IsMember() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	t, err := s.Tree(ctx, p)
 	if err != nil {
@@ -349,7 +350,7 @@ func (s *WikiService) Move(ctx context.Context, user *models.User, p *models.Pro
 	}
 	target := t.ByID[targetID]
 	if page == nil || target == nil {
-		return ErrNotFound
+		return apperr.ErrNotFound
 	}
 	if isWithin(target, page) { // onto itself or into its own subtree
 		return ErrWikiParent
@@ -412,7 +413,7 @@ func (s *WikiService) Delete(ctx context.Context, user *models.User, p *models.P
 		return err
 	}
 	if !CanDeleteWikiPage(user, p, pg) {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	if has, err := s.repo.HasChildren(ctx, pg.ID); err != nil {
 		return err
@@ -427,10 +428,10 @@ func (s *WikiService) Delete(ctx context.Context, user *models.User, p *models.P
 // page, everything else is served as a download (application/octet-stream, sandboxed).
 func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.Project, uploads []Upload) ([]*models.WikiFile, error) {
 	if !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	if len(uploads) > MaxAttachments {
-		return nil, userErr("err.attachments_count", MaxAttachments)
+		return nil, apperr.New("err.attachments_count", MaxAttachments)
 	}
 	type checked struct {
 		u     Upload
@@ -442,7 +443,7 @@ func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.P
 			continue
 		}
 		if len(u.Data) > MaxAttachmentBytes {
-			return nil, userErr("err.attachment_size", MaxAttachmentBytes>>20)
+			return nil, apperr.New("err.attachment_size", MaxAttachmentBytes>>20)
 		}
 		ctype, _, _ := strings.Cut(http.DetectContentType(u.Data), ";")
 		ok = append(ok, checked{u, ctype})
@@ -467,7 +468,7 @@ func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.P
 func (s *WikiService) File(ctx context.Context, p *models.Project, id int64) (*models.WikiFile, []byte, error) {
 	f, err := s.repo.GetFile(ctx, p.ID, id)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, nil, ErrNotFound
+		return nil, nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, nil, err
 	}

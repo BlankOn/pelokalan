@@ -11,7 +11,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"pelokalan/internal/models"
-	"pelokalan/internal/service"
+	"pelokalan/internal/platform/apperr"
 )
 
 // Public JSON API: no key, no sign-in, readable from any site (CORS). The members list includes
@@ -61,7 +61,7 @@ func (h *Handler) apiProject(r *http.Request) (*models.Project, error) {
 // APIMembers lists a project's members: GET /api/projects/{id}/members
 func (h *Handler) APIMembers(w http.ResponseWriter, r *http.Request) {
 	p, err := h.apiProject(r)
-	if errors.Is(err, service.ErrNotFound) {
+	if errors.Is(err, apperr.ErrNotFound) {
 		apiJSON(w, http.StatusNotFound, map[string]string{"error": "project not found"})
 		return
 	} else if err != nil {

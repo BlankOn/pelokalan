@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 )
 
 func TestPatchLinkToken(t *testing.T) {
@@ -16,18 +17,18 @@ func TestPatchLinkToken(t *testing.T) {
 	tok := s.PatchLinkToken(u, "c", 1234, now)
 	// tampered tokens and expired ones are refused before any lookup
 	for _, bad := range []string{"", "x", tok + "a", "p" + tok[1:], tok[:len(tok)-2] + "zz"} {
-		if _, err := s.ParsePatchLink(context.Background(), bad, now); err != ErrInvalidToken {
+		if _, err := s.ParsePatchLink(context.Background(), bad, now); err != apperr.ErrInvalidToken {
 			t.Errorf("%q: err = %v, want ErrInvalidToken", bad, err)
 		}
 	}
 	if p, sig, ok := strings.Cut(tok, "."); !ok || strings.Contains(p, "_") || strings.Contains(sig, ".") {
 		t.Errorf("token %q", tok)
 	}
-	if _, err := s.ParsePatchLink(context.Background(), tok, now.Add(PatchLinkTTL+time.Second)); err != ErrInvalidToken {
+	if _, err := s.ParsePatchLink(context.Background(), tok, now.Add(PatchLinkTTL+time.Second)); err != apperr.ErrInvalidToken {
 		t.Errorf("expired: err = %v", err)
 	}
 	other := &AuthService{jwtSecret: []byte("other")}
-	if _, err := other.ParsePatchLink(context.Background(), tok, now); err != ErrInvalidToken {
+	if _, err := other.ParsePatchLink(context.Background(), tok, now); err != apperr.ErrInvalidToken {
 		t.Errorf("other secret: err = %v", err)
 	}
 }

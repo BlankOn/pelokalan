@@ -19,6 +19,7 @@ import (
 	"pelokalan/internal/handler/web"
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/repository/postgres"
 	"pelokalan/internal/service"
@@ -33,7 +34,7 @@ type Options struct {
 	// Root is the project directory holding internal/templates, static and migrations ("." on the server)
 	Root string
 	// Mailer replaces the configured one (tests capture emails with it)
-	Mailer service.Mailer
+	Mailer mailer.Mailer
 	// Offline leaves out the GNOME translation site client, so nothing asks the site (tests)
 	Offline bool
 }
@@ -44,7 +45,7 @@ type App struct {
 	DB     *sql.DB
 	Repos  *repository.Repositories
 	Blobs  *blobstore.Postgres
-	Mailer service.Mailer
+	Mailer mailer.Mailer
 
 	Auth         *service.AuthService
 	Projects     *service.ProjectService
@@ -109,7 +110,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	// Services
 	a.Mailer = opts.Mailer
 	if a.Mailer == nil {
-		a.Mailer = service.NewMailer(cfg.Mail)
+		a.Mailer = mailer.NewMailer(cfg.Mail)
 	}
 	mailer := a.Mailer
 	a.Auth = service.NewAuthService(repos.User, repos.OTP, mailer, cfg.Auth, cfg.Site, cfg.JWT)

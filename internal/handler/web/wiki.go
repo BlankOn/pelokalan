@@ -15,6 +15,7 @@ import (
 
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 )
@@ -51,7 +52,7 @@ func (h *Handler) WikiIndex(w http.ResponseWriter, r *http.Request) {
 
 // wikiRedirect sends an old page address to the page's current one; it reports whether it did
 func (h *Handler) wikiRedirect(w http.ResponseWriter, r *http.Request, p *models.Project, err error, suffix string) bool {
-	if !errors.Is(err, service.ErrNotFound) {
+	if !errors.Is(err, apperr.ErrNotFound) {
 		return false
 	}
 	cur, rerr := h.wiki.Redirect(r.Context(), p, chi.URLParam(r, "slug"))
@@ -163,7 +164,7 @@ func (h *Handler) WikiCreate(w http.ResponseWriter, r *http.Request) {
 	in := wikiInput(r)
 	pg, err := h.wiki.Create(r.Context(), middleware.GetUser(r.Context()), p, in)
 	if err != nil {
-		if _, ok := service.AsUserError(err); ok {
+		if _, ok := apperr.AsUserError(err); ok {
 			h.renderWikiEdit(w, r, p, nil, in, h.errorMessage(r, err))
 			return
 		}
@@ -202,7 +203,7 @@ func (h *Handler) WikiSave(w http.ResponseWriter, r *http.Request) {
 	in := wikiInput(r)
 	pg, err := h.wiki.Update(r.Context(), middleware.GetUser(r.Context()), p, chi.URLParam(r, "slug"), in)
 	if err != nil {
-		if _, ok := service.AsUserError(err); ok {
+		if _, ok := apperr.AsUserError(err); ok {
 			cur, perr := h.wiki.Page(r.Context(), p, chi.URLParam(r, "slug"))
 			if perr != nil {
 				h.fail(w, r, perr)

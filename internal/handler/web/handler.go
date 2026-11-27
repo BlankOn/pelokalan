@@ -22,6 +22,7 @@ import (
 
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
@@ -432,7 +433,7 @@ type partial struct {
 // errorMessage translates an error for display, logging unexpected ones
 func (h *Handler) errorMessage(r *http.Request, err error) string {
 	lang := middleware.GetLang(r.Context())
-	if ue, ok := service.AsUserError(err); ok {
+	if ue, ok := apperr.AsUserError(err); ok {
 		return i18n.T(lang, ue.Key, ue.Args...)
 	}
 	log.Printf("%s %s: %v", r.Method, r.URL.Path, err)
@@ -443,12 +444,12 @@ func (h *Handler) errorMessage(r *http.Request, err error) string {
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, err error) {
 	status := http.StatusInternalServerError
 	switch {
-	case errors.Is(err, service.ErrNotFound):
+	case errors.Is(err, apperr.ErrNotFound):
 		status = http.StatusNotFound
-	case errors.Is(err, service.ErrForbidden):
+	case errors.Is(err, apperr.ErrForbidden):
 		status = http.StatusForbidden
 	default:
-		if _, ok := service.AsUserError(err); ok {
+		if _, ok := apperr.AsUserError(err); ok {
 			status = http.StatusBadRequest
 		}
 	}

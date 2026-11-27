@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/po"
 )
@@ -110,18 +111,18 @@ func (s *CatalogService) commit(ctx context.Context, authorID *int64, c *models.
 // Commit saves the current state of the user's catalog with a message
 func (s *CatalogService) Commit(ctx context.Context, user *models.User, c *models.Catalog, message string) (*models.Commit, error) {
 	if !c.WritableBy(user.ID) {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	message = strings.TrimSpace(message)
 	if message == "" || len([]rune(message)) > 500 {
-		return nil, userErr("err.commit_message")
+		return nil, apperr.New("err.commit_message")
 	}
 	cm, created, err := s.commit(ctx, &user.ID, c, models.CommitManual, message, nil, false)
 	if err != nil {
 		return nil, err
 	}
 	if !created {
-		return nil, userErr("err.nothing_to_commit")
+		return nil, apperr.New("err.nothing_to_commit")
 	}
 	s.activity.Record(ctx, &models.ActivityEvent{Kind: models.ActivityCommitCreated, UserID: &user.ID,
 		ProjectID: &c.ProjectID, CatalogID: &c.ID, Language: c.Language,
@@ -133,15 +134,15 @@ func (s *CatalogService) Commit(ctx context.Context, user *models.User, c *model
 // and the rest of the history stay as they are
 func (s *CatalogService) EditCommitMessage(ctx context.Context, user *models.User, c *models.Catalog, id int64, message string) (*models.Commit, error) {
 	if !c.WritableBy(user.ID) {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	cm, err := s.commits.Get(ctx, id)
 	if err != nil || cm.CatalogID != c.ID {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	message = strings.TrimSpace(message)
 	if message == "" || len([]rune(message)) > 500 || strings.Contains(message, "|") {
-		return nil, userErr("err.commit_message")
+		return nil, apperr.New("err.commit_message")
 	}
 	if err := s.commits.SetMessage(ctx, cm.ID, message); err != nil {
 		return nil, err
@@ -195,7 +196,7 @@ func (s *CatalogService) Discard(ctx context.Context, user *models.User, c *mode
 		return nil, err
 	}
 	if latest == nil {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	return s.Restore(ctx, user, c, latest.ID)
 }
@@ -227,7 +228,7 @@ func (s *CatalogService) WorkingDiff(ctx context.Context, c *models.Catalog) (*D
 func (s *CatalogService) ownCommit(ctx context.Context, c *models.Catalog, id int64) (*models.Commit, error) {
 	cm, err := s.commits.Get(ctx, id)
 	if err != nil || cm.CatalogID != c.ID {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	return cm, nil
 }
@@ -301,7 +302,7 @@ func splitOriginFlag(flags []string) ([]string, string) {
 // committed first and the restore is itself recorded, so it can be undone.
 func (s *CatalogService) Restore(ctx context.Context, user *models.User, c *models.Catalog, id int64) (*models.Commit, error) {
 	if !c.WritableBy(user.ID) {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	target, data, err := s.commitSnapshot(ctx, c, id)
 	if err != nil {

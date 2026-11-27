@@ -2,9 +2,6 @@ package web
 
 import (
 	"bytes"
-	"github.com/yuin/goldmark"
-	"github.com/yuin/goldmark/extension"
-	gmhtml "github.com/yuin/goldmark/renderer/html"
 	"html"
 	"html/template"
 	"io"
@@ -15,10 +12,15 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/extension"
+	gmhtml "github.com/yuin/goldmark/renderer/html"
+
 	"github.com/go-chi/chi/v5"
 
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/service"
@@ -152,7 +154,7 @@ func (h *Handler) GlossaryTermPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	term, err := h.glossary.Term(r.Context(), p, hash)
-	if err != nil && err != service.ErrNotFound {
+	if err != nil && err != apperr.ErrNotFound {
 		h.fail(w, r, err)
 		return
 	}
@@ -329,7 +331,7 @@ func (h *Handler) PostComment(w http.ResponseWriter, r *http.Request) {
 	_, _, err = h.discuss.Comment(r.Context(), middleware.GetUser(r.Context()), p, subjectType, key,
 		r.FormValue("body"), middleware.GetLang(r.Context()), uploads)
 	if err != nil {
-		if _, isUser := service.AsUserError(err); !isUser || err == service.ErrForbidden {
+		if _, isUser := apperr.AsUserError(err); !isUser || err == apperr.ErrForbidden {
 			h.fail(w, r, err)
 			return
 		}
@@ -347,16 +349,16 @@ func readAttachments(w http.ResponseWriter, r *http.Request) ([]service.Upload, 
 	limit := int64(service.MaxAttachments*service.MaxAttachmentBytes + 1<<20)
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
-		return nil, &service.UserError{Key: "err.attachment_size", Args: []any{service.MaxAttachmentBytes >> 20}}
+		return nil, &apperr.UserError{Key: "err.attachment_size", Args: []any{service.MaxAttachmentBytes >> 20}}
 	}
 	files := r.MultipartForm.File["files"]
 	if len(files) > service.MaxAttachments {
-		return nil, &service.UserError{Key: "err.attachments_count", Args: []any{service.MaxAttachments}}
+		return nil, &apperr.UserError{Key: "err.attachments_count", Args: []any{service.MaxAttachments}}
 	}
 	var out []service.Upload
 	for _, fh := range files {
 		if fh.Size > service.MaxAttachmentBytes {
-			return nil, &service.UserError{Key: "err.attachment_size", Args: []any{service.MaxAttachmentBytes >> 20}}
+			return nil, &apperr.UserError{Key: "err.attachment_size", Args: []any{service.MaxAttachmentBytes >> 20}}
 		}
 		f, err := fh.Open()
 		if err != nil {
@@ -573,7 +575,7 @@ func (h *Handler) TopicCreate(w http.ResponseWriter, r *http.Request) {
 	subj, err := h.discuss.CreateTopic(r.Context(), middleware.GetUser(r.Context()), p,
 		r.FormValue("title"), r.FormValue("body"), middleware.GetLang(r.Context()), uploads)
 	if err != nil {
-		if _, ok := service.AsUserError(err); ok {
+		if _, ok := apperr.AsUserError(err); ok {
 			h.renderTopicNew(w, r, p, r.FormValue("title"), r.FormValue("body"), h.errorMessage(r, err))
 			return
 		}
@@ -617,7 +619,7 @@ func (h *Handler) ThreadPage(w http.ResponseWriter, r *http.Request) {
 	}
 	thread, err := h.discuss.Thread(r.Context(), p, chi.URLParam(r, "type"), chi.URLParam(r, "key"))
 	if err == nil && thread.Discussion == nil {
-		err = service.ErrNotFound
+		err = apperr.ErrNotFound
 	}
 	if err != nil {
 		h.fail(w, r, err)

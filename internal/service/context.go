@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/repository"
 )
 
@@ -18,7 +19,7 @@ const (
 )
 
 // ErrContextConflict: someone saved the Konteks after the editor opened it
-var ErrContextConflict = userErr("err.context_conflict")
+var ErrContextConflict = apperr.New("err.context_conflict")
 
 // ContextService manages Konteks: one note per module of a project (all PO files whose
 // name starts with the same word), kept in Pelokalan only. Everyone who can read the
@@ -73,11 +74,11 @@ func (s *ContextService) Edits(ctx context.Context, n *models.ModuleContext) ([]
 // stored: it returns the latest Konteks with ErrContextConflict.
 func (s *ContextService) Save(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, note string, version int64) (*models.ModuleContext, error) {
 	if user == nil || !p.Role.IsMember() || c.IsTemplate {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	note = strings.TrimRight(strings.ReplaceAll(note, "\r\n", "\n"), " \n")
 	if len([]rune(note)) > maxContextLen {
-		return nil, userErr("err.context_length", maxContextLen)
+		return nil, apperr.New("err.context_length", maxContextLen)
 	}
 	module := ModuleOf(c)
 	if cur, err := s.ForModule(ctx, p.ID, module); err == nil && cur != nil && cur.Version == version && cur.Note == note {
@@ -101,15 +102,15 @@ const maxContextTitle = 120
 // CreateGeneral adds a Konteks item that belongs to no module (members only)
 func (s *ContextService) CreateGeneral(ctx context.Context, user *models.User, p *models.Project, title, note string) (*models.ModuleContext, error) {
 	if user == nil || !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	title = strings.Join(strings.Fields(title), " ")
 	note = strings.TrimRight(strings.ReplaceAll(note, "\r\n", "\n"), " \n")
 	if title == "" || len([]rune(title)) > maxContextTitle {
-		return nil, userErr("err.context_title", maxContextTitle)
+		return nil, apperr.New("err.context_title", maxContextTitle)
 	}
 	if strings.TrimSpace(note) == "" || len([]rune(note)) > maxContextLen {
-		return nil, userErr("err.context_length", maxContextLen)
+		return nil, apperr.New("err.context_length", maxContextLen)
 	}
 	n := &models.ModuleContext{ProjectID: p.ID, Module: "~" + randomHex(6), Title: title, Note: note, UpdatedBy: &user.ID,
 		UpdaterName: user.DisplayName()}
@@ -123,19 +124,19 @@ func (s *ContextService) CreateGeneral(ctx context.Context, user *models.User, p
 // version the form started from; ErrContextConflict with the latest when someone saved in between.
 func (s *ContextService) SaveGeneral(ctx context.Context, user *models.User, p *models.Project, key, title, note string, version int64) (*models.ModuleContext, error) {
 	if user == nil || !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	cur, err := s.ForModule(ctx, p.ID, key)
 	if err != nil || cur == nil || !cur.IsGeneral() {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	title = strings.Join(strings.Fields(title), " ")
 	note = strings.TrimRight(strings.ReplaceAll(note, "\r\n", "\n"), " \n")
 	if title == "" || len([]rune(title)) > maxContextTitle {
-		return nil, userErr("err.context_title", maxContextTitle)
+		return nil, apperr.New("err.context_title", maxContextTitle)
 	}
 	if len([]rune(note)) > maxContextLen {
-		return nil, userErr("err.context_length", maxContextLen)
+		return nil, apperr.New("err.context_length", maxContextLen)
 	}
 	if cur.Version == version && cur.Note == note && cur.Title == title {
 		return cur, nil
@@ -152,11 +153,11 @@ func (s *ContextService) SaveGeneral(ctx context.Context, user *models.User, p *
 // DeleteGeneral removes an item without a module (like emptying its note: it leaves the list, its edits stay)
 func (s *ContextService) DeleteGeneral(ctx context.Context, user *models.User, p *models.Project, key string) error {
 	if user == nil || !p.Role.IsMember() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	cur, err := s.ForModule(ctx, p.ID, key)
 	if err != nil || cur == nil || !cur.IsGeneral() {
-		return ErrNotFound
+		return apperr.ErrNotFound
 	}
 	if cur.Note == "" {
 		return nil

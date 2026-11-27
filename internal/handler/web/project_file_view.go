@@ -10,6 +10,7 @@ import (
 
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/service"
 	"pelokalan/pkg/po"
 )
@@ -111,7 +112,7 @@ func (h *Handler) ProjectFileByModule(w http.ResponseWriter, r *http.Request) {
 	name, _ := url.PathUnescape(chi.URLParam(r, "name"))
 	f, err := h.glossary.ProjectFileForModule(r.Context(), p, name)
 	if err != nil || f == nil {
-		h.fail(w, r, service.ErrNotFound)
+		h.fail(w, r, apperr.ErrNotFound)
 		return
 	}
 	target := p.Path() + "/project-files/" + strconv.FormatInt(f.ID, 10) + "/view"

@@ -11,6 +11,7 @@ import (
 
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 )
@@ -147,7 +148,7 @@ func (h *Handler) DeleteGeneralContext(w http.ResponseWriter, r *http.Request) {
 	}
 	err := h.contexts.DeleteGeneral(r.Context(), middleware.GetUser(r.Context()), p, "~"+chi.URLParam(r, "key"))
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) || errors.Is(err, service.ErrForbidden) {
+		if errors.Is(err, apperr.ErrNotFound) || errors.Is(err, apperr.ErrForbidden) {
 			h.fail(w, r, err)
 			return
 		}
@@ -167,7 +168,7 @@ func (h *Handler) SaveGeneralContext(w http.ResponseWriter, r *http.Request) {
 	version, _ := strconv.ParseInt(r.FormValue("version"), 10, 64)
 	_, err := h.contexts.SaveGeneral(r.Context(), middleware.GetUser(r.Context()), p, key, r.FormValue("title"), r.FormValue("note"), version)
 	if err != nil {
-		if errors.Is(err, service.ErrNotFound) || errors.Is(err, service.ErrForbidden) {
+		if errors.Is(err, apperr.ErrNotFound) || errors.Is(err, apperr.ErrForbidden) {
 			h.fail(w, r, err)
 			return
 		}

@@ -25,8 +25,8 @@ import (
 
 	"pelokalan/internal/app"
 	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/testdb"
-	"pelokalan/internal/service"
 	"pelokalan/pkg/githubapp/githubtest"
 )
 
@@ -111,10 +111,10 @@ func testConfig(db config.DatabaseConfig, base string) *config.Config {
 // captureMailer keeps every email so tests can read codes and check notifications
 type captureMailer struct {
 	mu   sync.Mutex
-	sent []*service.Message
+	sent []*mailer.Message
 }
 
-func (m *captureMailer) Send(_ context.Context, msg *service.Message) error {
+func (m *captureMailer) Send(_ context.Context, msg *mailer.Message) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.sent = append(m.sent, msg)
@@ -122,10 +122,10 @@ func (m *captureMailer) Send(_ context.Context, msg *service.Message) error {
 }
 
 // to returns the emails sent to an address, oldest first
-func (m *captureMailer) to(addr string) []*service.Message {
+func (m *captureMailer) to(addr string) []*mailer.Message {
 	m.mu.Lock()
 	defer m.mu.Unlock()
-	var out []*service.Message
+	var out []*mailer.Message
 	for _, msg := range m.sent {
 		if strings.EqualFold(msg.To, addr) {
 			out = append(out, msg)
@@ -136,7 +136,7 @@ func (m *captureMailer) to(addr string) []*service.Message {
 
 // waitFor waits until an email to addr whose subject or text contains want arrives
 // (notifications are sent in the background)
-func (m *captureMailer) waitFor(t *testing.T, addr, want string) *service.Message {
+func (m *captureMailer) waitFor(t *testing.T, addr, want string) *mailer.Message {
 	t.Helper()
 	deadline := time.Now().Add(5 * time.Second)
 	for time.Now().Before(deadline) {

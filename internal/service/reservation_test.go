@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/repository"
 )
@@ -130,7 +131,7 @@ func TestReservations(t *testing.T) {
 	}
 	// a translator may not release someone else's; a manager may, and the holder is emailed
 	p.Role = models.RoleTranslator
-	if err := s.Release(ctx, budi, p, "gtk"); err != ErrForbidden {
+	if err := s.Release(ctx, budi, p, "gtk"); err != apperr.ErrForbidden {
 		t.Fatalf("translator release: %v", err)
 	}
 	p.Role = models.RoleManager

@@ -15,9 +15,11 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/repository"
 )
 
@@ -33,7 +35,7 @@ type Subject struct {
 }
 
 // ErrDiscussionClosed: the discussion's subject is gone, so it is read-only
-var ErrDiscussionClosed = userErr("err.discussion_closed")
+var ErrDiscussionClosed = apperr.New("err.discussion_closed")
 
 // ThreadURL is the standalone page of a discussion whose subject is gone
 func ThreadURL(p *models.Project, subjectType, key string) string {
@@ -54,7 +56,7 @@ type DiscussionService struct {
 	glossary repository.GlossaryRepository
 	catalogs repository.CatalogRepository
 	blobs    blobstore.Store
-	mailer   Mailer
+	mailer   mailer.Mailer
 	site     config.SiteConfig
 	notifs   repository.NotificationRepository // members' email choices (nil: email everyone)
 	activity *ActivityService
@@ -90,7 +92,7 @@ func (s *DiscussionService) SetNotifications(r repository.NotificationRepository
 // NotificationSettings returns a member's email choices in a project
 func (s *DiscussionService) NotificationSettings(ctx context.Context, user *models.User, p *models.Project) (*models.NotificationSettings, error) {
 	if user == nil || !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	if s.notifs == nil {
 		return &models.NotificationSettings{Off: map[string]bool{}}, nil
@@ -108,7 +110,7 @@ func (s *DiscussionService) NotificationSettings(ctx context.Context, user *mode
 // SaveNotificationSettings stores a member's email choices; on lists the kinds switched on
 func (s *DiscussionService) SaveNotificationSettings(ctx context.Context, user *models.User, p *models.Project, muted bool, on map[string]bool) error {
 	if user == nil || !p.Role.IsMember() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	if s.notifs == nil {
 		return nil
@@ -128,7 +130,7 @@ func (s *DiscussionService) SetActivity(a *ActivityService) { s.activity = a }
 // NewDiscussionService creates the discussion service
 func NewDiscussionService(repo repository.DiscussionRepository, projects repository.ProjectRepository,
 	glossaryRepo repository.GlossaryRepository, catalogs repository.CatalogRepository, blobs blobstore.Store,
-	mailer Mailer, site config.SiteConfig) *DiscussionService {
+	mailer mailer.Mailer, site config.SiteConfig) *DiscussionService {
 	return &DiscussionService{repo: repo, projects: projects, glossary: glossaryRepo, catalogs: catalogs, blobs: blobs,
 		mailer: mailer, site: site}
 }
@@ -147,7 +149,7 @@ func (s *DiscussionService) ResolveSubject(ctx context.Context, p *models.Projec
 	switch subjectType {
 	case models.SubjectGlossaryTerm:
 		if len(key) != 64 {
-			return nil, ErrNotFound
+			return nil, apperr.ErrNotFound
 		}
 		term, err := s.glossary.Term(ctx, p.ID, key)
 		if errors.Is(err, repository.ErrNotFound) {
@@ -155,7 +157,7 @@ func (s *DiscussionService) ResolveSubject(ctx context.Context, p *models.Projec
 			if d, derr := s.repo.Get(ctx, p.ID, subjectType, key); derr == nil {
 				return &Subject{Type: subjectType, Key: key, Title: d.Title, URL: GlossaryTermURL(p, key)}, nil
 			}
-			return nil, ErrNotFound
+			return nil, apperr.ErrNotFound
 		} else if err != nil {
 			return nil, err
 		}
@@ -184,21 +186,21 @@ func (s *DiscussionService) ResolveSubject(ctx context.Context, p *models.Projec
 		if d, derr := s.repo.Get(ctx, p.ID, subjectType, key); derr == nil {
 			return &Subject{Type: subjectType, Key: key, Title: d.Title, URL: url, ReadOnly: c.IsDeleted()}, nil
 		}
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	case models.SubjectTopic:
 		// a topic exists only once it has been started (CreateTopic)
 		if !topicKeyRe.MatchString(key) {
-			return nil, ErrNotFound
+			return nil, apperr.ErrNotFound
 		}
 		d, err := s.repo.Get(ctx, p.ID, subjectType, key)
 		if errors.Is(err, repository.ErrNotFound) {
-			return nil, ErrNotFound
+			return nil, apperr.ErrNotFound
 		} else if err != nil {
 			return nil, err
 		}
 		return &Subject{Type: subjectType, Key: key, Title: d.Title, URL: TopicURL(p, key)}, nil
 	}
-	return nil, ErrNotFound
+	return nil, apperr.ErrNotFound
 }
 
 var topicKeyRe = regexp.MustCompile(`^[0-9a-f]{12}$`)
@@ -212,11 +214,11 @@ const maxTopicTitle = 140
 // Nothing is stored when the post is invalid.
 func (s *DiscussionService) CreateTopic(ctx context.Context, user *models.User, p *models.Project, title, body, lang string, uploads []Upload) (*Subject, error) {
 	if !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	title = strings.Join(strings.Fields(title), " ")
 	if title == "" || len([]rune(title)) > maxTopicTitle {
-		return nil, userErr("err.topic_title", maxTopicTitle)
+		return nil, apperr.New("err.topic_title", maxTopicTitle)
 	}
 	b := make([]byte, 6)
 	if _, err := rand.Read(b); err != nil {
@@ -235,11 +237,11 @@ func (s *DiscussionService) entryCatalog(ctx context.Context, p *models.Project,
 	idPart, hash, ok := strings.Cut(key, "-")
 	id, err := strconv.ParseInt(idPart, 10, 64)
 	if !ok || err != nil || len(hash) != 16 {
-		return nil, "", ErrNotFound
+		return nil, "", apperr.ErrNotFound
 	}
 	c, err := s.catalogs.GetByID(ctx, id)
 	if err != nil || c.ProjectID != p.ID {
-		return nil, "", ErrNotFound
+		return nil, "", apperr.ErrNotFound
 	}
 	return c, hash, nil
 }
@@ -320,7 +322,7 @@ func (s *DiscussionService) Members(ctx context.Context, p *models.Project) (map
 func cleanBody(body string) (string, error) {
 	body = strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n"))
 	if body == "" || len([]rune(body)) > maxCommentLen {
-		return "", userErr("err.comment_length", maxCommentLen)
+		return "", apperr.New("err.comment_length", maxCommentLen)
 	}
 	return body, nil
 }
@@ -357,7 +359,7 @@ func attachmentFilename(name string) string {
 // storeUploads saves the files and returns attachment records (not yet linked)
 func (s *DiscussionService) storeUploads(ctx context.Context, uploads []Upload) ([]*models.Attachment, error) {
 	if len(uploads) > MaxAttachments {
-		return nil, userErr("err.attachments_count", MaxAttachments)
+		return nil, apperr.New("err.attachments_count", MaxAttachments)
 	}
 	var out []*models.Attachment
 	for _, u := range uploads {
@@ -365,13 +367,13 @@ func (s *DiscussionService) storeUploads(ctx context.Context, uploads []Upload) 
 			continue
 		}
 		if len(u.Data) > MaxAttachmentBytes {
-			return nil, userErr("err.attachment_size", MaxAttachmentBytes>>20)
+			return nil, apperr.New("err.attachment_size", MaxAttachmentBytes>>20)
 		}
 		// the type comes from the content, never from the file name
 		ctype, _, _ := strings.Cut(http.DetectContentType(u.Data), ";")
 		// only images for now (png, jpeg, gif, webp)
 		if !models.IsInlineType(ctype) {
-			return nil, userErr("err.attachment_type")
+			return nil, apperr.New("err.attachment_type")
 		}
 		key, err := s.blobs.Put(ctx, u.Data)
 		if err != nil {
@@ -386,12 +388,12 @@ func (s *DiscussionService) storeUploads(ctx context.Context, uploads []Upload) 
 // A comment needs text, files, or both.
 func (s *DiscussionService) Comment(ctx context.Context, user *models.User, p *models.Project, subjectType, key, body, lang string, uploads []Upload) (*models.Comment, *Subject, error) {
 	if !p.Role.IsMember() {
-		return nil, nil, ErrForbidden
+		return nil, nil, apperr.ErrForbidden
 	}
 	// text is optional when files are attached, but never too long
 	body = strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n"))
 	if len([]rune(body)) > maxCommentLen || (body == "" && len(uploads) == 0) {
-		return nil, nil, userErr("err.comment_length", maxCommentLen)
+		return nil, nil, apperr.New("err.comment_length", maxCommentLen)
 	}
 	subj, err := s.ResolveSubject(ctx, p, subjectType, key)
 	if err != nil {
@@ -408,14 +410,14 @@ func (s *DiscussionService) post(ctx context.Context, user *models.User, p *mode
 	}
 	body = strings.TrimSpace(strings.ReplaceAll(body, "\r\n", "\n"))
 	if len([]rune(body)) > maxCommentLen || (body == "" && len(uploads) == 0) {
-		return nil, userErr("err.comment_length", maxCommentLen)
+		return nil, apperr.New("err.comment_length", maxCommentLen)
 	}
 	attachments, err := s.storeUploads(ctx, uploads)
 	if err != nil {
 		return nil, err
 	}
 	if body == "" && len(attachments) == 0 {
-		return nil, userErr("err.comment_length", maxCommentLen)
+		return nil, apperr.New("err.comment_length", maxCommentLen)
 	}
 	d := &models.Discussion{ProjectID: p.ID, SubjectType: subj.Type, SubjectKey: subj.Key, Title: subj.Title, CreatedBy: &user.ID}
 	if err := s.repo.GetOrCreate(ctx, d); err != nil {
@@ -569,28 +571,24 @@ func (s *DiscussionService) notify(ctx context.Context, author *models.User, p *
 <blockquote style="border-left:3px solid #ccc;margin:0;padding:6px 12px;color:#333;white-space:pre-wrap">%s</blockquote>
 <p>%s</p>
 <p style="color:#888;font-size:12px">%s<br>%s · <a href="%s" style="color:#888">%s</a></p></div>`,
-			html.EscapeString(intro), html.EscapeString(c.Body), emailButton(link, i18n.T(lang, "mail.mention_button")),
+			html.EscapeString(intro), html.EscapeString(c.Body), mailer.Button(link, i18n.T(lang, "mail.mention_button")),
 			html.EscapeString(i18n.T(lang, "mail.comment_footer", p.Name)), html.EscapeString(why), settingsLink, html.EscapeString(manage))
-		if err := s.mailer.Send(ctx, &Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: kind}); err != nil {
+		if err := s.mailer.Send(ctx, &mailer.Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: kind}); err != nil {
 			log.Printf("discussion: %s email to %s: %v", kind, u.Email, err)
 		}
 	}
 }
 
 // emailButton is the call-to-action link of an email: a small, plain button
-func emailButton(href, label string) string {
-	return fmt.Sprintf(`<a href="%s" style="display:inline-block;background:#2f6fde;color:#fff;padding:5px 12px;border-radius:5px;font-size:14px;line-height:20px;text-decoration:none">%s</a>`,
-		html.EscapeString(href), html.EscapeString(label))
-}
 
 func (s *DiscussionService) projectComment(ctx context.Context, p *models.Project, id int64) (*models.Comment, *models.Discussion, error) {
 	c, err := s.repo.GetComment(ctx, id)
 	if err != nil {
-		return nil, nil, ErrNotFound
+		return nil, nil, apperr.ErrNotFound
 	}
 	d, err := s.repo.GetByID(ctx, c.DiscussionID)
 	if err != nil || d.ProjectID != p.ID {
-		return nil, nil, ErrNotFound
+		return nil, nil, apperr.ErrNotFound
 	}
 	// comments of a read-only discussion (its subject is gone) are not changed any more
 	if subj, err := s.ResolveSubject(ctx, p, d.SubjectType, d.SubjectKey); err == nil && subj.ReadOnly {
@@ -606,7 +604,7 @@ func (s *DiscussionService) EditComment(ctx context.Context, user *models.User, 
 		return nil, err
 	}
 	if c.AuthorID == nil || *c.AuthorID != user.ID || c.IsDeleted() || !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	body, err = cleanBody(body)
 	if err != nil {
@@ -627,7 +625,7 @@ func (s *DiscussionService) DeleteComment(ctx context.Context, user *models.User
 	}
 	own := c.AuthorID != nil && *c.AuthorID == user.ID
 	if !own && !p.Role.IsOwner() { // only its author or the project owner
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	return d, s.repo.DeleteComment(ctx, id, user.ID)
 }
@@ -651,7 +649,7 @@ func (s *DiscussionService) ResolveComment(ctx context.Context, user *models.Use
 		}
 	}
 	if !allowed {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	return d, s.repo.ResolveComment(ctx, id, user.ID)
 }
@@ -674,11 +672,11 @@ func (s *DiscussionService) List(ctx context.Context, p *models.Project, f repos
 func (s *DiscussionService) Attachment(ctx context.Context, p *models.Project, id int64) (*models.Attachment, []byte, error) {
 	a, projectID, err := s.repo.Attachment(ctx, id)
 	if err != nil || projectID != p.ID {
-		return nil, nil, ErrNotFound
+		return nil, nil, apperr.ErrNotFound
 	}
 	data, err := s.blobs.Get(ctx, a.BlobKey)
 	if err != nil {
-		return nil, nil, ErrNotFound
+		return nil, nil, apperr.ErrNotFound
 	}
 	return a, data, nil
 }
@@ -722,13 +720,13 @@ func (s *DiscussionService) DeleteDiscussion(ctx context.Context, user *models.U
 		return nil, err
 	}
 	if t.Discussion == nil {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	if t.Subject.ReadOnly {
 		return nil, ErrDiscussionClosed
 	}
 	if !CanDeleteDiscussion(user, p, t) {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	return t.Subject, s.repo.DeleteDiscussion(ctx, t.Discussion.ID)
 }

@@ -8,6 +8,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 )
@@ -105,7 +106,7 @@ func buildHeatmap(lang string, days []models.ProfileDay, today time.Time) heatma
 func (h *Handler) UserPage(w http.ResponseWriter, r *http.Request) {
 	u, err := h.authService.UserByUsername(r.Context(), chi.URLParam(r, "username"))
 	if err != nil {
-		h.fail(w, r, service.ErrNotFound)
+		h.fail(w, r, apperr.ErrNotFound)
 		return
 	}
 	loc := siteLocation

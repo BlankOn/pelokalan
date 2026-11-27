@@ -11,18 +11,21 @@ import (
 	"log"
 	"math/big"
 	"net/mail"
-	"pelokalan/pkg/po"
 	"regexp"
 	"slices"
 	"strings"
 	"time"
 
+	"pelokalan/pkg/po"
+
 	"github.com/golang-jwt/jwt/v5"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/repository"
 )
 
@@ -30,7 +33,7 @@ import (
 type AuthService struct {
 	users     repository.UserRepository
 	otps      repository.OTPRepository
-	mailer    Mailer
+	mailer    mailer.Mailer
 	cfg       config.AuthConfig
 	site      config.SiteConfig
 	jwtSecret []byte
@@ -53,7 +56,7 @@ func (s *AuthService) SetActivity(a *ActivityService) { s.activity = a }
 func (s *AuthService) SetBlobs(b blobstore.Store) { s.blobs = b }
 
 // NewAuthService creates a new auth service
-func NewAuthService(users repository.UserRepository, otps repository.OTPRepository, mailer Mailer,
+func NewAuthService(users repository.UserRepository, otps repository.OTPRepository, mailer mailer.Mailer,
 	cfg config.AuthConfig, site config.SiteConfig, jwtCfg config.JWTConfig) *AuthService {
 	return &AuthService{
 		users:     users,
@@ -95,7 +98,7 @@ func normalizeAndCheck(email string) (string, error) {
 	email = config.NormalizeEmail(email)
 	addr, err := mail.ParseAddress(email)
 	if err != nil || addr.Address != email || !strings.Contains(email, "@") {
-		return "", ErrInvalidEmail
+		return "", apperr.ErrInvalidEmail
 	}
 	return email, nil
 }
@@ -119,10 +122,10 @@ func NormalizeUsername(u string) string {
 
 func validUsername(u string) error {
 	if !usernameRe.MatchString(u) || strings.Contains(u, "..") {
-		return ErrUsernameInvalid
+		return apperr.ErrUsernameInvalid
 	}
 	if reservedUsernames[u] {
-		return ErrUsernameReserved
+		return apperr.ErrUsernameReserved
 	}
 	return nil
 }
@@ -138,7 +141,7 @@ func (s *AuthService) usernameAvailable(ctx context.Context, u string, selfID in
 	case err != nil:
 		return err
 	case existing.ID != selfID:
-		return ErrUsernameTaken
+		return apperr.ErrUsernameTaken
 	}
 	return nil
 }
@@ -151,17 +154,17 @@ func (s *AuthService) StartRegistration(ctx context.Context, email, username, na
 	}
 	name = strings.TrimSpace(name)
 	if name == "" || len([]rune(name)) > 100 {
-		return email, ErrNameRequired
+		return email, apperr.ErrNameRequired
 	}
 	username = NormalizeUsername(username)
 	if err := s.usernameAvailable(ctx, username, 0); err != nil {
 		return email, err
 	}
 	if !s.IsAllowed(email) {
-		return email, ErrNotWhitelisted
+		return email, apperr.ErrNotWhitelisted
 	}
 	if _, err := s.users.GetByEmail(ctx, email); err == nil {
-		return email, ErrUserExists
+		return email, apperr.ErrUserExists
 	} else if !errors.Is(err, repository.ErrNotFound) {
 		return email, err
 	}
@@ -175,10 +178,10 @@ func (s *AuthService) StartLogin(ctx context.Context, email, lang string) (strin
 		return "", err
 	}
 	if !s.IsAllowed(email) {
-		return email, ErrNotWhitelisted
+		return email, apperr.ErrNotWhitelisted
 	}
 	if _, err := s.users.GetByEmail(ctx, email); errors.Is(err, repository.ErrNotFound) {
-		return email, ErrUserNotFound
+		return email, apperr.ErrUserNotFound
 	} else if err != nil {
 		return email, err
 	}
@@ -189,21 +192,21 @@ func (s *AuthService) StartLogin(ctx context.Context, email, lang string) (strin
 func (s *AuthService) ResendCode(ctx context.Context, email, purpose, lang string) error {
 	email = config.NormalizeEmail(email)
 	if !s.IsAllowed(email) {
-		return ErrNotWhitelisted
+		return apperr.ErrNotWhitelisted
 	}
 	name, username := "", ""
 	if purpose == models.OTPPurposeRegister {
 		prev, err := s.otps.GetLatest(ctx, email, purpose)
 		if err != nil {
-			return ErrOTPExpired
+			return apperr.ErrOTPExpired
 		}
 		name, username = prev.Name, prev.Username
 		if _, err := s.users.GetByEmail(ctx, email); err == nil {
-			return ErrUserExists
+			return apperr.ErrUserExists
 		}
 	} else {
 		if _, err := s.users.GetByEmail(ctx, email); err != nil {
-			return ErrUserNotFound
+			return apperr.ErrUserNotFound
 		}
 	}
 	return s.sendCode(ctx, email, purpose, name, username, lang)
@@ -212,7 +215,7 @@ func (s *AuthService) ResendCode(ctx context.Context, email, purpose, lang strin
 func (s *AuthService) sendCode(ctx context.Context, email, purpose, name, username, lang string) error {
 	// the wait is per email address, shared by sign-in and registration
 	if wait := s.ResendWait(ctx, email); wait > 0 {
-		return userErr("err.otp_too_soon", int(wait.Seconds()+0.999))
+		return apperr.New("err.otp_too_soon", int(wait.Seconds()+0.999))
 	}
 
 	code, err := randomDigits(6)
@@ -247,9 +250,9 @@ func (s *AuthService) sendCode(ctx context.Context, email, purpose, name, userna
 <p style="color:#666">%s</p></div>`,
 		i18n.T(lang, "mail.otp_intro", s.site.Name), code, i18n.T(lang, "mail.otp_footer", minutes))
 
-	if err := s.mailer.Send(ctx, &Message{To: email, Subject: subject, Text: text, HTML: html, Category: "otp"}); err != nil {
+	if err := s.mailer.Send(ctx, &mailer.Message{To: email, Subject: subject, Text: text, HTML: html, Category: "otp"}); err != nil {
 		log.Printf("failed to send code to %s: %v", email, err)
-		return userErr("err.mail_failed")
+		return apperr.New("err.mail_failed")
 	}
 	return nil
 }
@@ -259,33 +262,33 @@ func (s *AuthService) sendCode(ctx context.Context, email, purpose, name, userna
 func (s *AuthService) Verify(ctx context.Context, email, purpose, code, lang string) (*models.User, error) {
 	email = config.NormalizeEmail(email)
 	if !s.IsAllowed(email) {
-		return nil, ErrNotWhitelisted
+		return nil, apperr.ErrNotWhitelisted
 	}
 	code = strings.Join(strings.Fields(code), "")
 
 	otp, err := s.otps.GetLatest(ctx, email, purpose)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrOTPInvalid
+		return nil, apperr.ErrOTPInvalid
 	} else if err != nil {
 		return nil, err
 	}
 	if otp.UsedAt != nil || otp.IsExpired() {
-		return nil, ErrOTPExpired
+		return nil, apperr.ErrOTPExpired
 	}
 	if otp.Attempts >= s.cfg.OTPMaxAttempts {
-		return nil, ErrOTPTooManyAttempts
+		return nil, apperr.ErrOTPTooManyAttempts
 	}
 	if !hmac.Equal([]byte(otp.CodeHash), []byte(s.hashCode(email, code))) {
 		if err := s.otps.IncrementAttempts(ctx, otp.ID); err != nil {
 			return nil, err
 		}
 		if otp.Attempts+1 >= s.cfg.OTPMaxAttempts {
-			return nil, ErrOTPTooManyAttempts
+			return nil, apperr.ErrOTPTooManyAttempts
 		}
-		return nil, ErrOTPInvalid
+		return nil, apperr.ErrOTPInvalid
 	}
 	if err := s.otps.MarkUsed(ctx, otp.ID); err != nil {
-		return nil, ErrOTPExpired
+		return nil, apperr.ErrOTPExpired
 	}
 
 	user, err := s.users.GetByEmail(ctx, email)
@@ -294,7 +297,7 @@ func (s *AuthService) Verify(ctx context.Context, email, purpose, code, lang str
 	case errors.Is(err, repository.ErrNotFound) && purpose == models.OTPPurposeRegister:
 		user = &models.User{Email: email, Username: otp.Username, Name: otp.Name, Lang: i18n.Normalize(lang)}
 		if user.Username == "" { // registration started before usernames existed
-			return nil, ErrOTPExpired
+			return nil, apperr.ErrOTPExpired
 		}
 		if err := s.usernameAvailable(ctx, user.Username, 0); err != nil {
 			return nil, err
@@ -304,7 +307,7 @@ func (s *AuthService) Verify(ctx context.Context, email, purpose, code, lang str
 		}
 		s.activity.Record(ctx, &models.ActivityEvent{Kind: models.ActivityUserRegistered, UserID: &user.ID})
 	case errors.Is(err, repository.ErrNotFound):
-		return nil, ErrUserNotFound
+		return nil, apperr.ErrUserNotFound
 	default:
 		return nil, err
 	}
@@ -348,23 +351,23 @@ func (s *AuthService) GenerateToken(user *models.User) (string, error) {
 func (s *AuthService) Authenticate(ctx context.Context, tokenString string) (*models.User, error) {
 	token, err := jwt.ParseWithClaims(tokenString, &Claims{}, func(t *jwt.Token) (any, error) {
 		if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, ErrInvalidToken
+			return nil, apperr.ErrInvalidToken
 		}
 		return s.jwtSecret, nil
 	})
 	if err != nil {
-		return nil, ErrInvalidToken
+		return nil, apperr.ErrInvalidToken
 	}
 	claims, ok := token.Claims.(*Claims)
 	if !ok || !token.Valid {
-		return nil, ErrInvalidToken
+		return nil, apperr.ErrInvalidToken
 	}
 	user, err := s.users.GetByID(ctx, claims.UserID)
 	if err != nil {
-		return nil, ErrInvalidToken
+		return nil, apperr.ErrInvalidToken
 	}
 	if !s.IsAllowed(user.Email) {
-		return nil, ErrNotWhitelisted
+		return nil, apperr.ErrNotWhitelisted
 	}
 	return user, nil
 }
@@ -373,7 +376,7 @@ func (s *AuthService) Authenticate(ctx context.Context, tokenString string) (*mo
 func (s *AuthService) UserByUsername(ctx context.Context, username string) (*models.User, error) {
 	u, err := s.users.GetByUsername(ctx, NormalizeUsername(username))
 	if err != nil {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	return u, nil
 }
@@ -391,7 +394,7 @@ func (s *AuthService) SetBadgeEmails(ctx context.Context, user *models.User, on 
 func (s *AuthService) UpdateProfile(ctx context.Context, user *models.User, username, name, lang string) error {
 	name = strings.TrimSpace(name)
 	if name == "" || len([]rune(name)) > 100 {
-		return ErrNameRequired
+		return apperr.ErrNameRequired
 	}
 	username = NormalizeUsername(username)
 	if err := s.usernameAvailable(ctx, username, user.ID); err != nil {
@@ -411,11 +414,11 @@ func (s *AuthService) UpdateIdentity(ctx context.Context, user *models.User, nam
 	if email != "" {
 		addr, err := mail.ParseAddress(email)
 		if err != nil || addr.Address != email {
-			return ErrInvalidEmail
+			return apperr.ErrInvalidEmail
 		}
 	}
 	if len([]rune(name)) > 100 || len([]rune(team)) > 200 || strings.ContainsAny(name+team, "\n\r") {
-		return userErr("err.identity_invalid")
+		return apperr.New("err.identity_invalid")
 	}
 	user.TranslatorName, user.TranslatorEmail, user.LanguageTeam = name, email, team
 	return s.users.Update(ctx, user)

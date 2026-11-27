@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"pelokalan/internal/handler/middleware"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/service"
 )
 
@@ -20,7 +21,7 @@ func (h *Handler) DownloadTP(w http.ResponseWriter, r *http.Request) {
 	}
 	d, err := h.glossary.TPFor(r.Context(), p, c)
 	if errors.Is(err, service.ErrNotTP) {
-		h.fail(w, r, service.ErrNotFound)
+		h.fail(w, r, apperr.ErrNotFound)
 		return
 	}
 	pc, err := h.catalogService.Build(r.Context(), middleware.GetUser(r.Context()), c)

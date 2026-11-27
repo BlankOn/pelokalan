@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/gitpatch"
 	"pelokalan/pkg/po"
@@ -23,7 +24,7 @@ func (s *CatalogService) SetProjectFiles(r repository.GlossaryRepository) { s.pr
 // SetRepoPath stores a file's path in its module group's git repository
 func (s *CatalogService) SetRepoPath(ctx context.Context, user *models.User, c *models.Catalog, path string) error {
 	if !c.WritableBy(user.ID) {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	c.RepoPath = path
 	return s.catalogs.SetRepoPath(ctx, c.ID, path)
@@ -116,7 +117,7 @@ func TranslatorCredit(u *models.User) *gitpatch.Credit {
 
 func (s *CatalogService) GitPatch(ctx context.Context, user *models.User, p *models.Project, catalogs []*models.Catalog, projectURL string) (*GitPatchResult, error) {
 	if s.projectFiles == nil {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	res := &GitPatchResult{}
 	var diffs []*gitpatch.FileDiff

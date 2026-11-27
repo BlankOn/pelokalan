@@ -4,17 +4,20 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	"github.com/go-chi/chi/v5"
 	"log"
 	"mime"
 	"net/http"
 	"net/url"
-	"pelokalan/pkg/ai"
 	"strconv"
 	"strings"
 
+	"github.com/go-chi/chi/v5"
+
+	"pelokalan/pkg/ai"
+
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/service"
@@ -54,7 +57,7 @@ func (h *Handler) loadCatalog(w http.ResponseWriter, r *http.Request) (*models.C
 func (h *Handler) loadOwnCatalog(w http.ResponseWriter, r *http.Request) (*models.Catalog, *models.Project, bool) {
 	c, p, ok := h.loadCatalog(w, r)
 	if ok && !c.Owned {
-		h.fail(w, r, service.ErrForbidden)
+		h.fail(w, r, apperr.ErrForbidden)
 		return nil, nil, false
 	}
 	return c, p, ok
@@ -446,7 +449,7 @@ func (h *Handler) SaveEntry(w http.ResponseWriter, r *http.Request) {
 		}
 		v := h.editorData(r, c, p, e)
 		v.Error = h.errorMessage(r, err)
-		if errors.Is(err, service.ErrEntryConflict) {
+		if errors.Is(err, apperr.ErrEntryConflict) {
 			v.Draft = forms
 		}
 		sv := v
@@ -510,7 +513,7 @@ func (h *Handler) DownloadMO(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if c.IsTemplate {
-		h.fail(w, r, service.ErrForbidden)
+		h.fail(w, r, apperr.ErrForbidden)
 		return
 	}
 	pc, err := h.catalogService.Build(r.Context(), middleware.GetUser(r.Context()), c)

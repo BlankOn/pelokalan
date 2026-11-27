@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/ai"
 	"pelokalan/pkg/glossary"
@@ -151,7 +152,7 @@ func parseMoney(v string) (float64, bool) {
 // SaveSettings stores the AI settings (owner or manager)
 func (s *AIService) SaveSettings(ctx context.Context, user *models.User, p *models.Project, in AISettingsInput) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	current, err := s.Settings(ctx, p)
 	if err != nil {
@@ -163,11 +164,11 @@ func (s *AIService) SaveSettings(ctx context.Context, user *models.User, p *mode
 		st.BaseURL = ai.DefaultBaseURL
 	}
 	if _, err := glossary.ValidateURL(st.BaseURL); err != nil {
-		return userErr("err.ai_base_url")
+		return apperr.New("err.ai_base_url")
 	}
 	st.Model = strings.TrimSpace(in.Model)
 	if st.Model == "" || len(st.Model) > 100 || strings.ContainsAny(st.Model, " /?#") {
-		return userErr("err.ai_model")
+		return apperr.New("err.ai_model")
 	}
 	ok1, ok2, ok3 := true, true, true
 	if _, known := AIPrices[st.Model]; known {
@@ -178,17 +179,17 @@ func (s *AIService) SaveSettings(ctx context.Context, user *models.User, p *mode
 	}
 	st.MonthlyBudget, ok3 = parseMoney(in.MonthlyBudget)
 	if !ok1 || !ok2 || !ok3 {
-		return userErr("err.ai_price")
+		return apperr.New("err.ai_price")
 	}
 	st.ExtraContext = strings.TrimSpace(strings.ReplaceAll(in.ExtraContext, "\r\n", "\n"))
 	if len([]rune(st.ExtraContext)) > ai.MaxProjectContext {
-		return userErr("err.ai_context_length", ai.MaxProjectContext)
+		return apperr.New("err.ai_context_length", ai.MaxProjectContext)
 	}
 	key := strings.TrimSpace(in.APIKey)
 	switch {
 	case key != "":
 		if len(key) < 10 || len(key) > 500 || strings.ContainsAny(key, " \n\r\t") {
-			return userErr("err.ai_key")
+			return apperr.New("err.ai_key")
 		}
 		if st.APIKeyEnc, err = s.box.Seal(key); err != nil {
 			return err
@@ -197,7 +198,7 @@ func (s *AIService) SaveSettings(ctx context.Context, user *models.User, p *mode
 	case current != nil:
 		st.APIKeyEnc, st.APIKeyHint = current.APIKeyEnc, current.APIKeyHint
 	default:
-		return userErr("err.ai_key_required")
+		return apperr.New("err.ai_key_required")
 	}
 	return s.repo.SaveSettings(ctx, st)
 }
@@ -205,7 +206,7 @@ func (s *AIService) SaveSettings(ctx context.Context, user *models.User, p *mode
 // RemoveSettings deletes the stored key and settings
 func (s *AIService) RemoveSettings(ctx context.Context, p *models.Project) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	return s.repo.DeleteSettings(ctx, p.ID)
 }
@@ -213,7 +214,7 @@ func (s *AIService) RemoveSettings(ctx context.Context, p *models.Project) error
 func (s *AIService) client(st *models.AISettings) (chatClient, error) {
 	key, err := s.box.Open(st.APIKeyEnc)
 	if err != nil {
-		return nil, userErr("err.ai_key_unreadable")
+		return nil, apperr.New("err.ai_key_unreadable")
 	}
 	return s.newClient(st, key), nil
 }
@@ -221,14 +222,14 @@ func (s *AIService) client(st *models.AISettings) (chatClient, error) {
 // TestConnection checks the key and model against the API
 func (s *AIService) TestConnection(ctx context.Context, p *models.Project) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	st, err := s.Settings(ctx, p)
 	if err != nil {
 		return err
 	}
 	if st == nil {
-		return userErr("err.ai_not_configured")
+		return apperr.New("err.ai_not_configured")
 	}
 	c, err := s.client(st)
 	if err != nil {
@@ -243,11 +244,11 @@ func translateAIError(err error) error {
 	case err == nil:
 		return nil
 	case errors.Is(err, ai.ErrUnauthorized):
-		return userErr("err.ai_unauthorized")
+		return apperr.New("err.ai_unauthorized")
 	case errors.As(err, &apiErr):
-		return userErr("err.ai_api", apiErr.Message)
+		return apperr.New("err.ai_api", apiErr.Message)
 	default:
-		return userErr("err.ai_api", err.Error())
+		return apperr.New("err.ai_api", err.Error())
 	}
 }
 
@@ -456,7 +457,7 @@ func (s *AIService) LatestJob(ctx context.Context, c *models.Catalog) (*models.A
 func (s *AIService) Job(ctx context.Context, c *models.Catalog, id int64) (*models.AIJob, error) {
 	j, err := s.repo.GetJob(ctx, id)
 	if err != nil || j.CatalogID != c.ID {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	return j, nil
 }
@@ -474,19 +475,19 @@ func (s *AIService) Cancel(ctx context.Context, c *models.Catalog, id int64) err
 // Start begins pre-translating a catalog in the background
 func (s *AIService) Start(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, opts AIOptions) (*models.AIJob, error) {
 	if c.IsTemplate || !c.WritableBy(user.ID) {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	st, err := s.Settings(ctx, p)
 	if err != nil {
 		return nil, err
 	}
 	if opts.UseAI && st == nil {
-		return nil, userErr("err.ai_not_configured")
+		return nil, apperr.New("err.ai_not_configured")
 	}
 	if last, err := s.LatestJob(ctx, c); err != nil {
 		return nil, err
 	} else if last != nil && last.IsRunning() {
-		return nil, userErr("err.ai_job_running")
+		return nil, apperr.New("err.ai_job_running")
 	}
 	var cl chatClient
 	if opts.UseAI {
@@ -503,7 +504,7 @@ func (s *AIService) Start(ctx context.Context, user *models.User, p *models.Proj
 		pl.items, pl.batches = nil, nil
 	}
 	if len(pl.memory)+len(pl.direct)+len(pl.items) == 0 {
-		return nil, userErr("err.ai_nothing")
+		return nil, apperr.New("err.ai_nothing")
 	}
 	model, estimated := "", 0.0
 	if opts.UseAI {
@@ -516,7 +517,7 @@ func (s *AIService) Start(ctx context.Context, user *models.User, p *models.Proj
 			return nil, err
 		}
 		if spent+estimated > st.MonthlyBudget {
-			return nil, userErr("err.ai_budget", st.MonthlyBudget-spent)
+			return nil, apperr.New("err.ai_budget", st.MonthlyBudget-spent)
 		}
 	}
 
@@ -607,7 +608,7 @@ func (s *AIService) run(job *models.AIJob, st *models.AISettings, cl chatClient,
 		}
 		if err != nil {
 			job.Status = models.AIJobFailed
-			if ue, ok := AsUserError(translateAIError(err)); ok {
+			if ue, ok := apperr.AsUserError(translateAIError(err)); ok {
 				job.Error = ue.Key + "|" + joinArgs(ue.Args)
 			}
 			s.finish(job)
@@ -777,14 +778,14 @@ const MaxAIAlternatives = 4
 func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, e *models.Entry, current []string, alternatives int) (*EntryAIResult, error) {
 	alternatives = min(max(alternatives, 1), MaxAIAlternatives)
 	if c.IsTemplate || !c.WritableBy(user.ID) {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	st, err := s.Settings(ctx, p)
 	if err != nil {
 		return nil, err
 	}
 	if st == nil {
-		return nil, userErr("err.ai_not_configured")
+		return nil, apperr.New("err.ai_not_configured")
 	}
 	cl, err := s.client(st)
 	if err != nil {
@@ -832,7 +833,7 @@ func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *mo
 			return nil, err
 		}
 		if spent+st.Cost(u.PromptTokens, u.CompletionTokens) > st.MonthlyBudget {
-			return nil, userErr("err.ai_budget", st.MonthlyBudget-spent)
+			return nil, apperr.New("err.ai_budget", st.MonthlyBudget-spent)
 		}
 	}
 
@@ -854,7 +855,7 @@ func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *mo
 	}
 	results, err := ai.ParseResponse(content)
 	if err != nil {
-		return nil, userErr("err.ai_entry_empty")
+		return nil, apperr.New("err.ai_entry_empty")
 	}
 	res := &EntryAIResult{}
 	seen := map[string]bool{}
@@ -879,7 +880,7 @@ func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *mo
 		res.Alternatives = append(res.Alternatives, EntryAIAlternative{Forms: forms, Flagged: len(problems) > 0})
 	}
 	if len(res.Alternatives) == 0 {
-		return nil, userErr("err.ai_entry_empty")
+		return nil, apperr.New("err.ai_entry_empty")
 	}
 	return res, nil
 }

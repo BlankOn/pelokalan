@@ -6,15 +6,18 @@ import (
 	"fmt"
 	"html"
 	"log"
-	"pelokalan/pkg/po"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
 
+	"pelokalan/pkg/po"
+
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/repository"
 )
 
@@ -22,14 +25,14 @@ import (
 type ProjectService struct {
 	projects repository.ProjectRepository
 	users    repository.UserRepository
-	mailer   Mailer
+	mailer   mailer.Mailer
 	auth     *AuthService
 	cfg      config.AuthConfig
 	site     config.SiteConfig
 }
 
 // NewProjectService creates a new project service
-func NewProjectService(projects repository.ProjectRepository, users repository.UserRepository, mailer Mailer,
+func NewProjectService(projects repository.ProjectRepository, users repository.UserRepository, mailer mailer.Mailer,
 	auth *AuthService, cfg config.AuthConfig, site config.SiteConfig) *ProjectService {
 	return &ProjectService{projects: projects, users: users, mailer: mailer, auth: auth, cfg: cfg, site: site}
 }
@@ -99,7 +102,7 @@ func (s *ProjectService) uniqueSlug(ctx context.Context, slug string, selfID int
 			return "", err
 		}
 	}
-	return "", ErrSlugTaken
+	return "", apperr.ErrSlugTaken
 }
 
 // resolveSlug validates a requested slug, or derives one from the name
@@ -110,11 +113,11 @@ func (s *ProjectService) resolveSlug(ctx context.Context, in *ProjectInput, self
 		return err
 	}
 	if !validSlug(in.Slug) {
-		return ErrSlugInvalid
+		return apperr.ErrSlugInvalid
 	}
 	existing, err := s.projects.GetBySlug(ctx, in.Slug)
 	if err == nil && existing.ID != selfID {
-		return ErrSlugTaken
+		return apperr.ErrSlugTaken
 	}
 	if err != nil && !errors.Is(err, repository.ErrNotFound) {
 		return err
@@ -128,24 +131,24 @@ func (in *ProjectInput) clean() error {
 	in.Description = strings.TrimSpace(in.Description)
 	in.SourceLanguage = strings.TrimSpace(in.SourceLanguage)
 	if in.Name == "" || len([]rune(in.Name)) > 120 {
-		return ErrProjectNameRequired
+		return apperr.ErrProjectNameRequired
 	}
 	if in.SourceLanguage == "" {
 		in.SourceLanguage = "en"
 	}
 	if !validLanguageCode(in.SourceLanguage) {
-		return ErrInvalidLanguage
+		return apperr.ErrInvalidLanguage
 	}
 	in.Language = strings.TrimSpace(in.Language)
 	if in.Language != "" && !validLanguageCode(in.Language) {
-		return ErrInvalidLanguage
+		return apperr.ErrInvalidLanguage
 	}
 	return nil
 }
 
 // LanguageMismatch is the error for a file or import in another language than the project's
 func LanguageMismatch(p *models.Project, got string) error {
-	return userErr("err.language_mismatch", got, p.Language)
+	return apperr.New("err.language_mismatch", got, p.Language)
 }
 
 // checkProjectLanguage refuses a language other than the project's (when it has one)
@@ -191,7 +194,7 @@ func (s *ProjectService) ListAll(ctx context.Context, user *models.User) ([]*mod
 func (s *ProjectService) GetPublic(ctx context.Context, user *models.User, id int64) (*models.Project, error) {
 	p, err := s.projects.GetByID(ctx, id)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -209,7 +212,7 @@ func (s *ProjectService) GetPublic(ctx context.Context, user *models.User, id in
 func (s *ProjectService) GetPublicBySlug(ctx context.Context, user *models.User, slug string) (*models.Project, error) {
 	p, err := s.projects.GetBySlug(ctx, strings.ToLower(slug))
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -220,13 +223,13 @@ func (s *ProjectService) GetPublicBySlug(ctx context.Context, user *models.User,
 func (s *ProjectService) Get(ctx context.Context, user *models.User, id int64) (*models.Project, error) {
 	role, err := s.projects.GetMemberRole(ctx, id, user.ID)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
 	p, err := s.projects.GetByID(ctx, id)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -237,7 +240,7 @@ func (s *ProjectService) Get(ctx context.Context, user *models.User, id int64) (
 // Update changes project details (owner or manager)
 func (s *ProjectService) Update(ctx context.Context, p *models.Project, in ProjectInput) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	if err := in.clean(); err != nil {
 		return err
@@ -262,7 +265,7 @@ func (s *ProjectService) Update(ctx context.Context, p *models.Project, in Proje
 // Delete removes the project and all its files (owner only)
 func (s *ProjectService) Delete(ctx context.Context, p *models.Project) error {
 	if !p.Role.IsOwner() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	return s.projects.Delete(ctx, p.ID)
 }
@@ -280,26 +283,26 @@ func (s *ProjectService) PendingInvitations(ctx context.Context, p *models.Proje
 // Invite asks a whitelisted email address to join the project
 func (s *ProjectService) Invite(ctx context.Context, inviter *models.User, p *models.Project, email string, role models.ProjectRole, lang string) (*models.Invitation, error) {
 	if !p.Role.CanManage() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	if !role.IsInvitable() || (role == models.RoleManager && !p.Role.CanManage()) {
-		return nil, ErrInvalidRole
+		return nil, apperr.ErrInvalidRole
 	}
 	email, err := normalizeAndCheck(email)
 	if err != nil {
 		return nil, err
 	}
 	if !s.auth.IsAllowed(email) {
-		return nil, ErrNotWhitelisted
+		return nil, apperr.ErrNotWhitelisted
 	}
 	if u, err := s.users.GetByEmail(ctx, email); err == nil {
 		if _, err := s.projects.GetMemberRole(ctx, p.ID, u.ID); err == nil {
-			return nil, ErrAlreadyMember
+			return nil, apperr.ErrAlreadyMember
 		}
 	}
 	if existing, err := s.projects.GetPendingInvitation(ctx, p.ID, email); err == nil {
 		if !existing.IsExpired() {
-			return nil, ErrAlreadyInvited
+			return nil, apperr.ErrAlreadyInvited
 		}
 		if err := s.projects.DeleteInvitation(ctx, existing.ID); err != nil {
 			return nil, err
@@ -331,9 +334,9 @@ func (s *ProjectService) Invite(ctx context.Context, inviter *models.User, p *mo
 <p>%s</p>
 <p style="color:#666">%s</p></div>`,
 		html.EscapeString(i18n.T(lang, "mail.invite_intro", inv.InviterName, p.Name, roleName)),
-		emailButton(link, i18n.T(lang, "mail.invite_button")),
+		mailer.Button(link, i18n.T(lang, "mail.invite_button")),
 		html.EscapeString(i18n.T(lang, "mail.invite_footer", s.site.Name)))
-	if err := s.mailer.Send(ctx, &Message{To: email, Subject: subject, Text: text, HTML: htmlBody, Category: "invitation"}); err != nil {
+	if err := s.mailer.Send(ctx, &mailer.Message{To: email, Subject: subject, Text: text, HTML: htmlBody, Category: "invitation"}); err != nil {
 		// The invitation stays valid and is shown after sign in, so do not fail.
 		log.Printf("failed to send invitation email to %s: %v", email, err)
 	}
@@ -343,11 +346,11 @@ func (s *ProjectService) Invite(ctx context.Context, inviter *models.User, p *mo
 // CancelInvitation withdraws a pending invitation
 func (s *ProjectService) CancelInvitation(ctx context.Context, p *models.Project, invitationID int64) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	inv, err := s.projects.GetInvitation(ctx, invitationID)
 	if err != nil || inv.ProjectID != p.ID {
-		return ErrNotFound
+		return apperr.ErrNotFound
 	}
 	return s.projects.DeleteInvitation(ctx, inv.ID)
 }
@@ -360,7 +363,7 @@ func (s *ProjectService) InvitationsForUser(ctx context.Context, user *models.Us
 func (s *ProjectService) ownInvitation(ctx context.Context, user *models.User, id int64) (*models.Invitation, error) {
 	inv, err := s.projects.GetInvitation(ctx, id)
 	if err != nil || inv.Email != user.Email || inv.AcceptedAt != nil || inv.DeclinedAt != nil || inv.IsExpired() {
-		return nil, ErrInvitationInvalid
+		return nil, apperr.ErrInvitationInvalid
 	}
 	return inv, nil
 }
@@ -397,7 +400,7 @@ func (s *ProjectService) JoinOpen(ctx context.Context, user *models.User, p *mod
 		}
 	}
 	if !p.Open {
-		return ErrProjectPrivate
+		return apperr.ErrProjectPrivate
 	}
 	if err := s.projects.AddMember(ctx, p.ID, user.ID, models.RoleTranslator); err != nil {
 		return err
@@ -418,17 +421,17 @@ func (s *ProjectService) DeclineInvitation(ctx context.Context, user *models.Use
 // ChangeRole updates a member's role
 func (s *ProjectService) ChangeRole(ctx context.Context, actor *models.User, p *models.Project, userID int64, role models.ProjectRole) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	if !role.IsInvitable() {
-		return ErrInvalidRole
+		return apperr.ErrInvalidRole
 	}
 	current, err := s.projects.GetMemberRole(ctx, p.ID, userID)
 	if err != nil {
-		return ErrNotFound
+		return apperr.ErrNotFound
 	}
 	if current == models.RoleOwner {
-		return ErrCannotChangeOwner
+		return apperr.ErrCannotChangeOwner
 	}
 	if current == role {
 		return nil
@@ -461,9 +464,9 @@ func (s *ProjectService) notifyRoleChange(ctx context.Context, actor *models.Use
 <p>%s</p>
 <p style="color:#666">%s</p></div>`,
 		html.EscapeString(intro),
-		emailButton(link, i18n.T(lang, "mail.role_button")),
+		mailer.Button(link, i18n.T(lang, "mail.role_button")),
 		html.EscapeString(i18n.T(lang, "mail.role_footer", s.site.Name)))
-	if err := s.mailer.Send(ctx, &Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: "role"}); err != nil {
+	if err := s.mailer.Send(ctx, &mailer.Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: "role"}); err != nil {
 		log.Printf("role change email to user %d: %v", userID, err)
 	}
 }
@@ -472,17 +475,17 @@ func (s *ProjectService) notifyRoleChange(ctx context.Context, actor *models.Use
 // except the owner.
 func (s *ProjectService) RemoveMember(ctx context.Context, actor *models.User, p *models.Project, userID int64) error {
 	if userID != actor.ID && !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	current, err := s.projects.GetMemberRole(ctx, p.ID, userID)
 	if err != nil {
-		return ErrNotFound
+		return apperr.ErrNotFound
 	}
 	if current == models.RoleOwner {
 		if userID == actor.ID {
-			return ErrCannotRemoveSelfOnly
+			return apperr.ErrCannotRemoveSelfOnly
 		}
-		return ErrCannotChangeOwner
+		return apperr.ErrCannotChangeOwner
 	}
 	return s.projects.RemoveMember(ctx, p.ID, userID)
 }

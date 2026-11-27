@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 )
 
@@ -150,7 +151,7 @@ type AccountInput struct {
 func (s *AuthService) UpdateAccount(ctx context.Context, user *models.User, in AccountInput) error {
 	name := strings.TrimSpace(in.Name)
 	if name == "" || len([]rune(name)) > 100 {
-		return ErrNameRequired
+		return apperr.ErrNameRequired
 	}
 	username := NormalizeUsername(in.Username)
 	if err := s.usernameAvailable(ctx, username, user.ID); err != nil {
@@ -160,21 +161,21 @@ func (s *AuthService) UpdateAccount(ctx context.Context, user *models.User, in A
 	if temail != "" {
 		addr, err := mail.ParseAddress(temail)
 		if err != nil || addr.Address != temail {
-			return ErrInvalidEmail
+			return apperr.ErrInvalidEmail
 		}
 	}
 	if len([]rune(tname)) > 100 || len([]rune(team)) > 200 || strings.ContainsAny(tname+team, "\n\r") {
-		return userErr("err.identity_invalid")
+		return apperr.New("err.identity_invalid")
 	}
 	bio := strings.TrimSpace(strings.ReplaceAll(in.Bio, "\r\n", "\n"))
 	if len([]rune(bio)) > MaxBio {
-		return userErr("err.bio_length", MaxBio)
+		return apperr.New("err.bio_length", MaxBio)
 	}
 	links := map[string]string{}
 	for _, k := range models.LinkKinds {
 		v, ok := NormalizeLink(k, in.Links[k])
 		if !ok {
-			return userErr("err.link_invalid", i18n.T(i18n.Normalize(user.Lang), fmt.Sprintf("profile.link_%s", k)))
+			return apperr.New("err.link_invalid", i18n.T(i18n.Normalize(user.Lang), fmt.Sprintf("profile.link_%s", k)))
 		}
 		if v != "" {
 			links[k] = v

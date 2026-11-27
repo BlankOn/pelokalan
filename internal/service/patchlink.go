@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 )
 
 // Patch links let a member fetch a file's git patch from a terminal (`curl … | git am`) without the
@@ -43,32 +44,32 @@ func (s *AuthService) PatchLinkToken(user *models.User, kind string, id int64, n
 func (s *AuthService) ParsePatchLink(ctx context.Context, token string, now time.Time) (*PatchLink, error) {
 	i := strings.LastIndexByte(token, '.')
 	if i < 0 {
-		return nil, ErrInvalidToken
+		return nil, apperr.ErrInvalidToken
 	}
 	payload, sig := token[:i], token[i+1:]
 	if !hmac.Equal([]byte(sig), []byte(s.patchSig(payload))) {
-		return nil, ErrInvalidToken
+		return nil, apperr.ErrInvalidToken
 	}
 	parts := strings.Split(payload, "-")
 	if len(parts) != 3 || len(parts[0]) < 2 {
-		return nil, ErrInvalidToken
+		return nil, apperr.ErrInvalidToken
 	}
 	id, err1 := strconv.ParseInt(parts[0][1:], 36, 64)
 	uid, err2 := strconv.ParseInt(parts[1], 36, 64)
 	exp, err3 := strconv.ParseInt(parts[2], 36, 64)
 	if err1 != nil || err2 != nil || err3 != nil || now.Unix() > exp {
-		return nil, ErrInvalidToken
+		return nil, apperr.ErrInvalidToken
 	}
 	user, err := s.users.GetByID(ctx, uid)
 	if err != nil {
-		return nil, ErrInvalidToken
+		return nil, apperr.ErrInvalidToken
 	}
 	if !s.IsAllowed(user.Email) {
-		return nil, ErrNotWhitelisted
+		return nil, apperr.ErrNotWhitelisted
 	}
 	link := &PatchLink{User: user}
 	if parts[0][0] != 'c' {
-		return nil, ErrInvalidToken
+		return nil, apperr.ErrInvalidToken
 	}
 	link.CatalogID = id
 	return link, nil

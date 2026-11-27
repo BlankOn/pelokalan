@@ -9,6 +9,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"pelokalan/internal/handler/middleware"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/service"
 )
 
@@ -56,7 +57,7 @@ func (h *Handler) Avatar(w http.ResponseWriter, r *http.Request) {
 	}
 	data, err := h.authService.AvatarData(r.Context(), key)
 	if err != nil {
-		if !errors.Is(err, service.ErrNotFound) {
+		if !errors.Is(err, apperr.ErrNotFound) {
 			h.fail(w, r, err)
 			return
 		}

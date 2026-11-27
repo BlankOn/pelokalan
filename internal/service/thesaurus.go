@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/thesaurus"
@@ -63,7 +64,7 @@ func (s *ThesaurusService) Available() bool { return s.index.Len() > 0 }
 // Lookup returns the entry of a word for a project member, or nil
 func (s *ThesaurusService) Lookup(p *models.Project, word string) (*thesaurus.Entry, error) {
 	if !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	if e, ok := s.index.LookupForms(word); ok {
 		return e, nil

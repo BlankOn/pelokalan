@@ -10,6 +10,7 @@ import (
 
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 )
@@ -91,13 +92,13 @@ func (h *Handler) GitPatchByLink(w http.ResponseWriter, r *http.Request) {
 	var res *service.GitPatchResult
 	c, p, err := h.catalogService.Get(r.Context(), user, link.CatalogID)
 	if err == nil && !c.Owned {
-		err = service.ErrForbidden
+		err = apperr.ErrForbidden
 	}
 	if err == nil {
 		res, err = h.catalogPatch(r, user, c, p)
 	}
 	switch {
-	case errors.Is(err, service.ErrNotFound), errors.Is(err, service.ErrForbidden):
+	case errors.Is(err, apperr.ErrNotFound), errors.Is(err, apperr.ErrForbidden):
 		plain(http.StatusForbidden, i18n.T(lang, "git.link_invalid"))
 	case err != nil:
 		plain(http.StatusInternalServerError, h.errorMessage(r, err))

@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
 	"pelokalan/pkg/tpsite"
@@ -34,7 +35,7 @@ func (s *GlossaryService) fetchTP(ctx context.Context, v *models.ModuleGroup, et
 	}
 	rows, err := tpsite.ParseTeamPage(page.Data)
 	if err != nil {
-		return nil, userErr("err.tp_page")
+		return nil, apperr.New("err.tp_page")
 	}
 	team := v.TPTeam
 	stored, err := s.repo.TPDomains(ctx, team, true)

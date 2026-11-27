@@ -12,6 +12,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/service"
 	"pelokalan/pkg/badgecard"
 )
@@ -81,7 +82,7 @@ func (h *Handler) badgeImage(u *models.User, s badgeShare) ([]byte, error) {
 func (h *Handler) BadgeSharePage(w http.ResponseWriter, r *http.Request) {
 	u, err := h.authService.UserByUsername(r.Context(), chi.URLParam(r, "username"))
 	if err != nil {
-		h.fail(w, r, service.ErrNotFound)
+		h.fail(w, r, apperr.ErrNotFound)
 		return
 	}
 	tierParam := chi.URLParam(r, "tier")

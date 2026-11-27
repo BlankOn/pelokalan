@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/po"
 )
@@ -96,7 +97,7 @@ func (s *CatalogService) List(ctx context.Context, user *models.User, p *models.
 func (s *CatalogService) Get(ctx context.Context, user *models.User, id int64) (*models.Catalog, *models.Project, error) {
 	c, err := s.catalogs.GetByID(ctx, id)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, nil, ErrNotFound
+		return nil, nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, nil, err
 	}
@@ -208,18 +209,18 @@ func genericFilename(name, language string) bool {
 // language. When language is not empty it overrides the file header.
 func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *models.Project, filename string, data []byte, language string) (*models.Catalog, *MergeResult, error) {
 	if !p.Role.IsMember() {
-		return nil, nil, ErrForbidden
+		return nil, nil, apperr.ErrForbidden
 	}
 	pc, err := po.ParseBytes(data)
 	if err != nil {
 		var pe *po.ParseError
 		if errors.As(err, &pe) {
-			return nil, nil, userErr("err.parse_failed", pe.Line, pe.Msg)
+			return nil, nil, apperr.New("err.parse_failed", pe.Line, pe.Msg)
 		}
-		return nil, nil, ErrInvalidFile
+		return nil, nil, apperr.ErrInvalidFile
 	}
 	if len(pc.Entries) == 0 {
-		return nil, nil, ErrEmptyCatalog
+		return nil, nil, apperr.ErrEmptyCatalog
 	}
 
 	language = strings.TrimSpace(language)
@@ -230,7 +231,7 @@ func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *model
 	if isTemplate {
 		language = ""
 	} else if !validLanguageCode(language) {
-		return nil, nil, ErrInvalidLanguage
+		return nil, nil, apperr.ErrInvalidLanguage
 	} else if err := checkProjectLanguage(p, language); err != nil {
 		return nil, nil, err
 	}
@@ -308,7 +309,7 @@ func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *model
 	}
 	if err := s.catalogs.Create(ctx, c, entries); err != nil {
 		if isUniqueViolation(err) {
-			return nil, nil, ErrFilenameTaken
+			return nil, nil, apperr.ErrFilenameTaken
 		}
 		return nil, nil, err
 	}
@@ -319,7 +320,7 @@ func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *model
 // Replace imports a new version of an existing translation file
 func (s *CatalogService) Replace(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, filename string, data []byte) error {
 	if !c.WritableBy(user.ID) || c.IsTemplate {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	s.SafetyCommit(ctx, user.ID, c, CommitMsgBeforeReplace)
 	name, err := s.uniqueFilename(ctx, c, cleanFilename(filename, c.Filename))
@@ -340,12 +341,12 @@ func (s *CatalogService) replaceContent(ctx context.Context, user *models.User, 
 	if err != nil {
 		var pe *po.ParseError
 		if errors.As(err, &pe) {
-			return userErr("err.parse_failed", pe.Line, pe.Msg)
+			return apperr.New("err.parse_failed", pe.Line, pe.Msg)
 		}
-		return ErrInvalidFile
+		return apperr.ErrInvalidFile
 	}
 	if len(pc.Entries) == 0 {
-		return ErrEmptyCatalog
+		return apperr.ErrEmptyCatalog
 	}
 	c.Header = pc.Header
 	c.HeaderComments = strings.Join(pc.HeaderComments, "\n")
@@ -373,18 +374,18 @@ func (s *CatalogService) replaceContent(ctx context.Context, user *models.User, 
 // CreateFromTemplate starts a new translation of the project template
 func (s *CatalogService) CreateFromTemplate(ctx context.Context, user *models.User, p *models.Project, language string) (*models.Catalog, error) {
 	if !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	language = strings.TrimSpace(language)
 	if !validLanguageCode(language) {
-		return nil, ErrInvalidLanguage
+		return nil, apperr.ErrInvalidLanguage
 	}
 	tmpl, err := s.Template(ctx, p, user.ID)
 	if err != nil {
 		return nil, err
 	}
 	if tmpl == nil {
-		return nil, ErrNoTemplate
+		return nil, apperr.ErrNoTemplate
 	}
 	tentries, err := s.catalogs.ListEntries(ctx, tmpl.ID, false)
 	if err != nil {
@@ -440,7 +441,7 @@ func (s *CatalogService) CreateFromTemplate(ctx context.Context, user *models.Us
 	}
 	if err := s.catalogs.Create(ctx, c, entries); err != nil {
 		if isUniqueViolation(err) {
-			return nil, ErrFilenameTaken
+			return nil, apperr.ErrFilenameTaken
 		}
 		return nil, err
 	}
@@ -452,14 +453,14 @@ func (s *CatalogService) CreateFromTemplate(ctx context.Context, user *models.Us
 // strings are added, existing translations kept and removed strings become obsolete.
 func (s *CatalogService) UpdateFromTemplate(ctx context.Context, p *models.Project, c *models.Catalog) (*MergeResult, error) {
 	if c.IsTemplate || !c.Owned {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	tmpl, err := s.Template(ctx, p, c.OwnerID)
 	if err != nil {
 		return nil, err
 	}
 	if tmpl == nil {
-		return nil, ErrNoTemplate
+		return nil, apperr.ErrNoTemplate
 	}
 	tentries, err := s.catalogs.ListEntries(ctx, tmpl.ID, false)
 	if err != nil {
@@ -472,7 +473,7 @@ func (s *CatalogService) UpdateFromTemplate(ctx context.Context, p *models.Proje
 	// A member keeps several modules in one project; never merge the
 	// template into a file of another module (it would turn every string obsolete).
 	if !templateFits(tentries, current) {
-		return nil, ErrTemplateMismatch
+		return nil, apperr.ErrTemplateMismatch
 	}
 	s.SafetyCommit(ctx, c.OwnerID, c, CommitMsgBeforeMerge)
 	merged, res := mergeEntries(tentries, current, c.NPlurals)
@@ -494,7 +495,7 @@ func (s *CatalogService) UpdateAllFromTemplate(ctx context.Context, user *models
 			continue
 		}
 		res, err := s.UpdateFromTemplate(ctx, p, c)
-		if errors.Is(err, ErrTemplateMismatch) {
+		if errors.Is(err, apperr.ErrTemplateMismatch) {
 			total.Skipped++
 			continue
 		}
@@ -609,7 +610,7 @@ func fitForms(forms []string, plural bool, nplurals int) []string {
 // Delete removes a file from the project
 func (s *CatalogService) Delete(ctx context.Context, user *models.User, c *models.Catalog) error {
 	if !c.WritableBy(user.ID) {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	return s.catalogs.Delete(ctx, c.ID, user.ID)
 }
@@ -733,7 +734,7 @@ func sortEntries(entries []*models.Entry, order string) {
 func (s *CatalogService) Entry(ctx context.Context, c *models.Catalog, id int64) (*models.Entry, error) {
 	e, err := s.catalogs.GetEntry(ctx, id)
 	if err != nil || e.CatalogID != c.ID || e.Obsolete {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	e.Issues = validateEntry(c, e)
 	return e, nil
@@ -751,7 +752,7 @@ type EntryInput struct {
 // else saved the entry since it was loaded.
 func (s *CatalogService) SaveEntry(ctx context.Context, user *models.User, c *models.Catalog, id int64, in EntryInput) (*models.Entry, error) {
 	if c.IsTemplate || user == nil || !c.WritableBy(user.ID) {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	e, err := s.Entry(ctx, c, id)
 	if err != nil {
@@ -772,7 +773,7 @@ func (s *CatalogService) SaveEntry(ctx context.Context, user *models.User, c *mo
 	e.ReplacedMsgStr = nil
 	if err := s.catalogs.UpdateEntry(ctx, e, user.ID); err != nil {
 		if errors.Is(err, repository.ErrConflict) {
-			return nil, ErrEntryConflict
+			return nil, apperr.ErrEntryConflict
 		}
 		return nil, err
 	}
@@ -794,7 +795,7 @@ func (s *CatalogService) Suggestions(ctx context.Context, user *models.User, c *
 // PreTranslate fills untranslated entries from the translation memory
 func (s *CatalogService) PreTranslate(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, markFuzzy bool) (int, error) {
 	if c.IsTemplate || user == nil || !c.WritableBy(user.ID) {
-		return 0, ErrForbidden
+		return 0, apperr.ErrForbidden
 	}
 	s.SafetyCommit(ctx, user.ID, c, CommitMsgBeforeMemory)
 	return s.catalogs.PreTranslate(ctx, c.ID, user.ID, c.Language, markFuzzy)
@@ -845,10 +846,10 @@ func (s *CatalogService) Build(ctx context.Context, user *models.User, c *models
 // catalog's UpdatedAt when the text was loaded; a newer change is a conflict.
 func (s *CatalogService) SaveRaw(ctx context.Context, user *models.User, c *models.Catalog, text string, updatedAt int64) error {
 	if !c.WritableBy(user.ID) {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	if c.UpdatedAt.UnixNano() != updatedAt {
-		return userErr("err.raw_conflict")
+		return apperr.New("err.raw_conflict")
 	}
 	text = strings.ReplaceAll(text, "\r\n", "\n")
 	s.SafetyCommit(ctx, user.ID, c, CommitMsgBeforeRaw)
@@ -876,7 +877,7 @@ func (s *CatalogService) Properties(c *models.Catalog) CatalogProperties {
 // UpdateProperties saves header values and the contributor comments
 func (s *CatalogService) UpdateProperties(ctx context.Context, user *models.User, c *models.Catalog, in CatalogProperties) error {
 	if !c.WritableBy(user.ID) {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	clean := func(v string) string { return strings.TrimSpace(strings.NewReplacer("\n", " ", "\r", " ").Replace(v)) }
 	if v := clean(in.ProjectVersion); v != "" || po.GetHeaderField(c.Header, "Project-Id-Version") != "" {
@@ -931,14 +932,14 @@ func (s *CatalogService) uniqueFilename(ctx context.Context, c *models.Catalog, 
 			return cand, nil
 		}
 	}
-	return "", ErrFilenameTaken
+	return "", apperr.ErrFilenameTaken
 }
 
 // GetByPath returns one of the user's files by its URL parts
 func (s *CatalogService) GetByPath(ctx context.Context, user *models.User, projectID int64, username, filename string) (*models.Catalog, *models.Project, error) {
 	c, err := s.catalogs.GetByPath(ctx, projectID, username, filename)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, nil, ErrNotFound
+		return nil, nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, nil, err
 	}
@@ -993,7 +994,7 @@ func (s *CatalogService) MatchOwnFiles(ctx context.Context, user *models.User, p
 // continues: the current state is committed first, then the upstream version.
 func (s *CatalogService) UpdateFromUpstream(ctx context.Context, user *models.User, c *models.Catalog, label string, data []byte) error {
 	if !c.WritableBy(user.ID) || c.IsTemplate {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	s.SafetyCommit(ctx, user.ID, c, CommitMsgBeforeReplace)
 	if err := s.replaceContent(ctx, user, c, data); err != nil {
@@ -1032,7 +1033,7 @@ func validateEntry(c *models.Catalog, e *models.Entry) []string {
 // SetUpstreamPage stores the file's page on the GNOME translation site (checked by the caller; "" = none)
 func (s *CatalogService) SetUpstreamPage(ctx context.Context, user *models.User, c *models.Catalog, page string) error {
 	if !c.WritableBy(user.ID) {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	c.UpstreamPage = page
 	return s.catalogs.SetUpstreamPage(ctx, c.ID, page)
@@ -1041,7 +1042,7 @@ func (s *CatalogService) SetUpstreamPage(ctx context.Context, user *models.User,
 // SetSourceURL remembers the link a file was downloaded from, so it can be downloaded again
 func (s *CatalogService) SetSourceURL(ctx context.Context, user *models.User, c *models.Catalog, url string) error {
 	if !c.WritableBy(user.ID) {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	c.SourceURL = url
 	return s.catalogs.SetSourceURL(ctx, c.ID, url)

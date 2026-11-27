@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/repository"
 )
 
@@ -23,7 +25,7 @@ import (
 // ReminderDays before). The holder gets an email whenever someone or something else releases it.
 
 // ErrModuleReserved: another member holds the module
-var ErrModuleReserved = userErr("err.module_reserved")
+var ErrModuleReserved = apperr.New("err.module_reserved")
 
 // ReservationDays are the expiry choices in Settings (0 = never)
 var ReservationDays = []int{0, 14, 30, 60}
@@ -36,13 +38,13 @@ type ReservationService struct {
 	repo     repository.ReservationRepository
 	projects repository.ProjectRepository
 	users    repository.UserRepository
-	mailer   Mailer
+	mailer   mailer.Mailer
 	site     config.SiteConfig
 }
 
 // NewReservationService creates the reservation service
 func NewReservationService(repo repository.ReservationRepository, projects repository.ProjectRepository,
-	users repository.UserRepository, mailer Mailer, site config.SiteConfig) *ReservationService {
+	users repository.UserRepository, mailer mailer.Mailer, site config.SiteConfig) *ReservationService {
 	return &ReservationService{repo: repo, projects: projects, users: users, mailer: mailer, site: site}
 }
 
@@ -112,7 +114,7 @@ func (s *ReservationService) Release(ctx context.Context, user *models.User, p *
 	reason := models.ReleaseHolder
 	if h.UserID != user.ID {
 		if !p.Role.CanManage() {
-			return ErrForbidden
+			return apperr.ErrForbidden
 		}
 		reason = models.ReleaseManager
 	}
@@ -233,9 +235,9 @@ func (s *ReservationService) notify(ctx context.Context, p *models.Project, r *m
 	text := fmt.Sprintf("%s\n\n%s\n\n%s\n\n— %s\n", hello, body, link, s.site.Name)
 	htmlBody := fmt.Sprintf(`<meta charset="utf-8"><div style="font-family:sans-serif;max-width:560px;color:#1d1f24"><p>%s</p><p>%s</p><p>%s</p>
 <p style="color:#888;font-size:12px">%s · %s</p></div>`,
-		html.EscapeString(hello), html.EscapeString(body), emailButton(link, button),
+		html.EscapeString(hello), html.EscapeString(body), mailer.Button(link, button),
 		html.EscapeString(s.site.Name), html.EscapeString(i18n.T(lang, "mail.reserve_footer", p.Name)))
-	if err := s.mailer.Send(ctx, &Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: "reservation"}); err != nil {
+	if err := s.mailer.Send(ctx, &mailer.Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: "reservation"}); err != nil {
 		log.Printf("reservations: %s email to user %d: %v", kind, u.ID, err)
 	}
 }

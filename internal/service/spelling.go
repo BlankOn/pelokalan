@@ -8,6 +8,7 @@ import (
 	"sync"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
@@ -119,7 +120,7 @@ func (s *SpellingService) forget(projectID int64) {
 // does not apply)
 func (s *SpellingService) Check(ctx context.Context, p *models.Project, language, text, source string) ([]string, error) {
 	if !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	c := s.Checker(ctx, p, language)
 	if c == nil {
@@ -131,7 +132,7 @@ func (s *SpellingService) Check(ctx context.Context, p *models.Project, language
 // Suggest returns close dictionary words for a project member
 func (s *SpellingService) Suggest(p *models.Project, word string) ([]string, error) {
 	if !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	if s.dict.Len() == 0 {
 		return nil, nil
@@ -142,7 +143,7 @@ func (s *SpellingService) Suggest(p *models.Project, word string) ([]string, err
 // ExtraWords lists the project's own words (members)
 func (s *SpellingService) ExtraWords(ctx context.Context, p *models.Project) ([]repository.ExtraWord, error) {
 	if !p.Role.IsMember() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	return s.repo.ExtraWords(ctx, p.ID)
 }
@@ -150,11 +151,11 @@ func (s *SpellingService) ExtraWords(ctx context.Context, p *models.Project) ([]
 // AddWord accepts a word in the project (any member): one word, letters with inner hyphens
 func (s *SpellingService) AddWord(ctx context.Context, user *models.User, p *models.Project, word string) (string, error) {
 	if !p.Role.IsMember() {
-		return "", ErrForbidden
+		return "", apperr.ErrForbidden
 	}
 	w := strings.ToLower(strings.TrimSpace(word))
 	if words := spelling.Words(w); len(words) != 1 || strings.ToLower(words[0]) != w {
-		return "", userErr("err.spelling_word")
+		return "", apperr.New("err.spelling_word")
 	}
 	if err := s.repo.AddExtraWord(ctx, p.ID, w, user.ID); err != nil {
 		return "", err
@@ -166,7 +167,7 @@ func (s *SpellingService) AddWord(ctx context.Context, user *models.User, p *mod
 // DeleteWord removes one of the project's own words (owners and managers)
 func (s *SpellingService) DeleteWord(ctx context.Context, p *models.Project, word string) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	if err := s.repo.DeleteExtraWord(ctx, p.ID, strings.ToLower(strings.TrimSpace(word))); err != nil {
 		return err

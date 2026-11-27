@@ -9,6 +9,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/repository"
 )
 
@@ -46,9 +47,9 @@ type oneUser struct {
 
 func (o oneUser) GetByID(context.Context, int64) (*models.User, error) { return o.u, nil }
 
-type sentMail struct{ msgs []*Message }
+type sentMail struct{ msgs []*mailer.Message }
 
-func (m *sentMail) Send(_ context.Context, msg *Message) error {
+func (m *sentMail) Send(_ context.Context, msg *mailer.Message) error {
 	m.msgs = append(m.msgs, msg)
 	return nil
 }

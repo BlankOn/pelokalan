@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/glossary"
@@ -98,11 +99,11 @@ func cleanGroup(name, version string) (string, string, error) {
 	name = strings.ToLower(strings.TrimSpace(name))
 	version = strings.TrimSpace(version)
 	if name == "" || version == "" {
-		return "", "", userErr("err.version_required")
+		return "", "", apperr.New("err.version_required")
 	}
 	if len(name) > 40 || len(version) > 40 || !versionPartRe.MatchString(version) ||
 		!versionNameRe.MatchString(name) {
-		return "", "", userErr("err.version_invalid")
+		return "", "", apperr.New("err.version_invalid")
 	}
 	return name, version, nil
 }
@@ -112,7 +113,7 @@ func cleanGroup(name, version string) (string, string, error) {
 // language; an earlier import of the same module group and language is replaced.
 func (s *GlossaryService) ImportGroup(ctx context.Context, user *models.User, p *models.Project, in ModuleGroupImportInput) (*ModuleGroupImportResult, error) {
 	if !p.Role.CanManage() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	name, version, err := cleanGroup(in.Name, in.Version)
 	if err != nil {
@@ -120,7 +121,7 @@ func (s *GlossaryService) ImportGroup(ctx context.Context, user *models.User, p 
 	}
 	language := strings.TrimSpace(in.Language)
 	if language != "" && !validLanguageCode(language) {
-		return nil, ErrInvalidLanguage
+		return nil, apperr.ErrInvalidLanguage
 	}
 	if err := checkProjectLanguage(p, language); err != nil {
 		return nil, err
@@ -149,13 +150,13 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 	files, err := glossary.ReadFiles(filename, data, glossary.Limits{})
 	switch {
 	case errors.Is(err, glossary.ErrUnsupported):
-		return nil, userErr("err.glossary_unsupported")
+		return nil, apperr.New("err.glossary_unsupported")
 	case errors.Is(err, glossary.ErrNoPOFiles):
-		return nil, userErr("err.glossary_no_files")
+		return nil, apperr.New("err.glossary_no_files")
 	case errors.Is(err, glossary.ErrTooLarge):
-		return nil, userErr("err.glossary_too_large")
+		return nil, apperr.New("err.glossary_too_large")
 	case err != nil:
-		return nil, userErr("err.glossary_unreadable")
+		return nil, apperr.New("err.glossary_unreadable")
 	}
 
 	if v.IsGit() {
@@ -172,7 +173,7 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 		built.Terms = terms
 	}
 	if len(built.Terms) == 0 {
-		return nil, userErr("err.glossary_empty")
+		return nil, apperr.New("err.glossary_empty")
 	}
 	// every language in the upload or download must be the project's (manual imports and syncs)
 	if s.projects != nil {
@@ -261,7 +262,7 @@ type GroupSyncInput struct {
 // URL is kept even when this first download fails; the error is returned.
 func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p *models.Project, in GroupSyncInput) (*models.ModuleGroup, *FetchOutcome, error) {
 	if !p.Role.CanManage() {
-		return nil, nil, ErrForbidden
+		return nil, nil, apperr.ErrForbidden
 	}
 	name, version, err := cleanGroup(in.Name, in.Version)
 	if err != nil {
@@ -271,7 +272,7 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 	if strings.TrimSpace(in.Repo) != "" {
 		var ok bool
 		if repo, branch, ok = ParseGitHubRepo(in.Repo, in.Branch); !ok {
-			return nil, nil, userErr("err.git_repo_invalid")
+			return nil, nil, apperr.New("err.git_repo_invalid")
 		}
 		in.URL = GitHubArchiveURL(repo, branch)
 	}
@@ -279,7 +280,7 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 	if strings.TrimSpace(in.Team) != "" {
 		var ok bool
 		if team, ok = tpsite.ParseTeam(in.Team); !ok {
-			return nil, nil, userErr("err.tp_team_invalid")
+			return nil, nil, apperr.New("err.tp_team_invalid")
 		}
 		in.URL = tpsite.TeamURL(team)
 		if strings.TrimSpace(in.Language) == "" {
@@ -288,11 +289,11 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 	}
 	u, err := glossary.ValidateURL(in.URL)
 	if err != nil {
-		return nil, nil, userErr("err.feed_url_invalid")
+		return nil, nil, apperr.New("err.feed_url_invalid")
 	}
 	language := strings.TrimSpace(in.Language)
 	if language != "" && !validLanguageCode(language) {
-		return nil, nil, ErrInvalidLanguage
+		return nil, nil, apperr.ErrInvalidLanguage
 	}
 	if err := checkProjectLanguage(p, language); err != nil {
 		return nil, nil, err
@@ -324,7 +325,7 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 func (s *GlossaryService) projectGroup(ctx context.Context, p *models.Project, groupID int64) (*models.ModuleGroup, error) {
 	v, err := s.repo.GetGroup(ctx, groupID)
 	if err != nil || v.ProjectID != p.ID {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	return v, nil
 }
@@ -332,7 +333,7 @@ func (s *GlossaryService) projectGroup(ctx context.Context, p *models.Project, g
 // DeleteGroup removes a module group and everything imported for it
 func (s *GlossaryService) DeleteGroup(ctx context.Context, p *models.Project, groupID int64) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	v, err := s.projectGroup(ctx, p, groupID)
 	if err != nil {
@@ -344,7 +345,7 @@ func (s *GlossaryService) DeleteGroup(ctx context.Context, p *models.Project, gr
 // RemoveGroupSync stops the automatic download of a module group (its content stays)
 func (s *GlossaryService) RemoveGroupSync(ctx context.Context, p *models.Project, groupID int64) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	v, err := s.projectGroup(ctx, p, groupID)
 	if err != nil {
@@ -356,14 +357,14 @@ func (s *GlossaryService) RemoveGroupSync(ctx context.Context, p *models.Project
 // FetchGroupNow downloads a module group's source immediately
 func (s *GlossaryService) FetchGroupNow(ctx context.Context, p *models.Project, groupID int64) (*FetchOutcome, error) {
 	if !p.Role.CanManage() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	v, err := s.projectGroup(ctx, p, groupID)
 	if err != nil {
 		return nil, err
 	}
 	if !v.HasFeed() {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	if v.IsTP() { // nil outcome: running in the background
 		s.fetchInBackground(v)
@@ -390,7 +391,7 @@ func (s *GlossaryService) fetchInBackground(v *models.ModuleGroup) {
 // re-imports the ones that changed (glossary and project files). Managers only.
 func (s *GlossaryService) SyncAll(ctx context.Context, p *models.Project) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	groups, err := s.repo.ListGroups(ctx, p.ID)
 	if err != nil {
@@ -403,10 +404,10 @@ func (s *GlossaryService) SyncAll(ctx context.Context, p *models.Project) error 
 		}
 	}
 	if len(feeds) == 0 && s.upstream == nil {
-		return ErrNoSyncLink
+		return apperr.ErrNoSyncLink
 	}
 	if !s.syncing.TryLock() {
-		return ErrSyncRunning
+		return apperr.ErrSyncRunning
 	}
 	st := &SyncStatus{Running: true, Groups: len(feeds)}
 	s.setSync(p.ID, st)
@@ -527,7 +528,7 @@ func (s *GlossaryService) FetchGroup(ctx context.Context, v *models.ModuleGroup)
 }
 
 func fetchErrorText(err error) string {
-	if ue, ok := AsUserError(err); ok {
+	if ue, ok := apperr.AsUserError(err); ok {
 		// "key|arg|arg" keeps the message's details (shown with errText)
 		parts := []string{ue.Key}
 		for _, a := range ue.Args {
@@ -583,7 +584,7 @@ func countFiles(files []glossary.File, built *glossary.Result, lang string) int 
 func (s *GlossaryService) Term(ctx context.Context, p *models.Project, hash string) (*models.GlossaryTerm, error) {
 	t, err := s.repo.Term(ctx, p.ID, strings.ToLower(hash))
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	return t, err
 }
@@ -596,11 +597,11 @@ func (s *GlossaryService) GroupImports(ctx context.Context, p *models.Project) (
 // DeleteGroupImport removes an upload and its terms
 func (s *GlossaryService) DeleteGroupImport(ctx context.Context, p *models.Project, id int64) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	imp, err := s.repo.GetGroupImport(ctx, id)
 	if err != nil || imp.ProjectID != p.ID {
-		return ErrNotFound
+		return apperr.ErrNotFound
 	}
 	return s.repo.DeleteGroupImport(ctx, id)
 }
@@ -862,7 +863,7 @@ func (s *GlossaryService) GroupsWithFiles(ctx context.Context, p *models.Project
 func (s *GlossaryService) ProjectFile(ctx context.Context, p *models.Project, id int64) (*models.ProjectFile, []byte, error) {
 	f, err := s.repo.GetProjectFile(ctx, p.ID, id)
 	if errors.Is(err, repository.ErrNotFound) {
-		return nil, nil, ErrNotFound
+		return nil, nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, nil, err
 	}

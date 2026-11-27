@@ -14,6 +14,7 @@ import (
 	_ "golang.org/x/image/webp"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 )
 
 // Profile pictures: whatever people upload (already cropped by the browser, or not) is cut to a centred square,
@@ -26,7 +27,7 @@ const (
 )
 
 // ErrAvatarInvalid is returned for files that are not a usable picture
-var ErrAvatarInvalid = userErr("err.avatar_invalid")
+var ErrAvatarInvalid = apperr.New("err.avatar_invalid")
 
 // MakeAvatar turns an uploaded picture (JPEG, PNG, GIF or WebP) into the stored square JPEG
 func MakeAvatar(data []byte) ([]byte, error) {
@@ -88,7 +89,7 @@ func (s *AuthService) RemoveAvatar(ctx context.Context, user *models.User) error
 // other blobs, such as comment attachments)
 func (s *AuthService) AvatarData(ctx context.Context, key string) ([]byte, error) {
 	if s.blobs == nil || !s.users.AvatarInUse(ctx, key) {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	return s.blobs.Get(ctx, key)
 }

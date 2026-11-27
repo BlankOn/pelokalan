@@ -7,6 +7,7 @@ import (
 
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 )
@@ -38,7 +39,7 @@ func (h *Handler) Login(w http.ResponseWriter, r *http.Request) {
 		data.Error = h.errorMessage(r, err)
 		data.Data["Email"] = r.FormValue("email")
 		data.Data["Next"] = next
-		data.Data["NoAccount"] = errors.Is(err, service.ErrUserNotFound)
+		data.Data["NoAccount"] = errors.Is(err, apperr.ErrUserNotFound)
 		h.render(w, "login", data)
 		return
 	}
@@ -69,7 +70,7 @@ func (h *Handler) Register(w http.ResponseWriter, r *http.Request) {
 		data.Data["Name"] = r.FormValue("name")
 		data.Data["Username"] = r.FormValue("username")
 		data.Data["Next"] = next
-		data.Data["HasAccount"] = errors.Is(err, service.ErrUserExists)
+		data.Data["HasAccount"] = errors.Is(err, apperr.ErrUserExists)
 		h.render(w, "register", data)
 		return
 	}

@@ -1,10 +1,12 @@
-package service
+// Package mail sends the app's emails (Mailtrap HTTP API, or the log in development) and builds their common parts
+package mailer
 
 import (
 	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"io"
 	"log"
 	"net/http"
@@ -120,4 +122,10 @@ func (m *MailtrapMailer) Send(ctx context.Context, msg *Message) error {
 		return fmt.Errorf("mailtrap API error: status %d, body: %s", resp.StatusCode, respBody)
 	}
 	return nil
+}
+
+// Button is the small link button used in every email
+func Button(href, label string) string {
+	return fmt.Sprintf(`<a href="%s" style="display:inline-block;background:#2f6fde;color:#fff;padding:5px 12px;border-radius:5px;font-size:14px;line-height:20px;text-decoration:none">%s</a>`,
+		html.EscapeString(href), html.EscapeString(label))
 }

@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/apperr"
 	"pelokalan/pkg/githubapp"
 )
 
@@ -23,14 +24,14 @@ func (s *GlossaryService) GitHubApp() *githubapp.Client { return s.github }
 // stores the answer (no write access also turns full integration off)
 func (s *GlossaryService) CheckGitAccess(ctx context.Context, p *models.Project, groupID int64) (*models.ModuleGroup, error) {
 	if !p.Role.CanManage() {
-		return nil, ErrForbidden
+		return nil, apperr.ErrForbidden
 	}
 	g, err := s.projectGroup(ctx, p, groupID)
 	if err != nil {
 		return nil, err
 	}
 	if !g.IsGit() || s.github == nil {
-		return nil, ErrNotFound
+		return nil, apperr.ErrNotFound
 	}
 	a, err := s.github.Check(ctx, g.GitRepo)
 	msg := ""
@@ -53,21 +54,21 @@ func (s *GlossaryService) CheckGitAccess(ctx context.Context, p *models.Project,
 // must allow writing) or off
 func (s *GlossaryService) SetGitDirect(ctx context.Context, p *models.Project, groupID int64, on bool) error {
 	if !p.Role.CanManage() {
-		return ErrForbidden
+		return apperr.ErrForbidden
 	}
 	g, err := s.projectGroup(ctx, p, groupID)
 	if err != nil {
 		return err
 	}
 	if !g.IsGit() {
-		return ErrNotFound
+		return apperr.ErrNotFound
 	}
 	if on {
 		if g, err = s.CheckGitAccess(ctx, p, groupID); err != nil {
 			return err
 		}
 		if !g.GitWrite {
-			return userErr(g.GitAccessError)
+			return apperr.New(g.GitAccessError)
 		}
 	}
 	return s.repo.SetGroupGitDirect(ctx, g.ID, on)

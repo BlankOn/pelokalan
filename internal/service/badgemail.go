@@ -11,6 +11,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/repository"
 )
 
@@ -25,13 +26,13 @@ const BadgeAwardsBaselineJob = "badge-awards-baseline"
 
 type badgeMail struct {
 	users   repository.UserRepository
-	mailer  Mailer
+	mailer  mailer.Mailer
 	site    config.SiteConfig
 	allowed func(email string) bool
 }
 
 // SetBadgeMail lets AwardBadges look people up and email them; allowed is the sign-in whitelist
-func (s *ActivityService) SetBadgeMail(users repository.UserRepository, mailer Mailer, site config.SiteConfig, allowed func(string) bool) {
+func (s *ActivityService) SetBadgeMail(users repository.UserRepository, mailer mailer.Mailer, site config.SiteConfig, allowed func(string) bool) {
 	s.mail = &badgeMail{users: users, mailer: mailer, site: site, allowed: allowed}
 }
 
@@ -93,7 +94,7 @@ func (s *ActivityService) AwardBadges(ctx context.Context, loc *time.Location, n
 }
 
 // badgeMessage is the email about new badges: what was earned, its picture, and links to share it
-func (s *ActivityService) badgeMessage(u *models.User, badges []Badge) *Message {
+func (s *ActivityService) badgeMessage(u *models.User, badges []Badge) *mailer.Message {
 	lang := i18n.Normalize(u.Lang)
 	base := strings.TrimRight(s.mail.site.BaseURL, "/")
 	shares := make([]BadgeShare, len(badges))
@@ -131,13 +132,13 @@ func (s *ActivityService) badgeMessage(u *models.User, badges []Badge) *Message 
 <p style="margin:0">%s &nbsp; <span style="font-size:13px;color:#4a4e56">%s <a href="%s">LinkedIn</a> · <a href="%s">X</a> · <a href="%s">Facebook</a></span></p></div>`,
 			html.EscapeString(sh.PageURL), html.EscapeString(sh.ImageURL), html.EscapeString(sh.Name+" · "+sh.TierLabel),
 			html.EscapeString(sh.Name), html.EscapeString(sh.TierLabel), html.EscapeString(done),
-			emailButton(sh.PageURL, i18n.T(lang, "mail.badge_view")), html.EscapeString(i18n.T(lang, "mail.badge_share_on")),
+			mailer.Button(sh.PageURL, i18n.T(lang, "mail.badge_view")), html.EscapeString(i18n.T(lang, "mail.badge_share_on")),
 			html.EscapeString(sh.LinkedInURL()), html.EscapeString(sh.XURL()), html.EscapeString(sh.FacebookURL()))
 	}
 	fmt.Fprintf(&text, "%s\n\n%s\n\n— %s\n%s\n%s: %s\n", encourage, profile, s.mail.site.Name, why, off, settings)
 	fmt.Fprintf(&body, `<p>%s</p><p>%s</p>
 <p style="color:#888;font-size:12px">%s · <a href="%s" style="color:#888">%s</a></p></div>`,
-		html.EscapeString(encourage), emailButton(profile, i18n.T(lang, "mail.badge_profile")),
+		html.EscapeString(encourage), mailer.Button(profile, i18n.T(lang, "mail.badge_profile")),
 		html.EscapeString(why), html.EscapeString(settings), html.EscapeString(off))
-	return &Message{To: u.Email, Subject: subject, Text: text.String(), HTML: body.String(), Category: "badge"}
+	return &mailer.Message{To: u.Email, Subject: subject, Text: text.String(), HTML: body.String(), Category: "badge"}
 }
