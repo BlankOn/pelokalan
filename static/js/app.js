@@ -3725,7 +3725,7 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
                 if (d.error) { line(d.error, "c-err"); return; }
                 if (!d.configured) { line(dlg.dataset.noai || "", "c-err"); return; }
                 if (d.modules) { // the group's modules: with several, one must be chosen (keeps token use small)
-                    while (modSel.options.length > 1) modSel.remove(1);
+                    while (modSel.options.length > 2) modSel.remove(2); // keep "choose" and "all modules"
                     d.modules.forEach(function (m) {
                         var o = document.createElement("option");
                         o.value = m.name;
@@ -3738,6 +3738,8 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
                 line(d.summary);
                 if (d.cost && !choose) line(d.cost);
                 if (d.budget) line(d.budget, d.over_budget ? "c-err" : "muted");
+                if (d.warning) line(d.warning, "extract-warn");
+                start.dataset.warning = d.warning || "";
                 start.disabled = running || d.over_budget || choose;
             })
             .catch(function () { box.textContent = ""; });
@@ -3790,6 +3792,16 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
     });
     modSel.addEventListener("change", estimate);
     start.addEventListener("click", function () {
+        // every module at once can cost a lot: ask once more, with the estimate
+        if (start.dataset.warning && !start.dataset.confirmed) {
+            window.askConfirm(start.dataset.warning, {ok: dlg.dataset.allOk, danger: true}).then(function (yes) {
+                if (!yes) return;
+                start.dataset.confirmed = "1";
+                start.click();
+                delete start.dataset.confirmed;
+            });
+            return;
+        }
         start.disabled = true;
         var fd = new FormData();
         fd.append("group", group.value);

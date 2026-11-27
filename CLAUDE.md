@@ -909,7 +909,9 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
 - Short strings become glossary terms as they are; documentation keeps its vocabulary in long strings. Owners and
   coordinators press "✨ Ekstrak istilah dengan AI" on the glossary page (`#extract-dialog`, app.js): pick a module group
   and, when it has more than one module, one module (`module` param, `ExtractEstimate.Modules/NeedModule`;
-  `StartExtract` refuses a group-wide run then, `err.extract_module_required`, to keep token use small), see the estimate (`GET /projects/{id}/glossary-extract?group=`: long strings, already extracted, to send, tokens, cost,
+  `StartExtract` refuses a group-wide run then, `err.extract_module_required`, to keep token use small; "⚠ Semua modul"
+  = `pretranslate.AllModules` "*" runs every module on purpose: the estimate adds an orange cost warning
+  (`extract.all_warning`) and Start asks once more), see the estimate (`GET /projects/{id}/glossary-extract?group=`: long strings, already extracted, to send, tokens, cost,
   budget), start (`POST`). While a run is going the button is hidden (`Data.ExtractRunning`, app.js) and its progress
   shows instead (`GET …/glossary-extract/status`, polled) with "Hentikan" beside it (`POST …/cancel`; a run the
   process no longer has, only marked running in the database, is closed as cancelled).

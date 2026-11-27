@@ -662,6 +662,8 @@ h1 .ai-badge { font-size: 12px; }
 #extract-dialog { width: min(560px, calc(100vw - 32px)); }
 .extract-form select { width: 100%; max-width: 100%; min-width: 0; text-overflow: ellipsis; }
 .extract-estimate p { margin: 0 0 4px; }
+.extract-estimate .extract-warn { margin-top: 8px; padding: 8px 10px; border-radius: 6px; background: #fff4e6; color: #8a4500;
+    border: 1px solid #ffd8a8; }
 .gl-detail { padding: 4px 4px 14px; }
 .gl-warn { color: var(--fuzzy); margin: 4px 0 8px; }
 .gl-table td { vertical-align: top; }

@@ -81,7 +81,7 @@
 
 {{if and $p.Role.CanManage .Data.Languages}}
 <dialog id="extract-dialog" class="dialog" data-base="{{$p.Path}}/glossary-extract"
-        data-starting="{{t .Lang "extract.estimating"}}" data-noai="{{t .Lang "extract.no_ai"}}">
+        data-starting="{{t .Lang "extract.estimating"}}" data-noai="{{t .Lang "extract.no_ai"}}" data-all-ok="{{t .Lang "extract.all_ok"}}">
     <form method="dialog" class="form extract-form">
         <h2>✨ {{t .Lang "extract.title"}}</h2>
         <p class="muted small">{{t .Lang "extract.intro"}}</p>
@@ -93,6 +93,7 @@
             <label for="ex-module">{{t .Lang "extract.module"}}</label>
             <select id="ex-module" name="module" data-extract-module>
                 <option value="">{{t .Lang "extract.module_choose"}}</option>
+                <option value="*">⚠ {{t .Lang "extract.module_all"}}</option>
             </select>
             <p class="muted small field-help">{{t .Lang "extract.module_help"}}</p>
         </div>

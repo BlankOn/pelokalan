@@ -172,6 +172,15 @@ func TestGlossaryExtraction(t *testing.T) {
 	if strings.Contains(scalar[string](t, `SELECT error FROM term_extraction_jobs WHERE project_id = $1 ORDER BY id DESC LIMIT 1`, pid), "err") {
 		t.Fatal("sync run failed")
 	}
+	// every module at once is possible on purpose, with a warning about the cost: the backlog of sys.po goes
+	owner.get(base+"/glossary-extract?group="+g+"&module=*").status(http.StatusOK).contains(`"warning":"Peringatan`, "mengirim 1 string")
+	owner.post(base+"/glossary-extract", url.Values{"group": {g}, "module": {"*"}}).status(http.StatusOK).contains("dimulai")
+	waitExtract(t, pid, 3)
+	if reqs := fake.requests(); len(reqs) != 3 || len(reqs[2]) != 1 || reqs[2][0] != backlog {
+		t.Fatalf("requests after the all-modules run = %q", reqs)
+	}
+	owner.get(base + "/glossary-extract?group=" + g + "&module=*").status(http.StatusOK).contains(`"to_send":0`).lacks(`"warning"`)
+
 	// while a run is going the button gives way to its progress and "Hentikan"; a run the server lost (only in the
 	// database) is closed by Hentikan too
 	owner.get(base + "/glossary").status(http.StatusOK).contains("data-extract-open>").lacks("data-extract-open hidden")

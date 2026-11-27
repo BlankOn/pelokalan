@@ -6,6 +6,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/pretranslate"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -38,6 +39,9 @@ func (h *Handler) GlossaryExtractEstimate(w http.ResponseWriter, r *http.Request
 		resp["summary"] = i18n.T(lang, "extract.summary", est.Strings, est.Done, est.ToSend)
 		if est.ToSend > 0 {
 			resp["cost"] = i18n.T(lang, "extract.cost", est.Model, est.PromptTokens+est.CompletionTokens, usd(est.Cost))
+		}
+		if est.Module == pretranslate.AllModules && est.ToSend > 0 { // every module at once: say what it costs
+			resp["warning"] = i18n.T(lang, "extract.all_warning", est.ToSend, usd(est.Cost))
 		}
 		if est.Budget > 0 {
 			resp["budget"] = i18n.T(lang, "extract.budget", usd(est.MonthSpent), usd(est.Budget), usd(max(est.BudgetLeft, 0)))

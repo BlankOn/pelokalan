@@ -165,6 +165,10 @@ type extractPlan struct {
 	modules map[string]*ExtractModule // per module (when the plan covers every module)
 }
 
+// AllModules as the module of an extraction run: every module of the group at once (asked for on purpose, with a
+// warning about the cost)
+const AllModules = "*"
+
 // ExtractModule is one module of a group in the extraction dialog
 type ExtractModule struct {
 	Name    string
@@ -299,6 +303,10 @@ func (s *Service) EstimateExtract(ctx context.Context, p *models.Project, groupI
 		return nil, err
 	}
 	est := &ExtractEstimate{GroupID: groupID, Running: s.extracting(p.ID), Module: module}
+	all := module == AllModules
+	if all {
+		module = ""
+	}
 	if st == nil {
 		return est, nil
 	}
@@ -307,7 +315,7 @@ func (s *Service) EstimateExtract(ctx context.Context, p *models.Project, groupI
 	if err != nil {
 		return nil, err
 	}
-	if module == "" {
+	if module == "" && !all {
 		est.Modules = pl.moduleList()
 		est.NeedModule = len(est.Modules) > 1
 	}
@@ -366,12 +374,16 @@ func (s *Service) StartExtract(ctx context.Context, user *models.User, p *models
 	if !lock.TryLock() {
 		return nil, apperr.New("err.extract_running")
 	}
+	all := module == AllModules
+	if all {
+		module = ""
+	}
 	pl, err := s.planExtract(ctx, p.ID, groupID, nil, module)
 	if err != nil {
 		lock.Unlock()
 		return nil, err
 	}
-	if module == "" && len(pl.modules) > 1 {
+	if module == "" && !all && len(pl.modules) > 1 {
 		lock.Unlock()
 		return nil, apperr.New("err.extract_module_required")
 	}
