@@ -15,6 +15,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/activity"
+	"pelokalan/internal/catalog"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/blobstore"
@@ -58,7 +59,7 @@ type DiscussionService struct {
 	repo     repository.DiscussionRepository
 	projects project.Repository
 	glossary source.Repository
-	catalogs repository.CatalogRepository
+	catalogs catalog.Repository
 	blobs    blobstore.Store
 	mailer   mailer.Mailer
 	site     config.SiteConfig
@@ -133,7 +134,7 @@ func (s *DiscussionService) SetActivity(a *activity.Service) { s.activity = a }
 
 // NewDiscussionService creates the discussion service
 func NewDiscussionService(repo repository.DiscussionRepository, projects project.Repository,
-	glossaryRepo source.Repository, catalogs repository.CatalogRepository, blobs blobstore.Store,
+	glossaryRepo source.Repository, catalogs catalog.Repository, blobs blobstore.Store,
 	mailer mailer.Mailer, site config.SiteConfig) *DiscussionService {
 	return &DiscussionService{repo: repo, projects: projects, glossary: glossaryRepo, catalogs: catalogs, blobs: blobs,
 		mailer: mailer, site: site}

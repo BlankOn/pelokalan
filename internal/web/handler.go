@@ -22,6 +22,7 @@ import (
 
 	"pelokalan/internal/account"
 	"pelokalan/internal/activity"
+	"pelokalan/internal/catalog"
 	"pelokalan/internal/langtools"
 	"pelokalan/internal/models"
 	"pelokalan/internal/modulecontext"
@@ -47,7 +48,7 @@ type Handler struct {
 	serverConfig   config.ServerConfig
 	authService    *account.Service
 	projectService *project.Service
-	catalogService *service.CatalogService
+	catalogService *catalog.Service
 	glossary       *source.Service
 	ai             *service.AIService
 	discuss        *service.DiscussionService
@@ -71,7 +72,7 @@ func NewHandler(
 	serverConfig config.ServerConfig,
 	authService *account.Service,
 	projectService *project.Service,
-	catalogService *service.CatalogService,
+	catalogService *catalog.Service,
 	glossaryService *source.Service,
 	aiService *service.AIService,
 	discussionService *service.DiscussionService,

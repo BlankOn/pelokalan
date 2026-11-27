@@ -1,4 +1,4 @@
-package postgres
+package catalog
 
 import (
 	"bytes"
@@ -10,7 +10,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 type commitRepository struct {
@@ -18,7 +17,7 @@ type commitRepository struct {
 }
 
 // NewCommitRepository creates a new PostgreSQL commit repository
-func NewCommitRepository(db *sql.DB) repository.CommitRepository {
+func NewCommitRepository(db *sql.DB) CommitRepository {
 	return &commitRepository{db: db}
 }
 

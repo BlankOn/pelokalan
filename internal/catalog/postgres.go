@@ -1,4 +1,4 @@
-package postgres
+package catalog
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 	"pelokalan/internal/source"
 )
 
@@ -19,7 +18,7 @@ type catalogRepository struct {
 }
 
 // NewCatalogRepository creates a new PostgreSQL catalog repository
-func NewCatalogRepository(db *sql.DB) repository.CatalogRepository {
+func NewRepository(db *sql.DB) Repository {
 	return &catalogRepository{db: db}
 }
 

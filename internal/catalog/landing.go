@@ -1,4 +1,4 @@
-package service
+package catalog
 
 import (
 	"context"
@@ -31,7 +31,7 @@ func landingWorthy(msgid string) bool {
 // DetectLandings records the strings of members' files in project projectID (language lang) that the
 // just-imported upstream files of module group groupID now contain as the member wrote them. language
 // forces the files' language ("" = detect per file, as imports do). It returns how many are new.
-func (s *CatalogService) DetectLandings(ctx context.Context, projectID, groupID int64, lang, language string, files []source.UpstreamFile) (int, error) {
+func (s *Service) DetectLandings(ctx context.Context, projectID, groupID int64, lang, language string, files []source.UpstreamFile) (int, error) {
 	if s.activity == nil || len(files) == 0 {
 		return 0, nil
 	}
@@ -103,7 +103,7 @@ func upstreamTranslations(cat *po.Catalog) map[string][]string {
 
 // landingsIn records the strings of c the member wrote that upstream now has. refAt measures "wrote" against
 // the member's starting point at that time (nil = now); landedAt is stored as the time (nil = now).
-func (s *CatalogService) landingsIn(ctx context.Context, c *models.Catalog, groupID int64, upstream map[string][]string, refAt, landedAt *time.Time) (int, error) {
+func (s *Service) landingsIn(ctx context.Context, c *models.Catalog, groupID int64, upstream map[string][]string, refAt, landedAt *time.Time) (int, error) {
 	ref := s.referenceAt(ctx, c, refAt)
 	if ref == nil { // no version to tell the member's work from what they started with
 		return 0, nil
@@ -144,7 +144,7 @@ func (s *CatalogService) landingsIn(ctx context.Context, c *models.Catalog, grou
 }
 
 // SetReservations lets syncs release a module whose holder's changes are all upstream
-func (s *CatalogService) SetReservations(r *reservation.Service) { s.reservations = r }
+func (s *Service) SetReservations(r *reservation.Service) { s.reservations = r }
 
 // BackfillLandingsJob names the one-time catch-up in one_time_jobs
 const BackfillLandingsJob = "backfill-upstream-landings-2026-11"
@@ -154,7 +154,7 @@ const BackfillLandingsJob = "backfill-upstream-landings-2026-11"
 // member's work against their starting point as it was at since (so work merged and then pulled back
 // with "Perbarui" after since still counts). A string found is dated when that upstream file was stored.
 // Run once at start-up (main.go, one_time_jobs); it returns how many strings it recorded.
-func (s *CatalogService) BackfillLandings(ctx context.Context, projects []*models.Project, since time.Time) (int, error) {
+func (s *Service) BackfillLandings(ctx context.Context, projects []*models.Project, since time.Time) (int, error) {
 	if s.activity == nil || s.projectFiles == nil {
 		return 0, nil
 	}

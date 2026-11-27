@@ -8,10 +8,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/catalog"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
@@ -29,7 +29,7 @@ func (h *Handler) sendPatch(w http.ResponseWriter, r *http.Request, data []byte,
 }
 
 // catalogPatch builds the owner's changes to one repository file
-func (h *Handler) catalogPatch(r *http.Request, user *models.User, c *models.Catalog, p *models.Project) (*service.GitPatchResult, error) {
+func (h *Handler) catalogPatch(r *http.Request, user *models.User, c *models.Catalog, p *models.Project) (*catalog.GitPatchResult, error) {
 	return h.catalogService.GitPatch(r.Context(), user, p, []*models.Catalog{c}, strings.TrimRight(h.siteConfig.BaseURL, "/")+c.URL())
 }
 
@@ -43,7 +43,7 @@ func (h *Handler) CatalogGitPatch(w http.ResponseWriter, r *http.Request) {
 	h.patchResponse(w, r, p, res, err)
 }
 
-func (h *Handler) patchResponse(w http.ResponseWriter, r *http.Request, p *models.Project, res *service.GitPatchResult, err error) {
+func (h *Handler) patchResponse(w http.ResponseWriter, r *http.Request, p *models.Project, res *catalog.GitPatchResult, err error) {
 	if err != nil {
 		h.fail(w, r, err)
 		return
@@ -90,7 +90,7 @@ func (h *Handler) GitPatchByLink(w http.ResponseWriter, r *http.Request) {
 	if user.Lang != "" {
 		lang = user.Lang
 	}
-	var res *service.GitPatchResult
+	var res *catalog.GitPatchResult
 	c, p, err := h.catalogService.Get(r.Context(), user, link.CatalogID)
 	if err == nil && !c.Owned {
 		err = apperr.ErrForbidden

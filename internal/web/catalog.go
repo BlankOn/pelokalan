@@ -15,6 +15,7 @@ import (
 
 	"pelokalan/pkg/ai"
 
+	"pelokalan/internal/catalog"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
@@ -84,7 +85,7 @@ func (h *Handler) attachComments(r *http.Request, p *models.Project, c *models.C
 }
 
 // reviewComments fills the filter's open review comments ("review" ticked) and returns their count
-func (h *Handler) reviewComments(r *http.Request, p *models.Project, c *models.Catalog, f *service.EntryFilter) int {
+func (h *Handler) reviewComments(r *http.Request, p *models.Project, c *models.Catalog, f *catalog.EntryFilter) int {
 	open := h.discuss.OpenReviewComments(r.Context(), p, c.ID)
 	if f != nil && f.Review {
 		f.ReviewHashes = map[string]bool{}
@@ -99,7 +100,7 @@ func (h *Handler) reviewComments(r *http.Request, p *models.Project, c *models.C
 	return n
 }
 
-func filterFromRequest(r *http.Request) service.EntryFilter {
+func filterFromRequest(r *http.Request) catalog.EntryFilter {
 	q := r.URL.Query()
 	// status may repeat (checkboxes) or be comma separated (?status=fuzzy,ai)
 	var statuses []string
@@ -112,7 +113,7 @@ func filterFromRequest(r *http.Request) service.EntryFilter {
 			}
 		}
 	}
-	f := service.EntryFilter{Query: q.Get("q"), Order: q.Get("order"), Review: seen["review"]}
+	f := catalog.EntryFilter{Query: q.Get("q"), Order: q.Get("order"), Review: seen["review"]}
 	for _, s := range statuses {
 		if s != "review" {
 			f.Statuses = append(f.Statuses, s)
@@ -141,8 +142,8 @@ type editorView struct {
 type listView struct {
 	Lang     string
 	Catalog  *models.Catalog
-	Listing  *service.EntryListing
-	Filter   service.EntryFilter
+	Listing  *catalog.EntryListing
+	Filter   catalog.EntryFilter
 	Selected int64
 }
 
@@ -281,7 +282,7 @@ func (h *Handler) editorPage(w http.ResponseWriter, r *http.Request, c *models.C
 	h.attachComments(r, p, c, listing.Entries)
 	// deep link to one entry: ?entry=<key hash>
 	if want := r.URL.Query().Get("entry"); want != "" {
-		if all, err := h.catalogService.Entries(r.Context(), c, service.EntryFilter{}); err == nil {
+		if all, err := h.catalogService.Entries(r.Context(), c, catalog.EntryFilter{}); err == nil {
 			for _, e := range all.Entries {
 				if e.KeyHash() == want {
 					data.Data["InitialEntry"] = e.ID
@@ -433,7 +434,7 @@ func (h *Handler) SaveEntry(w http.ResponseWriter, r *http.Request) {
 		}
 		forms = append(forms, v[0])
 	}
-	in := service.EntryInput{
+	in := catalog.EntryInput{
 		Version:     version,
 		Translation: forms,
 		Fuzzy:       r.FormValue("fuzzy") == "1",
@@ -462,7 +463,7 @@ func (h *Handler) SaveEntry(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	stats, _ := h.catalogService.Entries(r.Context(), c, service.EntryFilter{})
+	stats, _ := h.catalogService.Entries(r.Context(), c, catalog.EntryFilter{})
 	if stats != nil {
 		stats.ReviewComments = h.reviewComments(r, p, c, nil)
 	}
@@ -521,7 +522,7 @@ func (h *Handler) DownloadMO(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	sendFile(w, service.MOFilename(c), "application/x-gettext-translation", pc.CompileMO())
+	sendFile(w, catalog.MOFilename(c), "application/x-gettext-translation", pc.CompileMO())
 }
 
 func sendFile(w http.ResponseWriter, name, contentType string, body []byte) {
@@ -655,7 +656,7 @@ func (h *Handler) UpdateProperties(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	err := h.catalogService.UpdateProperties(r.Context(), middleware.GetUser(r.Context()), c, service.CatalogProperties{
+	err := h.catalogService.UpdateProperties(r.Context(), middleware.GetUser(r.Context()), c, catalog.CatalogProperties{
 		ProjectVersion: r.FormValue("project_version"),
 		ReportBugsTo:   r.FormValue("report_bugs_to"),
 		LanguageTeam:   r.FormValue("language_team"),

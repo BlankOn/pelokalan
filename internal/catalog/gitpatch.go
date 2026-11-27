@@ -1,4 +1,4 @@
-package service
+package catalog
 
 import (
 	"context"
@@ -18,10 +18,10 @@ import (
 )
 
 // SetProjectFiles gives the service access to project files, for git patches against the repository's files
-func (s *CatalogService) SetProjectFiles(r source.Repository) { s.projectFiles = r }
+func (s *Service) SetProjectFiles(r source.Repository) { s.projectFiles = r }
 
 // SetRepoPath stores a file's path in its module group's git repository
-func (s *CatalogService) SetRepoPath(ctx context.Context, user *models.User, c *models.Catalog, path string) error {
+func (s *Service) SetRepoPath(ctx context.Context, user *models.User, c *models.Catalog, path string) error {
 	if !c.WritableBy(user.ID) {
 		return apperr.ErrForbidden
 	}
@@ -46,13 +46,13 @@ type poState struct {
 
 // reference is what the member started from: the file as taken, or as last updated from upstream
 // (the newest "initial" or "from upstream" version); nil when the file has no such version
-func (s *CatalogService) reference(ctx context.Context, c *models.Catalog) map[string]poState {
+func (s *Service) reference(ctx context.Context, c *models.Catalog) map[string]poState {
 	return s.referenceAt(ctx, c, nil)
 }
 
 // referenceAt is reference as it was at time at (nil = now): the newest such version made by then, else the
 // oldest one (a file taken after at)
-func (s *CatalogService) referenceAt(ctx context.Context, c *models.Catalog, at *time.Time) map[string]poState {
+func (s *Service) referenceAt(ctx context.Context, c *models.Catalog, at *time.Time) map[string]poState {
 	list, err := s.commits.List(ctx, c.ID) // newest first
 	if err != nil {
 		return nil
@@ -105,7 +105,7 @@ func TranslatorCredit(u *models.User) *gitpatch.Credit {
 	return &gitpatch.Credit{Name: u.CreditName(), Email: u.CreditEmail(), Year: time.Now().Year()}
 }
 
-func (s *CatalogService) GitPatch(ctx context.Context, user *models.User, p *models.Project, catalogs []*models.Catalog, projectURL string) (*GitPatchResult, error) {
+func (s *Service) GitPatch(ctx context.Context, user *models.User, p *models.Project, catalogs []*models.Catalog, projectURL string) (*GitPatchResult, error) {
 	if s.projectFiles == nil {
 		return nil, apperr.ErrNotFound
 	}
@@ -165,7 +165,7 @@ func (s *CatalogService) GitPatch(ctx context.Context, user *models.User, p *mod
 // (the reference version), as patch targets; unreviewed AI drafts and empty strings stay out. Entries
 // whose state equals the one in sent (a repository file as Pelokalan last committed it; nil = none)
 // are left out too, so strings already sent never overwrite newer repository translations.
-func (s *CatalogService) ChangedTargets(ctx context.Context, c *models.Catalog, sent []byte) (map[string]gitpatch.Target, error) {
+func (s *Service) ChangedTargets(ctx context.Context, c *models.Catalog, sent []byte) (map[string]gitpatch.Target, error) {
 	entries, err := s.catalogs.ListEntries(ctx, c.ID, false)
 	if err != nil {
 		return nil, err
@@ -215,7 +215,7 @@ func sameStrings(a, b []string) bool {
 // starting point (the newest "initial"/"from upstream" version) and differs from the member's. Differences that
 // are the member's own work (upstream unchanged since the starting point) do not count. Without a starting point
 // only new strings and translations of strings the member left empty count.
-func (s *CatalogService) UpstreamChanges(ctx context.Context, c *models.Catalog, upstream []byte) (int, error) {
+func (s *Service) UpstreamChanges(ctx context.Context, c *models.Catalog, upstream []byte) (int, error) {
 	cat, err := po.ParseBytes(upstream)
 	if err != nil {
 		return 0, err
@@ -270,7 +270,7 @@ func translated(tr []string) bool {
 // from the member's. The member's starting point for an entry is what Pelokalan last committed for it (sent),
 // else the file's reference version. Committing would overwrite those, so the commit is refused until the
 // member pulls the upstream changes.
-func (s *CatalogService) UpstreamConflicts(ctx context.Context, c *models.Catalog, branch []byte, want map[string]gitpatch.Target, sent []byte) []string {
+func (s *Service) UpstreamConflicts(ctx context.Context, c *models.Catalog, branch []byte, want map[string]gitpatch.Target, sent []byte) []string {
 	cat, err := po.ParseBytes(branch)
 	if err != nil {
 		return nil

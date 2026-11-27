@@ -17,6 +17,7 @@ import (
 
 	"pelokalan/internal/account"
 	"pelokalan/internal/activity"
+	"pelokalan/internal/catalog"
 	"pelokalan/internal/langtools"
 	"pelokalan/internal/modulecontext"
 	"pelokalan/internal/platform/blobstore"
@@ -51,10 +52,10 @@ type Repositories struct {
 	User     account.UserRepository
 	OTP      account.OTPRepository
 	Project  project.Repository
-	Catalog  repository.CatalogRepository
+	Catalog  catalog.Repository
 	Glossary source.Repository
 	AI       repository.AIRepository
-	Commit   repository.CommitRepository
+	Commit   catalog.CommitRepository
 	Discuss  repository.DiscussionRepository
 	Activity activity.Repository
 	Reserve  reservation.Repository
@@ -71,7 +72,7 @@ type App struct {
 
 	Auth         *account.Service
 	Projects     *project.Service
-	Catalogs     *service.CatalogService
+	Catalogs     *catalog.Service
 	Glossary     *source.Service
 	Discussions  *service.DiscussionService
 	Activity     *activity.Service
@@ -115,10 +116,10 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		User:     account.NewUserRepository(db),
 		OTP:      account.NewOTPRepository(db),
 		Project:  project.NewRepository(db),
-		Catalog:  postgres.NewCatalogRepository(db),
+		Catalog:  catalog.NewRepository(db),
 		Glossary: source.NewRepository(db),
 		AI:       postgres.NewAIRepository(db),
-		Commit:   postgres.NewCommitRepository(db),
+		Commit:   catalog.NewCommitRepository(db),
 		Discuss:  postgres.NewDiscussionRepository(db),
 		Activity: activity.NewRepository(db),
 		Reserve:  reservation.NewRepository(db),
@@ -137,7 +138,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	mailer := a.Mailer
 	a.Auth = account.New(repos.User, repos.OTP, mailer, cfg.Auth, cfg.Site, cfg.JWT)
 	a.Projects = project.New(repos.Project, repos.User, mailer, a.Auth, cfg.Auth, cfg.Site)
-	a.Catalogs = service.NewCatalogService(repos.Catalog, repos.Commit, a.Projects)
+	a.Catalogs = catalog.New(repos.Catalog, repos.Commit, a.Projects)
 	fetcher := glossary.NewFetcher(cfg.Glossary.MaxDownloadMB<<20, cfg.Glossary.AllowPrivateHosts,
 		cfg.Site.Name+" glossary fetcher (+"+cfg.Site.BaseURL+")")
 	a.Glossary = source.New(repos.Glossary, fetcher)

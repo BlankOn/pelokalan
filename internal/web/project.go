@@ -17,11 +17,11 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/catalog"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/project"
-	"pelokalan/internal/service"
 	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/glossary"
@@ -994,8 +994,8 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 		}
 		return list[i].ID > list[j].ID
 	}
-	progress := func(c *models.Catalog) service.FileProgress {
-		return service.FileProgress{Total: c.Stats.Total, Translated: c.Stats.Translated, Name: c.Filename}
+	progress := func(c *models.Catalog) catalog.FileProgress {
+		return catalog.FileProgress{Total: c.Stats.Total, Translated: c.Stats.Translated, Name: c.Filename}
 	}
 	sort.SliceStable(list, func(i, j int) bool {
 		switch order {
@@ -1008,12 +1008,12 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 					return a == (order == "reserved")
 				}
 			}
-			if c := service.CompareProgress("remaining", progress(list[i]), progress(list[j])); c != 0 {
+			if c := catalog.CompareProgress("remaining", progress(list[i]), progress(list[j])); c != 0 {
 				return c < 0
 			}
 			return list[i].ID > list[j].ID
 		}
-		if c := service.CompareProgress(order, progress(list[i]), progress(list[j])); c != 0 {
+		if c := catalog.CompareProgress(order, progress(list[i]), progress(list[j])); c != 0 {
 			return c < 0
 		}
 		return list[i].ID > list[j].ID

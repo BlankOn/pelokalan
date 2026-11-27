@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"pelokalan/internal/catalog"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/store"
@@ -75,7 +76,7 @@ const (
 // AIService runs LLM pre-translation with glossary constraints
 type AIService struct {
 	repo         repository.AIRepository
-	catalogs     repository.CatalogRepository
+	catalogs     catalog.Repository
 	glossary     source.Repository
 	box          *ai.Box
 	allowPrivate bool
@@ -107,7 +108,7 @@ type chatClient interface {
 }
 
 // NewAIService creates the AI service
-func NewAIService(repo repository.AIRepository, catalogs repository.CatalogRepository, glossaryRepo source.Repository,
+func NewAIService(repo repository.AIRepository, catalogs catalog.Repository, glossaryRepo source.Repository,
 	box *ai.Box, allowPrivate bool) *AIService {
 	s := &AIService{repo: repo, catalogs: catalogs, glossary: glossaryRepo, box: box, allowPrivate: allowPrivate}
 	s.newClient = func(st *models.AISettings, key string) chatClient {
@@ -533,7 +534,7 @@ func (s *AIService) Start(ctx context.Context, user *models.User, p *models.Proj
 		EstimatedCost: estimated,
 	}
 	if s.history != nil {
-		s.history.AutoCommitByID(ctx, user.ID, c.ID, CommitMsgBeforeAI)
+		s.history.AutoCommitByID(ctx, user.ID, c.ID, catalog.CommitMsgBeforeAI)
 	}
 	if err := s.repo.CreateJob(ctx, job); err != nil {
 		return nil, err
@@ -691,9 +692,9 @@ func (s *AIService) finish(job *models.AIJob) {
 	}
 	// record what the model changed as its own version
 	if s.history != nil && job.UserID != nil && job.FromMemory+job.FromGlossary+job.Translated > 0 {
-		msg := CommitMsgAfterPretranslate
+		msg := catalog.CommitMsgAfterPretranslate
 		if job.Translated > 0 {
-			msg = CommitMsgAfterAI + "|" + job.Model
+			msg = catalog.CommitMsgAfterAI + "|" + job.Model
 		}
 		s.history.AutoCommitByID(context.Background(), *job.UserID, job.CatalogID, msg)
 	}
@@ -718,7 +719,7 @@ func (s *AIService) apply(ctx context.Context, c *models.Catalog, id int64, vers
 	}
 	// keep the replaced translation for comparison: the last text a person wrote (an earlier
 	// machine result does not replace it)
-	newForms := fitForms(forms, e.IsPlural(), c.NPlurals)
+	newForms := catalog.FitForms(forms, e.IsPlural(), c.NPlurals)
 	if hasText(e.MsgStr) && !sameForms(e.MsgStr, newForms) && (e.Origin == "" || e.ReplacedMsgStr == nil) {
 		e.ReplacedMsgStr = e.MsgStr
 	}

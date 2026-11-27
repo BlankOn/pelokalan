@@ -1,4 +1,4 @@
-package service
+package catalog
 
 import (
 	"context"
@@ -36,7 +36,7 @@ const (
 
 // snapshot serializes the catalog state (header and all entries) to PO text.
 // Unlike Build it adds nothing time-dependent, so equal content hashes equal.
-func (s *CatalogService) snapshot(ctx context.Context, c *models.Catalog) ([]byte, *models.Commit, error) {
+func (s *Service) snapshot(ctx context.Context, c *models.Catalog) ([]byte, *models.Commit, error) {
 	entries, err := s.catalogs.ListEntries(ctx, c.ID, true)
 	if err != nil {
 		return nil, nil, err
@@ -70,7 +70,7 @@ func (s *CatalogService) snapshot(ctx context.Context, c *models.Catalog) ([]byt
 	return data, stats, nil
 }
 
-func (s *CatalogService) latestCommit(ctx context.Context, c *models.Catalog) (*models.Commit, error) {
+func (s *Service) latestCommit(ctx context.Context, c *models.Catalog) (*models.Commit, error) {
 	l, err := s.commits.Latest(ctx, c.ID)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil
@@ -80,7 +80,7 @@ func (s *CatalogService) latestCommit(ctx context.Context, c *models.Catalog) (*
 
 // commit stores a new version. Unless force is set, nothing is stored when the
 // content equals the latest version (created reports whether one was made).
-func (s *CatalogService) commit(ctx context.Context, authorID *int64, c *models.Catalog, kind, message string, restoredFrom *int64, force bool) (*models.Commit, bool, error) {
+func (s *Service) commit(ctx context.Context, authorID *int64, c *models.Catalog, kind, message string, restoredFrom *int64, force bool) (*models.Commit, bool, error) {
 	data, cm, err := s.snapshot(ctx, c)
 	if err != nil {
 		return nil, false, err
@@ -109,7 +109,7 @@ func (s *CatalogService) commit(ctx context.Context, authorID *int64, c *models.
 }
 
 // Commit saves the current state of the user's catalog with a message
-func (s *CatalogService) Commit(ctx context.Context, user *models.User, c *models.Catalog, message string) (*models.Commit, error) {
+func (s *Service) Commit(ctx context.Context, user *models.User, c *models.Catalog, message string) (*models.Commit, error) {
 	if !c.WritableBy(user.ID) {
 		return nil, apperr.ErrForbidden
 	}
@@ -132,7 +132,7 @@ func (s *CatalogService) Commit(ctx context.Context, user *models.User, c *model
 
 // EditCommitMessage changes the message of a version of the file (owner only); the content
 // and the rest of the history stay as they are
-func (s *CatalogService) EditCommitMessage(ctx context.Context, user *models.User, c *models.Catalog, id int64, message string) (*models.Commit, error) {
+func (s *Service) EditCommitMessage(ctx context.Context, user *models.User, c *models.Catalog, id int64, message string) (*models.Commit, error) {
 	if !c.WritableBy(user.ID) {
 		return nil, apperr.ErrForbidden
 	}
@@ -154,7 +154,7 @@ func (s *CatalogService) EditCommitMessage(ctx context.Context, user *models.Use
 // SafetyCommit records the current state before a risky operation when it
 // differs from the latest version. Failures are logged, not returned: the
 // operation itself should not be blocked by history bookkeeping.
-func (s *CatalogService) SafetyCommit(ctx context.Context, authorID int64, c *models.Catalog, message string) {
+func (s *Service) SafetyCommit(ctx context.Context, authorID int64, c *models.Catalog, message string) {
 	kind := models.CommitAuto
 	if latest, err := s.latestCommit(ctx, c); err == nil && latest == nil {
 		kind = models.CommitInitial
@@ -166,7 +166,7 @@ func (s *CatalogService) SafetyCommit(ctx context.Context, authorID int64, c *mo
 
 // AutoCommitByID records an automatic version of a catalog by id (used by
 // background jobs that do not hold the catalog)
-func (s *CatalogService) AutoCommitByID(ctx context.Context, authorID, catalogID int64, message string) {
+func (s *Service) AutoCommitByID(ctx context.Context, authorID, catalogID int64, message string) {
 	c, err := s.catalogs.GetByID(ctx, catalogID)
 	if err != nil {
 		log.Printf("history: load catalog %d: %v", catalogID, err)
@@ -177,7 +177,7 @@ func (s *CatalogService) AutoCommitByID(ctx context.Context, authorID, catalogID
 
 // EnsureBaseline gives a catalog without history its first version, so files
 // created before version control can always be returned to this point.
-func (s *CatalogService) EnsureBaseline(ctx context.Context, c *models.Catalog) {
+func (s *Service) EnsureBaseline(ctx context.Context, c *models.Catalog) {
 	latest, err := s.latestCommit(ctx, c)
 	if err != nil || latest != nil {
 		return
@@ -190,7 +190,7 @@ func (s *CatalogService) EnsureBaseline(ctx context.Context, c *models.Catalog) 
 
 // Discard throws away uncommitted changes by restoring the latest version.
 // The discarded state is still saved as an automatic version first.
-func (s *CatalogService) Discard(ctx context.Context, user *models.User, c *models.Catalog) (*models.Commit, error) {
+func (s *Service) Discard(ctx context.Context, user *models.User, c *models.Catalog) (*models.Commit, error) {
 	latest, err := s.latestCommit(ctx, c)
 	if err != nil {
 		return nil, err
@@ -202,12 +202,12 @@ func (s *CatalogService) Discard(ctx context.Context, user *models.User, c *mode
 }
 
 // History lists the versions of a catalog, newest first
-func (s *CatalogService) History(ctx context.Context, c *models.Catalog) ([]*models.Commit, error) {
+func (s *Service) History(ctx context.Context, c *models.Catalog) ([]*models.Commit, error) {
 	return s.commits.List(ctx, c.ID)
 }
 
 // WorkingDiff compares the current state with the latest version
-func (s *CatalogService) WorkingDiff(ctx context.Context, c *models.Catalog) (*Diff, error) {
+func (s *Service) WorkingDiff(ctx context.Context, c *models.Catalog) (*Diff, error) {
 	data, _, err := s.snapshot(ctx, c)
 	if err != nil {
 		return nil, err
@@ -225,7 +225,7 @@ func (s *CatalogService) WorkingDiff(ctx context.Context, c *models.Catalog) (*D
 	return DiffSnapshots(old, data), nil
 }
 
-func (s *CatalogService) ownCommit(ctx context.Context, c *models.Catalog, id int64) (*models.Commit, error) {
+func (s *Service) ownCommit(ctx context.Context, c *models.Catalog, id int64) (*models.Commit, error) {
 	cm, err := s.commits.Get(ctx, id)
 	if err != nil || cm.CatalogID != c.ID {
 		return nil, apperr.ErrNotFound
@@ -234,7 +234,7 @@ func (s *CatalogService) ownCommit(ctx context.Context, c *models.Catalog, id in
 }
 
 // CommitDiff compares a version with the one before it
-func (s *CatalogService) CommitDiff(ctx context.Context, c *models.Catalog, id int64) (*models.Commit, *Diff, error) {
+func (s *Service) CommitDiff(ctx context.Context, c *models.Catalog, id int64) (*models.Commit, *Diff, error) {
 	cm, err := s.ownCommit(ctx, c, id)
 	if err != nil {
 		return nil, nil, err
@@ -256,7 +256,7 @@ func (s *CatalogService) CommitDiff(ctx context.Context, c *models.Catalog, id i
 const originFlagPrefix = "x-origin-"
 
 // CommitSnapshot returns the PO text of a version as stored (with origin flags)
-func (s *CatalogService) commitSnapshot(ctx context.Context, c *models.Catalog, id int64) (*models.Commit, []byte, error) {
+func (s *Service) commitSnapshot(ctx context.Context, c *models.Catalog, id int64) (*models.Commit, []byte, error) {
 	cm, err := s.ownCommit(ctx, c, id)
 	if err != nil {
 		return nil, nil, err
@@ -266,7 +266,7 @@ func (s *CatalogService) commitSnapshot(ctx context.Context, c *models.Catalog, 
 }
 
 // CommitSnapshot returns the PO file of a version for download
-func (s *CatalogService) CommitSnapshot(ctx context.Context, c *models.Catalog, id int64) (*models.Commit, []byte, error) {
+func (s *Service) CommitSnapshot(ctx context.Context, c *models.Catalog, id int64) (*models.Commit, []byte, error) {
 	cm, data, err := s.commitSnapshot(ctx, c, id)
 	if err != nil {
 		return nil, nil, err
@@ -300,7 +300,7 @@ func splitOriginFlag(flags []string) ([]string, string) {
 
 // Restore brings the catalog back to an earlier version. The current state is
 // committed first and the restore is itself recorded, so it can be undone.
-func (s *CatalogService) Restore(ctx context.Context, user *models.User, c *models.Catalog, id int64) (*models.Commit, error) {
+func (s *Service) Restore(ctx context.Context, user *models.User, c *models.Catalog, id int64) (*models.Commit, error) {
 	if !c.WritableBy(user.ID) {
 		return nil, apperr.ErrForbidden
 	}

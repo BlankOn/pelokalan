@@ -1,7 +1,6 @@
-package service
+package catalog
 
 import (
-	"strings"
 	"testing"
 
 	"pelokalan/internal/models"
@@ -86,13 +85,5 @@ func TestDiffReviewed(t *testing.T) {
 	}
 	if d.Items[1].Kind != "changed" || d.Items[1].OldOrigin != "ai" || d.Items[1].NewOrigin != "" {
 		t.Errorf("changed item = %+v", d.Items[1])
-	}
-}
-
-func TestMentions(t *testing.T) {
-	got := Mentions("Hi @ani and @Budi.S, see admin@blankon.id and @ani again. @x @ok_user.")
-	want := "ani budi.s ok_user"
-	if strings.Join(got, " ") != want {
-		t.Errorf("mentions = %v, want %s", got, want)
 	}
 }

@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"html"
 	"log"
+	"slices"
 	"strings"
 	"time"
 
 	"pelokalan/internal/account"
+	"pelokalan/internal/catalog"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
@@ -39,7 +41,7 @@ const MaxReviewNote = 2000
 // ReviewService handles review requests and commits to repositories
 type ReviewService struct {
 	repo         repository.ReviewRepository
-	catalogs     *CatalogService
+	catalogs     *catalog.Service
 	glossary     *source.Service
 	reservations *reservation.Service
 	projects     project.Repository
@@ -85,7 +87,7 @@ func (s *ReviewService) openComments(ctx context.Context, p *models.Project, cat
 }
 
 // NewReviewService creates the review service
-func NewReviewService(repo repository.ReviewRepository, catalogs *CatalogService, glossary *source.Service,
+func NewReviewService(repo repository.ReviewRepository, catalogs *catalog.Service, glossary *source.Service,
 	reservations *reservation.Service, projects project.Repository, users account.UserRepository,
 	mailer mailer.Mailer, site config.SiteConfig) *ReviewService {
 	return &ReviewService{repo: repo, catalogs: catalogs, glossary: glossary, reservations: reservations,
@@ -178,7 +180,7 @@ func (s *ReviewService) Changes(ctx context.Context, p *models.Project, c *model
 	}
 	var credit *gitpatch.Credit
 	if owner, err := s.users.GetByID(ctx, c.OwnerID); err == nil {
-		credit = TranslatorCredit(owner)
+		credit = catalog.TranslatorCredit(owner)
 	}
 	return gitpatch.DiffCredit(c.RepoPath, base, want, credit), nil
 }
@@ -289,7 +291,7 @@ func (s *ReviewService) Approve(ctx context.Context, reviewer *models.User, p *m
 	if err != nil {
 		return nil, err
 	}
-	c, err := s.catalogs.catalogs.GetByID(ctx, r.CatalogID)
+	c, err := s.catalogs.ByID(ctx, r.CatalogID)
 	if err != nil {
 		return nil, err
 	}
@@ -382,7 +384,7 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 		if conflicts := s.catalogs.UpstreamConflicts(ctx, c, f.Data, want, sent); len(conflicts) > 0 {
 			return apperr.New("err.review_upstream_conflict", len(conflicts), conflictList(conflicts))
 		}
-		data, n := gitpatch.ApplyCredit(f.Data, want, TranslatorCredit(owner)) // the header credits the translator
+		data, n := gitpatch.ApplyCredit(f.Data, want, catalog.TranslatorCredit(owner)) // the header credits the translator
 		if n == 0 {
 			return apperr.New("err.review_nothing")
 		}
@@ -422,7 +424,7 @@ func sentEntries(branch []byte, want map[string]gitpatch.Target) []byte {
 	out := &po.Catalog{Header: cat.Header}
 	for _, e := range cat.Entries {
 		t, ok := want[e.Key()]
-		if !ok || e.Obsolete || sameStrings(e.Translation, t.Translation) && e.Fuzzy == t.Fuzzy {
+		if !ok || e.Obsolete || slices.Equal(e.Translation, t.Translation) && e.Fuzzy == t.Fuzzy {
 			continue
 		}
 		out.Entries = append(out.Entries, &po.Entry{HasContext: e.HasContext, Context: e.Context, ID: e.ID,
@@ -510,7 +512,7 @@ func (s *ReviewService) notifyTranslator(ctx context.Context, p *models.Project,
 	if s.mailer == nil || s.users == nil {
 		return
 	}
-	c, err := s.catalogs.catalogs.GetByID(ctx, r.CatalogID)
+	c, err := s.catalogs.ByID(ctx, r.CatalogID)
 	if err != nil {
 		return
 	}

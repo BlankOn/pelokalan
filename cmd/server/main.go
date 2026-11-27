@@ -17,9 +17,9 @@ import (
 
 	"pelokalan/internal/activity"
 	"pelokalan/internal/app"
+	"pelokalan/internal/catalog"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 	"pelokalan/internal/web"
 )
 
@@ -118,7 +118,7 @@ func main() {
 	// badges silently (BadgeAwardsBaselineJob); (3) every hour, record new badge tiers and email them.
 	go func() {
 		ctx := context.Background()
-		if claimed, err := activityService.ClaimOneTimeJob(ctx, service.BackfillLandingsJob); err == nil && claimed {
+		if claimed, err := activityService.ClaimOneTimeJob(ctx, catalog.BackfillLandingsJob); err == nil && claimed {
 			if projects, err := repos.Project.ListAll(ctx, 0); err != nil {
 				log.Printf("upstream landings backfill: %v", err)
 			} else {
