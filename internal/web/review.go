@@ -6,10 +6,10 @@ import (
 	"strconv"
 	"strings"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 )
 
 // Full GitHub integration (service/review.go, service/github.go): managers check the GitHub App's access on a

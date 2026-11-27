@@ -20,12 +20,12 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/badgecard"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
@@ -87,8 +87,8 @@ func NewHandler(
 		wiki:           wikiService,
 		contexts:       contextService,
 	}
-	// static/ sits two levels above internal/templates (the project root)
-	staticDir := filepath.Join(filepath.Dir(filepath.Dir(templatesDir)), "static")
+	// static/ sits at the project root, three levels above internal/web/templates
+	staticDir := filepath.Join(filepath.Dir(filepath.Dir(filepath.Dir(templatesDir))), "static")
 	h.assetVersion = assetVersion(staticDir)
 	for _, name := range []string{"blankon-foundation.svg", "blankon-foundation.png"} { // footer "A project by"
 		if _, err := os.Stat(filepath.Join(staticDir, "img", name)); err == nil {

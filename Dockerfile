@@ -18,7 +18,7 @@ RUN apk add --no-cache ca-certificates tzdata
 RUN adduser -D -g '' appuser
 
 COPY --from=builder /app/server /app/server
-COPY --from=builder /app/internal/templates /app/internal/templates
+COPY --from=builder /app/internal/web/templates /app/internal/web/templates
 COPY --from=builder /app/static /app/static
 COPY --from=builder /app/migrations /app/migrations
 

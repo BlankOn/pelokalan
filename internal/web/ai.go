@@ -5,10 +5,10 @@ import (
 	"net/http"
 	"strconv"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 )
 
 // aiSettingsData adds the AI section data to the settings page

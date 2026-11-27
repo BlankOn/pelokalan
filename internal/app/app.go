@@ -15,14 +15,14 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"pelokalan/internal/handler/middleware"
-	"pelokalan/internal/handler/web"
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/repository/postgres"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web"
+	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/ai"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/glossary"
@@ -31,7 +31,7 @@ import (
 
 // Options changes how the application is put together
 type Options struct {
-	// Root is the project directory holding internal/templates, static and migrations ("." on the server)
+	// Root is the project directory holding internal/web/templates, static and migrations ("." on the server)
 	Root string
 	// Mailer replaces the configured one (tests capture emails with it)
 	Mailer mailer.Mailer
@@ -156,7 +156,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 
 	// Handlers
 	h, err := web.NewHandler(
-		filepath.Join(opts.Root, "internal", "templates"),
+		filepath.Join(opts.Root, "internal", "web", "templates"),
 		cfg.Site,
 		cfg.Server,
 		a.Auth,

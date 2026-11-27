@@ -13,7 +13,7 @@ import (
 // The editor renders the Konteks history also for modules without any Konteks yet
 // (no edit list at all); that must not fail the page.
 func TestContextHistoryRendersWithoutEdits(t *testing.T) {
-	tmpl := template.Must(template.New("t").Funcs(funcMap()).ParseFiles("../../templates/partials/context_history.html"))
+	tmpl := template.Must(template.New("t").Funcs(funcMap()).ParseFiles("templates/partials/context_history.html"))
 	cases := map[string]any{
 		"missing": nil,
 		"empty":   []models.ContextEdit{},

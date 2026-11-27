@@ -4,9 +4,9 @@ import (
 	"errors"
 	"net/http"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 )
 
 // Translation Project (service/tp.go): the site takes translations by email only, from the translator's

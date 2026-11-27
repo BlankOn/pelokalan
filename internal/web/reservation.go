@@ -5,10 +5,10 @@ import (
 	"net/url"
 	"strings"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 )
 
 // Module reservations (service/reservation.go): a project setting; members hold a module while working on

@@ -18,7 +18,7 @@ import (
 // Project file rows show the upstream state; one Take/Update button per row fetches the latest file
 func TestProjectFileRowsUpstream(t *testing.T) {
 	tmpl := template.Must(template.New("t").Funcs(funcMap()).ParseFiles(
-		"../../templates/partials/project_card.html", "../../templates/partials/progress.html"))
+		"templates/partials/project_card.html", "templates/partials/progress.html"))
 	up := &models.UpstreamStats{State: "Translating", Translated: 10, Fuzzy: 2, Untranslated: 3,
 		PageURL: "https://l10n.gnome.org/vertimus/glib/main/po/id/", POFileURL: "https://l10n.gnome.org/POT/glib.main/glib.main.id.po"}
 	files := []*models.ProjectFile{
@@ -65,7 +65,7 @@ func TestProjectFileRowsUpstream(t *testing.T) {
 // "Berkas Anda" rows carry the same badge; the file filter offers the upstream states
 func TestFileRowsUpstream(t *testing.T) {
 	tmpl := template.Must(template.New("t").Funcs(funcMap()).ParseFiles(
-		"../../templates/partials/project_card.html", "../../templates/partials/progress.html"))
+		"templates/partials/project_card.html", "templates/partials/progress.html"))
 	files := []*models.Catalog{
 		{ID: 3, Filename: "glib.main.id.po", Language: "id", UpstreamInfo: models.UpstreamInfo{UpstreamChecked: true,
 			Upstream: &models.UpstreamStats{State: "Proofread", Translated: 4, PageURL: "https://l10n.gnome.org/y"}}},

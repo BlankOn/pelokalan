@@ -7,9 +7,9 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 )
 
 // Progress chart of a module group (above Berkas proyek): translated, fuzzy and untranslated

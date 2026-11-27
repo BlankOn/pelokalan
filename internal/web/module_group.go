@@ -5,10 +5,10 @@ import (
 	"net/url"
 	"strconv"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 )
 
 // Module groups ("Kelompok modul", e.g. gnome-51): the PO archives imported per language, by

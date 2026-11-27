@@ -7,9 +7,9 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 )
 
 // Indonesian spelling check in the editor (project members only: the word list has no licence and

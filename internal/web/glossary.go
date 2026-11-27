@@ -6,11 +6,11 @@ import (
 	"strconv"
 	"time"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 )
 
 // glossaryView is the data of the glossary result partials

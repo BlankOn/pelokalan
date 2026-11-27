@@ -5,9 +5,9 @@ import (
 	"net/http"
 	"strings"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/web/middleware"
 )
 
 // chartPoint is one version in the progress chart of the history page

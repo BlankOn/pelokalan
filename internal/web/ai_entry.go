@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strconv"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/web/middleware"
 )
 
 // AITranslateEntry translates one entry with the model and returns the text (JSON); the

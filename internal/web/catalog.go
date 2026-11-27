@@ -15,12 +15,12 @@ import (
 
 	"pelokalan/pkg/ai"
 
-	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/service"
+	"pelokalan/internal/web/middleware"
 )
 
 // loadCatalog resolves the file of the request, either by id (/catalogs/{cid})
