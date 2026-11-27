@@ -1682,6 +1682,8 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .home-feature-icon { width: 38px; height: 38px; border-radius: 10px; background: var(--accent-soft); color: var(--accent);
     display: flex; align-items: center; justify-content: center; flex: none; }
 .home-feature-icon .badge-icon { width: 22px; height: 22px; stroke: currentColor; }
+/* the sources' own marks (GNOME foot, GitHub, GNU head; Simple Icons, CC0) */
+.home-feature-icon .brand-icon { width: 22px; height: 22px; fill: currentColor; }
 .home-feature h3 { margin: 0 0 4px; font-size: 15px; }
 .home-feature p { margin: 0; font-size: 13.5px; color: #4a4e56; }
 .home-sources { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }

@@ -256,9 +256,8 @@ func (s *Service) Upload(ctx context.Context, user *models.User, p *models.Proje
 	if !isTemplate {
 		c.Header = po.SetHeaderField(c.Header, "Language", language)
 		c.PluralForms = pc.HeaderField("Plural-Forms")
-		if c.PluralForms == "" {
+		if c.PluralForms == "" { // known for the checks; written into the file only when it needs it (pluralFormsHeader)
 			c.PluralForms = po.LookupLanguage(language).PluralForms
-			c.Header = po.SetHeaderField(c.Header, "Plural-Forms", c.PluralForms)
 		}
 	}
 	c.NPlurals = po.NPlurals(c.PluralForms)
@@ -353,9 +352,7 @@ func (s *Service) replaceContent(ctx context.Context, user *models.User, c *mode
 		c.Header = po.SetHeaderField(c.Header, "Language", c.Language)
 		if pf := pc.HeaderField("Plural-Forms"); pf != "" {
 			c.PluralForms = pf
-		} else {
-			c.Header = po.SetHeaderField(c.Header, "Plural-Forms", c.PluralForms)
-		}
+		} // else: the rule stays known for the checks, the file is written without it unless it needs it
 		c.NPlurals = po.NPlurals(c.PluralForms)
 	}
 	entries := make([]*models.Entry, 0, len(pc.Entries))
@@ -814,7 +811,6 @@ func (s *Service) Build(ctx context.Context, user *models.User, c *models.Catalo
 	if !c.IsTemplate && (user == nil || user.ID != c.OwnerID) {
 		// someone else's file is exported as stored, without their identity
 		pc.Header = po.SetHeaderField(pc.Header, "Language", c.Language)
-		pc.Header = po.SetHeaderField(pc.Header, "Plural-Forms", c.PluralForms)
 	} else if !c.IsTemplate {
 		// sync the translator identity: Last-Translator, Language-Team and the
 		// contributor line in the header comments
@@ -829,8 +825,17 @@ func (s *Service) Build(ctx context.Context, user *models.User, c *models.Catalo
 		}
 		pc.HeaderComments = po.AddContributor(pc.HeaderComments, user.CreditName(), user.CreditEmail(), now.Year())
 		pc.Header = po.SetHeaderField(pc.Header, "Language", c.Language)
-		pc.Header = po.SetHeaderField(pc.Header, "Plural-Forms", c.PluralForms)
 		pc.Header = po.SetHeaderField(pc.Header, "X-Generator", "pelokalan.blankon.id")
+	}
+	if !c.IsTemplate { // Plural-Forms only when the file needs it or upstream has it
+		plural := false
+		for _, e := range entries {
+			if e.MsgIDPlural != "" && !e.Obsolete {
+				plural = true
+				break
+			}
+		}
+		pc.Header = s.pluralFormsHeader(ctx, c, pc.Header, plural)
 	}
 	for _, e := range entries {
 		pe := e.ToPO()

@@ -26,6 +26,7 @@ var licenseCredits = []credit{
 	{"Go fonts", "https://go.dev/blog/go-fonts", "BSD-3-Clause", "licenses.use_gofont"},
 	{"htmx 1.9.10", "https://htmx.org", "0BSD", "licenses.use_htmx"},
 	{"Feather Icons", "https://feathericons.com", "MIT", "licenses.use_feather"},
+	{"Simple Icons", "https://simpleicons.org", "CC0-1.0", "licenses.use_simpleicons"},
 	{"PostgreSQL", "https://www.postgresql.org", "PostgreSQL License", "licenses.use_postgres"},
 }
 

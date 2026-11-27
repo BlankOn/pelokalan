@@ -148,6 +148,12 @@ func TestGitHubReviews(t *testing.T) {
 	owner.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Pakai \"direktorinya\"?"},
 		"anchor_text": {"direktori"}, "anchor_start": {"6"}, "anchor_form": {"0"}}).status(http.StatusOK).
 		contains("Sudah diselesaikan", "btn-approve rv-resolve", `data-review-open="1"`)
+	// a reply while that comment is open is a plain comment: one thing to resolve per string at a time
+	owner.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Atau \"folder\"?"}}).status(http.StatusOK).
+		contains(`data-review-open="1"`)
+	if n := scalar[int](t, `SELECT count(*) FROM comments WHERE review_id = $1`, rid); n != 1 {
+		t.Fatalf("review comments after a reply = %d, want 1", n)
+	}
 	if got := scalar[string](t, `SELECT anchor_text FROM comments WHERE review_id IS NOT NULL ORDER BY id DESC LIMIT 1`); got != "direktori" {
 		t.Fatalf("anchor = %q", got)
 	}
@@ -187,6 +193,11 @@ func TestGitHubReviews(t *testing.T) {
 		t.Fatal("a visitor resolved a review comment")
 	}
 	kiki.hx(fmt.Sprintf("%s/comments/%d/resolve", base, cmt), nil).status(http.StatusOK).contains("Diselesaikan oleh", `data-review-open="0"`)
+	// with every review comment on the string resolved, the reviewer's next comment is a review comment again
+	owner.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Satu lagi: huruf kecil."}}).status(http.StatusOK).
+		contains(`data-review-open="1"`)
+	again := scalar[int64](t, `SELECT id FROM comments WHERE review_id = $1 AND resolved_at IS NULL`, rid)
+	kiki.hx(fmt.Sprintf("%s/comments/%d/resolve", base, again), nil).status(http.StatusOK).contains(`data-review-open="0"`)
 	// resolved: the mark goes
 	kiki.get(fmt.Sprintf("/catalogs/%d/list", kc)).status(http.StatusOK).lacks(mark)
 	// ...but the review editor keeps showing what was commented on: the row and the passage turn green there

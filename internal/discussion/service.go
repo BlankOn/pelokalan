@@ -451,6 +451,13 @@ func (s *Service) post(ctx context.Context, user *models.User, p *models.Project
 	}
 	if cid := entryCatalog(subj.Type, subj.Key); cid > 0 && s.reviewFor != nil {
 		c.ReviewID = s.reviewFor(ctx, p, cid, user) // a reviewer's comment on a file waiting for review
+		// while the string already has an open review comment, a reply is a plain comment (one thing to resolve per
+		// string at a time); a comment on a passage is a point of its own and stays a review comment
+		if c.ReviewID != nil && anchor == nil {
+			if open, err := s.repo.HasOpenReviewComment(ctx, d.ID); err == nil && open {
+				c.ReviewID = nil
+			}
+		}
 	}
 	if err := s.repo.AddComment(ctx, c, ids(mentioned), attachments); err != nil {
 		return nil, err

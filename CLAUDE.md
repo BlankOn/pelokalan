@@ -545,7 +545,8 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
 `/projects` starts with a landing introduction (`#home-intro`, pages/projects.html, `home.*` strings): an illustration
 right above the card (`static/img/home-hero.png`, transparent background, `.home-art`), headline, pitch,
 buttons (visitors: sign up / sign in; members: jump to the list), six feature cards (`homeFeatures`, badge
-icons), the connected sources (GNOME l10n.gnome.org, GitHub repositories and the Translation Project, `home.src_*`) and three "how it works"
+icons), the connected sources (GNOME l10n.gnome.org, GitHub repositories and the Translation Project, `home.src_*`,
+with the GNOME foot, GitHub and GNU marks from Simple Icons, CC0, inline `.brand-icon`) and three "how it works"
 steps. It is always shown (no hide button).
 
 ## Footer
@@ -700,6 +701,10 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   `credits_missing` when their name/email is not in it and `credits_year` when their line lists years but
   not this one (lines without years are fine). The editor alert offers "Tambahkan identitas saya" / "Tambahkan
   tahun ini" (`creditFix` → `po.AddCredit`, same year rule), which fills the box (undoable, not saved).
+- **Plural-Forms** is written only when needed (`catalog/pluralheader.go`, `pluralFormsHeader` in `Build`): files with
+  plural strings get the file's rule; others keep the field only if they had it. Uploads no longer add it (the language's
+  rule stays in `Catalog.PluralForms` for the checks); files that got it from an earlier upload lose it on export when
+  their upstream copy (project file: same repository path, else name, else module) has none (cached 10 min).
 - `/catalogs/{cid}/properties` edits Project-Id-Version, Report-Msgid-Bugs-To,
   Language-Team and the header comment lines.
 
@@ -836,7 +841,9 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   file owner, the author or a manager): red dot on the entry row (`Entry.ReviewOpen`, `mark-review`, kept in sync by
   app.js from the thread's `data-review-open`), a "Komentar tinjauan" status filter (`EntryFilter.Review`) and status bar
   count in the translator's editor. Approving or sending (`push`/`PushNow`) waits until none is open
-  (`err.review_open_comments`). The reject route stays but the UI works through comments.
+  (`err.review_open_comments`). The reject route stays but the UI works through comments. While a string already has
+  an open review comment, a reviewer's reply there is a plain comment (`HasOpenReviewComment`); once all are resolved,
+  the next one is a review comment again. A comment on a passage (anchor) is always a review comment.
 
 ## Module groups UI
 

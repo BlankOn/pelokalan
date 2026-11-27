@@ -103,6 +103,22 @@ func SetHeaderField(header, name, value string) string {
 	return strings.Join(lines, "\n") + "\n"
 }
 
+// RemoveHeaderField drops a header field (every line with that name)
+func RemoveHeaderField(header, name string) string {
+	lines := strings.Split(strings.TrimRight(header, "\n"), "\n")
+	out := lines[:0]
+	for _, line := range lines {
+		if k, _, ok := strings.Cut(line, ":"); ok && strings.EqualFold(strings.TrimSpace(k), name) {
+			continue
+		}
+		out = append(out, line)
+	}
+	if len(out) == 0 || len(out) == 1 && out[0] == "" {
+		return ""
+	}
+	return strings.Join(out, "\n") + "\n"
+}
+
 // GetHeaderField returns a header field value from a raw header string
 func GetHeaderField(header, name string) string {
 	return (&Catalog{Header: header}).HeaderField(name)

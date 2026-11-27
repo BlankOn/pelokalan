@@ -362,6 +362,13 @@ func (r *discussionRepository) OpenReviewComments(ctx context.Context, projectID
 	return r.reviewCommentCounts(ctx, projectID, catalogID, false)
 }
 
+func (r *discussionRepository) HasOpenReviewComment(ctx context.Context, discussionID int64) (bool, error) {
+	var open bool
+	err := r.db.QueryRowContext(ctx, `SELECT EXISTS (SELECT 1 FROM comments WHERE discussion_id = $1
+		AND review_id IS NOT NULL AND resolved_at IS NULL AND deleted_at IS NULL)`, discussionID).Scan(&open)
+	return open, err
+}
+
 func (r *discussionRepository) ResolvedReviewEntries(ctx context.Context, projectID, catalogID int64) (map[string]int, error) {
 	return r.reviewCommentCounts(ctx, projectID, catalogID, true)
 }

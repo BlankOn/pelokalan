@@ -34,6 +34,8 @@ type Repository interface {
 	ResolveComment(ctx context.Context, id, byUserID int64) error
 	// OpenReviewComments counts the open review comments on a file's entries, by entry key hash
 	OpenReviewComments(ctx context.Context, projectID, catalogID int64) (map[string]int, error)
+	// HasOpenReviewComment reports whether a discussion has a review comment nobody resolved yet
+	HasOpenReviewComment(ctx context.Context, discussionID int64) (bool, error)
 	// ResolvedReviewEntries counts the resolved review comments on a file's entries, by entry key hash
 	ResolvedReviewEntries(ctx context.Context, projectID, catalogID int64) (map[string]int, error)
 	// ReviewAnchors lists the passages review comments on a file are about (open ones first), by entry key hash
