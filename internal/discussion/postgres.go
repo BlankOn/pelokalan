@@ -1,4 +1,4 @@
-package postgres
+package discussion
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 type discussionRepository struct {
@@ -17,7 +16,7 @@ type discussionRepository struct {
 }
 
 // NewDiscussionRepository creates a new PostgreSQL discussion repository
-func NewDiscussionRepository(db *sql.DB) repository.DiscussionRepository {
+func NewRepository(db *sql.DB) Repository {
 	return &discussionRepository{db: db}
 }
 
@@ -56,7 +55,7 @@ func (r *discussionRepository) GetOrCreate(ctx context.Context, d *models.Discus
 	).Scan(&d.ID, &d.CommentCount, &d.LastActivityAt, &d.CreatedAt)
 }
 
-func (r *discussionRepository) List(ctx context.Context, projectID int64, f repository.DiscussionFilter) ([]*models.Discussion, int, error) {
+func (r *discussionRepository) List(ctx context.Context, projectID int64, f DiscussionFilter) ([]*models.Discussion, int, error) {
 	where := `d.project_id = $1 AND d.comment_count > 0`
 	args := []any{projectID}
 	if f.SubjectType != "" {

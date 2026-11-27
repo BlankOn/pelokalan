@@ -25,40 +25,6 @@ type AIRepository interface {
 	FailRunning(ctx context.Context) error
 }
 
-// DiscussionFilter narrows a discussion listing
-type DiscussionFilter struct {
-	MentionedUserID int64 // only discussions mentioning this user
-	SubjectType     string
-	Query           string // every word must appear in the title or a visible comment
-	Limit, Offset   int
-}
-
-// DiscussionRepository stores generic discussions and their comments
-type DiscussionRepository interface {
-	Get(ctx context.Context, projectID int64, subjectType, subjectKey string) (*models.Discussion, error)
-	GetByID(ctx context.Context, id int64) (*models.Discussion, error)
-	// GetOrCreate returns the discussion of a subject, creating it when missing
-	GetOrCreate(ctx context.Context, d *models.Discussion) error
-	List(ctx context.Context, projectID int64, f DiscussionFilter) ([]*models.Discussion, int, error)
-	// Counts returns comment counts per subject key
-	Counts(ctx context.Context, projectID int64, subjectType string, keys []string) (map[string]int, error)
-
-	// AddComment stores a comment with its mentions and attachments (blobs must exist)
-	AddComment(ctx context.Context, c *models.Comment, mentions []int64, attachments []*models.Attachment) error
-	// Attachment returns an attachment with the project of its discussion
-	Attachment(ctx context.Context, id int64) (*models.Attachment, int64, error)
-	Comments(ctx context.Context, discussionID int64) ([]*models.Comment, error)
-	GetComment(ctx context.Context, id int64) (*models.Comment, error)
-	// ResolveComment marks an open review comment resolved
-	ResolveComment(ctx context.Context, id, byUserID int64) error
-	// OpenReviewComments counts the open review comments on a file's entries, by entry key hash
-	OpenReviewComments(ctx context.Context, projectID, catalogID int64) (map[string]int, error)
-	UpdateComment(ctx context.Context, id int64, body string, mentions []int64) error
-	DeleteComment(ctx context.Context, id, byUserID int64) error
-	// DeleteDiscussion removes a discussion with its comments, mentions and attachment links
-	DeleteDiscussion(ctx context.Context, id int64) error
-}
-
 // ReviewRepository stores review requests of modules for repositories Pelokalan writes to (module_reviews)
 type ReviewRepository interface {
 	// Create stores a request; ErrConflict when the file already has an open one

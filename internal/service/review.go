@@ -12,6 +12,7 @@ import (
 
 	"pelokalan/internal/account"
 	"pelokalan/internal/catalog"
+	"pelokalan/internal/discussion"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
@@ -48,12 +49,12 @@ type ReviewService struct {
 	users        account.UserRepository
 	mailer       mailer.Mailer
 	site         config.SiteConfig
-	discuss      *DiscussionService // review comments (nil = none)
+	discuss      *discussion.Service // review comments (nil = none)
 }
 
 // SetDiscussions connects review comments: comments by reviewers on a file waiting for review stay open
 // until resolved, and approval waits for them
-func (s *ReviewService) SetDiscussions(d *DiscussionService) {
+func (s *ReviewService) SetDiscussions(d *discussion.Service) {
 	s.discuss = d
 	d.SetReviews(s.OpenFor)
 }

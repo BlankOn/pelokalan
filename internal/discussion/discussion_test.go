@@ -1,4 +1,4 @@
-package service
+package discussion
 
 import (
 	"strings"

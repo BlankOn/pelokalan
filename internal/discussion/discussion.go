@@ -1,4 +1,4 @@
-package service
+package discussion
 
 import (
 	"context"
@@ -24,7 +24,6 @@ import (
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/project"
-	"pelokalan/internal/repository"
 	"pelokalan/internal/source"
 )
 
@@ -55,8 +54,8 @@ type Thread struct {
 }
 
 // DiscussionService manages comment threads attached to project subjects
-type DiscussionService struct {
-	repo     repository.DiscussionRepository
+type Service struct {
+	repo     Repository
 	projects project.Repository
 	glossary source.Repository
 	catalogs catalog.Repository
@@ -71,7 +70,7 @@ type DiscussionService struct {
 }
 
 // SetReviews makes comments by reviewers on files waiting for review into review comments
-func (s *DiscussionService) SetReviews(f func(ctx context.Context, p *models.Project, catalogID int64, user *models.User) *int64) {
+func (s *Service) SetReviews(f func(ctx context.Context, p *models.Project, catalogID int64, user *models.User) *int64) {
 	s.reviewFor = f
 }
 
@@ -92,10 +91,10 @@ func entryCatalog(subjectType, key string) int64 {
 }
 
 // SetNotifications connects the members' notification settings
-func (s *DiscussionService) SetNotifications(r project.NotificationRepository) { s.notifs = r }
+func (s *Service) SetNotifications(r project.NotificationRepository) { s.notifs = r }
 
 // NotificationSettings returns a member's email choices in a project
-func (s *DiscussionService) NotificationSettings(ctx context.Context, user *models.User, p *models.Project) (*models.NotificationSettings, error) {
+func (s *Service) NotificationSettings(ctx context.Context, user *models.User, p *models.Project) (*models.NotificationSettings, error) {
 	if user == nil || !p.Role.IsMember() {
 		return nil, apperr.ErrForbidden
 	}
@@ -113,7 +112,7 @@ func (s *DiscussionService) NotificationSettings(ctx context.Context, user *mode
 }
 
 // SaveNotificationSettings stores a member's email choices; on lists the kinds switched on
-func (s *DiscussionService) SaveNotificationSettings(ctx context.Context, user *models.User, p *models.Project, muted bool, on map[string]bool) error {
+func (s *Service) SaveNotificationSettings(ctx context.Context, user *models.User, p *models.Project, muted bool, on map[string]bool) error {
 	if user == nil || !p.Role.IsMember() {
 		return apperr.ErrForbidden
 	}
@@ -130,13 +129,13 @@ func (s *DiscussionService) SaveNotificationSettings(ctx context.Context, user *
 }
 
 // SetActivity makes the service record comments in the activity log
-func (s *DiscussionService) SetActivity(a *activity.Service) { s.activity = a }
+func (s *Service) SetActivity(a *activity.Service) { s.activity = a }
 
 // NewDiscussionService creates the discussion service
-func NewDiscussionService(repo repository.DiscussionRepository, projects project.Repository,
+func New(repo Repository, projects project.Repository,
 	glossaryRepo source.Repository, catalogs catalog.Repository, blobs blobstore.Store,
-	mailer mailer.Mailer, site config.SiteConfig) *DiscussionService {
-	return &DiscussionService{repo: repo, projects: projects, glossary: glossaryRepo, catalogs: catalogs, blobs: blobs,
+	mailer mailer.Mailer, site config.SiteConfig) *Service {
+	return &Service{repo: repo, projects: projects, glossary: glossaryRepo, catalogs: catalogs, blobs: blobs,
 		mailer: mailer, site: site}
 }
 
@@ -150,7 +149,7 @@ func GlossaryTermURL(p *models.Project, hash string) string {
 
 // ResolveSubject checks that a subject exists and returns its title and page.
 // Supporting a new kind of subject only needs a case here.
-func (s *DiscussionService) ResolveSubject(ctx context.Context, p *models.Project, subjectType, key string) (*Subject, error) {
+func (s *Service) ResolveSubject(ctx context.Context, p *models.Project, subjectType, key string) (*Subject, error) {
 	switch subjectType {
 	case models.SubjectGlossaryTerm:
 		if len(key) != 64 {
@@ -217,7 +216,7 @@ const maxTopicTitle = 140
 
 // CreateTopic starts a free discussion (project members) with a title and a first post.
 // Nothing is stored when the post is invalid.
-func (s *DiscussionService) CreateTopic(ctx context.Context, user *models.User, p *models.Project, title, body, lang string, uploads []Upload) (*Subject, error) {
+func (s *Service) CreateTopic(ctx context.Context, user *models.User, p *models.Project, title, body, lang string, uploads []Upload) (*Subject, error) {
 	if !p.Role.IsMember() {
 		return nil, apperr.ErrForbidden
 	}
@@ -238,7 +237,7 @@ func (s *DiscussionService) CreateTopic(ctx context.Context, user *models.User, 
 }
 
 // entryCatalog parses a PO entry subject key and loads its file
-func (s *DiscussionService) entryCatalog(ctx context.Context, p *models.Project, key string) (*models.Catalog, string, error) {
+func (s *Service) entryCatalog(ctx context.Context, p *models.Project, key string) (*models.Catalog, string, error) {
 	idPart, hash, ok := strings.Cut(key, "-")
 	id, err := strconv.ParseInt(idPart, 10, 64)
 	if !ok || err != nil || len(hash) != 16 {
@@ -261,7 +260,7 @@ func entryTitle(msgid string, c *models.Catalog) string {
 }
 
 // SubjectURL returns the page of a stored discussion's subject
-func (s *DiscussionService) SubjectURL(ctx context.Context, p *models.Project, d *models.Discussion) string {
+func (s *Service) SubjectURL(ctx context.Context, p *models.Project, d *models.Discussion) string {
 	switch d.SubjectType {
 	case models.SubjectGlossaryTerm:
 		return GlossaryTermURL(p, d.SubjectKey)
@@ -277,7 +276,7 @@ func (s *DiscussionService) SubjectURL(ctx context.Context, p *models.Project, d
 }
 
 // Thread loads the discussion of a subject
-func (s *DiscussionService) Thread(ctx context.Context, p *models.Project, subjectType, key string) (*Thread, error) {
+func (s *Service) Thread(ctx context.Context, p *models.Project, subjectType, key string) (*Thread, error) {
 	subj, err := s.ResolveSubject(ctx, p, subjectType, key)
 	if err != nil {
 		return nil, err
@@ -311,7 +310,7 @@ func Mentions(body string) []string {
 }
 
 // Members returns the project members keyed by username (for mentions)
-func (s *DiscussionService) Members(ctx context.Context, p *models.Project) (map[string]*models.User, error) {
+func (s *Service) Members(ctx context.Context, p *models.Project) (map[string]*models.User, error) {
 	members, err := s.projects.ListMembers(ctx, p.ID)
 	if err != nil {
 		return nil, err
@@ -344,7 +343,8 @@ const (
 	MaxAttachments     = 5
 )
 
-func attachmentFilename(name string) string {
+// AttachmentFilename is the name an uploaded file is stored under (no directories, safe characters)
+func AttachmentFilename(name string) string {
 	name = filepath.Base(strings.ReplaceAll(name, "\\", "/"))
 	name = strings.Map(func(r rune) rune {
 		if r < 32 || r == 127 || r == '"' {
@@ -362,7 +362,7 @@ func attachmentFilename(name string) string {
 }
 
 // storeUploads saves the files and returns attachment records (not yet linked)
-func (s *DiscussionService) storeUploads(ctx context.Context, uploads []Upload) ([]*models.Attachment, error) {
+func (s *Service) storeUploads(ctx context.Context, uploads []Upload) ([]*models.Attachment, error) {
 	if len(uploads) > MaxAttachments {
 		return nil, apperr.New("err.attachments_count", MaxAttachments)
 	}
@@ -384,14 +384,14 @@ func (s *DiscussionService) storeUploads(ctx context.Context, uploads []Upload) 
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, &models.Attachment{BlobKey: key, Filename: attachmentFilename(u.Filename), ContentType: ctype, Size: int64(len(u.Data))})
+		out = append(out, &models.Attachment{BlobKey: key, Filename: AttachmentFilename(u.Filename), ContentType: ctype, Size: int64(len(u.Data))})
 	}
 	return out, nil
 }
 
 // Comment adds a comment to the discussion of a subject (project members only).
 // A comment needs text, files, or both.
-func (s *DiscussionService) Comment(ctx context.Context, user *models.User, p *models.Project, subjectType, key, body, lang string, uploads []Upload) (*models.Comment, *Subject, error) {
+func (s *Service) Comment(ctx context.Context, user *models.User, p *models.Project, subjectType, key, body, lang string, uploads []Upload) (*models.Comment, *Subject, error) {
 	if !p.Role.IsMember() {
 		return nil, nil, apperr.ErrForbidden
 	}
@@ -409,7 +409,7 @@ func (s *DiscussionService) Comment(ctx context.Context, user *models.User, p *m
 }
 
 // post stores a comment on a resolved subject, creating its discussion on first use
-func (s *DiscussionService) post(ctx context.Context, user *models.User, p *models.Project, subj *Subject, body, lang string, uploads []Upload) (*models.Comment, error) {
+func (s *Service) post(ctx context.Context, user *models.User, p *models.Project, subj *Subject, body, lang string, uploads []Upload) (*models.Comment, error) {
 	if subj.ReadOnly {
 		return nil, ErrDiscussionClosed
 	}
@@ -447,7 +447,7 @@ func (s *DiscussionService) post(ctx context.Context, user *models.User, p *mode
 	return c, nil
 }
 
-func (s *DiscussionService) resolveMentions(body string, members map[string]*models.User) []*models.User {
+func (s *Service) resolveMentions(body string, members map[string]*models.User) []*models.User {
 	var out []*models.User
 	for _, name := range Mentions(body) {
 		if u, ok := members[name]; ok {
@@ -466,7 +466,7 @@ func ids(users []*models.User) []int64 {
 }
 
 // reasons lists why a member hears about a comment, strongest first (models.Notify*)
-func (s *DiscussionService) reasons(u *models.User, subj *Subject, d *models.Discussion, fileOwner int64,
+func (s *Service) reasons(u *models.User, subj *Subject, d *models.Discussion, fileOwner int64,
 	commenters map[int64]bool, newTopic, mentioned bool) []string {
 	var out []string
 	if mentioned {
@@ -498,7 +498,7 @@ func (s *DiscussionService) reasons(u *models.User, subj *Subject, d *models.Dis
 // notify emails the other project members about a new comment. Each member gets at most
 // one email, sent when any reason that applies to them is switched on in their settings;
 // the email says which reason it was and links to the settings.
-func (s *DiscussionService) notify(ctx context.Context, author *models.User, p *models.Project, subj *Subject, d *models.Discussion,
+func (s *Service) notify(ctx context.Context, author *models.User, p *models.Project, subj *Subject, d *models.Discussion,
 	c *models.Comment, mentioned []*models.User, members map[string]*models.User) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -584,7 +584,7 @@ func (s *DiscussionService) notify(ctx context.Context, author *models.User, p *
 	}
 }
 
-func (s *DiscussionService) projectComment(ctx context.Context, p *models.Project, id int64) (*models.Comment, *models.Discussion, error) {
+func (s *Service) projectComment(ctx context.Context, p *models.Project, id int64) (*models.Comment, *models.Discussion, error) {
 	c, err := s.repo.GetComment(ctx, id)
 	if err != nil {
 		return nil, nil, apperr.ErrNotFound
@@ -601,7 +601,7 @@ func (s *DiscussionService) projectComment(ctx context.Context, p *models.Projec
 }
 
 // EditComment changes the author's own comment
-func (s *DiscussionService) EditComment(ctx context.Context, user *models.User, p *models.Project, id int64, body string) (*models.Discussion, error) {
+func (s *Service) EditComment(ctx context.Context, user *models.User, p *models.Project, id int64, body string) (*models.Discussion, error) {
 	c, d, err := s.projectComment(ctx, p, id)
 	if err != nil {
 		return nil, err
@@ -621,7 +621,7 @@ func (s *DiscussionService) EditComment(ctx context.Context, user *models.User, 
 }
 
 // DeleteComment removes a comment (its author, or the project owner)
-func (s *DiscussionService) DeleteComment(ctx context.Context, user *models.User, p *models.Project, id int64) (*models.Discussion, error) {
+func (s *Service) DeleteComment(ctx context.Context, user *models.User, p *models.Project, id int64) (*models.Discussion, error) {
 	c, d, err := s.projectComment(ctx, p, id)
 	if err != nil {
 		return nil, err
@@ -635,7 +635,7 @@ func (s *DiscussionService) DeleteComment(ctx context.Context, user *models.User
 
 // ResolveComment closes an open review comment: the file's owner (the translator), the comment's author or an
 // owner/manager may
-func (s *DiscussionService) ResolveComment(ctx context.Context, user *models.User, p *models.Project, id int64) (*models.Discussion, error) {
+func (s *Service) ResolveComment(ctx context.Context, user *models.User, p *models.Project, id int64) (*models.Discussion, error) {
 	c, d, err := s.projectComment(ctx, p, id)
 	if err != nil {
 		return nil, err
@@ -658,7 +658,7 @@ func (s *DiscussionService) ResolveComment(ctx context.Context, user *models.Use
 }
 
 // OpenReviewComments counts a file's open review comments by entry key hash
-func (s *DiscussionService) OpenReviewComments(ctx context.Context, p *models.Project, catalogID int64) map[string]int {
+func (s *Service) OpenReviewComments(ctx context.Context, p *models.Project, catalogID int64) map[string]int {
 	out, err := s.repo.OpenReviewComments(ctx, p.ID, catalogID)
 	if err != nil {
 		return map[string]int{}
@@ -667,12 +667,12 @@ func (s *DiscussionService) OpenReviewComments(ctx context.Context, p *models.Pr
 }
 
 // List returns the discussions of a project, newest activity first
-func (s *DiscussionService) List(ctx context.Context, p *models.Project, f repository.DiscussionFilter) ([]*models.Discussion, int, error) {
+func (s *Service) List(ctx context.Context, p *models.Project, f DiscussionFilter) ([]*models.Discussion, int, error) {
 	return s.repo.List(ctx, p.ID, f)
 }
 
 // Attachment returns an attachment of the project and its content
-func (s *DiscussionService) Attachment(ctx context.Context, p *models.Project, id int64) (*models.Attachment, []byte, error) {
+func (s *Service) Attachment(ctx context.Context, p *models.Project, id int64) (*models.Attachment, []byte, error) {
 	a, projectID, err := s.repo.Attachment(ctx, id)
 	if err != nil || projectID != p.ID {
 		return nil, nil, apperr.ErrNotFound
@@ -685,7 +685,7 @@ func (s *DiscussionService) Attachment(ctx context.Context, p *models.Project, i
 }
 
 // Counts returns comment counts of subjects
-func (s *DiscussionService) Counts(ctx context.Context, p *models.Project, subjectType string, keys []string) (map[string]int, error) {
+func (s *Service) Counts(ctx context.Context, p *models.Project, subjectType string, keys []string) (map[string]int, error) {
 	return s.repo.Counts(ctx, p.ID, subjectType, keys)
 }
 
@@ -717,7 +717,7 @@ func CanDeleteDiscussion(user *models.User, p *models.Project, t *Thread) bool {
 }
 
 // DeleteDiscussion removes a whole discussion (the project owner, or its starter when all comments are theirs)
-func (s *DiscussionService) DeleteDiscussion(ctx context.Context, user *models.User, p *models.Project, subjectType, key string) (*Subject, error) {
+func (s *Service) DeleteDiscussion(ctx context.Context, user *models.User, p *models.Project, subjectType, key string) (*Subject, error) {
 	t, err := s.Thread(ctx, p, subjectType, key)
 	if err != nil {
 		return nil, err

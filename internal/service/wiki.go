@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"strings"
 
+	"pelokalan/internal/discussion"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/blobstore"
@@ -428,15 +429,15 @@ func (s *WikiService) Delete(ctx context.Context, user *models.User, p *models.P
 // Upload stores files for wiki pages (project members): 10 MB each, 5 per request. Any
 // type is accepted; images (png/jpeg/gif/webp, detected from the content) are shown in the
 // page, everything else is served as a download (application/octet-stream, sandboxed).
-func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.Project, uploads []Upload) ([]*models.WikiFile, error) {
+func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.Project, uploads []discussion.Upload) ([]*models.WikiFile, error) {
 	if !p.Role.IsMember() {
 		return nil, apperr.ErrForbidden
 	}
-	if len(uploads) > MaxAttachments {
-		return nil, apperr.New("err.attachments_count", MaxAttachments)
+	if len(uploads) > discussion.MaxAttachments {
+		return nil, apperr.New("err.attachments_count", discussion.MaxAttachments)
 	}
 	type checked struct {
-		u     Upload
+		u     discussion.Upload
 		ctype string
 	}
 	var ok []checked
@@ -444,8 +445,8 @@ func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.P
 		if len(u.Data) == 0 {
 			continue
 		}
-		if len(u.Data) > MaxAttachmentBytes {
-			return nil, apperr.New("err.attachment_size", MaxAttachmentBytes>>20)
+		if len(u.Data) > discussion.MaxAttachmentBytes {
+			return nil, apperr.New("err.attachment_size", discussion.MaxAttachmentBytes>>20)
 		}
 		ctype, _, _ := strings.Cut(http.DetectContentType(u.Data), ";")
 		ok = append(ok, checked{u, ctype})
@@ -456,7 +457,7 @@ func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.P
 		if err != nil {
 			return nil, err
 		}
-		f := &models.WikiFile{ProjectID: p.ID, BlobKey: key, Filename: attachmentFilename(c.u.Filename),
+		f := &models.WikiFile{ProjectID: p.ID, BlobKey: key, Filename: discussion.AttachmentFilename(c.u.Filename),
 			ContentType: c.ctype, Size: int64(len(c.u.Data)), UploadedBy: &user.ID}
 		if err := s.repo.CreateFile(ctx, f); err != nil {
 			return nil, err

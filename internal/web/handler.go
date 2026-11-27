@@ -23,6 +23,7 @@ import (
 	"pelokalan/internal/account"
 	"pelokalan/internal/activity"
 	"pelokalan/internal/catalog"
+	"pelokalan/internal/discussion"
 	"pelokalan/internal/langtools"
 	"pelokalan/internal/models"
 	"pelokalan/internal/modulecontext"
@@ -51,7 +52,7 @@ type Handler struct {
 	catalogService *catalog.Service
 	glossary       *source.Service
 	ai             *service.AIService
-	discuss        *service.DiscussionService
+	discuss        *discussion.Service
 	wiki           *service.WikiService
 	contexts       *modulecontext.Service
 	poFetcher      *glossary.Fetcher // downloads PO files from a URL (SSRF-safe)
@@ -75,7 +76,7 @@ func NewHandler(
 	catalogService *catalog.Service,
 	glossaryService *source.Service,
 	aiService *service.AIService,
-	discussionService *service.DiscussionService,
+	discussionService *discussion.Service,
 	wikiService *service.WikiService,
 	contextService *modulecontext.Service,
 ) (*Handler, error) {

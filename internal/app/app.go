@@ -18,6 +18,7 @@ import (
 	"pelokalan/internal/account"
 	"pelokalan/internal/activity"
 	"pelokalan/internal/catalog"
+	"pelokalan/internal/discussion"
 	"pelokalan/internal/langtools"
 	"pelokalan/internal/modulecontext"
 	"pelokalan/internal/platform/blobstore"
@@ -56,7 +57,7 @@ type Repositories struct {
 	Glossary source.Repository
 	AI       repository.AIRepository
 	Commit   catalog.CommitRepository
-	Discuss  repository.DiscussionRepository
+	Discuss  discussion.Repository
 	Activity activity.Repository
 	Reserve  reservation.Repository
 	Review   repository.ReviewRepository
@@ -74,7 +75,7 @@ type App struct {
 	Projects     *project.Service
 	Catalogs     *catalog.Service
 	Glossary     *source.Service
-	Discussions  *service.DiscussionService
+	Discussions  *discussion.Service
 	Activity     *activity.Service
 	Reservations *reservation.Service
 	Reviews      *service.ReviewService
@@ -120,7 +121,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		Glossary: source.NewRepository(db),
 		AI:       postgres.NewAIRepository(db),
 		Commit:   catalog.NewCommitRepository(db),
-		Discuss:  postgres.NewDiscussionRepository(db),
+		Discuss:  discussion.NewRepository(db),
 		Activity: activity.NewRepository(db),
 		Reserve:  reservation.NewRepository(db),
 		Review:   postgres.NewReviewRepository(db),
@@ -143,7 +144,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		cfg.Site.Name+" glossary fetcher (+"+cfg.Site.BaseURL+")")
 	a.Glossary = source.New(repos.Glossary, fetcher)
 	a.Catalogs.SetProjectFiles(repos.Glossary) // git patches against repository files
-	a.Discussions = service.NewDiscussionService(repos.Discuss, repos.Project, repos.Glossary, repos.Catalog, a.Blobs, mailer, cfg.Site)
+	a.Discussions = discussion.New(repos.Discuss, repos.Project, repos.Glossary, repos.Catalog, a.Blobs, mailer, cfg.Site)
 	// activity log for the Insight tab
 	a.Activity = activity.New(repos.Activity)
 	a.Activity.SetBadgeMail(repos.User, mailer, cfg.Site, a.Auth.IsAllowed) // emails about new badges

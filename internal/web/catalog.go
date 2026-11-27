@@ -16,10 +16,10 @@ import (
 	"pelokalan/pkg/ai"
 
 	"pelokalan/internal/catalog"
+	"pelokalan/internal/discussion"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
@@ -71,7 +71,7 @@ func (h *Handler) attachComments(r *http.Request, p *models.Project, c *models.C
 	}
 	keys := make([]string, len(entries))
 	for i, e := range entries {
-		keys[i] = service.EntrySubjectKey(c, e)
+		keys[i] = discussion.EntrySubjectKey(c, e)
 	}
 	counts, err := h.discuss.Counts(r.Context(), p, models.SubjectPOEntry, keys)
 	if err != nil {
@@ -370,7 +370,7 @@ func (h *Handler) editorData(r *http.Request, c *models.Catalog, p *models.Proje
 		Project:  p,
 		Entry:    e,
 		ReadOnly: c.IsTemplate || !c.Owned,
-		Thread:   p.Path() + "/discussions/" + models.SubjectPOEntry + "/" + service.EntrySubjectKey(c, e),
+		Thread:   p.Path() + "/discussions/" + models.SubjectPOEntry + "/" + discussion.EntrySubjectKey(c, e),
 	}
 	if !c.IsTemplate && c.Language != "" {
 		if g, err := h.glossary.ForEntry(r.Context(), p.ID, c.Language, e.MsgID, e.MsgIDPlural); err == nil {

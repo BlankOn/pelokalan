@@ -18,11 +18,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/discussion"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/repository"
-	"pelokalan/internal/service"
 	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
@@ -31,7 +30,7 @@ import (
 type threadView struct {
 	Lang       string
 	Project    *models.Project
-	Thread     *service.Thread
+	Thread     *discussion.Thread
 	User       *models.User
 	CanComment bool
 	CanManage  bool
@@ -45,7 +44,7 @@ type threadView struct {
 	OpenReview int   // open review comments in this thread
 }
 
-func (h *Handler) threadView(r *http.Request, p *models.Project, t *service.Thread) threadView {
+func (h *Handler) threadView(r *http.Request, p *models.Project, t *discussion.Thread) threadView {
 	v := threadView{
 		Lang:       middleware.GetLang(r.Context()),
 		Project:    p,
@@ -56,7 +55,7 @@ func (h *Handler) threadView(r *http.Request, p *models.Project, t *service.Thre
 		IsOwner:    p.Role.IsOwner() && !t.Subject.ReadOnly,
 		Known:      map[string]bool{},
 		ID:         "thread-" + t.Subject.Type + "-" + t.Subject.Key[:min(12, len(t.Subject.Key))],
-		CanDelete:  service.CanDeleteDiscussion(middleware.GetUser(r.Context()), p, t),
+		CanDelete:  discussion.CanDeleteDiscussion(middleware.GetUser(r.Context()), p, t),
 	}
 	if t.Subject.Type == models.SubjectPOEntry {
 		if id, _, ok := strings.Cut(t.Subject.Key, "-"); ok {
@@ -343,34 +342,34 @@ func (h *Handler) PostComment(w http.ResponseWriter, r *http.Request) {
 }
 
 // readAttachments reads the files of a multipart comment form
-func readAttachments(w http.ResponseWriter, r *http.Request) ([]service.Upload, error) {
+func readAttachments(w http.ResponseWriter, r *http.Request) ([]discussion.Upload, error) {
 	if !strings.HasPrefix(r.Header.Get("Content-Type"), "multipart/") {
 		return nil, nil
 	}
-	limit := int64(service.MaxAttachments*service.MaxAttachmentBytes + 1<<20)
+	limit := int64(discussion.MaxAttachments*discussion.MaxAttachmentBytes + 1<<20)
 	r.Body = http.MaxBytesReader(w, r.Body, limit)
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
-		return nil, &apperr.UserError{Key: "err.attachment_size", Args: []any{service.MaxAttachmentBytes >> 20}}
+		return nil, &apperr.UserError{Key: "err.attachment_size", Args: []any{discussion.MaxAttachmentBytes >> 20}}
 	}
 	files := r.MultipartForm.File["files"]
-	if len(files) > service.MaxAttachments {
-		return nil, &apperr.UserError{Key: "err.attachments_count", Args: []any{service.MaxAttachments}}
+	if len(files) > discussion.MaxAttachments {
+		return nil, &apperr.UserError{Key: "err.attachments_count", Args: []any{discussion.MaxAttachments}}
 	}
-	var out []service.Upload
+	var out []discussion.Upload
 	for _, fh := range files {
-		if fh.Size > service.MaxAttachmentBytes {
-			return nil, &apperr.UserError{Key: "err.attachment_size", Args: []any{service.MaxAttachmentBytes >> 20}}
+		if fh.Size > discussion.MaxAttachmentBytes {
+			return nil, &apperr.UserError{Key: "err.attachment_size", Args: []any{discussion.MaxAttachmentBytes >> 20}}
 		}
 		f, err := fh.Open()
 		if err != nil {
 			return nil, err
 		}
-		data, err := io.ReadAll(io.LimitReader(f, service.MaxAttachmentBytes+1))
+		data, err := io.ReadAll(io.LimitReader(f, discussion.MaxAttachmentBytes+1))
 		f.Close()
 		if err != nil {
 			return nil, err
 		}
-		out = append(out, service.Upload{Filename: fh.Filename, Data: data})
+		out = append(out, discussion.Upload{Filename: fh.Filename, Data: data})
 	}
 	return out, nil
 }
@@ -463,7 +462,7 @@ func (h *Handler) DiscussionsPage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	user := middleware.GetUser(r.Context())
-	f := repository.DiscussionFilter{Limit: 50}
+	f := discussion.DiscussionFilter{Limit: 50}
 	mine := r.URL.Query().Get("mentions") == "1" && user != nil
 	if mine {
 		f.MentionedUserID = user.ID

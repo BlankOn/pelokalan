@@ -1,4 +1,4 @@
-package service
+package discussion
 
 import (
 	"testing"
@@ -7,7 +7,7 @@ import (
 )
 
 func TestNotifyReasonsAndSettings(t *testing.T) {
-	s := &DiscussionService{}
+	s := &Service{}
 	me := &models.User{ID: 7}
 	starter := int64(7)
 	d := &models.Discussion{CreatedBy: &starter}
