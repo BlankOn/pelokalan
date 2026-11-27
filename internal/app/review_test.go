@@ -130,8 +130,18 @@ func TestGitHubReviews(t *testing.T) {
 
 	// a review comment on a string: approval waits until it is resolved
 	key := fmt.Sprintf("%d-%s", kc, models.KeyHashOf("Remove the directory"))
-	owner.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Pakai \"direktorinya\"?"}}).status(http.StatusOK).
+	// the reviewer selected "direktori" in "Hapus direktori": the comment is about that passage
+	owner.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Pakai \"direktorinya\"?"},
+		"anchor_text": {"direktori"}, "anchor_start": {"6"}, "anchor_form": {"0"}}).status(http.StatusOK).
 		contains("Sudah diselesaikan", "btn-approve rv-resolve", `data-review-open="1"`)
+	if got := scalar[string](t, `SELECT anchor_text FROM comments WHERE review_id IS NOT NULL ORDER BY id DESC LIMIT 1`); got != "direktori" {
+		t.Fatalf("anchor = %q", got)
+	}
+	// the passage is marked pink in the review editor and in the translator's own editor, and quoted in the thread
+	mark := `<mark class="rv-anchor"`
+	owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d", kc, rid)).status(http.StatusOK).contains(mark, ">direktori</mark>")
+	kiki.get(fmt.Sprintf("/catalogs/%d/list", kc)).status(http.StatusOK).contains(mark, ">direktori</mark>")
+	owner.get(base+"/discussions/po_entry/"+key).status(http.StatusOK).contains(`class="comment-quote"`, "“direktori”")
 	kiki.hx(base+"/discussions/po_entry/"+key+"/comments", url.Values{"body": {"Sudah saya pikirkan."}}).status(http.StatusOK)
 	if n := scalar[int](t, `SELECT count(*) FROM comments WHERE review_id = $1 AND resolved_at IS NULL`, rid); n != 1 {
 		t.Fatalf("review comments = %d, want 1 (the translator's reply is a plain comment)", n)
@@ -163,6 +173,11 @@ func TestGitHubReviews(t *testing.T) {
 		t.Fatal("a visitor resolved a review comment")
 	}
 	kiki.hx(fmt.Sprintf("%s/comments/%d/resolve", base, cmt), nil).status(http.StatusOK).contains("Diselesaikan oleh", `data-review-open="0"`)
+	// resolved: the mark goes
+	kiki.get(fmt.Sprintf("/catalogs/%d/list", kc)).status(http.StatusOK).lacks(mark)
+	// ...but the review editor keeps showing what was commented on: the row and the passage turn green there
+	owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d", kc, rid)).status(http.StatusOK).
+		contains("rv-resolved", `<mark class="rv-anchor rv-done"`, ">direktori</mark>")
 	// every review comment resolved: the request says so in green (queue and the translator's list)
 	owner.get(base+"/files").status(http.StatusOK).contains("rv-fixed", "Sudah diperbaiki")
 	kiki.get(base+"/my-files").status(http.StatusOK).contains("rv-fixed", "Sudah diperbaiki").lacks("Perlu perbaikan")

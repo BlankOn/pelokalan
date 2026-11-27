@@ -148,6 +148,8 @@ func (h *Handler) reviewData(r *http.Request, p *models.Project, c *models.Catal
 	}
 	data.Data["CanDecide"] = rv.Status == models.ReviewRequested && p.Role.CanManage() && user != nil && rv.RequestedBy != user.ID
 	data.Data["CanMerge"] = rv.Status == models.ReviewRequested && review.CanMergeUpstream(user, p, c) // "Tarik upstream"
+	// "Komentari bagian ini" in the selection popup: people who review (not the requester) on a waiting request
+	data.Data["CanAnchor"] = rv.Status == models.ReviewRequested && user != nil && p.Role.CanReview() && rv.RequestedBy != user.ID
 	data.Data["CanWithdraw"] = rv.Status == models.ReviewRequested && user != nil && rv.RequestedBy == user.ID
 	if rv.Status != models.ReviewRequested {
 		return

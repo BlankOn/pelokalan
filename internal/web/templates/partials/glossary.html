@@ -9,13 +9,16 @@
 </div>
 {{end}}
 
+{{/* a translation found only by AI extraction from long strings */}}
+{{define "ai_term_mark"}}<span class="gl-ai" title="{{t . "extract.mark_title"}}">AI</span>{{end}}
+
 {{define "glossary_page"}}
 {{range .Page.Groups}}{{$g := .}}
 <details class="gl-item{{if .IsInconsistent}} gl-inconsistent{{end}}">
     <summary>
         <span class="gl-source">{{.Source}}</span>
         <span class="gl-translations">
-            {{range $i, $tr := .Translations}}<span class="gl-chip{{if eq $i 0}} gl-main{{end}}" title="{{$tr.Count}}×">{{$tr.Text}}{{if $g.IsInconsistent}} <small>{{$tr.Share $g.Total}}%</small>{{end}}</span>{{end}}
+            {{range $i, $tr := .Translations}}<span class="gl-chip{{if eq $i 0}} gl-main{{end}}" title="{{$tr.Count}}×">{{$tr.Text}}{{if $tr.AI}} {{template "ai_term_mark" $.Lang}}{{end}}{{if $g.IsInconsistent}} <small>{{$tr.Share $g.Total}}%</small>{{end}}</span>{{end}}
         </span>
                 <span class="gl-count muted small">{{if .Comments}}<span class="comment-count" title="{{t $.Lang "discuss.title"}}">💬 {{.Comments}}</span> {{end}}{{.Total}}×</span>
     </summary>
@@ -27,7 +30,7 @@
             <tbody>
             {{range .Translations}}
             <tr>
-                <td><strong>{{.Text}}</strong>{{if .Contexts}}<div class="muted small">{{t $.Lang "editor.context"}}: {{join .Contexts ", "}}</div>{{end}}</td>
+                <td><strong>{{.Text}}</strong>{{if .AI}} {{template "ai_term_mark" $.Lang}}{{end}}{{if .Contexts}}<div class="muted small">{{t $.Lang "editor.context"}}: {{join .Contexts ", "}}</div>{{end}}</td>
                 <td class="num">{{.Count}}</td>
                 {{if eq $.Group "all"}}<td>{{range .Groups}}<span class="version-badge">{{.}}</span> {{end}}</td>{{end}}
                 <td class="small gl-modules">{{range .Modules}}<a class="gl-mod" href="{{$.ProjectPath}}/project-files/module/{{pathEscape .}}?q={{urlquery $g.Source}}" title="{{t $.Lang "glossary.module_open"}}"><code>{{.}}</code></a> {{end}}</td>

@@ -810,6 +810,19 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   modul" (reservations on, asks first) or "Ambil", which take the project file; visitors see "Hanya lihat".
 - The GitHub integration block always shows the app's install link (to install it on more repositories or change
   its access); it is the main button only until write access is confirmed.
+- **Comments on a passage** (migration 056, `comments.anchor_text/anchor_start/anchor_form`): in the review editor,
+  people who review (not the requester; `Data.CanAnchor` → `data-anchor-comment` on `#editor-app`) select part of a
+  translation in the table and the selection popup (thesaurus) starts with "💬 Komentari bagian ini": the row is
+  selected, the side panel opens, and the comment form gets the passage as a quote (`.comment-anchor`, hidden
+  inputs, ✕ drops it; app.js `startAnchorComment`). The comment shows the quote (`.comment-quote`). While such a
+  review comment is open, the passage is marked pink with a red underline in every table showing the file (review
+  editor, the translator's full editor): `Entry.Anchors` from `discussion.OpenReviewAnchors` (attachComments),
+  drawn by `anchorMarks` (the occurrence nearest the original offset; not marked once the text no longer has it).
+  Resolved review comments stay visible in the review editor only (`.review-mode:not(.view-mode)`): their rows get a
+  light green background (`Entry.ReviewResolved`, `discussion.ResolvedReviewEntries`, class `rv-resolved` when nothing
+  is open on the row) and their passages a green mark (`discussion.ReviewAnchors` returns resolved anchors too,
+  `rv-done`, unstyled elsewhere), so reviewers coming back see what they commented on. app.js turns the row green
+  as soon as its last open comment is resolved.
 - **Review comments** (migration 049, `comments.review_id/resolved_at/resolved_by`): a comment by an owner, coordinator
   or reviewer (not the requester) on an entry of a file with an open request is tied to it (`review.Service.OpenFor` via
   `discussion.Service.SetReviews`). It is open until resolved (green "Sudah diselesaikan" button with a check, `POST /projects/{id}/comments/{cid}/resolve`,
@@ -876,6 +889,29 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   model request; finished batches are kept) and the monthly budget, and skip entries edited meanwhile
   (entry version check). Running jobs are marked failed on startup (`RecoverJobs`).
 - Cost estimate: `ai.EstimateTokens` (~3.5 chars/token) via `pretranslate.Service.Estimate`.
+
+## Glossary extraction from long strings (AI)
+
+- Short strings become glossary terms as they are; documentation keeps its vocabulary in long strings. Owners and
+  coordinators press "✨ Ekstrak istilah dengan AI" on the glossary page (`#extract-dialog`, app.js): pick a module group,
+  see the estimate (`GET /projects/{id}/glossary-extract?group=`: long strings, already extracted, to send, tokens, cost,
+  budget), start (`POST`), progress beside the button (`GET …/glossary-extract/status`, polled), "Hentikan" (`POST …/cancel`).
+- `pkg/ai/extract.go`: `ExtractSystemPrompt` (precise rules: copy both sides verbatim, keep the inflected form, skip
+  function words, names, code, markup, untranslated terms; JSON `{"items":[{"id","terms":[{"s","t"}]}]}`),
+  `ExtractCandidate` (>= `ExtractMinWords` (4) words outside markup, <= 3000 chars), `CheckPairs` (each side must occur as
+  whole words in its text with code, ``literals``, tags and placeholders removed; reST links keep their visible text;
+  stop words, long sides, code-like identical pairs dropped; at most 15 per string).
+- `pretranslate/extract.go`: strings come from the import's stored project files (`source.Repository.ImportFiles`); results
+  are stored per string in `term_extractions` (migration 057, key language + SHA-256 of source and translation, shared by
+  every project, empty lists too), so each string is sent once. Runs (`term_extraction_jobs`, 3 batches of 20 at a time,
+  cost counted in `Spend`, so the monthly budget covers them; one run per project) end by rebuilding the group's AI rows:
+  `glossary_terms.origin = 'ai'` per import (`ReplaceAITerms`, `module_group_imports.ai_term_count` feeds `Stamp`).
+- After every import `source.Service` calls `TermExtractor.AfterImport` (app wires `pretranslate.Service`) in the background:
+  for groups where extraction was started (`module_groups.ai_terms`) the new import gets its AI rows from stored results,
+  then strings that are new or changed are extracted (within the budget), then rebuilt.
+- A translation is "AI" when every row behind it is (`bool_and(origin = 'ai')`): a small purple "AI" mark
+  (`ai_term_mark`) in the glossary list and term page. AI-only terms are never applied to a whole string
+  (`ai.Term.AI`, `Glossary.Exact`) and are only optional hints for pre-translation.
 
 ## Editor glossary section
 

@@ -230,7 +230,7 @@ func (s *Service) CreateTopic(ctx context.Context, user *models.User, p *models.
 	}
 	key := hex.EncodeToString(b)
 	subj := &Subject{Type: models.SubjectTopic, Key: key, Title: title, URL: TopicURL(p, key)}
-	if _, err := s.post(ctx, user, p, subj, body, lang, uploads); err != nil {
+	if _, err := s.post(ctx, user, p, subj, body, lang, uploads, nil); err != nil {
 		return nil, err
 	}
 	return subj, nil
@@ -391,7 +391,11 @@ func (s *Service) storeUploads(ctx context.Context, uploads []Upload) ([]*models
 
 // Comment adds a comment to the discussion of a subject (project members only).
 // A comment needs text, files, or both.
-func (s *Service) Comment(ctx context.Context, user *models.User, p *models.Project, subjectType, key, body, lang string, uploads []Upload) (*models.Comment, *Subject, error) {
+// MaxAnchorLen is the longest passage a comment can be about
+const MaxAnchorLen = 300
+
+// Comment posts a comment; anchor (optional, PO entries only) is the passage of the translation it is about
+func (s *Service) Comment(ctx context.Context, user *models.User, p *models.Project, subjectType, key, body, lang string, uploads []Upload, anchor *models.CommentAnchor) (*models.Comment, *Subject, error) {
 	if !p.Role.IsMember() {
 		return nil, nil, apperr.ErrForbidden
 	}
@@ -404,12 +408,20 @@ func (s *Service) Comment(ctx context.Context, user *models.User, p *models.Proj
 	if err != nil {
 		return nil, nil, err
 	}
-	c, err := s.post(ctx, user, p, subj, body, lang, uploads)
+	if anchor != nil {
+		anchor.Text = strings.TrimSpace(anchor.Text)
+		if anchor.Text == "" || subj.Type != models.SubjectPOEntry {
+			anchor = nil
+		} else if len([]rune(anchor.Text)) > MaxAnchorLen || anchor.Start < 0 || anchor.Form < 0 || anchor.Form > 9 {
+			return nil, nil, apperr.New("err.anchor_invalid", MaxAnchorLen)
+		}
+	}
+	c, err := s.post(ctx, user, p, subj, body, lang, uploads, anchor)
 	return c, subj, err
 }
 
 // post stores a comment on a resolved subject, creating its discussion on first use
-func (s *Service) post(ctx context.Context, user *models.User, p *models.Project, subj *Subject, body, lang string, uploads []Upload) (*models.Comment, error) {
+func (s *Service) post(ctx context.Context, user *models.User, p *models.Project, subj *Subject, body, lang string, uploads []Upload, anchor *models.CommentAnchor) (*models.Comment, error) {
 	if subj.ReadOnly {
 		return nil, ErrDiscussionClosed
 	}
@@ -434,6 +446,9 @@ func (s *Service) post(ctx context.Context, user *models.User, p *models.Project
 	}
 	mentioned := s.resolveMentions(body, members)
 	c := &models.Comment{DiscussionID: d.ID, AuthorID: &user.ID, Body: body}
+	if anchor != nil {
+		c.AnchorText, c.AnchorStart, c.AnchorForm = anchor.Text, anchor.Start, anchor.Form
+	}
 	if cid := entryCatalog(subj.Type, subj.Key); cid > 0 && s.reviewFor != nil {
 		c.ReviewID = s.reviewFor(ctx, p, cid, user) // a reviewer's comment on a file waiting for review
 	}
@@ -662,6 +677,25 @@ func (s *Service) OpenReviewComments(ctx context.Context, p *models.Project, cat
 	out, err := s.repo.OpenReviewComments(ctx, p.ID, catalogID)
 	if err != nil {
 		return map[string]int{}
+	}
+	return out
+}
+
+// ResolvedReviewEntries counts a file's resolved review comments by entry key hash (empty on errors)
+func (s *Service) ResolvedReviewEntries(ctx context.Context, p *models.Project, catalogID int64) map[string]int {
+	out, err := s.repo.ResolvedReviewEntries(ctx, p.ID, catalogID)
+	if err != nil {
+		return map[string]int{}
+	}
+	return out
+}
+
+// ReviewAnchors lists, by entry key hash, the passages a file's review comments are about (open ones first; resolved
+// ones are marked green in the review editor only)
+func (s *Service) ReviewAnchors(ctx context.Context, p *models.Project, catalogID int64) map[string][]models.CommentAnchor {
+	out, err := s.repo.ReviewAnchors(ctx, p.ID, catalogID)
+	if err != nil {
+		return nil
 	}
 	return out
 }

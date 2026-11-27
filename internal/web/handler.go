@@ -237,16 +237,7 @@ func funcMap() template.FuncMap {
 		"isPlural":       func(e *models.Entry) bool { return e.IsPlural() },
 		// stored errors are an i18n key, optionally with arguments: "key|arg|arg"
 		"errText": storedText,
-		"usd": func(v float64) string {
-			switch {
-			case v == 0:
-				return "$0"
-			case v < 0.01:
-				return fmt.Sprintf("$%.4f", v)
-			default:
-				return fmt.Sprintf("$%.2f", v)
-			}
-		},
+		"usd":     usd,
 		"num": func(v any) string {
 			switch n := v.(type) {
 			case int:
@@ -263,6 +254,7 @@ func funcMap() template.FuncMap {
 			return x / w * 100
 		},
 		"commitMsg":   storedText,
+		"anchorMarks": anchorMarks,
 		"hasPrefix":   strings.HasPrefix,
 		"commentHTML": commentHTML,
 		"wikiHTML":    wikiHTML,
@@ -604,6 +596,18 @@ var verbRe = regexp.MustCompile(`%[-+# 0]*\d*(?:\.\d+)?([a-zA-Z%])`)
 
 // storedText renders a message stored as text, "key|arg|arg" (version messages, sync errors, review errors): the
 // arguments come back as text, so those the message formats as numbers (%d) are turned back into numbers
+// usd formats a cost in dollars
+func usd(v float64) string {
+	switch {
+	case v == 0:
+		return "$0"
+	case v < 0.01:
+		return fmt.Sprintf("$%.4f", v)
+	default:
+		return fmt.Sprintf("$%.2f", v)
+	}
+}
+
 func storedText(lang, s string) string {
 	parts := strings.Split(s, "|")
 	if len(parts) == 0 || !i18n.Has(parts[0]) {

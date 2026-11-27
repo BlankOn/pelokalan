@@ -7,6 +7,7 @@ import (
 	"log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"pelokalan/internal/catalog"
@@ -85,6 +86,8 @@ type Service struct {
 	contexts fileContexts
 	// newClient is replaceable in tests
 	newClient func(s *models.AISettings, key string) chatClient
+	// glossary extraction: one run per project (project id -> *sync.Mutex) and how to stop it (-> context.CancelFunc)
+	extractLocks, extractCancels sync.Map
 }
 
 type historyRecorder interface {
@@ -314,7 +317,7 @@ func (s *Service) plan(ctx context.Context, p *models.Project, c *models.Catalog
 		}
 		terms := make([]ai.Term, len(pref))
 		for i, t := range pref {
-			terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words}
+			terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words, AI: t.AI}
 		}
 		g = ai.NewGlossary(terms)
 	}
@@ -799,7 +802,7 @@ func (s *Service) TranslateEntry(ctx context.Context, user *models.User, p *mode
 	}
 	terms := make([]ai.Term, len(pref))
 	for i, t := range pref {
-		terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words}
+		terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words, AI: t.AI}
 	}
 	fileContext := ""
 	if s.contexts != nil {

@@ -136,6 +136,9 @@ type Term struct {
 	Translation string // most used translation
 	Share       float64
 	Words       int
+	// AI: found only by glossary extraction from long strings (no person's short string has it): a hint the
+	// model may follow, never applied to a whole string nor enforced
+	AI bool
 }
 
 // Glossary looks up preferred translations by normalized source text
@@ -175,7 +178,7 @@ func (g *Glossary) Exact(source string) (string, bool) {
 		return "", false
 	}
 	t, ok := g.terms[glossary.Normalize(source)]
-	if !ok || t.Share < MinExactShare {
+	if !ok || t.Share < MinExactShare || t.AI {
 		return "", false
 	}
 	return t.Translation, true
@@ -190,7 +193,7 @@ func (g *Glossary) Matches(source string) []TermHint {
 	terms := g.MatchTerms(source)
 	out := make([]TermHint, len(terms))
 	for i, t := range terms {
-		out[i] = TermHint{Term: t.Source, Translation: t.Translation}
+		out[i] = TermHint{Term: t.Source, Translation: t.Translation, Optional: t.AI}
 	}
 	return out
 }

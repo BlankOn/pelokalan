@@ -194,6 +194,7 @@ type termVariant struct {
 	Count       int
 	Share       int
 	Groups      []string
+	AI          bool // found only by AI extraction from long strings
 }
 
 // termGroup lists the translations used in one module group
@@ -225,8 +226,9 @@ func summarizeTerm(t *models.GlossaryTerm) termSummary {
 		if !ok {
 			i = len(s.Variants)
 			idx[k] = i
-			s.Variants = append(s.Variants, termVariant{Language: row.Language, Translation: row.Translation})
+			s.Variants = append(s.Variants, termVariant{Language: row.Language, Translation: row.Translation, AI: true})
 		}
+		s.Variants[i].AI = s.Variants[i].AI && row.AI
 		s.Variants[i].Count += row.Count
 		s.Variants[i].Groups = append(s.Variants[i].Groups, row.GroupLabel)
 		vk := row.GroupLabel + "\x00" + row.Language
@@ -328,8 +330,14 @@ func (h *Handler) PostComment(w http.ResponseWriter, r *http.Request) {
 		h.renderThread(w, r, p, subjectType, key, h.errorMessage(r, err))
 		return
 	}
+	var anchor *models.CommentAnchor
+	if text := r.FormValue("anchor_text"); text != "" { // a passage selected in the table
+		start, _ := strconv.Atoi(r.FormValue("anchor_start"))
+		form, _ := strconv.Atoi(r.FormValue("anchor_form"))
+		anchor = &models.CommentAnchor{Text: text, Start: start, Form: form}
+	}
 	_, _, err = h.discuss.Comment(r.Context(), middleware.GetUser(r.Context()), p, subjectType, key,
-		r.FormValue("body"), middleware.GetLang(r.Context()), uploads)
+		r.FormValue("body"), middleware.GetLang(r.Context()), uploads, anchor)
 	if err != nil {
 		if _, isUser := apperr.AsUserError(err); !isUser || err == apperr.ErrForbidden {
 			h.fail(w, r, err)

@@ -655,6 +655,11 @@ h1 .ai-badge { font-size: 12px; }
 .gl-chip.gl-main { background: var(--ok-soft); border-color: #bfe3cc; }
 .gl-inconsistent .gl-chip:not(.gl-main) { background: var(--fuzzy-soft); border-color: #f2d9a6; }
 .gl-chip small { color: var(--muted); }
+.gl-ai { display: inline-block; font-size: 10px; font-weight: 700; line-height: 1; padding: 2px 4px; border-radius: 3px;
+    color: #7048e8; background: #f3f0ff; border: 1px solid #d0bfff; vertical-align: 1px; cursor: help; }
+.extract-bar { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
+.extract-estimate { min-height: 3em; margin: 10px 0; }
+.extract-estimate p { margin: 0 0 4px; }
 .gl-detail { padding: 4px 4px 14px; }
 .gl-warn { color: var(--fuzzy); margin: 4px 0 8px; }
 .gl-table td { vertical-align: top; }
@@ -1777,6 +1782,22 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 /* read-only tables: text can be selected (a selected word in a translation shows the thesaurus popup) */
 .review-mode .entry-row { user-select: text; }
 .review-mode .entry-row .cell-tr { cursor: text; }
+/* a passage an open review comment is about: pink with a red underline, in every table that shows the file */
+mark.rv-anchor { background: #ffe3ea; color: inherit; border-bottom: 2px solid #e03131; border-radius: 2px; padding: 0 1px; }
+.entry-row.selected mark.rv-anchor { background: #ffd2dd; color: #1d1f24; }
+/* resolved review comments: invisible elsewhere, a light green passage and row in the review editor, so reviewers
+   coming back see what they commented on */
+mark.rv-anchor.rv-done { background: none; border-bottom: 0; padding: 0; }
+.review-mode:not(.view-mode) mark.rv-anchor.rv-done { background: #d3f9d8; border-bottom: 2px solid #37b24d; padding: 0 1px; }
+.review-mode:not(.view-mode) .entry-row.rv-resolved:not(.selected) { background: #effaf1; }
+.review-mode:not(.view-mode) .entry-row.rv-resolved:not(.selected):hover { background: #e3f6e7; }
+.comment-quote { margin: 4px 0 6px; padding: 2px 8px; border-left: 3px solid #e03131; background: #fff0f3; color: #5c1a26;
+    font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.comment-anchor { display: flex; align-items: baseline; gap: 6px; margin-bottom: 6px; padding: 4px 8px; border-left: 3px solid #e03131;
+    background: #fff0f3; border-radius: 0 6px 6px 0; }
+.comment-anchor[hidden] { display: none; }
+.comment-anchor-text { flex: 1; min-width: 0; font-size: 13px; overflow-wrap: anywhere; }
+.th-pop .th-comment { display: block; width: 100%; margin-bottom: 8px; text-align: left; }
 /* review and view-only layouts have no edit pane to compare in, so the selected row is only lightly marked:
    a pale blue background, normal dark text and icons in their own colours */
 .review-mode .entry-row.selected, .review-mode .entry-row.selected:nth-child(even) { background: #e8f0fe; color: var(--text);

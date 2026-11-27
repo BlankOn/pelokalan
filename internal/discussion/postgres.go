@@ -161,8 +161,9 @@ func (r *discussionRepository) AddComment(ctx context.Context, c *models.Comment
 	}
 	defer tx.Rollback()
 	if err := tx.QueryRowContext(ctx,
-		`INSERT INTO comments (discussion_id, author_id, body, review_id) VALUES ($1, $2, $3, $4) RETURNING id, created_at`,
-		c.DiscussionID, c.AuthorID, c.Body, c.ReviewID).Scan(&c.ID, &c.CreatedAt); err != nil {
+		`INSERT INTO comments (discussion_id, author_id, body, review_id, anchor_text, anchor_start, anchor_form)
+		 VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id, created_at`,
+		c.DiscussionID, c.AuthorID, c.Body, c.ReviewID, c.AnchorText, c.AnchorStart, c.AnchorForm).Scan(&c.ID, &c.CreatedAt); err != nil {
 		return err
 	}
 	if err := insertMentions(ctx, tx, c.ID, mentions); err != nil {
@@ -188,12 +189,14 @@ func (r *discussionRepository) AddComment(ctx context.Context, c *models.Comment
 const commentColumns = `c.id, c.discussion_id, c.author_id, COALESCE(NULLIF(u.name, ''), u.username, ''), COALESCE(u.username, ''), COALESCE(u.avatar, ''),
 	c.body, c.created_at, c.edited_at, c.deleted_at, c.deleted_by,
 	COALESCE((SELECT COALESCE(NULLIF(x.name, ''), x.username) FROM users x WHERE x.id = c.deleted_by), ''),
-	c.review_id, c.resolved_at, COALESCE((SELECT COALESCE(NULLIF(x.name, ''), x.username) FROM users x WHERE x.id = c.resolved_by), '')`
+	c.review_id, c.resolved_at, COALESCE((SELECT COALESCE(NULLIF(x.name, ''), x.username) FROM users x WHERE x.id = c.resolved_by), ''),
+	c.anchor_text, c.anchor_start, c.anchor_form`
 
 func scanComment(row interface{ Scan(...any) error }) (*models.Comment, error) {
 	c := &models.Comment{}
 	err := row.Scan(&c.ID, &c.DiscussionID, &c.AuthorID, &c.AuthorName, &c.AuthorUsername, &c.AuthorAvatar, &c.Body, &c.CreatedAt,
-		&c.EditedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName, &c.ReviewID, &c.ResolvedAt, &c.ResolverName)
+		&c.EditedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName, &c.ReviewID, &c.ResolvedAt, &c.ResolverName,
+		&c.AnchorText, &c.AnchorStart, &c.AnchorForm)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, store.ErrNotFound
 	}
@@ -323,6 +326,31 @@ func (r *discussionRepository) ResolveComment(ctx context.Context, id, byUserID 
 	return err
 }
 
+func (r *discussionRepository) ReviewAnchors(ctx context.Context, projectID, catalogID int64) (map[string][]models.CommentAnchor, error) {
+	prefix := fmt.Sprintf("%d-", catalogID)
+	rows, err := r.db.QueryContext(ctx, `SELECT d.subject_key, c.id, c.anchor_text, c.anchor_start, c.anchor_form,
+		       COALESCE(NULLIF(u.name, ''), u.username, ''), left(c.body, 160), c.resolved_at IS NOT NULL
+		FROM comments c JOIN discussions d ON d.id = c.discussion_id LEFT JOIN users u ON u.id = c.author_id
+		WHERE d.project_id = $1 AND d.subject_type = 'po_entry' AND left(d.subject_key, length($2)) = $2
+		  AND c.review_id IS NOT NULL AND c.deleted_at IS NULL AND c.anchor_text <> ''
+		ORDER BY c.resolved_at IS NOT NULL, c.id`, projectID, prefix)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string][]models.CommentAnchor{}
+	for rows.Next() {
+		var key string
+		var a models.CommentAnchor
+		if err := rows.Scan(&key, &a.CommentID, &a.Text, &a.Start, &a.Form, &a.Author, &a.Body, &a.Resolved); err != nil {
+			return nil, err
+		}
+		k := strings.TrimPrefix(key, prefix)
+		out[k] = append(out[k], a)
+	}
+	return out, rows.Err()
+}
+
 func (r *discussionRepository) ResolvedReviewComments(ctx context.Context, reviewID int64) (int, error) {
 	var n int
 	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM comments
@@ -331,11 +359,20 @@ func (r *discussionRepository) ResolvedReviewComments(ctx context.Context, revie
 }
 
 func (r *discussionRepository) OpenReviewComments(ctx context.Context, projectID, catalogID int64) (map[string]int, error) {
+	return r.reviewCommentCounts(ctx, projectID, catalogID, false)
+}
+
+func (r *discussionRepository) ResolvedReviewEntries(ctx context.Context, projectID, catalogID int64) (map[string]int, error) {
+	return r.reviewCommentCounts(ctx, projectID, catalogID, true)
+}
+
+// reviewCommentCounts counts a file's open or resolved review comments by entry key hash
+func (r *discussionRepository) reviewCommentCounts(ctx context.Context, projectID, catalogID int64, resolved bool) (map[string]int, error) {
 	prefix := fmt.Sprintf("%d-", catalogID)
 	rows, err := r.db.QueryContext(ctx, `SELECT d.subject_key, COUNT(*) FROM comments c JOIN discussions d ON d.id = c.discussion_id
 		WHERE d.project_id = $1 AND d.subject_type = 'po_entry' AND left(d.subject_key, length($2)) = $2
-		  AND c.review_id IS NOT NULL AND c.resolved_at IS NULL AND c.deleted_at IS NULL
-		GROUP BY d.subject_key`, projectID, prefix)
+		  AND c.review_id IS NOT NULL AND (c.resolved_at IS NOT NULL) = $3 AND c.deleted_at IS NULL
+		GROUP BY d.subject_key`, projectID, prefix, resolved)
 	if err != nil {
 		return nil, err
 	}

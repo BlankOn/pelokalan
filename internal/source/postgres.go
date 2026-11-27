@@ -38,13 +38,13 @@ func (r *glossaryRepository) GetOrCreateGroup(ctx context.Context, projectID int
 
 const versionColumns = `v.id, v.project_id, v.name, v.version, v.created_at, v.sync_url, v.sync_language,
 	v.feed_created_by, v.last_fetched_at, v.last_changed_at, v.last_fetch_error, v.fetch_etag, v.fetch_last_modified,
-	v.fetch_content_hash, v.git_repo, v.git_branch, v.tp_team, v.git_direct, v.git_installation, v.git_write, v.git_checked_at, v.git_access_error, (SELECT COUNT(*) FROM module_group_imports i WHERE i.group_id = v.id)`
+	v.fetch_content_hash, v.git_repo, v.git_branch, v.tp_team, v.git_direct, v.git_installation, v.git_write, v.git_checked_at, v.git_access_error, v.ai_terms, (SELECT COUNT(*) FROM module_group_imports i WHERE i.group_id = v.id)`
 
 func scanGroup(row interface{ Scan(...any) error }) (*models.ModuleGroup, error) {
 	v := &models.ModuleGroup{}
 	err := row.Scan(&v.ID, &v.ProjectID, &v.Name, &v.Version, &v.CreatedAt, &v.SyncURL, &v.SyncLanguage,
 		&v.FeedCreatedBy, &v.LastFetchedAt, &v.LastChangedAt, &v.LastFetchError, &v.FetchETag, &v.FetchLastModified,
-		&v.FetchContentHash, &v.GitRepo, &v.GitBranch, &v.TPTeam, &v.GitDirect, &v.GitInstallation, &v.GitWrite, &v.GitCheckedAt, &v.GitAccessError, &v.ImportCount)
+		&v.FetchContentHash, &v.GitRepo, &v.GitBranch, &v.TPTeam, &v.GitDirect, &v.GitInstallation, &v.GitWrite, &v.GitCheckedAt, &v.GitAccessError, &v.AITerms, &v.ImportCount)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, store.ErrNotFound
 	}
@@ -130,13 +130,21 @@ func (r *glossaryRepository) CreateGroupImport(ctx context.Context, imp *models.
 		return err
 	}
 
-	const cols = 13
+	if err := insertTerms(ctx, tx, imp, terms, ""); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// insertTerms adds glossary rows of an import (origin "" or "ai")
+func insertTerms(ctx context.Context, tx *sql.Tx, imp *models.ModuleGroupImport, terms []GlossaryTerm, origin string) error {
+	const cols = 14
 	const batch = 500
 	for start := 0; start < len(terms); start += batch {
 		end := min(start+batch, len(terms))
 		var sb strings.Builder
 		sb.WriteString(`INSERT INTO glossary_terms (import_id, project_id, group_id, language, source, source_norm, translation,
-			translation_norm, word_count, occurrences, modules, contexts, source_hash) VALUES `)
+			translation_norm, word_count, occurrences, modules, contexts, source_hash, origin) VALUES `)
 		args := make([]any, 0, (end-start)*cols)
 		for i, t := range terms[start:end] {
 			if i > 0 {
@@ -152,13 +160,63 @@ func (r *glossaryRepository) CreateGroupImport(ctx context.Context, imp *models.
 			sb.WriteByte(')')
 			args = append(args, imp.ID, imp.ProjectID, imp.GroupID, imp.Language, t.Source, t.SourceNorm, t.Translation,
 				t.TranslationNorm, t.WordCount, t.Occurrences,
-				strings.Join(t.Modules, listSep), strings.Join(t.Contexts, listSep), glossary.TermHash(t.SourceNorm))
+				strings.Join(t.Modules, listSep), strings.Join(t.Contexts, listSep), glossary.TermHash(t.SourceNorm), origin)
 		}
 		if _, err := tx.ExecContext(ctx, sb.String(), args...); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+func (r *glossaryRepository) ReplaceAITerms(ctx context.Context, imp *models.ModuleGroupImport, terms []GlossaryTerm) error {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	// the import may have been replaced by a newer sync meanwhile: then there is nothing to update
+	var id int64
+	err = tx.QueryRowContext(ctx, `SELECT id FROM module_group_imports WHERE id = $1 FOR UPDATE`, imp.ID).Scan(&id)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `DELETE FROM glossary_terms WHERE import_id = $1 AND origin = 'ai'`, imp.ID); err != nil {
+		return err
+	}
+	if err := insertTerms(ctx, tx, imp, terms, "ai"); err != nil {
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, `UPDATE module_group_imports SET ai_term_count = $2 WHERE id = $1`, imp.ID, len(terms)); err != nil {
+		return err
+	}
 	return tx.Commit()
+}
+
+func (r *glossaryRepository) SetGroupAITerms(ctx context.Context, groupID int64, on bool) error {
+	_, err := r.db.ExecContext(ctx, `UPDATE module_groups SET ai_terms = $2 WHERE id = $1`, groupID, on)
+	return err
+}
+
+func (r *glossaryRepository) ImportFiles(ctx context.Context, importID int64) ([]*models.ProjectFile, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT `+projectFileColumns+`, f.data
+		FROM project_files f JOIN module_groups v ON v.id = f.group_id WHERE f.import_id = $1 ORDER BY f.filename`, importID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []*models.ProjectFile
+	for rows.Next() {
+		f := &models.ProjectFile{}
+		if err := rows.Scan(&f.ID, &f.ImportID, &f.ProjectID, &f.GroupID, &f.GroupLabel, &f.Filename, &f.Language,
+			&f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt, &f.RepoPath, &f.Data); err != nil {
+			return nil, err
+		}
+		out = append(out, f)
+	}
+	return out, rows.Err()
 }
 
 const importColumns = `i.id, i.project_id, i.group_id, v.name || CASE WHEN v.version = '' THEN '' ELSE '-' || v.version END, i.filename, i.language, i.file_count, i.entry_count, i.term_count,
@@ -229,7 +287,7 @@ func (r *glossaryRepository) Term(ctx context.Context, projectID int64, hash str
 		`SELECT MIN(t.source), MIN(t.word_count), v.id,
 		        v.name || CASE WHEN v.version = '' THEN '' ELSE '-' || v.version END, t.language,
 		        MIN(t.translation), SUM(t.occurrences),
-		        string_agg(t.modules, '`+listSep+`'), string_agg(t.contexts, '`+listSep+`')
+		        string_agg(t.modules, '`+listSep+`'), string_agg(t.contexts, '`+listSep+`'), bool_and(t.origin = 'ai')
 		 FROM glossary_terms t JOIN module_groups v ON v.id = t.group_id
 		 WHERE t.project_id = $1 AND t.source_hash = $2
 		 GROUP BY v.id, v.name, v.version, t.language, t.translation_norm
@@ -244,7 +302,7 @@ func (r *glossaryRepository) Term(ctx context.Context, projectID int64, hash str
 		var source, modules, contexts string
 		var words int
 		if err := rows.Scan(&source, &words, &row.GroupID, &row.GroupLabel, &row.Language, &row.Translation,
-			&row.Count, &modules, &contexts); err != nil {
+			&row.Count, &modules, &contexts, &row.AI); err != nil {
 			return nil, err
 		}
 		if term.Source == "" || source < term.Source {
@@ -274,7 +332,7 @@ func (r *glossaryRepository) PreferredTerms(ctx context.Context, projectID int64
 	rows, err := r.db.QueryContext(ctx, `
 		WITH t AS (
 			SELECT source_norm, translation_norm, MIN(source) AS src, MIN(translation) AS tr,
-			       SUM(occurrences) AS n, MIN(word_count) AS wc
+			       SUM(occurrences) AS n, MIN(word_count) AS wc, bool_and(origin = 'ai') AS ai
 			FROM glossary_terms
 			WHERE project_id = $1 AND language = $2`+filter+`
 			GROUP BY source_norm, translation_norm
@@ -283,7 +341,7 @@ func (r *glossaryRepository) PreferredTerms(ctx context.Context, projectID int64
 			       ROW_NUMBER() OVER (PARTITION BY source_norm ORDER BY n DESC, translation_norm) AS rk
 			FROM t
 		)
-		SELECT src, tr, n::float8 / total, wc FROM ranked WHERE rk = 1`, args...)
+		SELECT src, tr, n::float8 / total, wc, ai FROM ranked WHERE rk = 1`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -291,7 +349,7 @@ func (r *glossaryRepository) PreferredTerms(ctx context.Context, projectID int64
 	var out []PreferredTerm
 	for rows.Next() {
 		var t PreferredTerm
-		if err := rows.Scan(&t.Source, &t.Translation, &t.Share, &t.Words); err != nil {
+		if err := rows.Scan(&t.Source, &t.Translation, &t.Share, &t.Words, &t.AI); err != nil {
 			return nil, err
 		}
 		out = append(out, t)
@@ -356,7 +414,8 @@ func (r *glossaryRepository) Search(ctx context.Context, q GlossaryQuery) ([]*mo
 		`WITH page AS (`+page+`)
 		 SELECT g.source_norm, g.total, MIN(t.source), MIN(t.translation), SUM(t.occurrences),
 		        string_agg(t.modules, '`+listSep+`'), string_agg(t.contexts, '`+listSep+`'),
-		        string_agg(DISTINCT v.name || CASE WHEN v.version = '' THEN '' ELSE '-' || v.version END, '`+listSep+`')
+		        string_agg(DISTINCT v.name || CASE WHEN v.version = '' THEN '' ELSE '-' || v.version END, '`+listSep+`'),
+		        bool_and(t.origin = 'ai')
 		 FROM page g
 		 JOIN glossary_terms t ON `+scope+` AND t.source_norm = g.source_norm
 		 JOIN module_groups v ON v.id = t.group_id
@@ -374,7 +433,8 @@ func (r *glossaryRepository) Search(ctx context.Context, q GlossaryQuery) ([]*mo
 	for rows.Next() {
 		var key, source, translation, modules, contexts, groupLabels string
 		var groupTotal, count int
-		if err := rows.Scan(&key, &groupTotal, &source, &translation, &count, &modules, &contexts, &groupLabels); err != nil {
+		var fromAI bool
+		if err := rows.Scan(&key, &groupTotal, &source, &translation, &count, &modules, &contexts, &groupLabels, &fromAI); err != nil {
 			return nil, 0, err
 		}
 		if cur == nil || key != curKey {
@@ -388,6 +448,7 @@ func (r *glossaryRepository) Search(ctx context.Context, q GlossaryQuery) ([]*mo
 			Modules:  uniqueSplit(modules, 40),
 			Contexts: uniqueSplit(contexts, 10),
 			Groups:   uniqueSplit(groupLabels, 40),
+			AI:       fromAI,
 		})
 	}
 	return out, total, rows.Err()
@@ -437,7 +498,7 @@ func uniqueSplit(s string, max int) []string {
 func (r *glossaryRepository) Stamp(ctx context.Context, projectID int64, language string) (string, error) {
 	var n, maxID, terms int64
 	err := r.db.QueryRowContext(ctx,
-		`SELECT COUNT(*), COALESCE(MAX(id), 0), COALESCE(SUM(term_count), 0)
+		`SELECT COUNT(*), COALESCE(MAX(id), 0), COALESCE(SUM(term_count + ai_term_count), 0)
 		 FROM module_group_imports WHERE project_id = $1 AND language = $2`, projectID, language).Scan(&n, &maxID, &terms)
 	if err != nil {
 		return "", err

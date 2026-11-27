@@ -82,7 +82,7 @@ func (s *Service) matcher(ctx context.Context, projectID int64, language string)
 	}
 	terms := make([]ai.Term, len(pref))
 	for i, t := range pref {
-		terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words}
+		terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words, AI: t.AI}
 	}
 	g := ai.NewGlossary(terms)
 	c.mu.Lock()

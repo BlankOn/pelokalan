@@ -41,6 +41,7 @@ type GlossaryTranslation struct {
 	Modules  []string
 	Contexts []string
 	Groups   []string // module group labels using this translation
+	AI       bool     // found only by AI extraction from long strings
 }
 
 // Share returns the percentage of occurrences using this translation
@@ -84,6 +85,10 @@ type ModuleGroup struct {
 	GitWrite        bool
 	GitCheckedAt    *time.Time
 	GitAccessError  string
+
+	// AITerms: glossary extraction from long strings was started for the group; strings that are new or changed
+	// after a sync are extracted too
+	AITerms bool
 
 	// Filled by listing queries
 	ImportCount int
@@ -139,6 +144,7 @@ type GlossaryTermRow struct {
 	Count       int
 	Modules     []string
 	Contexts    []string
+	AI          bool // found only by AI extraction from long strings
 }
 
 // GlossaryTerm is everything known about one glossary string

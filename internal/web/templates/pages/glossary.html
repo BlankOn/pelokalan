@@ -8,6 +8,12 @@
             {{else if .HasFeed}}<span class="sync-dot sync-pending"></span>{{t $.Lang "glossary.sync_pending" .Label}}
             {{else if .LastImport}}<span class="sync-dot sync-manual"></span>{{t $.Lang "glossary.no_upstream" .Label (timeAgo $.Lang .LastImport)}}{{end}}
         {{end}}</span>
+        {{if and $p.Role.CanManage .Data.Languages}}
+        <span class="extract-bar">
+            <span id="extract-status" class="small muted" hidden></span>
+            <button type="button" class="btn btn-sm" data-extract-open>✨ {{t .Lang "extract.button"}}</button>
+        </span>
+        {{end}}
     </div>
     {{if .Data.Languages}}
     <form id="glossary-form" class="glossary-search" hx-get="{{$p.Path}}/glossary/search" hx-target="#glossary-results"
@@ -72,4 +78,24 @@
     {{end}}
 </section>
 
+{{if and $p.Role.CanManage .Data.Languages}}
+<dialog id="extract-dialog" class="dialog" data-base="{{$p.Path}}/glossary-extract"
+        data-starting="{{t .Lang "extract.estimating"}}" data-noai="{{t .Lang "extract.no_ai"}}">
+    <form method="dialog" class="form extract-form">
+        <h2>✨ {{t .Lang "extract.title"}}</h2>
+        <p class="muted small">{{t .Lang "extract.intro"}}</p>
+        <label for="ex-group">{{t .Lang "glossary.group"}}</label>
+            <select id="ex-group" name="group" data-extract-group>
+                {{range $r.Groups}}{{if .ImportCount}}<option value="{{.ID}}" {{if eq (printf "%d" .ID) $r.Group}}selected{{end}}>{{.Label}}{{if .AITerms}} · ✨{{end}}</option>{{end}}{{end}}
+            </select>
+        <div class="extract-estimate small" data-extract-estimate></div>
+        <p class="small muted">{{t .Lang "extract.after_sync"}}</p>
+        <div class="dialog-actions">
+            <button type="button" class="btn" data-close-dialog>{{t .Lang "action.close"}}</button>
+            <button type="button" class="btn btn-danger" data-extract-cancel hidden>{{t .Lang "extract.stop"}}</button>
+            <button type="button" class="btn btn-primary" data-extract-start disabled>{{t .Lang "extract.start"}}</button>
+        </div>
+    </form>
+</dialog>
+{{end}}
 {{end}}

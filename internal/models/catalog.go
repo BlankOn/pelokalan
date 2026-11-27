@@ -157,8 +157,10 @@ type Entry struct {
 	UpdatedByName      string
 	UpdatedAt          time.Time
 	// Comments in the entry's discussion (filled by handlers)
-	Comments   int
-	ReviewOpen int // open review comments on the entry (not stored)
+	Comments       int
+	ReviewOpen     int             // open review comments on the entry (not stored)
+	ReviewResolved int             // resolved review comments on the entry (not stored; green rows in the review editor)
+	Anchors        []CommentAnchor // passages open review comments are about (not stored)
 	// Origin of a machine translation not yet saved by a person: "ai", "glossary", "memory"
 	Origin string
 	// ReplacedMsgStr is the translation a machine replaced, kept until a person saves (nil = none)

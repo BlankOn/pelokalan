@@ -41,6 +41,7 @@ type Service struct {
 	syncState map[int64]*SyncStatus // per project: the latest Sync button run
 
 	landings LandingDetector // finds members' work accepted upstream after each import (nil = off)
+	terms    TermExtractor   // AI glossary terms from long strings after each import (nil = off)
 
 	github *githubapp.Client // the Pelokalan GitHub App (nil = not configured)
 }
@@ -60,6 +61,15 @@ type LandingDetector interface {
 
 // SetLandings turns on detecting members' work accepted upstream
 func (s *Service) SetLandings(d LandingDetector) { s.landings = d }
+
+// TermExtractor adds AI glossary terms found in long strings to new imports (pretranslate.Service)
+type TermExtractor interface {
+	AfterImport(projectID, groupID int64, imports []*models.ModuleGroupImport)
+}
+
+// SetTermExtractor makes every import get its AI glossary terms, and new strings of groups where extraction was
+// started be extracted, in the background
+func (s *Service) SetTermExtractor(t TermExtractor) { s.terms = t }
 
 // SetProjects lets imports and syncs check the project's language
 func (s *Service) SetProjects(r project.Repository) { s.projects = r }
@@ -232,6 +242,9 @@ func (s *Service) importInto(ctx context.Context, v *models.ModuleGroup, filenam
 			log.Printf("glossary: store project files of import %d: %v", imp.ID, err)
 		}
 		res.Imports = append(res.Imports, imp)
+	}
+	if s.terms != nil && len(res.Imports) > 0 {
+		go s.terms.AfterImport(v.ProjectID, v.ID, res.Imports)
 	}
 	if s.landings != nil { // whose work is upstream now: in the background, imports do not wait
 		up := make([]UpstreamFile, 0, len(files))

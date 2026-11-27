@@ -177,6 +177,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.AI = pretranslate.New(repos.AI, repos.Catalog, repos.Glossary, ai.NewBox(cfg.AI.SecretKey), cfg.AI.AllowPrivateHosts)
 	a.AI.SetHistory(a.Catalogs)
 	a.AI.SetContexts(a.Contexts)
+	a.Glossary.SetTermExtractor(a.AI) // AI glossary terms from long strings, also for strings new after a sync
 
 	// Handlers
 	h, err := web.NewHandler(
@@ -382,6 +383,11 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Post("/projects/{id}/project-files/{fid}/take", h.ProjectFileTake)
 		r.Post("/projects/{id}/project-files/sync", h.ProjectFilesSync)
 		r.Get("/projects/{id}/project-files/sync", h.ProjectFilesSyncStatus)
+		// glossary terms from long strings, found by the project's AI model (owners and coordinators)
+		r.Get("/projects/{id}/glossary-extract", h.GlossaryExtractEstimate)
+		r.Post("/projects/{id}/glossary-extract", h.GlossaryExtractStart)
+		r.Get("/projects/{id}/glossary-extract/status", h.GlossaryExtractStatus)
+		r.Post("/projects/{id}/glossary-extract/cancel", h.GlossaryExtractCancel)
 		r.Get("/projects/{id}/topics/new", h.TopicNew)
 		r.Post("/projects/{id}/topics/new", h.TopicCreate)
 		r.Post("/projects/{id}/wiki/new", h.WikiCreate)

@@ -49,6 +49,11 @@ type Comment struct {
 	ResolvedAt   *time.Time
 	ResolverName string
 
+	// The passage of the translation the comment is about (empty = the whole entry)
+	AnchorText  string
+	AnchorStart int // character offset where it was selected
+	AnchorForm  int // plural form
+
 	Attachments []*Attachment
 }
 
@@ -84,3 +89,14 @@ func (a *Attachment) IsImage() bool { return inlineTypes[a.ContentType] }
 
 // IsInlineType reports whether a content type may be rendered inline
 func IsInlineType(contentType string) bool { return inlineTypes[contentType] }
+
+// CommentAnchor is a passage of a translation an open review comment is about (the pink mark in the tables)
+type CommentAnchor struct {
+	CommentID int64
+	Text      string
+	Start     int // character offset where it was selected (the nearest occurrence is marked when the text moved)
+	Form      int
+	Author    string
+	Body      string // the start of the comment, for the mark's tooltip
+	Resolved  bool   // the comment was resolved: marked green in the review editor only
+}

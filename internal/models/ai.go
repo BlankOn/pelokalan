@@ -66,3 +66,25 @@ func (j *AIJob) Percent() int {
 	}
 	return j.Processed * 100 / j.Total
 }
+
+// TermExtractionJob is one run of glossary extraction from long strings of a module group
+type TermExtractionJob struct {
+	ID               int64
+	ProjectID        int64
+	GroupID          *int64
+	UserID           *int64 // nil = started by a sync
+	Status           string // AIJobRunning, AIJobDone, AIJobFailed, AIJobCancelled
+	Model            string
+	Total            int // strings to send
+	Processed        int
+	Pairs            int // checked pairs found
+	PromptTokens     int64
+	CompletionTokens int64
+	Cost             float64
+	Error            string // i18n "key|arg"
+	CreatedAt        time.Time
+	FinishedAt       *time.Time
+}
+
+// IsRunning reports whether the job is still working
+func (j *TermExtractionJob) IsRunning() bool { return j.Status == AIJobRunning }

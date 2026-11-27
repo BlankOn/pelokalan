@@ -2752,14 +2752,17 @@ document.addEventListener("change", function (ev) {
 
     // show the popup for sample under anchor (a screen rectangle); pick(word) runs when a word is clicked, else
     // (read-only tables) clicking a word copies it
-    function show(sample, anchor, res, pick) {
+    function show(sample, anchor, res, pick, top) {
         close();
         pop = document.createElement("div");
+        if (top) pop.appendChild(top);
         pop.className = "th-pop";
         pop.setAttribute("role", "dialog");
         var head = document.createElement("div");
         head.className = "th-head";
-        if (!res.found) {
+        if (!res) {
+            // no thesaurus lookup (a long passage): only the comment button
+        } else if (!res.found) {
             head.textContent = app.dataset.thNone;
             pop.appendChild(head);
             pop.classList.add("th-empty");
@@ -2802,7 +2805,7 @@ document.addEventListener("change", function (ev) {
         if (top + ph > window.innerHeight - 8) top = anchor.top - ph - 6;
         pop.style.left = Math.max(8, left) + "px";
         pop.style.top = Math.max(8, top) + "px";
-        if (!res.found) setTimeout(function () { if (pop && pop.classList.contains("th-empty")) close(); }, 1800);
+        if (res && !res.found && !top) setTimeout(function () { if (pop && pop.classList.contains("th-empty")) close(); }, 1800);
     }
 
     function lookup(q, done) {
@@ -2846,13 +2849,34 @@ document.addEventListener("change", function (ev) {
         var cell = node && node.closest && node.closest(".review-mode .entry-row .cell-tr");
         if (!cell || !cell.contains(sel.focusNode)) return false;
         var q = String(sel).trim();
-        if (!usable(q)) { close(); return true; }
-        var rect = sel.getRangeAt(0).getBoundingClientRect();
+        var canComment = app.dataset.anchorComment === "1" && q && q.length <= 300;
+        if (!usable(q) && !canComment) { close(); return true; }
+        var range = sel.getRangeAt(0), rect = range.getBoundingClientRect();
+        var info = null;
+        if (canComment) { // where the passage starts in the translation (first form, as the row shows it)
+            var txt = cell.querySelector(".txt") || cell;
+            var pre = document.createRange();
+            pre.selectNodeContents(txt);
+            pre.setEnd(range.startContainer, range.startOffset);
+            var raw = String(sel), lead = raw.length - raw.replace(/^\s+/, "").length;
+            info = { row: cell.closest(".entry-row"), text: q, start: pre.toString().length + lead, form: 0 };
+        }
+        function commentButton() {
+            if (!info) return null;
+            var b = document.createElement("button");
+            b.type = "button";
+            b.className = "btn btn-small th-comment";
+            b.textContent = "💬 " + (app.dataset.anchorLabel || "Comment");
+            b.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
+            b.addEventListener("click", function () { close(); window.startAnchorComment(info); });
+            return b;
+        }
         clearTimeout(timer);
         timer = setTimeout(function () {
+            if (!usable(q)) { show(q, rect, null, null, commentButton()); current = { table: true }; return; }
             lookup(q, function (res) {
                 if (String(window.getSelection()).trim() !== q) return;
-                show(q, rect, res, null);
+                show(q, rect, res, null, commentButton());
                 current = { table: true };
             });
         }, 180);
@@ -2993,6 +3017,13 @@ document.addEventListener("htmx:load", function (ev) {
         icon.insertBefore(dot, icon.firstChild);
     } else if (n === 0 && dot) {
         dot.remove();
+    }
+    // the last open one was resolved: the row and its passages turn green in the review editor
+    if (n === 0 && before > 0) {
+        row.classList.add("rv-resolved");
+        row.querySelectorAll("mark.rv-anchor").forEach(function (m) { m.classList.add("rv-done"); });
+    } else if (n > 0) {
+        row.classList.remove("rv-resolved");
     }
 });
 
@@ -3596,4 +3627,157 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
         apply();
     });
     apply();
+})();
+
+// Review editor: "Komentari bagian ini" (from the selection popup) comments on a passage of a translation. The
+// row is selected (its thread loads in the side panel), the passage goes into the comment form as a quote, and
+// after sending the rows are reloaded so the passage gets its pink mark.
+(function () {
+    var anchoredSend = false;
+    function fill(form, info) {
+        var box = form.querySelector(".comment-anchor");
+        if (!box) return;
+        box.hidden = false;
+        box.querySelector(".comment-anchor-text").textContent = info.text;
+        [["anchor_text", info.text], ["anchor_start", info.start], ["anchor_form", info.form]].forEach(function (kv) {
+            var inp = box.querySelector('input[name="' + kv[0] + '"]');
+            inp.value = String(kv[1]);
+            inp.disabled = false;
+        });
+        var ta = form.querySelector("textarea[name=body]");
+        if (ta) ta.focus();
+    }
+    function sidebarForm() { return document.querySelector("#sidebar .thread .comment-form"); }
+    window.startAnchorComment = function (info) {
+        var sel = window.getSelection();
+        if (sel) sel.removeAllRanges();
+        // the side panel must be open to write (tablets and phones keep it closed)
+        var ws = document.querySelector(".workspace");
+        var toggle = document.getElementById("side-toggle");
+        if (ws && toggle && (ws.classList.contains("sidebar-hidden") || ws.classList.contains("sidebar-closed")) && getComputedStyle(toggle).display !== "none") toggle.click();
+        var old = sidebarForm();
+        if (info.row.classList.contains("selected") && old) { fill(old, info); return; }
+        if (old) old.dataset.stale = "1";
+        info.row.click();
+        var tries = 0, wait = setInterval(function () {
+            var f = sidebarForm();
+            if (f && !f.dataset.stale) { clearInterval(wait); fill(f, info); }
+            else if (++tries > 60) clearInterval(wait);
+        }, 100);
+    };
+    document.addEventListener("click", function (ev) {
+        var clear = ev.target.closest && ev.target.closest("[data-anchor-clear]");
+        if (!clear) return;
+        var box = clear.closest(".comment-anchor");
+        box.hidden = true;
+        box.querySelectorAll("input").forEach(function (i) { i.value = ""; i.disabled = true; });
+    });
+    document.body.addEventListener("htmx:beforeRequest", function (ev) {
+        var f = ev.target && ev.target.matches && ev.target.matches(".comment-form") ? ev.target : null;
+        if (f) anchoredSend = !!f.querySelector('.comment-anchor input[name="anchor_text"]:not([disabled])');
+    });
+    document.body.addEventListener("htmx:afterSettle", function (ev) {
+        if (!anchoredSend || !ev.target || !ev.target.closest || !ev.target.closest(".thread, #sidebar")) return;
+        anchoredSend = false;
+        var form = document.getElementById("filter-form");
+        if (form && window.htmx) htmx.trigger(form, "submit"); // the new mark
+    });
+})();
+
+// Glossary extraction from long strings ("Ekstrak istilah dengan AI" on the glossary page): the dialog shows the
+// estimate for the chosen module group and starts the run; the toolbar shows its progress until it ends, then the
+// results reload.
+(function () {
+    var dlg = document.getElementById("extract-dialog");
+    var opener = document.querySelector("[data-extract-open]");
+    if (!dlg || !opener) return;
+    var base = dlg.dataset.base;
+    var status = document.getElementById("extract-status");
+    var group = dlg.querySelector("[data-extract-group]");
+    var box = dlg.querySelector("[data-extract-estimate]");
+    var start = dlg.querySelector("[data-extract-start]");
+    var stop = dlg.querySelector("[data-extract-cancel]");
+    var running = false, timer = null, lastID = null;
+
+    function post(url, body) {
+        return fetch(url, {method: "POST", body: body, credentials: "same-origin",
+            headers: {"X-Requested-With": "fetch"}}).then(function (r) { return r.json(); });
+    }
+    function line(text, cls) {
+        var p = document.createElement("p");
+        p.textContent = text;
+        if (cls) p.className = cls;
+        box.appendChild(p);
+    }
+    function estimate() {
+        box.textContent = dlg.dataset.starting;
+        start.disabled = true;
+        fetch(base + "?group=" + encodeURIComponent(group.value), {credentials: "same-origin"})
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                box.textContent = "";
+                if (d.error) { line(d.error, "c-err"); return; }
+                if (!d.configured) { line(dlg.dataset.noai || "", "c-err"); return; }
+                line(d.summary);
+                if (d.cost) line(d.cost);
+                if (d.budget) line(d.budget, d.over_budget ? "c-err" : "muted");
+                start.disabled = running || d.over_budget;
+            })
+            .catch(function () { box.textContent = ""; });
+    }
+    function showRunning(on) {
+        running = on;
+        stop.hidden = !on;
+        if (on) start.disabled = true;
+    }
+    function poll() {
+        clearTimeout(timer);
+        fetch(base + "/status", {credentials: "same-origin", cache: "no-store"})
+            .then(function (r) { return r.json(); })
+            .then(function (d) {
+                var was = running;
+                showRunning(!!d.running);
+                if (d.running) {
+                    status.hidden = false;
+                    status.classList.remove("c-err");
+                    status.textContent = d.message;
+                    timer = setTimeout(poll, 3000);
+                    return;
+                }
+                if (was && d.id === lastID) { // the run this page watched has ended
+                    if (d.error) window.toast(d.error, true); else window.toast(d.message);
+                    status.hidden = true;
+                    var form = document.getElementById("glossary-form");
+                    if (form && window.htmx) htmx.trigger(form, "submit");
+                }
+            })
+            .catch(function () { timer = setTimeout(poll, 10000); });
+    }
+    function watch() {
+        fetch(base + "/status", {credentials: "same-origin", cache: "no-store"})
+            .then(function (r) { return r.json(); })
+            .then(function (d) { lastID = d.id; if (d.running) { showRunning(true); poll(); } });
+    }
+
+    opener.addEventListener("click", function () {
+        if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
+        estimate();
+    });
+    group.addEventListener("change", estimate);
+    start.addEventListener("click", function () {
+        start.disabled = true;
+        var fd = new FormData();
+        fd.append("group", group.value);
+        post(base, fd).then(function (d) {
+            if (d.error) { window.toast(d.error, true); start.disabled = false; return; }
+            window.toast(d.message);
+            dlg.close();
+            lastID = null;
+            fetch(base + "/status", {credentials: "same-origin", cache: "no-store"})
+                .then(function (r) { return r.json(); })
+                .then(function (s) { lastID = s.id; showRunning(true); poll(); });
+        });
+    });
+    stop.addEventListener("click", function () { post(base + "/cancel", new FormData()).then(poll); });
+    watch();
 })();

@@ -2,6 +2,7 @@
 <div class="editor-app{{if or .Data.Review .Data.ViewOnly}} review-mode{{end}}{{if .Data.ViewOnly}} view-mode{{end}}" id="editor-app" data-catalog="{{$c.ID}}" data-readonly="{{.Data.ReadOnly}}" data-initial-entry="{{.Data.InitialEntry}}"
      {{if .Data.Owned}}data-spell="/catalogs/{{$c.ID}}/spell" data-spell-suggest="{{$p.Path}}/spell/suggest" data-spell-dict="{{$p.Path}}/dictionary" data-sp-title="{{t .Lang "spelling.popup_title"}}" data-sp-add="{{t .Lang "spelling.add"}}" data-sp-none="{{t .Lang "spelling.no_suggestions"}}"{{end}}
      {{if or .Data.Owned (and $p.Role.IsMember (or .Data.Review .Data.ViewOnly))}}{{template "thesaurus_attrs" (dict "Lang" .Lang "P" $p "Asset" .Asset)}}{{end}}
+     {{if .Data.CanAnchor}}data-anchor-comment="1" data-anchor-label="{{t .Lang "review.anchor_button"}}"{{end}}
      {{if .Data.Owned}}data-ai-working="{{t .Lang "ai.entry_working"}}" data-locked-msg="{{t .Lang "ai.editor_locked"}}"{{end}}
      data-msg-unsaved="{{t .Lang "editor.unsaved_changes"}}"
      data-msg-error="{{t .Lang "editor.request_failed"}}"

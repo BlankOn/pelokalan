@@ -78,9 +78,13 @@ func (h *Handler) attachComments(r *http.Request, p *models.Project, c *models.C
 		return
 	}
 	open := h.discuss.OpenReviewComments(r.Context(), p, c.ID)
+	resolved := h.discuss.ResolvedReviewEntries(r.Context(), p, c.ID)
+	anchors := h.discuss.ReviewAnchors(r.Context(), p, c.ID)
 	for i, e := range entries {
 		e.Comments = counts[keys[i]]
 		e.ReviewOpen = open[e.KeyHash()]
+		e.ReviewResolved = resolved[e.KeyHash()]
+		e.Anchors = anchors[e.KeyHash()]
 	}
 }
 
@@ -455,6 +459,7 @@ func (h *Handler) SaveEntry(w http.ResponseWriter, r *http.Request) {
 		}
 		sv := v
 		sv.OOB = true
+		h.attachComments(r, p, c, []*models.Entry{e})
 		h.renderPartials(w,
 			partial{"editor", v},
 			partial{"sidebar", sv},

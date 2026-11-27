@@ -29,6 +29,7 @@
                 <button type="button" class="linklike small danger" hx-post="{{$.Project.Path}}/comments/{{.ID}}/delete" hx-target="#{{$.ID}}" hx-swap="outerHTML" hx-confirm="{{t $.Lang "confirm.delete_comment"}}">{{t $.Lang "action.delete"}}</button>
                 {{end}}{{end}}
             </div>
+                        {{if .AnchorText}}<blockquote class="comment-quote" title="{{t $.Lang "review.anchor_quote_help"}}">“{{.AnchorText}}”</blockquote>{{end}}
                         {{if .Body}}<div class="comment-body">{{commentHTML .Body $.Known}}</div>{{end}}
             {{if .ReviewID}}{{if .ResolvedAt}}<div class="rv-resolved small muted">✓ {{t $.Lang "review.resolved_by" .ResolverName (timeAgo $.Lang (derefTime .ResolvedAt))}}</div>
             {{else if and $.User (not $.Thread.Subject.ReadOnly) (or $.CanManage (eq $.User.ID $.FileOwner) (and .AuthorID (eq (deref .AuthorID) $.User.ID)))}}
@@ -59,6 +60,12 @@
     {{if .CanComment}}
         <form class="comment-form" data-drop-label="{{t .Lang "discuss.drop_here"}}" hx-post="{{.Project.Path}}/discussions/{{$s.Type}}/{{$s.Key}}/comments" hx-target="#{{.ID}}" hx-swap="outerHTML"
           hx-encoding="multipart/form-data" hx-disabled-elt="find button[type=submit]">
+        <div class="comment-anchor" hidden>
+            <span class="comment-anchor-label small">{{t .Lang "review.anchor_about"}}</span>
+            <q class="comment-anchor-text"></q>
+            <button type="button" class="linklike small" data-anchor-clear title="{{t .Lang "review.anchor_clear"}}" aria-label="{{t .Lang "review.anchor_clear"}}">✕</button>
+            <input type="hidden" name="anchor_text" disabled><input type="hidden" name="anchor_start" disabled><input type="hidden" name="anchor_form" disabled>
+        </div>
         <textarea name="body" rows="3" maxlength="5000" placeholder="{{t .Lang "discuss.placeholder"}}" aria-label="{{t .Lang "discuss.placeholder"}}"></textarea>
         <div class="att-picker small">
             <label class="att-add">📎 {{t .Lang "discuss.attach"}}<input type="file" name="files" multiple hidden accept="image/png,image/jpeg,image/gif,image/webp" data-max="5" data-max-bytes="10485760" data-err-type="{{t .Lang "err.attachment_type"}}" data-err-size="{{t .Lang "err.attachment_size" 10}}" data-err-count="{{t .Lang "err.attachments_count" 5}}"></label>

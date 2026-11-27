@@ -111,7 +111,8 @@ func (r *aiRepository) IsCancelRequested(ctx context.Context, id int64) (bool, e
 func (r *aiRepository) Spend(ctx context.Context, projectID int64, since time.Time) (float64, error) {
 	var v float64
 	err := r.db.QueryRowContext(ctx,
-		`SELECT COALESCE(SUM(cost), 0)::float8 FROM ai_jobs WHERE project_id = $1 AND created_at >= $2`,
+		`SELECT (SELECT COALESCE(SUM(cost), 0) FROM ai_jobs WHERE project_id = $1 AND created_at >= $2)::float8
+		      + (SELECT COALESCE(SUM(cost), 0) FROM term_extraction_jobs WHERE project_id = $1 AND created_at >= $2)::float8`,
 		projectID, since).Scan(&v)
 	return v, err
 }
@@ -119,6 +120,12 @@ func (r *aiRepository) Spend(ctx context.Context, projectID int64, since time.Ti
 func (r *aiRepository) FailRunning(ctx context.Context) error {
 	_, err := r.db.ExecContext(ctx,
 		`UPDATE ai_jobs SET status = 'failed', error = 'interrupted by server restart', finished_at = NOW()
+		 WHERE status = 'running'`)
+	if err != nil {
+		return err
+	}
+	_, err = r.db.ExecContext(ctx,
+		`UPDATE term_extraction_jobs SET status = 'failed', error = 'err.ai_interrupted', finished_at = NOW()
 		 WHERE status = 'running'`)
 	return err
 }
