@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/gnomel10n"
 )

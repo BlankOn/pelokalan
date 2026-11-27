@@ -20,7 +20,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
-	"pelokalan/internal/config"
+	"pelokalan/internal/platform/config"
 )
 
 // EnvURL is the environment variable naming the PostgreSQL server for integration tests

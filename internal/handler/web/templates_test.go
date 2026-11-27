@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"pelokalan/internal/config"
+	"pelokalan/internal/platform/config"
 )
 
 func TestTemplatesParse(t *testing.T) {

@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 )
 

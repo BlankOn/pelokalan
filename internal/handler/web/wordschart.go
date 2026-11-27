@@ -5,8 +5,8 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/i18n"
 )
 
 // Growth chart on the Statistik tab ("Pertumbuhan terjemahan"): strings people saved with a

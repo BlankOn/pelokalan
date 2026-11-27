@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"time"
 
-	"pelokalan/internal/config"
+	"pelokalan/internal/platform/config"
 )
 
 const (

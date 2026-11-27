@@ -24,9 +24,9 @@ import (
 	"time"
 
 	"pelokalan/internal/app"
-	"pelokalan/internal/config"
+	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/testdb"
 	"pelokalan/internal/service"
-	"pelokalan/internal/testdb"
 	"pelokalan/pkg/githubapp/githubtest"
 )
 

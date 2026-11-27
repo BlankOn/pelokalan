@@ -12,9 +12,9 @@ import (
 	"strings"
 	"time"
 
-	"pelokalan/internal/config"
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/repository"
 )
 

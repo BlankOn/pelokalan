@@ -15,10 +15,10 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
-	"pelokalan/internal/blobstore"
-	"pelokalan/internal/config"
 	"pelokalan/internal/handler/middleware"
 	"pelokalan/internal/handler/web"
+	"pelokalan/internal/platform/blobstore"
+	"pelokalan/internal/platform/config"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/repository/postgres"
 	"pelokalan/internal/service"

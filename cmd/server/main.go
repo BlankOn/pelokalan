@@ -16,9 +16,9 @@ import (
 	_ "github.com/jackc/pgx/v5/stdlib"
 
 	"pelokalan/internal/app"
-	"pelokalan/internal/config"
 	"pelokalan/internal/handler/web"
-	"pelokalan/internal/i18n"
+	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 )
 

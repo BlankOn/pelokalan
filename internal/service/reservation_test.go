@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"pelokalan/internal/config"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/config"
 	"pelokalan/internal/repository"
 )
 

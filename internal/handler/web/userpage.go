@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 )
 

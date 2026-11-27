@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"pelokalan/internal/handler/middleware"
-	"pelokalan/internal/i18n"
+	"pelokalan/internal/platform/i18n"
 )
 
 // AITranslateEntry translates one entry with the model and returns the text (JSON); the

@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"pelokalan/internal/handler/middleware"
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 	"pelokalan/pkg/glossary"
 )

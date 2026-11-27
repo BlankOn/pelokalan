@@ -20,10 +20,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"pelokalan/internal/config"
 	"pelokalan/internal/handler/middleware"
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
 	"pelokalan/pkg/badgecard"
 	"pelokalan/pkg/glossary"

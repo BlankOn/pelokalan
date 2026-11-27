@@ -9,8 +9,8 @@ import (
 	"strings"
 	"unicode"
 
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/i18n"
 )
 
 // BadgeShare is one earned badge tier with its texts and addresses, for the share page, the share

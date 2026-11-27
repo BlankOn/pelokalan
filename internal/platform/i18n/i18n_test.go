@@ -31,7 +31,7 @@ func TestUsedKeysExist(t *testing.T) {
 		regexp.MustCompile(`h\.page\(r, "([a-z0-9_.]+)"`),
 	}
 	flashRe := regexp.MustCompile(`flash=([a-z_]+)`)
-	root := filepath.Join("..", "..")
+	root := filepath.Join("..", "..", "..") // the repository root
 	err := filepath.Walk(root, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err

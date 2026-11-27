@@ -8,8 +8,8 @@ import (
 	"regexp"
 	"strings"
 
-	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/i18n"
 )
 
 // Public profile extras: a short description and links (website, GitHub, X, LinkedIn, Mastodon). Links are
