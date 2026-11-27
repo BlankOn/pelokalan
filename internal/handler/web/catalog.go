@@ -173,6 +173,31 @@ func (h *Handler) CatalogRedirect(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, target, http.StatusSeeOther)
 }
 
+// othersFile is the warning bar on another member's file in the full (read-only) editor
+type othersFile struct {
+	Owner   string
+	Mine    *models.Catalog     // the viewer's own copy of the module, if any
+	Project *models.ProjectFile // else the module's project file, to take it from (members)
+}
+
+// othersFileData tells the viewer that the file belongs to someone else and where their own copy is
+func (h *Handler) othersFileData(r *http.Request, p *models.Project, c *models.Catalog, data *PageData) {
+	user := middleware.GetUser(r.Context())
+	if user != nil && c.OwnerID == user.ID {
+		return
+	}
+	of := &othersFile{Owner: c.OwnerUsername}
+	if user != nil && p.Role.IsMember() {
+		match := []*models.ProjectFile{{Filename: c.Filename, Language: c.Language}}
+		if err := h.catalogService.MatchOwnFiles(r.Context(), user, p, match); err == nil && match[0].Mine != nil {
+			of.Mine = match[0].Mine
+		} else if pf, err := h.glossary.UpstreamFor(r.Context(), p, c); err == nil && pf != nil {
+			of.Project = pf
+		}
+	}
+	data.Data["OthersFile"] = of
+}
+
 // Editor shows the translation editor
 func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 	c, p, ok := h.loadCatalog(w, r)
@@ -293,6 +318,8 @@ func (h *Handler) editorPage(w http.ResponseWriter, r *http.Request, c *models.C
 		h.reviewData(r, p, c, rv, &data)
 	} else if view {
 		h.viewData(r, p, c, &data)
+	} else if !c.IsTemplate && !c.IsDeleted() {
+		h.othersFileData(r, p, c, &data)
 	}
 	if n := r.URL.Query().Get("pretranslated"); n != "" {
 		data.Flash = i18n.T(data.Lang, "flash.pretranslated", n)

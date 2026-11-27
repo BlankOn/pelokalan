@@ -132,6 +132,9 @@
     {{end}}
 
     {{if .Flash}}<div class="editor-flash">{{.Flash}}</div>{{end}}
+    {{with .Data.OthersFile}}<div class="editor-flash editor-others" role="status">{{t $.Lang "editor.others_banner" .Owner}}
+        {{with .Mine}}<a href="{{.URL}}">{{t $.Lang "editor.open_mine" .Filename}}</a>
+        {{else}}{{with .Project}}<a href="{{$.Data.Project.Path}}/project-files/{{.ID}}/view">{{t $.Lang "editor.take_own"}}</a>{{end}}{{end}}</div>{{end}}
     {{with .Data.Review}}{{template "review_banner" (dict "R" . "Lang" $.Lang)}}{{end}}
     {{with .Data.Hold}}{{if $.Data.HoldMine}}{{if $c.Owned}}<div class="editor-flash editor-hold-mine" role="status">{{t $.Lang "reserve.editor_mine" (timeAgo $.Lang .ReservedAt)}}
         <form method="post" action="{{$.Data.Project.Path}}/reservations/release" class="inline-form" data-confirm="{{t $.Lang "reserve.release_confirm" $.Data.HoldModule}}"><input type="hidden" name="module" value="{{$.Data.HoldModule}}"><input type="hidden" name="next" value="{{$c.URL}}"><button class="linklike">{{t $.Lang "reserve.release"}}</button></form></div>{{end}}

@@ -192,7 +192,9 @@ func TestGitHubReviews(t *testing.T) {
 	owner.get(base + "/member-files").status(http.StatusOK).contains("library__os.po?view=1")
 	owner.get(base+"/"+kiki.Username+"/po/library__os.po?view=1").status(http.StatusOK).
 		contains("view-mode", "/take", "Remove the directory").lacks("rv-approve", "tb-commit", "filter-form")
-	owner.get(base + "/" + kiki.Username + "/po/library__os.po").status(http.StatusOK).lacks("view-mode")
+	owner.get(base+"/"+kiki.Username+"/po/library__os.po").status(http.StatusOK).lacks("view-mode").
+		contains("editor-others", "Ini berkas milik @"+kiki.Username, "Ambil salinan modul ini") // whose file, and how to get one's own
+	kiki.get(base + "/" + kiki.Username + "/po/library__os.po").status(http.StatusOK).lacks("editor-others")
 	if st := scalar[string](t, `SELECT status FROM module_reviews WHERE id = $1`, rid); st != "pushed" {
 		t.Fatalf("status = %s", st)
 	}

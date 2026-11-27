@@ -753,7 +753,9 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   with `review-mode`): the review layout without decisions or discussion (`.sb-thread` hidden): back, file + owner,
   "Hanya lihat", and for repository files the Tabel/Diff toggle with the member's changes against the last synced file.
   Links without `?view=1` (discussion emails, `?entry=`) open the normal read-only editor, except that someone who may
-  review a file waiting for review (`ReviewService.OpenFor`) is sent to the review editor with the same query. For owners, coordinators and
+  review a file waiting for review (`ReviewService.OpenFor`) is sent to the review editor with the same query. The
+  read-only editor has a yellow bar on top (`othersFileData`, `.editor-others`): whose file it is, and a link to the
+  viewer's own copy of the module (`MatchOwnFiles`) or, for members without one, to the module's project file to take it. For owners, coordinators and
   reviewers a file waiting for review shows "Tinjau" (to the review editor) instead of "Lihat". In review and view layouts long
   strings wrap in the table, and the selected row is only lightly marked (pale blue, dark text) since there is no edit
   pane below.
