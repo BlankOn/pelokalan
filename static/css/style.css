@@ -1774,6 +1774,9 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .review-mode .entry-row .cell-icon { align-items: flex-start; padding-top: 6px; }
 @media (min-width: 1181px) { .review-mode .side-toggle { display: none; } }
 .review-mode .entry-list { height: auto; flex: 1; }
+/* read-only tables: text can be selected (a selected word in a translation shows the thesaurus popup) */
+.review-mode .entry-row { user-select: text; }
+.review-mode .entry-row .cell-tr { cursor: text; }
 /* review and view-only layouts have no edit pane to compare in, so the selected row is only lightly marked:
    a pale blue background, normal dark text and icons in their own colours */
 .review-mode .entry-row.selected, .review-mode .entry-row.selected:nth-child(even) { background: #e8f0fe; color: var(--text);

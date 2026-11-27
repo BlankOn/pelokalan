@@ -1,5 +1,5 @@
 {{define "content"}}{{$p := .Data.Project}}{{$f := .Data.File}}{{$s := .Data.Stats}}
-<div class="editor-app review-mode view-mode project-file-view">
+<div class="editor-app review-mode view-mode project-file-view"{{if $p.Role.IsMember}} {{template "thesaurus_attrs" (dict "Lang" .Lang "P" $p "Asset" .Asset)}}{{end}}>
     <div class="toolbar review-toolbar">
         <a class="tb-btn" href="{{$p.Path}}/files" title="{{t .Lang "editor.back_to_project"}}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>

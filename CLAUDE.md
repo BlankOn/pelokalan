@@ -360,7 +360,10 @@ wired in `app.New`. Rules:
   project members only: `GET /projects/{id}/thesaurus?q=` (JSON). Do not expose it publicly.
 - `LookupForms` falls back to meN-/di-/-nya verb forms ("Tampilkan" → "menampilkan").
 - Editor: selecting text in the translation box shows a popup (app.js); clicking replaces the
-  selection, keeping a leading capital. The /licenses page credits the source.
+  selection, keeping a leading capital. In the review and view-only layouts and the project file viewer the table's text can be
+  selected (`.review-mode .entry-row { user-select: text }`; a click that ends a selection does not pick the row), and
+  a word selected in a translation shows the same popup for members, read-only: clicking a synonym copies it. The
+  pages carry `thesaurus_attrs` (partial) only for the owner or for members. The /licenses page credits the source.
 
 ## Spelling check (Indonesian)
 

@@ -880,6 +880,7 @@
 
     listEl().parentElement.addEventListener("click", function (ev) {
         var row = ev.target.closest(".entry-row");
+        if (row && app.classList.contains("review-mode") && String(window.getSelection()).trim()) return; // selecting text
         if (row) select(row.dataset.id);
     });
 
@@ -2707,8 +2708,9 @@ document.addEventListener("change", function (ev) {
 // Thesaurus: select a word or short phrase in the translation box to see synonyms;
 // clicking one replaces the selection (keeping a leading capital)
 (function () {
-    var app = document.getElementById("editor-app");
-    if (!app || !app.dataset.thesaurus) return;
+    // the editor, the review/view layouts and the project file viewer carry data-thesaurus for members
+    var app = document.querySelector("[data-thesaurus]");
+    if (!app) return;
     var cache = {}, pop = null, timer = null, current = null;
     var tags = {};
     (app.dataset.thTags || "").split(",").forEach(function (p) { var kv = p.split(":"); if (kv.length === 2) tags[kv[0]] = kv[1]; });
@@ -2748,9 +2750,10 @@ document.addEventListener("change", function (ev) {
         close();
     }
 
-    function show(ta, start, end, res) {
+    // show the popup for sample under anchor (a screen rectangle); pick(word) runs when a word is clicked, else
+    // (read-only tables) clicking a word copies it
+    function show(sample, anchor, res, pick) {
         close();
-        var sample = ta.value.slice(start, end);
         pop = document.createElement("div");
         pop.className = "th-pop";
         pop.setAttribute("role", "dialog");
@@ -2777,7 +2780,14 @@ document.addEventListener("change", function (ev) {
                     b.type = "button"; b.className = "th-word" + (kind[0] === "antonyms" ? " th-ant" : "");
                     b.textContent = word;
                     b.addEventListener("mousedown", function (ev) { ev.preventDefault(); });
-                    b.addEventListener("click", function () { replace(ta, start, end, matchCase(word, sample)); });
+                    b.addEventListener("click", function () {
+                        var w = matchCase(word, sample);
+                        if (pick) { pick(w); return; }
+                        if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(w).then(function () {
+                            if (window.toast) window.toast((app.dataset.thCopied || "%s").replace("%s", w));
+                        }, function () {});
+                        close();
+                    });
                     box.appendChild(b);
                 });
                 pop.appendChild(box);
@@ -2786,16 +2796,24 @@ document.addEventListener("change", function (ev) {
             pop.appendChild(src);
         }
         document.body.appendChild(pop);
-        var r = ta.getBoundingClientRect(), xy = caretXY(ta, start);
-        var top = r.top + Math.min(xy.y + 4, r.height), left = r.left + xy.x;
+        var top = anchor.bottom + 4, left = anchor.left;
         var pw = pop.offsetWidth, ph = pop.offsetHeight;
         if (left + pw > window.innerWidth - 8) left = window.innerWidth - pw - 8;
-        if (top + ph > window.innerHeight - 8) top = r.top + xy.y - ph - 28;
+        if (top + ph > window.innerHeight - 8) top = anchor.top - ph - 6;
         pop.style.left = Math.max(8, left) + "px";
         pop.style.top = Math.max(8, top) + "px";
-        current = { ta: ta, start: start, end: end };
         if (!res.found) setTimeout(function () { if (pop && pop.classList.contains("th-empty")) close(); }, 1800);
     }
+
+    function lookup(q, done) {
+        var key = q.toLowerCase();
+        if (cache[key]) return done(cache[key]);
+        fetch(app.dataset.thesaurus + "&q=" + encodeURIComponent(q), { credentials: "same-origin" })
+            .then(function (r) { return r.json(); })
+            .then(function (res) { cache[key] = res; done(res); })
+            .catch(function () {});
+    }
+    function usable(q) { return q && q.length <= 60 && !/\n/.test(q) && /\p{L}/u.test(q); }
 
     function check(ta) {
         if (ta.readOnly) { close(); return; }
@@ -2803,25 +2821,48 @@ document.addEventListener("change", function (ev) {
         var start = ta.selectionStart, end = ta.selectionEnd;
         var text = ta.value.slice(start, end);
         var q = text.trim();
-        if (!q || q.length > 60 || /\n/.test(q) || !/\p{L}/u.test(q)) { if (!current || current.ta === ta) close(); return; }
+        if (!usable(q)) { if (!current || current.ta === ta) close(); return; }
         if (current && current.ta === ta && current.start === start && current.end === end) return;
         // trim surrounding spaces from the replaced range too
         var lead = text.length - text.replace(/^\s+/, "").length, trail = text.length - text.replace(/\s+$/, "").length;
         start += lead; end -= trail;
         timer = setTimeout(function () {
-            var key = q.toLowerCase();
-            var done = function (res) { if (ta.selectionStart !== ta.selectionEnd) show(ta, start, end, res); };
-            if (cache[key]) return done(cache[key]);
-            fetch(app.dataset.thesaurus + "&q=" + encodeURIComponent(q), { credentials: "same-origin" })
-                .then(function (r) { return r.json(); })
-                .then(function (res) { cache[key] = res; done(res); })
-                .catch(function () {});
+            lookup(q, function (res) {
+                if (ta.selectionStart === ta.selectionEnd) return;
+                var r = ta.getBoundingClientRect(), xy = caretXY(ta, start);
+                var y = r.top + Math.min(xy.y, r.height);
+                show(ta.value.slice(start, end), { left: r.left + xy.x, top: y - 24, bottom: y }, res, function (w) { replace(ta, start, end, w); });
+                current = { ta: ta, start: start, end: end };
+            });
         }, 180);
+    }
+
+    // read-only tables (review and view layouts, project file viewer): a word selected in a translation shows its
+    // synonyms; clicking one copies it
+    function checkTable() {
+        var sel = window.getSelection();
+        if (!sel || sel.isCollapsed || !sel.rangeCount) return false;
+        var node = sel.anchorNode && (sel.anchorNode.nodeType === 1 ? sel.anchorNode : sel.anchorNode.parentElement);
+        var cell = node && node.closest && node.closest(".review-mode .entry-row .cell-tr");
+        if (!cell || !cell.contains(sel.focusNode)) return false;
+        var q = String(sel).trim();
+        if (!usable(q)) { close(); return true; }
+        var rect = sel.getRangeAt(0).getBoundingClientRect();
+        clearTimeout(timer);
+        timer = setTimeout(function () {
+            lookup(q, function (res) {
+                if (String(window.getSelection()).trim() !== q) return;
+                show(q, rect, res, null);
+                current = { table: true };
+            });
+        }, 180);
+        return true;
     }
 
     document.addEventListener("mouseup", function (ev) {
         if (ev.target.matches && ev.target.matches("#entry-form .tr-input")) setTimeout(function () { check(ev.target); }, 0);
-        else if (pop && !pop.contains(ev.target)) close();
+        else if (pop && pop.contains(ev.target)) return;
+        else setTimeout(function () { if (!checkTable() && pop) close(); }, 0);
     });
     document.addEventListener("keyup", function (ev) {
         if (ev.target.matches && ev.target.matches("#entry-form .tr-input") && (ev.shiftKey || ev.key === "Shift")) check(ev.target);
