@@ -267,6 +267,18 @@ type UpstreamInfo struct {
 	TP              *TPDomain      // the module's domain on the Translation Project (nil = none)
 }
 
+// ModulePage is the module's page upstream ("Modul" in the toolbars): its Translation Project domain, its page on
+// the GNOME translation site from the stored state, else the guessed one ("" = none)
+func (i UpstreamInfo) ModulePage() string {
+	switch {
+	case i.TP != nil:
+		return i.TP.PageURL()
+	case i.Upstream != nil && i.Upstream.PageURL != "":
+		return i.Upstream.PageURL
+	}
+	return i.UpstreamLink
+}
+
 // UpstreamClass is the file's value for the upstream state filter: a StateClass,
 // "missing" (the release has no such file) or "unknown" (not checked yet / no release upstream)
 func (i UpstreamInfo) UpstreamClass() string {

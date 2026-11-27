@@ -18,11 +18,15 @@
             <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "editor.search"}}" aria-label="{{t .Lang "editor.search"}}">
         </form>
         <div class="spacer"></div>
-        {{template "view_action" .}}
+        {{with .Data.ModulePage}}<a class="tb-btn" href="{{.}}" target="_blank" rel="noopener" title="{{t $.Lang "editor.module_page_help"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
+        <span>{{t $.Lang "editor.module_page"}}</span>
+    </a>{{end}}
         <a class="tb-btn" href="{{$p.Path}}/project-files/{{$f.ID}}/download" title="{{t .Lang "action.download"}} {{$f.Filename}}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
             <span>PO</span>
         </a>
+        {{template "view_action" .}}
     </div>
     <div class="workspace">
         <div class="main-col">

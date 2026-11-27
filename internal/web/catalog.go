@@ -311,12 +311,8 @@ func (h *Handler) editorPage(w http.ResponseWriter, r *http.Request, c *models.C
 		data.Data["ModulePage"] = u
 	} else if !c.IsTemplate { // the file's page on the GNOME translation site, from its stored state or own link
 		h.glossary.AttachUpstreamToCatalogs(r.Context(), p, []*models.Catalog{c})
-		if c.TP != nil { // a Translation Project domain: its page there
-			data.Data["ModulePage"] = c.TP.PageURL()
-		} else if c.Upstream != nil && c.Upstream.PageURL != "" {
-			data.Data["ModulePage"] = c.Upstream.PageURL
-		} else if c.UpstreamLink != "" {
-			data.Data["ModulePage"] = c.UpstreamLink
+		if u := c.ModulePage(); u != "" {
+			data.Data["ModulePage"] = u
 		}
 	}
 	if !c.IsTemplate && c.Owned {

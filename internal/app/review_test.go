@@ -40,6 +40,13 @@ func TestGitHubReviews(t *testing.T) {
 	owner.upload(base+"/module-groups/import", url.Values{"name": {"docs"}, "version_name": {"3.14"}, "language": {"id"}},
 		"docs.tar.gz", targz(t, map[string][]byte{"library/os.po": file})).redirectsTo(base + "/settings?")
 	gid := strconv.FormatInt(g.ID, 10)
+	// the project file viewer's toolbar: Modul (the file on GitHub), PO, then the main action
+	pfid := scalar[int64](t, `SELECT id FROM project_files WHERE group_id = $1`, g.ID)
+	viewBody := owner.get(fmt.Sprintf("%s/project-files/%d/view", base, pfid)).status(http.StatusOK).
+		contains("https://github.com/" + repo + "/blob/3.14/library/os.po").Body
+	if m, po := strings.Index(viewBody, "/blob/3.14/library/os.po"), strings.Index(viewBody, "<span>PO</span>"); m < 0 || po < m {
+		t.Fatalf("Modul should come before PO (at %d, %d)", m, po)
+	}
 
 	// the popup offers to install the app; checking without an installation reports it
 	owner.get(base+"/settings?groups=list").status(http.StatusOK).contains("Integrasi penuh dengan repositori",
@@ -97,6 +104,13 @@ func TestGitHubReviews(t *testing.T) {
 
 	// the owner sees the queue and the change; kiki cannot decide on her own request
 	owner.get(base+"/files").status(http.StatusOK).contains("Menunggu tinjauan", page)
+	// the queue says when it was asked for, and when the file changed after that (more than a minute later)
+	owner.get(base + "/files").status(http.StatusOK).contains("diajukan ").lacks(", diperbarui ")
+	if _, err := env.DB.Exec(`UPDATE catalogs SET updated_at = (SELECT created_at FROM module_reviews WHERE id = $2) + interval '5 minutes'
+		WHERE id = $1`, kc, rid); err != nil {
+		t.Fatal(err)
+	}
+	owner.get(base + "/files").status(http.StatusOK).contains(", diperbarui ")
 	// in Berkas anggota lain the owner gets "Tinjau" for a file waiting for review
 	owner.get(base + "/member-files").status(http.StatusOK).contains(`href="` + page + `">Tinjau`)
 	// the review editor: the review's strings only, the diff, the note, the approval button; no edit pane tools

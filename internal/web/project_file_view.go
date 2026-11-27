@@ -76,6 +76,15 @@ func (h *Handler) ProjectFileView(w http.ResponseWriter, r *http.Request) {
 	data2.Data["Query"] = r.URL.Query().Get("q")
 	data2.Data["FullPage"] = true
 	h.viewAction(r, p, f, data2.Data)
+	// "Modul": the file on GitHub for repository files, else its page upstream (GNOME site, Translation Project)
+	if u := h.glossary.GitFileURL(r.Context(), p, f.RepoPath); u != "" {
+		data2.Data["ModulePage"] = u
+	} else {
+		h.glossary.AttachUpstream(r.Context(), p, []*models.ProjectFile{f})
+		if u := f.ModulePage(); u != "" {
+			data2.Data["ModulePage"] = u
+		}
+	}
 	h.render(w, "project_file", data2)
 }
 

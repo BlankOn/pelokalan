@@ -413,7 +413,7 @@ shows it only to members), role, joined_at. Documented in README.md.
   the holder changed is upstream word for word. Lists: a red lock (`res_lock`, `.res-lock`: red circle, white lock; tooltip "Direservasi oleh @user") right after the file name (blue `.res-lock-mine` when the viewer holds it) and `res_chip` under it, "Reservasi modul" (takes the file; asks first: it reserves the module) / "Sedang direservasi"
   in Berkas proyek, "Reservasi modul" / "Lepas reservasi tugas" in the ⋯ menu, "Reservasi & Terjemahkan" instead of "Terjemahkan" on free modules in Berkas Anda (asks, reserves, opens the editor), `reserve_filter` (`rv` = mine, other, free; Berkas
   proyek uses `source.Service.ProjectFiles` with a keep filter, `KeepStates` for upstream states). Owners/managers release
-  someone else's reservation with a "Lepas" button (`res_release`, holder emailed) in the action column of Berkas proyek
+  someone else's reservation with a "Lepas reservasi" button (`res_release`, holder emailed) in the action column of Berkas proyek
   (instead of "Sedang direservasi") and Berkas anggota lain, and from the ⋯ menu ("Lepas reservasi @user"); Settings no
   longer lists held modules. In the ⋯ menu the review items (Ajukan/Lihat/Batalkan tinjauan, Kirim ke repositori) follow
   the reservation items.
@@ -754,7 +754,7 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   nothing fuzzy or AI, no open request, and not unchanged since its last commit to the repository; `#review-dialog` with an optional note; `POST /catalogs/{cid}/review`, sent in the background by app.js with
   `X-Requested-With: fetch` → JSON, so the page stays where it is: the popup closes, a toast shows and the file lists
   refresh with their current filters); owners and
-  managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan (each request is a clickable row, highlighted on hover; search by file
+  managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan (each request is a clickable row, highlighted on hover, saying "diajukan <time>" and, when the file changed more than a minute after the request, ", diperbarui <time>" (`ModuleReview.UpdatedAfter`, `FileUpdatedAt` = the file's `updated_at`); search by file
   or translator and an order select, `[data-review-queue]` in app.js, filtered in the page; a request whose review
   comments are all resolved shows a green "✓ Sudah diperbaiki" (`ModuleReview.ResolvedComments`), also on file rows); `/projects/{id}/reviews/{rid}` shows the
   changes (`review.Service.Changes`: `catalog.Service.ChangedTargets` = the git patch rule, against the last synced file)
@@ -763,7 +763,7 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   tinjauan" (Settings → Umum, `projects.review_required`, migration 050) is on: then the button is hidden and
   `PushNow` refuses (`err.review_required`). One open request per file.
   Owners and coordinators may also cancel someone else's open request: "Lepas tinjauan" in the review editor toolbar
-  (before "Setujui & commit") and beside "Tinjau" in Berkas anggota lain (same `POST …/reviews/{rid}/withdraw`;
+  (before "Setujui & commit") and in Berkas anggota lain (row order: Lepas reservasi, Lepas tinjauan, Tinjau) (same `POST …/reviews/{rid}/withdraw`;
   `review.Service.Withdraw` records who and emails the translator, `mail.review_cancelled`). Reviewers cannot.
 - Commit (`review.Service.commit`): reads the branch's current file, `gitpatch.ApplyCredit` (the whole file with only the
   member's changed entries rewritten, and the header crediting the translator: their "Name <email>, year." line among
@@ -808,8 +808,8 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   download). Glossary module chips (list and term page) link to `/projects/{id}/project-files/module/{name}?q=<term>`
   (`ProjectFileByModule`, `source.Service.ProjectFileForModule` matches `glossary.ModuleName`, newest group first).
 - The Berkas proyek and Berkas anggota lain rows have no download button: "Lihat" opens the view-only layout, whose toolbar
-  has the PO download. View-only toolbars (project files and other members' files) end with `view_action` (partials/view_action.html,
-  `viewAction`): "Buka berkas Anda" when the viewer has the module, who holds it when reserved, else "Reservasi
+  has the PO download. View-only toolbars (project files and other members' files) show "Modul" (`UpstreamInfo.ModulePage`, or the
+  file on GitHub), then PO, then end with `view_action` (partials/view_action.html, `viewAction`): "Buka berkas Anda" when the viewer has the module, who holds it when reserved, else "Reservasi
   modul" (reservations on, asks first) or "Ambil", which take the project file; visitors see "Hanya lihat".
 - The GitHub integration block always shows the app's install link (to install it on more repositories or change
   its access); it is the main button only until write access is confirmed.

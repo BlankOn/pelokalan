@@ -41,7 +41,12 @@ type ModuleReview struct {
 	Filename          string
 	OwnerUsername     string
 	ProjectSlug       string
+	FileUpdatedAt     time.Time // the file's last change (the translator's fixes after the request)
 }
+
+// UpdatedAfter reports whether the file changed more than a minute after the request was made (the queue then says
+// when it was updated too)
+func (r *ModuleReview) UpdatedAfter() bool { return r.FileUpdatedAt.Sub(r.CreatedAt) > time.Minute }
 
 // ShortSHA is the commit's short id
 func (r *ModuleReview) ShortSHA() string {
