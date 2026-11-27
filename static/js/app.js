@@ -3056,6 +3056,21 @@ document.addEventListener("click", function (ev) {
     dlg.showModal();
     dlg.querySelector("textarea").focus();
 });
+// Review editor: "Tampilkan" in the open-comments banner ticks the toolbar filter's "Komentar tinjauan" (one filter, in step)
+document.addEventListener("change", function (ev) {
+    var t = ev.target;
+    if (t.matches && t.matches("[data-filter-review]")) {
+        var opt = document.querySelector('#filter-form input[name="status"][value="review"]');
+        if (opt && opt.checked !== t.checked) {
+            opt.checked = t.checked;
+            opt.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+    } else if (t.matches && t.matches('#filter-form input[name="status"][value="review"]')) {
+        var box = document.querySelector("[data-filter-review]");
+        if (box) box.checked = t.checked;
+    }
+});
+
 // Penerjemahan: reload the file lists in place, keeping their search, filters and order
 window.refreshFileLists = function () {
     ["pf-filter", "my-filter", "member-filter"].forEach(function (id) {
