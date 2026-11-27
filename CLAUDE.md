@@ -735,8 +735,9 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - **Review editor** (`/projects/{id}/reviews/{rid}` = `editorPage` with the review, `reviewData`; class `review-mode`):
   read-only, lists only the review's strings (`EntryFilter.Only`, `ReviewService.ChangedHashes`), no edit pane (the
   status bar stays, without shortcuts or filter links), toolbar `review_toolbar` (back, file + requester, Tabel/Diff `[data-review-view]` toggling
-  `#review-diff`, the "Tampilkan komentar tinjauan yang belum diselesaikan" toggle (`.rv-open-filter`: the list with `review=<id>&status=review`), "Setujui & commit" disabled while review comments are open), banner
-  `review_banner` (translator's note, open comments, last commit error). The sidebar works as usual. The file's owner
+  `#review-diff`, "Setujui & commit" disabled while review comments are open), banner
+  `review_banner` (translator's note, open comments in yellow with a "Tampilkan" checkbox that lists only the strings
+  with unresolved review comments (`.rv-open-filter`: `review=<id>&status=review`), last commit error). The sidebar works as usual. The file's owner
   (the translator) is redirected from the review page to their full editor, filtered to open review comments
   (`?status=review`) when there are any, so they fix things right away.
 - **View-only layout** ("Lihat" on another member's file, `?view=1`; `viewData`, `view_toolbar`, class `view-mode`

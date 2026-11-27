@@ -147,8 +147,8 @@
     <td class="actions">
         {{if $v.Mine}}{{$heldOther := and .Reservation (ne .Reservation.UserID $v.Res.UserID)}}
         {{if and $v.Res.On (not .IsTemplate) (not .Reservation)}}<form method="post" action="{{$v.Project.Path}}/reservations" class="inline-form" data-confirm="{{t $v.Lang "reserve.translate_confirm" (module .Filename)}}{{if $v.Res.Days}} {{t $v.Lang "reserve.take_confirm_days" $v.Res.Days}}{{end}}" data-confirm-ok="{{t $v.Lang "reserve.translate"}}"><input type="hidden" name="module" value="{{module .Filename}}"><input type="hidden" name="next" value="{{.URL}}"><button class="btn btn-small btn-primary" title="{{t $v.Lang "reserve.reserve_help"}}">{{t $v.Lang "reserve.translate"}}</button></form>
-        {{else if .ReviewReady}}<button type="button" class="btn btn-small btn-primary" data-review="/catalogs/{{.ID}}/review" data-review-name="{{.RepoPath}}" title="{{t $v.Lang "review.request_ready_help"}}">{{t $v.Lang "review.request"}}</button>
-        <a class="btn btn-small" href="{{.URL}}">{{t $v.Lang "action.translate"}}</a>
+        {{else if .ReviewReady}}<a class="btn btn-small btn-primary" href="{{.URL}}">{{t $v.Lang "action.translate"}}</a>
+        <button type="button" class="btn btn-small btn-primary" data-review="/catalogs/{{.ID}}/review" data-review-name="{{.RepoPath}}" title="{{t $v.Lang "review.request_ready_help"}}">{{t $v.Lang "review.request"}}</button>
         {{else}}<a class="btn btn-small btn-primary" href="{{.URL}}">{{if $heldOther}}{{t $v.Lang "action.view"}}{{else}}{{t $v.Lang "action.translate"}}{{end}}</a>{{end}}
         <details class="dropdown">
             <summary class="btn btn-small" aria-label="{{t $v.Lang "action.more"}}">⋯</summary>
