@@ -579,8 +579,6 @@ func (s *DiscussionService) notify(ctx context.Context, author *models.User, p *
 	}
 }
 
-// emailButton is the call-to-action link of an email: a small, plain button
-
 func (s *DiscussionService) projectComment(ctx context.Context, p *models.Project, id int64) (*models.Comment, *models.Discussion, error) {
 	c, err := s.repo.GetComment(ctx, id)
 	if err != nil {

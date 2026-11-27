@@ -26,7 +26,7 @@ func TestUsedKeysExist(t *testing.T) {
 	patterns := []*regexp.Regexp{
 		regexp.MustCompile(`\bt \$?\.?Lang "([a-z0-9_.]+)"`),
 		regexp.MustCompile(`i18n\.T\([^,()]+, "([a-z0-9_.]+)"`),
-		regexp.MustCompile(`userErr\("([a-z0-9_.]+)"`),
+		regexp.MustCompile(`apperr\.New\("([a-z0-9_.]+)"`),
 		regexp.MustCompile(`Key: "([a-z0-9_.]+)"`),
 		regexp.MustCompile(`h\.page\(r, "([a-z0-9_.]+)"`),
 	}
