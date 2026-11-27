@@ -56,7 +56,16 @@ func (h *Handler) RequestReview(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	if _, err := h.reviews.Request(r.Context(), middleware.GetUser(r.Context()), p, c, r.FormValue("note")); err != nil {
+	_, err := h.reviews.Request(r.Context(), middleware.GetUser(r.Context()), p, c, r.FormValue("note"))
+	if r.Header.Get("X-Requested-With") == "fetch" { // the popup stays on the page and refreshes the file rows
+		if err != nil {
+			writeJSON(w, http.StatusBadRequest, map[string]string{"error": h.errorMessage(r, err)})
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"message": i18n.T(middleware.GetLang(r.Context()), "flash.review_requested")})
+		return
+	}
+	if err != nil {
 		h.fail(w, r, err)
 		return
 	}

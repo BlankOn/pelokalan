@@ -114,7 +114,15 @@ func TestGitHubReviews(t *testing.T) {
 	// fixed and asked again; meanwhile someone changes another string on the branch
 	save("Close the window", "Tutup jendelanya")
 	save("Remove the directory", "Hapus direktori")
-	kiki.post(fmt.Sprintf("/catalogs/%d/review", kc), nil).redirectsTo(base + "/files")
+	// the popup sends it in the background and stays on the page (JSON answer, the rows refresh)
+	fetchReview := func() *response {
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+fmt.Sprintf("/catalogs/%d/review", kc), strings.NewReader(""))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Requested-With", "fetch")
+		return kiki.do(req)
+	}
+	fetchReview().status(http.StatusOK).contains(`"message":"Tinjauan diajukan.`)
+	fetchReview().status(http.StatusBadRequest).contains(`"error":`, "sudah menunggu tinjauan")
 	rid = scalar[int64](t, `SELECT id FROM module_reviews WHERE catalog_id = $1 AND status = 'requested'`, kc)
 	page = fmt.Sprintf("%s/reviews/%d", base, rid)
 	ghFake.SetFile(repo, "3.14", "library/os.po", poFile("os", "Open the file", "Buka berkas tersebut", "Close the window", "", "Remove the directory", ""))

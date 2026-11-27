@@ -710,7 +710,9 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   Git groups edit repository + branch in "Ubah repositori atau cabang" instead of the archive link.
 - Reviews (`module_reviews`, `service/review.go`, `handler/web/review.go`): a member asks for a review of their file
   ("Ajukan tinjauan" in the ⋯ menu, and as the main button in Berkas Anda when `Catalog.ReviewReady`: fully translated,
-  nothing fuzzy or AI, no open request, and not unchanged since its last commit to the repository; `#review-dialog` with an optional note; `POST /catalogs/{cid}/review`); owners and
+  nothing fuzzy or AI, no open request, and not unchanged since its last commit to the repository; `#review-dialog` with an optional note; `POST /catalogs/{cid}/review`, sent in the background by app.js with
+  `X-Requested-With: fetch` → JSON, so the page stays where it is: the popup closes, a toast shows and the file lists
+  refresh with their current filters); owners and
   managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan (each request is a clickable row, highlighted on hover); `/projects/{id}/reviews/{rid}` shows the
   changes (`ReviewService.Changes`: `CatalogService.ChangedTargets` = the git patch rule, against the last synced file)
   with "Setujui & commit" / "Kembalikan dengan catatan" (note required, emailed). Nobody approves their own request.

@@ -3011,6 +3011,30 @@ document.addEventListener("click", function (ev) {
     dlg.showModal();
     dlg.querySelector("textarea").focus();
 });
+// sending it stays on the page: the popup closes, a message shows and the file rows refresh with the new status
+(function () {
+    var dlg = document.getElementById("review-dialog");
+    if (!dlg) return;
+    var form = dlg.querySelector("form");
+    form.addEventListener("submit", function (ev) {
+        ev.preventDefault();
+        var btn = form.querySelector('button[type="submit"]');
+        btn.disabled = true;
+        fetch(form.action, { method: "POST", body: new FormData(form), credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.j.error || "");
+                dlg.close();
+                if (window.toast) window.toast(res.j.message);
+                ["my-filter", "member-filter"].forEach(function (id) { // same search, filters and order
+                    var f = document.getElementById(id);
+                    if (f && window.htmx) htmx.trigger(f, "submit");
+                });
+            })
+            .catch(function (err) { window.showMessage(err.message || "Error"); })
+            .finally(function () { btn.disabled = false; });
+    });
+})();
 
 // Penerjemahan: stack each section's sticky parts (title, card head, filters, column row):
 // every part sticks right below the ones before it in the same section
