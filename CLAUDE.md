@@ -710,7 +710,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   Git groups edit repository + branch in "Ubah repositori atau cabang" instead of the archive link.
 - Reviews (`module_reviews`, `service/review.go`, `handler/web/review.go`): a member asks for a review of their file
   ("Ajukan tinjauan" in the ⋯ menu, `#review-dialog` with an optional note; `POST /catalogs/{cid}/review`); owners and
-  managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan; `/projects/{id}/reviews/{rid}` shows the
+  managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan (each request is a clickable row, highlighted on hover); `/projects/{id}/reviews/{rid}` shows the
   changes (`ReviewService.Changes`: `CatalogService.ChangedTargets` = the git patch rule, against the last synced file)
   with "Setujui & commit" / "Kembalikan dengan catatan" (note required, emailed). Nobody approves their own request.
   Owners/managers may also "Kirim ke repositori" any file directly (`PushNow`), unless the project setting "Wajibkan
@@ -734,7 +734,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - **Review editor** (`/projects/{id}/reviews/{rid}` = `editorPage` with the review, `reviewData`; class `review-mode`):
   read-only, lists only the review's strings (`EntryFilter.Only`, `ReviewService.ChangedHashes`), no edit pane (the
   status bar stays, without shortcuts or filter links), toolbar `review_toolbar` (back, file + requester, Tabel/Diff `[data-review-view]` toggling
-  `#review-diff`, the "Komentar terbuka saja" toggle (`.rv-open-filter`: the list with `review=<id>&status=review`), "Setujui & commit" disabled while review comments are open), banner
+  `#review-diff`, the "Tampilkan komentar tinjauan yang belum diselesaikan" toggle (`.rv-open-filter`: the list with `review=<id>&status=review`), "Setujui & commit" disabled while review comments are open), banner
   `review_banner` (translator's note, open comments, last commit error). The sidebar works as usual. The file's owner
   (the translator) is redirected from the review page to their full editor, filtered to open review comments
   (`?status=review`) when there are any, so they fix things right away.
@@ -743,7 +743,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   "Hanya lihat", and for repository files the Tabel/Diff toggle with the member's changes against the last synced file.
   Links without `?view=1` (discussion emails, `?entry=`) still open the normal read-only editor. For owners, coordinators and
   reviewers a file waiting for review shows "Tinjau" (to the review editor) instead of "Lihat". In review and view layouts long
-  strings wrap in the table.
+  strings wrap in the table, and the selected row is only lightly marked (pale blue, dark text) since there is no edit
+  pane below.
 - **Project file viewer** (`/projects/{id}/project-files/{fid}/view`, public; "Lihat" in Berkas proyek; `ProjectFileView`,
   pages/project_file.html): the stored file read-only in the view layout (table, `?q=` search, status bar, PO
   download). Glossary module chips (list and term page) link to `/projects/{id}/project-files/module/{name}?q=<term>`

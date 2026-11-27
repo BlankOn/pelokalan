@@ -6,15 +6,15 @@
 {{end}}
 {{with .Data.Reviews}}
 <section class="card review-queue">
-    <h2 class="review-queue-title">{{t $.Lang "review.queue_title"}} <span class="muted small">({{len .}})</span></h2>
+    <h2 class="review-queue-title"><svg class="rq-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>{{t $.Lang "review.queue_title"}} <span class="muted small">({{len .}})</span></h2>
     <p class="muted small">{{t $.Lang "review.queue_help"}}</p>
     <ul class="review-list">
         {{range .}}<li>
-            <a href="{{$p.Path}}/reviews/{{.ID}}"><strong>{{.RepoPath}}</strong></a>
+            <a class="review-link" href="{{$p.Path}}/reviews/{{.ID}}" title="{{t $.Lang "review.open"}}"><strong>{{.RepoPath}}</strong></a>
             <span class="muted small">@{{.RequesterUsername}} · {{t $.Lang "review.strings" .Entries}} · {{timeAgo $.Lang .CreatedAt}}</span>
             {{if .Error}}<span class="rv-chip rv-rejected small" title="{{errText $.Lang .Error}}">{{t $.Lang "review.failed"}}</span>{{end}}
             {{if .OpenComments}}<span class="rv-chip rv-rejected small"><span class="mark-review"></span> {{t $.Lang "review.state_changes" .OpenComments}}</span>{{end}}
-            <a class="btn btn-small btn-primary" href="{{$p.Path}}/reviews/{{.ID}}">{{t $.Lang "review.open"}}</a>
+            <span class="review-go" aria-hidden="true">›</span>
         </li>{{end}}
     </ul>
 </section>

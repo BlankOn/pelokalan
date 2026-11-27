@@ -1687,10 +1687,20 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .gh-integration { border-top: 1px dashed var(--border-soft); margin-top: 10px; padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .gh-integration p { margin: 0; }
 .review-queue { border-left: 4px solid #6366f1; }
-.review-queue-title { margin: 0 0 4px; font-size: 16px; }
-.review-list { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
-.review-list li { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-.review-list li .btn { margin-left: auto; }
+.review-queue-title { margin: 0 0 4px; font-size: 16px; display: flex; align-items: center; gap: 8px; }
+.rq-icon { width: 18px; height: 18px; fill: none; stroke: #6366f1; stroke-width: 2.2; stroke-linecap: round; flex: none; }
+/* each request is one clickable row (the file link stretches over it), lightly highlighted on hover */
+.review-list { list-style: none; margin: 8px -10px 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.review-list li { position: relative; display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 7px 10px;
+    border-radius: 8px; cursor: pointer; transition: background .1s; }
+.review-list li:hover, .review-list li:focus-within { background: var(--accent-soft); }
+.review-link::after { content: ""; position: absolute; inset: 0; border-radius: 8px; }
+.review-link:hover { text-decoration: none; }
+.review-link:focus-visible { outline: none; }
+.review-list li:has(.review-link:focus-visible) { box-shadow: 0 0 0 2px var(--accent); }
+.review-list .rv-chip[title] { position: relative; z-index: 1; cursor: help; } /* the error tooltip stays reachable */
+.review-go { margin-left: auto; color: var(--muted); font-size: 20px; line-height: 1; }
+.review-list li:hover .review-go { color: var(--accent); }
 .rv-chip { display: inline-block; margin-top: 4px; padding: 1px 8px; border-radius: 10px; font-size: 11.5px; font-weight: 600; line-height: 18px;
     border: 1px solid #e3e6ea; background: #f1f3f5; color: #6b7280; text-decoration: none; white-space: nowrap; }
 .rv-chip:hover { text-decoration: none; filter: brightness(.96); }
@@ -1731,6 +1741,20 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .review-mode .entry-row .cell-icon { align-items: flex-start; padding-top: 6px; }
 @media (min-width: 1181px) { .review-mode .side-toggle { display: none; } }
 .review-mode .entry-list { height: auto; flex: 1; }
+/* review and view-only layouts have no edit pane to compare in, so the selected row is only lightly marked:
+   a pale blue background, normal dark text and icons in their own colours */
+.review-mode .entry-row.selected, .review-mode .entry-row.selected:nth-child(even) { background: #e8f0fe; color: var(--text);
+    box-shadow: inset 3px 0 0 var(--accent); }
+.review-mode .entry-row.selected .cell-tr { color: var(--text); }
+.review-mode .entry-row.selected .ctx-tag { color: var(--muted); background: rgba(47,111,222,.1); }
+.review-mode .entry-row.selected .row-comments { color: var(--accent-dark); }
+.review-mode .entry-row.selected .mark-ai { stroke: #7a3fd1; }
+.review-mode .entry-row.selected .mark-ai .eye { fill: #7a3fd1; }
+.review-mode .entry-row.selected .mark-ai.is-fuzzy rect { fill: #f3e8ff; }
+.review-mode .entry-row.selected .mark-glossary { stroke: #1a7f5a; }
+.review-mode .entry-row.selected .mark-memory { stroke: #5b6fb3; }
+.review-mode .entry-row.selected .mark-glossary.is-fuzzy .fill { fill: #e3f4ec; }
+.review-mode .entry-row.selected .mark-memory.is-fuzzy .fill { fill: #e8ecfa; }
 .review-mode.show-diff .list-header, .review-mode.show-diff #entry-list { display: none; }
 .review-diff-wrap { flex: 1; overflow: auto; padding: 12px; min-height: 0; }
 .review-diff-wrap .review-diff { max-height: none; }
@@ -1743,13 +1767,13 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .rv-view-btn + .rv-view-btn { border-left: 1px solid var(--border); }
 .rv-open-filter { margin: 0 0 0 10px; }
 .rv-toggle { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; padding: 4px 10px; border: 1px solid var(--border);
-    border-radius: 6px; background: var(--surface); cursor: pointer; white-space: nowrap; }
+    border-radius: 6px; background: var(--surface); cursor: pointer; }
 .rv-toggle:has(input:checked) { border-color: #e03131; background: #fff5f5; color: #c92a2a; font-weight: 600; }
 .rv-toggle input { margin: 0; }
 .rv-view-btn.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
 .review-toolbar form { margin: 0; }
 .review-note-flash { white-space: pre-wrap; }
-.review-open-flash { color: #b42318; }
+.editor-flash.review-open-flash { background: var(--fuzzy-soft); color: #7a4d05; border-bottom-color: #f1d29a; } /* a warning, like the other ones */
 
 /* the owner's role on the members page: the same select as the others, locked */
 select.role-locked { cursor: not-allowed; opacity: 1; color: var(--muted); background-color: var(--surface-2); }
