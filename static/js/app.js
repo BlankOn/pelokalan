@@ -1839,7 +1839,7 @@ document.addEventListener("click", function (ev) {
         var edit = ev.target.closest("[data-edit-comment]");
         if (edit) {
             var li = document.getElementById("comment-" + edit.dataset.editComment);
-            li.querySelector(".comment-body").hidden = true;
+            li.querySelectorAll(".comment-body, .comment-actions").forEach(function (el) { el.hidden = true; });
             var f = li.querySelector(".comment-edit");
             f.hidden = false;
             f.querySelector("textarea").focus();
@@ -1849,7 +1849,7 @@ document.addEventListener("click", function (ev) {
         if (cancel) {
             var item = cancel.closest(".comment");
             item.querySelector(".comment-edit").hidden = true;
-            item.querySelector(".comment-body").hidden = false;
+            item.querySelectorAll(".comment-body, .comment-actions").forEach(function (el) { el.hidden = false; });
         }
     });
 

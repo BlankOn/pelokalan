@@ -360,6 +360,11 @@
     <div class="tb-sep"></div>
     {{template "editor_filter" (dict "Lang" .Lang "C" $c "F" .Data.Filter "Review" (or (and (eq $r.Status "requested") $r.ID) 0) "Reviewer" true)}}
     {{if eq $r.Status "requested"}}
+        {{if .Data.CanCancel}}
+        <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/withdraw" data-confirm="{{t .Lang "review.cancel_confirm" $r.RequesterUsername}}" data-confirm-ok="{{t .Lang "review.cancel"}}">
+            <button type="submit" class="btn rv-cancel">{{t .Lang "review.cancel"}}</button>
+        </form>
+        {{end}}
         {{if .Data.CanDecide}}
         <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/approve" data-confirm="{{t .Lang "review.approve_confirm" $r.RepoPath}}" data-confirm-ok="{{t .Lang "review.approve"}}" data-busy="{{t .Lang "review.pushing"}}">
             <button type="submit" class="btn btn-primary rv-approve"{{if $r.OpenComments}} disabled title="{{t .Lang "err.review_open_comments" $r.OpenComments}}"{{end}}>{{t .Lang "review.approve"}}</button>

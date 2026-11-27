@@ -264,7 +264,7 @@ wired in `app.New`. Rules:
 - Comments: project members only; readable publicly. Deletion is soft (`deleted_at`, `deleted_by`): the
   author, username and time stay visible with a note saying who deleted it and when. `@username` mentions of members are
   stored and emailed. Typing "@" in a comment box opens a small member popup (app.js, the thread's `data-members`;
-  arrows, Enter/Tab picks, Esc or typing on ignores it), so a plain "@" stays possible. Authors edit/delete their own; only the project owner deletes someone else's. Bodies are
+  arrows, Enter/Tab picks, Esc or typing on ignores it), so a plain "@" stays possible. Authors edit/delete their own; only the project owner deletes someone else's. "Sunting"/"Hapus" sit below the comment (`.comment-actions`, shown on hover; always on touch screens). Bodies are
   Markdown rendered by `commentHTML` (goldmark GFM + hard wraps, safe mode: raw HTML and
   javascript: links dropped; bare URLs auto-linked; mentions outside a/code/pre).
 - Project descriptions are plain text; `linkify` escapes them and links bare http(s) URLs.
@@ -762,6 +762,9 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   Owners/managers may also "Kirim ke repositori" any file directly (`PushNow`), unless the project setting "Wajibkan
   tinjauan" (Settings → Umum, `projects.review_required`, migration 050) is on: then the button is hidden and
   `PushNow` refuses (`err.review_required`). One open request per file.
+  Owners and coordinators may also cancel someone else's open request: "Lepas tinjauan" in the review editor toolbar
+  (before "Setujui & commit") and beside "Tinjau" in Berkas anggota lain (same `POST …/reviews/{rid}/withdraw`;
+  `review.Service.Withdraw` records who and emails the translator, `mail.review_cancelled`). Reviewers cannot.
 - Commit (`review.Service.commit`): reads the branch's current file, `gitpatch.ApplyCredit` (the whole file with only the
   member's changed entries rewritten, and the header crediting the translator: their "Name <email>, year." line among
   the header comments via `po.AddContributor`, and an existing Last-Translator field set to them; `TranslatorCredit`,

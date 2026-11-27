@@ -312,4 +312,19 @@ func TestGitHubReviews(t *testing.T) {
 	if got := string(ghFake.File(repo, "3.14", "library/os.po")); !strings.Contains(got, `msgstr "Buka berkas"`) {
 		t.Fatalf("the chosen version was not sent:\n%s", got)
 	}
+
+	// owners and coordinators may cancel someone else's request ("Lepas tinjauan"); reviewers may not
+	save("Remove the directory", "Hapus direktori itu")
+	kiki.post(fmt.Sprintf("/catalogs/%d/review", kc), nil).redirectsTo(base + "/files")
+	crid := scalar[int64](t, `SELECT id FROM module_reviews WHERE catalog_id = $1 AND status = 'requested'`, kc)
+	cpage := fmt.Sprintf("%s/reviews/%d", base, crid)
+	owner.get(cpage).status(http.StatusOK).contains("Lepas tinjauan", cpage+"/withdraw")
+	owner.get(base + "/member-files").status(http.StatusOK).contains("Lepas tinjauan")
+	rina.get(cpage).status(http.StatusOK).lacks("Lepas tinjauan")
+	rina.post(cpage+"/withdraw", nil).status(http.StatusForbidden)
+	owner.post(cpage+"/withdraw", nil).redirectsTo(base + "/files")
+	if st := scalar[string](t, `SELECT status FROM module_reviews WHERE id = $1`, crid); st != "withdrawn" {
+		t.Fatalf("status after cancel = %q", st)
+	}
+	mails.waitFor(t, kiki.Email, "membatalkan permintaan tinjauan")
 }

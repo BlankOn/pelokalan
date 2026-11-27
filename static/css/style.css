@@ -954,12 +954,13 @@ h1 .ai-badge { font-size: 12px; }
 .comment:first-child { border-top: 0; }
 .comment-target { background: #fffbe6; border-radius: 6px; padding-left: 8px; padding-right: 8px; }
 .comment-head { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-.comment-head .linklike { margin-left: 4px; }
-/* Edit/delete appear on hover or keyboard focus (not after a mouse click, e.g. on an image); always shown on touch screens. */
+/* Edit/delete sit below the comment; they appear on hover or keyboard focus (not after a mouse click, e.g. on an
+   image); always shown on touch screens. */
+.comment-actions { display: flex; gap: 14px; margin: 4px 0 0 28px; }
+.comment-actions[hidden] { display: none; }
 @media (hover: hover) {
-    .comment-head > button.linklike { opacity: 0; transition: opacity .12s; }
-    .comment:hover .comment-head > button.linklike,
-    .comment:has(:focus-visible) .comment-head > button.linklike { opacity: 1; }
+    .comment-actions { opacity: 0; transition: opacity .12s; }
+    .comment:hover .comment-actions, .comment:has(:focus-visible) .comment-actions { opacity: 1; }
 }
 .comment-body { margin: 6px 0 0 28px; word-break: break-word; line-height: 1.5; }
 .comment-edit { margin: 6px 0 0 28px; display: flex; flex-direction: column; gap: 6px; }

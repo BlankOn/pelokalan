@@ -250,14 +250,25 @@ func (s *Service) Withdraw(ctx context.Context, user *models.User, p *models.Pro
 	if err != nil {
 		return err
 	}
-	if r.RequestedBy != user.ID {
+	own := r.RequestedBy == user.ID
+	if !own && !p.Role.CanManage() { // owners and coordinators cancel anyone's request
 		return apperr.ErrForbidden
 	}
 	if r.Status != models.ReviewRequested {
 		return apperr.New("err.review_closed")
 	}
 	r.Status = models.ReviewWithdrawn
-	return s.repo.Update(ctx, r)
+	if !own {
+		now := time.Now()
+		r.ReviewedBy, r.ReviewedAt = &user.ID, &now
+	}
+	if err := s.repo.Update(ctx, r); err != nil {
+		return err
+	}
+	if !own { // the translator learns who cancelled it
+		go s.notifyTranslator(context.Background(), p, r, user, "cancelled")
+	}
+	return nil
 }
 
 // Reject sends a request back to the translator with a note (owners and managers, not the translator)
@@ -534,10 +545,14 @@ func (s *Service) notifyTranslator(ctx context.Context, p *models.Project, r *mo
 	base := strings.TrimRight(s.site.BaseURL, "/")
 	subject := i18n.T(lang, fmt.Sprintf("mail.review_%s_subject", kind), r.RepoPath, p.Name)
 	var body, note, link, button string
-	if kind == "pushed" {
+	switch kind {
+	case "pushed":
 		body = i18n.T(lang, "mail.review_pushed", reviewer.DisplayName(), r.Entries, r.RepoPath, p.Name)
 		link, button = r.CommitURL, i18n.T(lang, "mail.review_commit_button")
-	} else {
+	case "cancelled":
+		body = i18n.T(lang, "mail.review_cancelled", reviewer.DisplayName(), r.RepoPath, p.Name)
+		link, button = base+r.FileURL(), i18n.T(lang, "mail.review_file_button")
+	default:
 		body = i18n.T(lang, "mail.review_rejected", reviewer.DisplayName(), r.RepoPath, p.Name)
 		note = r.ReviewNote
 		link, button = base+r.FileURL(), i18n.T(lang, "mail.review_file_button")

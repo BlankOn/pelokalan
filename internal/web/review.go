@@ -151,6 +151,8 @@ func (h *Handler) reviewData(r *http.Request, p *models.Project, c *models.Catal
 	// "Komentari bagian ini" in the selection popup: people who review (not the requester) on a waiting request
 	data.Data["CanAnchor"] = rv.Status == models.ReviewRequested && user != nil && p.Role.CanReview() && rv.RequestedBy != user.ID
 	data.Data["CanWithdraw"] = rv.Status == models.ReviewRequested && user != nil && rv.RequestedBy == user.ID
+	// owners and coordinators may cancel someone else's request (the translator is emailed)
+	data.Data["CanCancel"] = rv.Status == models.ReviewRequested && user != nil && rv.RequestedBy != user.ID && p.Role.CanManage()
 	if rv.Status != models.ReviewRequested {
 		return
 	}
@@ -212,7 +214,8 @@ func (h *Handler) RejectReview(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, p.Path()+"/reviews/"+strconv.FormatInt(id, 10)+"?flash=review_rejected", http.StatusSeeOther)
 }
 
-// WithdrawReview takes the user's own request back: POST /projects/{id}/reviews/{rid}/withdraw
+// WithdrawReview takes the user's own request back, or (owners and coordinators) cancels someone else's:
+// POST /projects/{id}/reviews/{rid}/withdraw
 func (h *Handler) WithdrawReview(w http.ResponseWriter, r *http.Request) {
 	p, ok := h.loadMemberProject(w, r)
 	if !ok {

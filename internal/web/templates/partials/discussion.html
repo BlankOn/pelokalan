@@ -22,13 +22,8 @@
                 <a class="muted small" href="#comment-{{.ID}}">{{timeAgo $.Lang .CreatedAt}}</a>
                 {{if .EditedAt}}<span class="muted small">· {{t $.Lang "discuss.edited"}}</span>{{end}}
                 {{if .ReviewID}}<span class="rv-comment-tag" title="{{t $.Lang "review.comment_help"}}">{{if .OpenReview}}<span class="mark-review"></span>{{end}}{{t $.Lang "review.comment_tag"}}</span>{{end}}
-                <div class="spacer"></div>
-                {{$own := and $.User .AuthorID (eq (deref .AuthorID) $.User.ID)}}
-                {{if and $own $.CanComment}}<button type="button" class="linklike small" data-edit-comment="{{.ID}}">{{t $.Lang "action.edit"}}</button>{{end}}
-                {{if and (or $own $.IsOwner) (not $.Thread.Subject.ReadOnly)}}{{if $.User}}
-                <button type="button" class="linklike small danger" hx-post="{{$.Project.Path}}/comments/{{.ID}}/delete" hx-target="#{{$.ID}}" hx-swap="outerHTML" hx-confirm="{{t $.Lang "confirm.delete_comment"}}">{{t $.Lang "action.delete"}}</button>
-                {{end}}{{end}}
             </div>
+            {{$own := and $.User .AuthorID (eq (deref .AuthorID) $.User.ID)}}
                         {{if .AnchorText}}<blockquote class="comment-quote" title="{{t $.Lang "review.anchor_quote_help"}}">“{{.AnchorText}}”</blockquote>{{end}}
                         {{if .Body}}<div class="comment-body">{{commentHTML .Body $.Known}}</div>{{end}}
             {{if .ReviewID}}{{if .ResolvedAt}}<div class="rv-resolved small muted">✓ {{t $.Lang "review.resolved_by" .ResolverName (timeAgo $.Lang (derefTime .ResolvedAt))}}</div>
@@ -43,6 +38,13 @@
                 <a class="att-file" href="{{$url}}" download="{{.Filename}}">📎 <span class="att-name">{{.Filename}}</span> <span class="muted small">{{fileSize .Size}}</span></a>
                 {{end}}
                 {{end}}
+            </div>
+            {{end}}
+            {{$canEdit := and $own $.CanComment}}{{$canDelete := and $.User (or $own $.IsOwner) (not $.Thread.Subject.ReadOnly)}}
+            {{if or $canEdit $canDelete}}
+            <div class="comment-actions">
+                {{if $canEdit}}<button type="button" class="linklike small" data-edit-comment="{{.ID}}">{{t $.Lang "action.edit"}}</button>{{end}}
+                {{if $canDelete}}<button type="button" class="linklike small danger" hx-post="{{$.Project.Path}}/comments/{{.ID}}/delete" hx-target="#{{$.ID}}" hx-swap="outerHTML" hx-confirm="{{t $.Lang "confirm.delete_comment"}}">{{t $.Lang "action.delete"}}</button>{{end}}
             </div>
             {{end}}
             {{if and $own $.CanComment}}
