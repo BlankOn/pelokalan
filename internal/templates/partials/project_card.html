@@ -37,7 +37,6 @@
             <input type="hidden" name="into" value="{{.Mine.ID}}">
             <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
         {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"{{if $v.Res.On}} data-confirm="{{t $v.Lang "reserve.take_confirm" (module .Filename)}}{{if $v.Res.Days}} {{t $v.Lang "reserve.take_confirm_days" $v.Res.Days}}{{end}}" data-confirm-ok="{{t $v.Lang "reserve.take"}}"{{end}}><button class="btn btn-small btn-primary" title="{{if $v.Res.On}}{{t $v.Lang "reserve.take_help"}}{{else}}{{t $v.Lang "files.take_help"}}{{end}}">{{if $v.Res.On}}{{t $v.Lang "reserve.take"}}{{else}}{{t $v.Lang "files.take"}}{{end}}</button></form>{{end}}{{end}}
-        <a class="btn btn-small btn-icon" href="{{$v.Project.Path}}/project-files/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
     </div></td>
 </tr>
 {{end}}
@@ -177,7 +176,6 @@
         {{if and $v.CanSend .CanPush (not $v.Project.ReviewRequired)}}<form method="post" action="/catalogs/{{.ID}}/push" class="inline-form" data-confirm="{{t $v.Lang "review.push_confirm_member" .RepoPath .OwnerUsername}}" data-confirm-ok="{{t $v.Lang "review.push"}}"><button class="btn btn-small" title="{{t $v.Lang "review.push_help"}}">{{t $v.Lang "review.push"}}</button></form>{{end}}
         {{if and $v.Reviewer .Review (eq .Review.Status "requested")}}<a class="btn btn-small btn-primary" href="{{$v.Project.Path}}/reviews/{{.Review.ID}}">{{t $v.Lang "review.open"}}</a>
         {{else}}<a class="btn btn-small" href="{{.URL}}?view=1">{{t $v.Lang "action.view"}}</a>{{end}}
-        <a class="btn btn-small btn-icon" href="/catalogs/{{.ID}}/download" title="{{t $v.Lang "action.download"}} {{.Filename}}" aria-label="{{t $v.Lang "action.download"}} {{.Filename}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11"/><path d="M7 10l5 5 5-5"/><path d="M5 20h14"/></svg></a>
         {{end}}
     </td>
 </tr>

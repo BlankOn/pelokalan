@@ -764,7 +764,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   pages/project_file.html): the stored file read-only in the view layout (table, `?q=` search, status bar, PO
   download). Glossary module chips (list and term page) link to `/projects/{id}/project-files/module/{name}?q=<term>`
   (`ProjectFileByModule`, `GlossaryService.ProjectFileForModule` matches `glossary.ModuleName`, newest group first).
-- View-only toolbars (project files and other members' files) end with `view_action` (partials/view_action.html,
+- The Berkas proyek and Berkas anggota lain rows have no download button: "Lihat" opens the view-only layout, whose toolbar
+  has the PO download. View-only toolbars (project files and other members' files) end with `view_action` (partials/view_action.html,
   `viewAction`): "Buka berkas Anda" when the viewer has the module, who holds it when reserved, else "Reservasi
   modul" (reservations on, asks first) or "Ambil", which take the project file; visitors see "Hanya lihat".
 - The GitHub integration block always shows the app's install link (to install it on more repositories or change
