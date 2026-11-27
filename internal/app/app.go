@@ -22,6 +22,7 @@ import (
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/mailer"
+	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/repository/postgres"
 	"pelokalan/internal/service"
@@ -47,7 +48,7 @@ type Options struct {
 type Repositories struct {
 	User     account.UserRepository
 	OTP      account.OTPRepository
-	Project  repository.ProjectRepository
+	Project  project.Repository
 	Catalog  repository.CatalogRepository
 	Glossary repository.GlossaryRepository
 	AI       repository.AIRepository
@@ -67,7 +68,7 @@ type App struct {
 	Mailer mailer.Mailer
 
 	Auth         *account.Service
-	Projects     *service.ProjectService
+	Projects     *project.Service
 	Catalogs     *service.CatalogService
 	Glossary     *service.GlossaryService
 	Discussions  *service.DiscussionService
@@ -111,7 +112,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.Repos = &Repositories{
 		User:     account.NewUserRepository(db),
 		OTP:      account.NewOTPRepository(db),
-		Project:  postgres.NewProjectRepository(db),
+		Project:  project.NewRepository(db),
 		Catalog:  postgres.NewCatalogRepository(db),
 		Glossary: postgres.NewGlossaryRepository(db),
 		AI:       postgres.NewAIRepository(db),
@@ -133,7 +134,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	}
 	mailer := a.Mailer
 	a.Auth = account.New(repos.User, repos.OTP, mailer, cfg.Auth, cfg.Site, cfg.JWT)
-	a.Projects = service.NewProjectService(repos.Project, repos.User, mailer, a.Auth, cfg.Auth, cfg.Site)
+	a.Projects = project.New(repos.Project, repos.User, mailer, a.Auth, cfg.Auth, cfg.Site)
 	a.Catalogs = service.NewCatalogService(repos.Catalog, repos.Commit, a.Projects)
 	fetcher := glossary.NewFetcher(cfg.Glossary.MaxDownloadMB<<20, cfg.Glossary.AllowPrivateHosts,
 		cfg.Site.Name+" glossary fetcher (+"+cfg.Site.BaseURL+")")
@@ -166,7 +167,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.Reviews.SetDiscussions(a.Discussions) // reviewers' comments on files waiting for review stay open until resolved
 	a.Catalogs.SetActivity(a.Activity)
 	a.Discussions.SetActivity(a.Activity)
-	a.Discussions.SetNotifications(postgres.NewNotificationRepository(db))
+	a.Discussions.SetNotifications(project.NewNotificationRepository(db))
 	a.Wiki = service.NewWikiService(postgres.NewWikiRepository(db), a.Blobs)
 	a.Contexts = modulecontext.New(modulecontext.NewRepository(db))
 	a.AI = service.NewAIService(repos.AI, repos.Catalog, repos.Glossary, ai.NewBox(cfg.AI.SecretKey), cfg.AI.AllowPrivateHosts)

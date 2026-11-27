@@ -1,4 +1,4 @@
-package service
+package project
 
 import (
 	"context"
@@ -36,7 +36,7 @@ func newLinkToken() (string, error) {
 }
 
 // InviteLinks lists a project's invite links (owners and managers)
-func (s *ProjectService) InviteLinks(ctx context.Context, p *models.Project) ([]*models.InviteLink, error) {
+func (s *Service) InviteLinks(ctx context.Context, p *models.Project) ([]*models.InviteLink, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -45,7 +45,7 @@ func (s *ProjectService) InviteLinks(ctx context.Context, p *models.Project) ([]
 
 // CreateInviteLink makes a shareable link that adds whoever opens it (after signing in)
 // with the given role.
-func (s *ProjectService) CreateInviteLink(ctx context.Context, user *models.User, p *models.Project, role models.ProjectRole, days, maxUses int) (*models.InviteLink, error) {
+func (s *Service) CreateInviteLink(ctx context.Context, user *models.User, p *models.Project, role models.ProjectRole, days, maxUses int) (*models.InviteLink, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -74,7 +74,7 @@ func (s *ProjectService) CreateInviteLink(ctx context.Context, user *models.User
 }
 
 // DeleteInviteLink revokes a link; it stops working immediately
-func (s *ProjectService) DeleteInviteLink(ctx context.Context, p *models.Project, id int64) error {
+func (s *Service) DeleteInviteLink(ctx context.Context, p *models.Project, id int64) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -89,7 +89,7 @@ func (s *ProjectService) DeleteInviteLink(ctx context.Context, p *models.Project
 // InviteLink resolves a link token to the link and its project (with the viewer's role).
 // Unknown tokens give ErrInviteLinkInvalid; expired or used-up links are returned so the
 // page can say why they no longer work.
-func (s *ProjectService) InviteLink(ctx context.Context, user *models.User, token string) (*models.InviteLink, *models.Project, error) {
+func (s *Service) InviteLink(ctx context.Context, user *models.User, token string) (*models.InviteLink, *models.Project, error) {
 	if len(token) < 16 || len(token) > 64 {
 		return nil, nil, apperr.ErrInviteLinkInvalid
 	}
@@ -108,7 +108,7 @@ func (s *ProjectService) InviteLink(ctx context.Context, user *models.User, toke
 
 // JoinByInviteLink adds the signed-in user to the link's project. Existing members
 // are left as they are (their role does not change and the link use is not counted).
-func (s *ProjectService) JoinByInviteLink(ctx context.Context, user *models.User, token string) (*models.Project, error) {
+func (s *Service) JoinByInviteLink(ctx context.Context, user *models.User, token string) (*models.Project, error) {
 	l, p, err := s.InviteLink(ctx, user, token)
 	if err != nil {
 		return nil, err

@@ -1,4 +1,4 @@
-package service
+package project
 
 import (
 	"testing"
@@ -11,16 +11,16 @@ import (
 func TestCheckProjectLanguage(t *testing.T) {
 	p := &models.Project{Language: "id"}
 	for _, ok := range []string{"id", "ID", "", " id "} {
-		if err := checkProjectLanguage(p, ok); err != nil {
+		if err := CheckProjectLanguage(p, ok); err != nil {
 			t.Errorf("%q refused: %v", ok, err)
 		}
 	}
-	err := checkProjectLanguage(p, "jv")
+	err := CheckProjectLanguage(p, "jv")
 	ue, isUser := apperr.AsUserError(err)
 	if !isUser || ue.Key != "err.language_mismatch" || ue.Args[0] != "jv" || ue.Args[1] != "id" {
 		t.Fatalf("jv in an id project: %v", err)
 	}
-	if checkProjectLanguage(&models.Project{}, "jv") != nil {
+	if CheckProjectLanguage(&models.Project{}, "jv") != nil {
 		t.Error("a project without a language must accept anything")
 	}
 	if !po.SameLanguage("pt-BR", "pt_br") || po.SameLanguage("pt", "pt_BR") {

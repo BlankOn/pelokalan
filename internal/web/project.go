@@ -20,6 +20,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/project"
 	"pelokalan/internal/service"
 	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/glossary"
@@ -36,7 +37,7 @@ func (h *Handler) Projects(w http.ResponseWriter, r *http.Request) {
 	h.renderProjects(w, r, "", nil)
 }
 
-func (h *Handler) renderProjects(w http.ResponseWriter, r *http.Request, errMsg string, form *service.ProjectInput) {
+func (h *Handler) renderProjects(w http.ResponseWriter, r *http.Request, errMsg string, form *project.ProjectInput) {
 	user := middleware.GetUser(r.Context())
 	projects, err := h.projectService.ListAll(r.Context(), user)
 	if err != nil {
@@ -75,7 +76,7 @@ func (h *Handler) renderProjects(w http.ResponseWriter, r *http.Request, errMsg 
 // CreateProject creates a project
 func (h *Handler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	user := middleware.GetUser(r.Context())
-	in := service.ProjectInput{
+	in := project.ProjectInput{
 		Name:           r.FormValue("name"),
 		Slug:           r.FormValue("slug"),
 		Description:    r.FormValue("description"),
@@ -351,8 +352,8 @@ func (h *Handler) renderMembers(w http.ResponseWriter, r *http.Request, p *model
 			return
 		}
 		data.Data["InviteLinks"] = links
-		data.Data["LinkDays"] = service.InviteLinkDays
-		data.Data["LinkUses"] = service.InviteLinkUses
+		data.Data["LinkDays"] = project.InviteLinkDays
+		data.Data["LinkUses"] = project.InviteLinkUses
 		data.Data["SiteURL"] = strings.TrimRight(h.siteConfig.BaseURL, "/")
 		data.Data["NewLink"] = r.URL.Query().Get("link")
 	}
@@ -439,7 +440,7 @@ func (h *Handler) UpdateSettings(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	in := service.ProjectInput{
+	in := project.ProjectInput{
 		Name:           r.FormValue("name"),
 		Slug:           r.FormValue("slug"),
 		Description:    r.FormValue("description"),

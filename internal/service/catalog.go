@@ -16,6 +16,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/store"
+	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/po"
 )
@@ -24,7 +25,7 @@ import (
 type CatalogService struct {
 	catalogs repository.CatalogRepository
 	commits  repository.CommitRepository
-	projects *ProjectService
+	projects *project.Service
 	activity *activity.Service
 	// reservations: released when a sync shows all the holder's changes upstream (nil = off)
 	reservations *ReservationService
@@ -36,7 +37,7 @@ type CatalogService struct {
 func (s *CatalogService) SetActivity(a *activity.Service) { s.activity = a }
 
 // NewCatalogService creates a new catalog service
-func NewCatalogService(catalogs repository.CatalogRepository, commits repository.CommitRepository, projects *ProjectService) *CatalogService {
+func NewCatalogService(catalogs repository.CatalogRepository, commits repository.CommitRepository, projects *project.Service) *CatalogService {
 	return &CatalogService{catalogs: catalogs, commits: commits, projects: projects}
 }
 
@@ -231,9 +232,9 @@ func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *model
 	isTemplate := strings.HasSuffix(strings.ToLower(filename), ".pot") || language == ""
 	if isTemplate {
 		language = ""
-	} else if !validLanguageCode(language) {
+	} else if !project.ValidLanguageCode(language) {
 		return nil, nil, apperr.ErrInvalidLanguage
-	} else if err := checkProjectLanguage(p, language); err != nil {
+	} else if err := project.CheckProjectLanguage(p, language); err != nil {
 		return nil, nil, err
 	}
 
@@ -378,7 +379,7 @@ func (s *CatalogService) CreateFromTemplate(ctx context.Context, user *models.Us
 		return nil, apperr.ErrForbidden
 	}
 	language = strings.TrimSpace(language)
-	if !validLanguageCode(language) {
+	if !project.ValidLanguageCode(language) {
 		return nil, apperr.ErrInvalidLanguage
 	}
 	tmpl, err := s.Template(ctx, p, user.ID)

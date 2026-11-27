@@ -19,6 +19,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/store"
+	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/glossary"
@@ -32,10 +33,10 @@ type GlossaryService struct {
 	repo     repository.GlossaryRepository
 	fetcher  *glossary.Fetcher
 	matchers matcherCache
-	syncing  sync.Mutex                   // one download round at a time (hourly sync or the Sync button)
-	projects repository.ProjectRepository // for the project's language (imports in another one are refused)
-	upstream *gnomel10n.Client            // state of project files on the GNOME translation site (nil = off)
-	warming  sync.Mutex                   // one upstream state round at a time (start-up and sync rounds)
+	syncing  sync.Mutex         // one download round at a time (hourly sync or the Sync button)
+	projects project.Repository // for the project's language (imports in another one are refused)
+	upstream *gnomel10n.Client  // state of project files on the GNOME translation site (nil = off)
+	warming  sync.Mutex         // one upstream state round at a time (start-up and sync rounds)
 
 	stateMu   sync.Mutex
 	syncState map[int64]*SyncStatus // per project: the latest Sync button run
@@ -55,7 +56,7 @@ type LandingDetector interface {
 func (s *GlossaryService) SetLandings(d LandingDetector) { s.landings = d }
 
 // SetProjects lets imports and syncs check the project's language
-func (s *GlossaryService) SetProjects(r repository.ProjectRepository) { s.projects = r }
+func (s *GlossaryService) SetProjects(r project.Repository) { s.projects = r }
 
 // SetUpstream shows the state of project files on the GNOME translation site
 func (s *GlossaryService) SetUpstream(c *gnomel10n.Client) { s.upstream = c }
@@ -121,17 +122,17 @@ func (s *GlossaryService) ImportGroup(ctx context.Context, user *models.User, p 
 		return nil, err
 	}
 	language := strings.TrimSpace(in.Language)
-	if language != "" && !validLanguageCode(language) {
+	if language != "" && !project.ValidLanguageCode(language) {
 		return nil, apperr.ErrInvalidLanguage
 	}
-	if err := checkProjectLanguage(p, language); err != nil {
+	if err := project.CheckProjectLanguage(p, language); err != nil {
 		return nil, err
 	}
 	// check the files' languages before a module group is created for them
 	if p.Language != "" {
 		if files, err := glossary.ReadFiles(in.Filename, in.Data, glossary.Limits{}); err == nil {
 			for _, lang := range glossary.Build(files, language).Languages {
-				if err := checkProjectLanguage(p, lang); err != nil {
+				if err := project.CheckProjectLanguage(p, lang); err != nil {
 					return nil, err
 				}
 			}
@@ -180,7 +181,7 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 	if s.projects != nil {
 		if p, err := s.projects.GetByID(ctx, v.ProjectID); err == nil {
 			for _, lang := range built.Languages {
-				if err := checkProjectLanguage(p, lang); err != nil {
+				if err := project.CheckProjectLanguage(p, lang); err != nil {
 					return nil, err
 				}
 			}
@@ -293,10 +294,10 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 		return nil, nil, apperr.New("err.feed_url_invalid")
 	}
 	language := strings.TrimSpace(in.Language)
-	if language != "" && !validLanguageCode(language) {
+	if language != "" && !project.ValidLanguageCode(language) {
 		return nil, nil, apperr.ErrInvalidLanguage
 	}
-	if err := checkProjectLanguage(p, language); err != nil {
+	if err := project.CheckProjectLanguage(p, language); err != nil {
 		return nil, nil, err
 	}
 	v, err := s.repo.GetOrCreateGroup(ctx, p.ID, name, version)

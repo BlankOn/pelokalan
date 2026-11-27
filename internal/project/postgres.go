@@ -1,4 +1,4 @@
-package postgres
+package project
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 type projectRepository struct {
@@ -15,7 +14,7 @@ type projectRepository struct {
 }
 
 // NewProjectRepository creates a new PostgreSQL project repository
-func NewProjectRepository(db *sql.DB) repository.ProjectRepository {
+func NewRepository(db *sql.DB) Repository {
 	return &projectRepository{db: db}
 }
 

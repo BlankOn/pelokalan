@@ -1,4 +1,4 @@
-package postgres
+package project
 
 import (
 	"context"
@@ -7,13 +7,12 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
-	"pelokalan/internal/repository"
 )
 
 type notificationRepository struct{ db *sql.DB }
 
 // NewNotificationRepository creates the notification settings repository
-func NewNotificationRepository(db *sql.DB) repository.NotificationRepository {
+func NewNotificationRepository(db *sql.DB) NotificationRepository {
 	return &notificationRepository{db: db}
 }
 

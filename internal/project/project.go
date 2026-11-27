@@ -1,4 +1,4 @@
-package service
+package project
 
 import (
 	"context"
@@ -20,12 +20,11 @@ import (
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 // ProjectService handles projects, members and invitations
-type ProjectService struct {
-	projects repository.ProjectRepository
+type Service struct {
+	projects Repository
 	users    account.UserRepository
 	mailer   mailer.Mailer
 	auth     *account.Service
@@ -34,9 +33,9 @@ type ProjectService struct {
 }
 
 // NewProjectService creates a new project service
-func NewProjectService(projects repository.ProjectRepository, users account.UserRepository, mailer mailer.Mailer,
-	auth *account.Service, cfg config.AuthConfig, site config.SiteConfig) *ProjectService {
-	return &ProjectService{projects: projects, users: users, mailer: mailer, auth: auth, cfg: cfg, site: site}
+func New(projects Repository, users account.UserRepository, mailer mailer.Mailer,
+	auth *account.Service, cfg config.AuthConfig, site config.SiteConfig) *Service {
+	return &Service{projects: projects, users: users, mailer: mailer, auth: auth, cfg: cfg, site: site}
 }
 
 // ProjectInput holds editable project fields
@@ -57,9 +56,9 @@ type ProjectInput struct {
 // slugRe allows 3-50 lowercase letters, digits and dashes, not at the ends
 var slugRe = regexp.MustCompile(`^[a-z0-9][a-z0-9-]{1,48}[a-z0-9]$`)
 
-// validSlug checks a project slug; it must contain a letter so it is never
+// ValidSlug checks a project slug; it must contain a letter so it is never
 // mistaken for a numeric project id
-func validSlug(s string) bool {
+func ValidSlug(s string) bool {
 	return slugRe.MatchString(s) && !strings.Contains(s, "--") && strings.IndexFunc(s, func(r rune) bool { return r >= 'a' && r <= 'z' }) >= 0
 }
 
@@ -80,9 +79,9 @@ func Slugify(name string) string {
 	if len(s) > 46 {
 		s = strings.Trim(s[:46], "-")
 	}
-	if !validSlug(s) {
+	if !ValidSlug(s) {
 		s = strings.Trim("project-"+s, "-")
-		if !validSlug(s) {
+		if !ValidSlug(s) {
 			s = "project"
 		}
 	}
@@ -90,7 +89,7 @@ func Slugify(name string) string {
 }
 
 // uniqueSlug returns slug, or slug-2, slug-3… when taken by another project
-func (s *ProjectService) uniqueSlug(ctx context.Context, slug string, selfID int64) (string, error) {
+func (s *Service) uniqueSlug(ctx context.Context, slug string, selfID int64) (string, error) {
 	for i := 1; i < 1000; i++ {
 		cand := slug
 		if i > 1 {
@@ -108,13 +107,13 @@ func (s *ProjectService) uniqueSlug(ctx context.Context, slug string, selfID int
 }
 
 // resolveSlug validates a requested slug, or derives one from the name
-func (s *ProjectService) resolveSlug(ctx context.Context, in *ProjectInput, selfID int64) error {
+func (s *Service) resolveSlug(ctx context.Context, in *ProjectInput, selfID int64) error {
 	if in.Slug == "" {
 		slug, err := s.uniqueSlug(ctx, Slugify(in.Name), selfID)
 		in.Slug = slug
 		return err
 	}
-	if !validSlug(in.Slug) {
+	if !ValidSlug(in.Slug) {
 		return apperr.ErrSlugInvalid
 	}
 	existing, err := s.projects.GetBySlug(ctx, in.Slug)
@@ -138,11 +137,11 @@ func (in *ProjectInput) clean() error {
 	if in.SourceLanguage == "" {
 		in.SourceLanguage = "en"
 	}
-	if !validLanguageCode(in.SourceLanguage) {
+	if !ValidLanguageCode(in.SourceLanguage) {
 		return apperr.ErrInvalidLanguage
 	}
 	in.Language = strings.TrimSpace(in.Language)
-	if in.Language != "" && !validLanguageCode(in.Language) {
+	if in.Language != "" && !ValidLanguageCode(in.Language) {
 		return apperr.ErrInvalidLanguage
 	}
 	return nil
@@ -153,8 +152,8 @@ func LanguageMismatch(p *models.Project, got string) error {
 	return apperr.New("err.language_mismatch", got, p.Language)
 }
 
-// checkProjectLanguage refuses a language other than the project's (when it has one)
-func checkProjectLanguage(p *models.Project, language string) error {
+// CheckProjectLanguage refuses a language other than the project's (when it has one)
+func CheckProjectLanguage(p *models.Project, language string) error {
 	if p == nil || p.Language == "" || language == "" || po.SameLanguage(p.Language, language) {
 		return nil
 	}
@@ -162,7 +161,7 @@ func checkProjectLanguage(p *models.Project, language string) error {
 }
 
 // Create creates a project owned by the user
-func (s *ProjectService) Create(ctx context.Context, user *models.User, in ProjectInput) (*models.Project, error) {
+func (s *Service) Create(ctx context.Context, user *models.User, in ProjectInput) (*models.Project, error) {
 	if err := in.clean(); err != nil {
 		return nil, err
 	}
@@ -178,12 +177,12 @@ func (s *ProjectService) Create(ctx context.Context, user *models.User, in Proje
 }
 
 // ListForUser returns the projects the user belongs to
-func (s *ProjectService) ListForUser(ctx context.Context, user *models.User) ([]*models.Project, error) {
+func (s *Service) ListForUser(ctx context.Context, user *models.User) ([]*models.Project, error) {
 	return s.projects.ListForUser(ctx, user.ID)
 }
 
 // ListAll returns every project (projects are public); user may be nil
-func (s *ProjectService) ListAll(ctx context.Context, user *models.User) ([]*models.Project, error) {
+func (s *Service) ListAll(ctx context.Context, user *models.User) ([]*models.Project, error) {
 	var uid int64
 	if user != nil {
 		uid = user.ID
@@ -193,7 +192,7 @@ func (s *ProjectService) ListAll(ctx context.Context, user *models.User) ([]*mod
 
 // GetPublic returns a project for reading. Projects are public; Role is empty
 // for visitors and non-members. user may be nil.
-func (s *ProjectService) GetPublic(ctx context.Context, user *models.User, id int64) (*models.Project, error) {
+func (s *Service) GetPublic(ctx context.Context, user *models.User, id int64) (*models.Project, error) {
 	p, err := s.projects.GetByID(ctx, id)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
@@ -211,7 +210,7 @@ func (s *ProjectService) GetPublic(ctx context.Context, user *models.User, id in
 }
 
 // GetPublicBySlug is GetPublic for a project address such as "gnome-id"
-func (s *ProjectService) GetPublicBySlug(ctx context.Context, user *models.User, slug string) (*models.Project, error) {
+func (s *Service) GetPublicBySlug(ctx context.Context, user *models.User, slug string) (*models.Project, error) {
 	p, err := s.projects.GetBySlug(ctx, strings.ToLower(slug))
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
@@ -222,7 +221,7 @@ func (s *ProjectService) GetPublicBySlug(ctx context.Context, user *models.User,
 }
 
 // Get returns a project with the user's role, or ErrNotFound when the user is not a member
-func (s *ProjectService) Get(ctx context.Context, user *models.User, id int64) (*models.Project, error) {
+func (s *Service) Get(ctx context.Context, user *models.User, id int64) (*models.Project, error) {
 	role, err := s.projects.GetMemberRole(ctx, id, user.ID)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
@@ -240,7 +239,7 @@ func (s *ProjectService) Get(ctx context.Context, user *models.User, id int64) (
 }
 
 // Update changes project details (owner or manager)
-func (s *ProjectService) Update(ctx context.Context, p *models.Project, in ProjectInput) error {
+func (s *Service) Update(ctx context.Context, p *models.Project, in ProjectInput) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -265,7 +264,7 @@ func (s *ProjectService) Update(ctx context.Context, p *models.Project, in Proje
 }
 
 // Delete removes the project and all its files (owner only)
-func (s *ProjectService) Delete(ctx context.Context, p *models.Project) error {
+func (s *Service) Delete(ctx context.Context, p *models.Project) error {
 	if !p.Role.IsOwner() {
 		return apperr.ErrForbidden
 	}
@@ -273,17 +272,17 @@ func (s *ProjectService) Delete(ctx context.Context, p *models.Project) error {
 }
 
 // Members lists project members
-func (s *ProjectService) Members(ctx context.Context, p *models.Project) ([]*models.ProjectMember, error) {
+func (s *Service) Members(ctx context.Context, p *models.Project) ([]*models.ProjectMember, error) {
 	return s.projects.ListMembers(ctx, p.ID)
 }
 
 // PendingInvitations lists open invitations of a project
-func (s *ProjectService) PendingInvitations(ctx context.Context, p *models.Project) ([]*models.Invitation, error) {
+func (s *Service) PendingInvitations(ctx context.Context, p *models.Project) ([]*models.Invitation, error) {
 	return s.projects.ListPendingInvitationsForProject(ctx, p.ID)
 }
 
 // Invite asks a whitelisted email address to join the project
-func (s *ProjectService) Invite(ctx context.Context, inviter *models.User, p *models.Project, email string, role models.ProjectRole, lang string) (*models.Invitation, error) {
+func (s *Service) Invite(ctx context.Context, inviter *models.User, p *models.Project, email string, role models.ProjectRole, lang string) (*models.Invitation, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -346,7 +345,7 @@ func (s *ProjectService) Invite(ctx context.Context, inviter *models.User, p *mo
 }
 
 // CancelInvitation withdraws a pending invitation
-func (s *ProjectService) CancelInvitation(ctx context.Context, p *models.Project, invitationID int64) error {
+func (s *Service) CancelInvitation(ctx context.Context, p *models.Project, invitationID int64) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -358,11 +357,11 @@ func (s *ProjectService) CancelInvitation(ctx context.Context, p *models.Project
 }
 
 // InvitationsForUser lists open invitations addressed to the user
-func (s *ProjectService) InvitationsForUser(ctx context.Context, user *models.User) ([]*models.Invitation, error) {
+func (s *Service) InvitationsForUser(ctx context.Context, user *models.User) ([]*models.Invitation, error) {
 	return s.projects.ListPendingInvitationsForEmail(ctx, user.Email)
 }
 
-func (s *ProjectService) ownInvitation(ctx context.Context, user *models.User, id int64) (*models.Invitation, error) {
+func (s *Service) ownInvitation(ctx context.Context, user *models.User, id int64) (*models.Invitation, error) {
 	inv, err := s.projects.GetInvitation(ctx, id)
 	if err != nil || inv.Email != user.Email || inv.AcceptedAt != nil || inv.DeclinedAt != nil || inv.IsExpired() {
 		return nil, apperr.ErrInvitationInvalid
@@ -371,7 +370,7 @@ func (s *ProjectService) ownInvitation(ctx context.Context, user *models.User, i
 }
 
 // AcceptInvitation adds the user to the invited project
-func (s *ProjectService) AcceptInvitation(ctx context.Context, user *models.User, id int64) (*models.Invitation, error) {
+func (s *Service) AcceptInvitation(ctx context.Context, user *models.User, id int64) (*models.Invitation, error) {
 	inv, err := s.ownInvitation(ctx, user, id)
 	if err != nil {
 		return nil, err
@@ -384,7 +383,7 @@ func (s *ProjectService) AcceptInvitation(ctx context.Context, user *models.User
 
 // JoinOpen adds the user to an open project as translator. A pending email invitation to
 // the project is accepted instead, so its role is kept. Members are left as they are.
-func (s *ProjectService) JoinOpen(ctx context.Context, user *models.User, p *models.Project) error {
+func (s *Service) JoinOpen(ctx context.Context, user *models.User, p *models.Project) error {
 	if p.Role.IsMember() {
 		return nil
 	}
@@ -412,7 +411,7 @@ func (s *ProjectService) JoinOpen(ctx context.Context, user *models.User, p *mod
 }
 
 // DeclineInvitation rejects an invitation
-func (s *ProjectService) DeclineInvitation(ctx context.Context, user *models.User, id int64) error {
+func (s *Service) DeclineInvitation(ctx context.Context, user *models.User, id int64) error {
 	inv, err := s.ownInvitation(ctx, user, id)
 	if err != nil {
 		return err
@@ -421,7 +420,7 @@ func (s *ProjectService) DeclineInvitation(ctx context.Context, user *models.Use
 }
 
 // ChangeRole updates a member's role
-func (s *ProjectService) ChangeRole(ctx context.Context, actor *models.User, p *models.Project, userID int64, role models.ProjectRole) error {
+func (s *Service) ChangeRole(ctx context.Context, actor *models.User, p *models.Project, userID int64, role models.ProjectRole) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -448,7 +447,7 @@ func (s *ProjectService) ChangeRole(ctx context.Context, actor *models.User, p *
 }
 
 // notifyRoleChange emails a member whose role someone else changed (in their language): who, from what, to what
-func (s *ProjectService) notifyRoleChange(ctx context.Context, actor *models.User, p *models.Project, userID int64, from, to models.ProjectRole) {
+func (s *Service) notifyRoleChange(ctx context.Context, actor *models.User, p *models.Project, userID int64, from, to models.ProjectRole) {
 	if s.mailer == nil {
 		return
 	}
@@ -475,7 +474,7 @@ func (s *ProjectService) notifyRoleChange(ctx context.Context, actor *models.Use
 
 // RemoveMember removes a member. Members may always remove themselves (leave),
 // except the owner.
-func (s *ProjectService) RemoveMember(ctx context.Context, actor *models.User, p *models.Project, userID int64) error {
+func (s *Service) RemoveMember(ctx context.Context, actor *models.User, p *models.Project, userID int64) error {
 	if userID != actor.ID && !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -492,7 +491,8 @@ func (s *ProjectService) RemoveMember(ctx context.Context, actor *models.User, p
 	return s.projects.RemoveMember(ctx, p.ID, userID)
 }
 
-func validLanguageCode(code string) bool {
+// ValidLanguageCode accepts gettext language codes ("id", "pt_BR", "sr@latin")
+func ValidLanguageCode(code string) bool {
 	if len(code) < 2 || len(code) > 12 {
 		return false
 	}

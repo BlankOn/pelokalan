@@ -11,6 +11,7 @@ import (
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/store"
+	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 )
 
@@ -237,7 +238,7 @@ func (s *WikiService) uniqueSlug(ctx context.Context, projectID int64, base stri
 
 // wikiSlug derives a page address from its title ("Panduan Gaya" -> "panduan-gaya")
 func wikiSlug(title string) string {
-	s := Slugify(title)
+	s := project.Slugify(title)
 	// Slugify pads short or empty results with "project"; say "page" for wiki pages instead
 	if !strings.HasPrefix(strings.ToLower(strings.TrimSpace(title)), "project") {
 		if s == "project" {
@@ -272,7 +273,7 @@ func (s *WikiService) Create(ctx context.Context, user *models.User, p *models.P
 			return nil, err
 		}
 	} else {
-		if !validSlug(slug) || wikiReserved[slug] {
+		if !project.ValidSlug(slug) || wikiReserved[slug] {
 			return nil, ErrWikiSlug
 		}
 		if taken, err := s.repo.SlugExists(ctx, p.ID, slug); err != nil {
@@ -312,7 +313,7 @@ func (s *WikiService) Update(ctx context.Context, user *models.User, p *models.P
 	}
 	// a new address must be valid and free; the old one keeps redirecting here
 	if slug := strings.ToLower(strings.TrimSpace(in.Slug)); slug != "" && slug != pg.Slug {
-		if !validSlug(slug) || wikiReserved[slug] {
+		if !project.ValidSlug(slug) || wikiReserved[slug] {
 			return nil, ErrWikiSlug
 		}
 		if taken, err := s.repo.SlugExists(ctx, p.ID, slug); err != nil {

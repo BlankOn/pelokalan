@@ -22,6 +22,7 @@ import (
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
+	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 )
 
@@ -54,13 +55,13 @@ type Thread struct {
 // DiscussionService manages comment threads attached to project subjects
 type DiscussionService struct {
 	repo     repository.DiscussionRepository
-	projects repository.ProjectRepository
+	projects project.Repository
 	glossary repository.GlossaryRepository
 	catalogs repository.CatalogRepository
 	blobs    blobstore.Store
 	mailer   mailer.Mailer
 	site     config.SiteConfig
-	notifs   repository.NotificationRepository // members' email choices (nil: email everyone)
+	notifs   project.NotificationRepository // members' email choices (nil: email everyone)
 	activity *activity.Service
 
 	// reviewFor returns the open review a comment by user on a file's entry belongs to (nil = a plain comment)
@@ -89,7 +90,7 @@ func entryCatalog(subjectType, key string) int64 {
 }
 
 // SetNotifications connects the members' notification settings
-func (s *DiscussionService) SetNotifications(r repository.NotificationRepository) { s.notifs = r }
+func (s *DiscussionService) SetNotifications(r project.NotificationRepository) { s.notifs = r }
 
 // NotificationSettings returns a member's email choices in a project
 func (s *DiscussionService) NotificationSettings(ctx context.Context, user *models.User, p *models.Project) (*models.NotificationSettings, error) {
@@ -130,7 +131,7 @@ func (s *DiscussionService) SaveNotificationSettings(ctx context.Context, user *
 func (s *DiscussionService) SetActivity(a *activity.Service) { s.activity = a }
 
 // NewDiscussionService creates the discussion service
-func NewDiscussionService(repo repository.DiscussionRepository, projects repository.ProjectRepository,
+func NewDiscussionService(repo repository.DiscussionRepository, projects project.Repository,
 	glossaryRepo repository.GlossaryRepository, catalogs repository.CatalogRepository, blobs blobstore.Store,
 	mailer mailer.Mailer, site config.SiteConfig) *DiscussionService {
 	return &DiscussionService{repo: repo, projects: projects, glossary: glossaryRepo, catalogs: catalogs, blobs: blobs,

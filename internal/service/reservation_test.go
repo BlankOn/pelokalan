@@ -11,7 +11,7 @@ import (
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
+	"pelokalan/internal/project"
 )
 
 // memReservations keeps reservations in memory with the same rules as the table (one holder per module)
@@ -89,7 +89,7 @@ func (m *memReservations) SetReminded(_ context.Context, id int64) error {
 }
 
 type oneProject struct {
-	repository.ProjectRepository
+	project.Repository
 	p *models.Project
 }
 

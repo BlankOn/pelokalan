@@ -28,6 +28,7 @@ import (
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/project"
 	"pelokalan/internal/service"
 	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/badgecard"
@@ -43,7 +44,7 @@ type Handler struct {
 	siteConfig     config.SiteConfig
 	serverConfig   config.ServerConfig
 	authService    *account.Service
-	projectService *service.ProjectService
+	projectService *project.Service
 	catalogService *service.CatalogService
 	glossary       *service.GlossaryService
 	ai             *service.AIService
@@ -67,7 +68,7 @@ func NewHandler(
 	siteConfig config.SiteConfig,
 	serverConfig config.ServerConfig,
 	authService *account.Service,
-	projectService *service.ProjectService,
+	projectService *project.Service,
 	catalogService *service.CatalogService,
 	glossaryService *service.GlossaryService,
 	aiService *service.AIService,

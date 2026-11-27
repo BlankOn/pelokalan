@@ -17,6 +17,7 @@ import (
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
+	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/gitpatch"
@@ -39,7 +40,7 @@ type ReviewService struct {
 	catalogs     *CatalogService
 	glossary     *GlossaryService
 	reservations *ReservationService
-	projects     repository.ProjectRepository
+	projects     project.Repository
 	users        account.UserRepository
 	mailer       mailer.Mailer
 	site         config.SiteConfig
@@ -83,7 +84,7 @@ func (s *ReviewService) openComments(ctx context.Context, p *models.Project, cat
 
 // NewReviewService creates the review service
 func NewReviewService(repo repository.ReviewRepository, catalogs *CatalogService, glossary *GlossaryService,
-	reservations *ReservationService, projects repository.ProjectRepository, users account.UserRepository,
+	reservations *ReservationService, projects project.Repository, users account.UserRepository,
 	mailer mailer.Mailer, site config.SiteConfig) *ReviewService {
 	return &ReviewService{repo: repo, catalogs: catalogs, glossary: glossary, reservations: reservations,
 		projects: projects, users: users, mailer: mailer, site: site}

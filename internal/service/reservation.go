@@ -16,6 +16,7 @@ import (
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
+	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 )
 
@@ -35,14 +36,14 @@ const ReminderDays = 3
 // ReservationService manages module reservations
 type ReservationService struct {
 	repo     repository.ReservationRepository
-	projects repository.ProjectRepository
+	projects project.Repository
 	users    account.UserRepository
 	mailer   mailer.Mailer
 	site     config.SiteConfig
 }
 
 // NewReservationService creates the reservation service
-func NewReservationService(repo repository.ReservationRepository, projects repository.ProjectRepository,
+func NewReservationService(repo repository.ReservationRepository, projects project.Repository,
 	users account.UserRepository, mailer mailer.Mailer, site config.SiteConfig) *ReservationService {
 	return &ReservationService{repo: repo, projects: projects, users: users, mailer: mailer, site: site}
 }
