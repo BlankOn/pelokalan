@@ -1258,6 +1258,7 @@ h1 .ai-badge { font-size: 12px; }
     .files-table td:empty { display: none; }
     .files-table .progress { width: calc(100% - 48px); }
     .files-table td.actions { display: flex; gap: 8px; justify-content: flex-start; margin-top: 6px; }
+    .files-table td.actions > .pf-actions { flex: 1; min-width: 0; }
     .pf-actions { justify-content: flex-start; }
     .files-table td.actions { position: relative; }
     .files-table .dropdown { position: static; }
@@ -1573,7 +1574,9 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .project-files .progress { display: inline-flex; width: 110px; vertical-align: middle; }
 .project-files td.actions form { margin: 0; display: inline; }
 /* one row of equally tall buttons with equal gaps (inline forms would add uneven whitespace) */
-.pf-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; }
+.pf-actions { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; }
+/* narrow screens: buttons wrap onto more lines instead of running past the edge */
+.pf-actions > * { flex: 0 0 auto; }
 .pf-actions form { display: flex; }
 .pf-actions .btn { display: inline-flex; align-items: center; line-height: 1; margin: 0; }
 .project-files td.actions form .btn { min-width: 84px; justify-content: center; text-align: center; }

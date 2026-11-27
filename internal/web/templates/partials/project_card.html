@@ -142,7 +142,7 @@
     <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>
         {{template "file_counts" (dict "Lang" $v.Lang "S" .Stats)}}
         {{else}}<span class="small muted">{{t $v.Lang "project.template_strings" .Stats.Total}}</span>{{end}}</td>
-    <td class="actions">
+    <td class="actions"><div class="pf-actions">
         {{if $v.Mine}}{{$heldOther := and .Reservation (ne .Reservation.UserID $v.Res.UserID)}}
         {{if and $v.Res.On (not .IsTemplate) (not .Reservation)}}<form method="post" action="{{$v.Project.Path}}/reservations" class="inline-form" data-confirm="{{t $v.Lang "reserve.translate_confirm" (module .Filename)}}{{if $v.Res.Days}} {{t $v.Lang "reserve.take_confirm_days" $v.Res.Days}}{{end}}" data-confirm-ok="{{t $v.Lang "reserve.translate"}}"><input type="hidden" name="module" value="{{module .Filename}}"><input type="hidden" name="next" value="{{.URL}}"><button class="btn btn-small btn-primary" title="{{t $v.Lang "reserve.reserve_help"}}">{{t $v.Lang "reserve.translate"}}</button></form>
         {{else if .ReviewReady}}<a class="btn btn-small btn-primary" href="{{.URL}}">{{t $v.Lang "action.translate"}}</a>
@@ -179,7 +179,7 @@
         <a class="btn btn-small btn-primary" href="{{$v.Project.Path}}/reviews/{{.Review.ID}}">{{t $v.Lang "review.open"}}</a>
         {{else}}<a class="btn btn-small" href="{{.URL}}?view=1">{{t $v.Lang "action.view"}}</a>{{end}}
         {{end}}
-    </td>
+    </div></td>
 </tr>
 {{else}}
 {{if .Searched}}<tr class="pf-more"><td colspan="3" class="muted">{{t .Lang "files.project_none"}}</td></tr>{{end}}
