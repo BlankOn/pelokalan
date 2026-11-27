@@ -46,7 +46,7 @@ func (h *Handler) renderSettingsWith(w http.ResponseWriter, r *http.Request, p *
 	}
 	data.Data["Project"] = p
 	data.Data["Tab"] = "settings"
-	data.Data["ReservationDays"] = service.ReservationDays
+	data.Data["ReservationDays"] = models.ReservationDays
 	if n, err := h.discuss.NotificationSettings(r.Context(), middleware.GetUser(r.Context()), p); err == nil {
 		data.Data["Notify"] = n
 	}

@@ -39,11 +39,26 @@ type Options struct {
 	Offline bool
 }
 
+// Repositories are the Postgres stores the app was built with (main and tests use some directly)
+type Repositories struct {
+	User     repository.UserRepository
+	OTP      repository.OTPRepository
+	Project  repository.ProjectRepository
+	Catalog  repository.CatalogRepository
+	Glossary repository.GlossaryRepository
+	AI       repository.AIRepository
+	Commit   repository.CommitRepository
+	Discuss  repository.DiscussionRepository
+	Activity repository.ActivityRepository
+	Reserve  repository.ReservationRepository
+	Review   repository.ReviewRepository
+}
+
 // App is the wired application
 type App struct {
 	Router http.Handler
 	DB     *sql.DB
-	Repos  *repository.Repositories
+	Repos  *Repositories
 	Blobs  *blobstore.Postgres
 	Mailer mailer.Mailer
 
@@ -89,7 +104,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		opts.Root = "."
 	}
 	a := &App{DB: db}
-	a.Repos = &repository.Repositories{
+	a.Repos = &Repositories{
 		User:     postgres.NewUserRepository(db),
 		OTP:      postgres.NewOTPRepository(db),
 		Project:  postgres.NewProjectRepository(db),

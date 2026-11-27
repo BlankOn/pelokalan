@@ -28,9 +28,6 @@ import (
 // ErrModuleReserved: another member holds the module
 var ErrModuleReserved = apperr.New("err.module_reserved")
 
-// ReservationDays are the expiry choices in Settings (0 = never)
-var ReservationDays = []int{0, 14, 30, 60}
-
 // ReminderDays is how long before expiry the holder is reminded
 const ReminderDays = 3
 

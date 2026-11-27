@@ -87,3 +87,11 @@ func (s *ActivityService) Summary(ctx context.Context, p *models.Project, rangeK
 func (s *ActivityService) HourlyTranslated(ctx context.Context, p *models.Project) ([]models.ActivityDay, error) {
 	return s.repo.HourlyTranslated(ctx, p.ID)
 }
+
+// ClaimOneTimeJob marks a one-time job as started; false when it already ran
+func (s *ActivityService) ClaimOneTimeJob(ctx context.Context, name string) (bool, error) {
+	if s == nil {
+		return false, nil
+	}
+	return s.repo.ClaimOneTimeJob(ctx, name)
+}

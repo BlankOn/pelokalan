@@ -292,21 +292,6 @@ type DiscussionRepository interface {
 	DeleteDiscussion(ctx context.Context, id int64) error
 }
 
-// Repositories holds all repositories
-type Repositories struct {
-	User     UserRepository
-	OTP      OTPRepository
-	Project  ProjectRepository
-	Catalog  CatalogRepository
-	Glossary GlossaryRepository
-	AI       AIRepository
-	Commit   CommitRepository
-	Discuss  DiscussionRepository
-	Activity ActivityRepository
-	Reserve  ReservationRepository
-	Review   ReviewRepository
-}
-
 // ReviewRepository stores review requests of modules for repositories Pelokalan writes to (module_reviews)
 type ReviewRepository interface {
 	// Create stores a request; ErrConflict when the file already has an open one

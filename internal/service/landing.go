@@ -212,11 +212,3 @@ func (s *CatalogService) BackfillLandings(ctx context.Context, projects []*model
 	}
 	return added, nil
 }
-
-// ClaimOneTimeJob marks a one-time job as started; false when it already ran
-func (s *ActivityService) ClaimOneTimeJob(ctx context.Context, name string) (bool, error) {
-	if s == nil {
-		return false, nil
-	}
-	return s.repo.ClaimOneTimeJob(ctx, name)
-}

@@ -255,7 +255,7 @@ func (s *ProjectService) Update(ctx context.Context, p *models.Project, in Proje
 	p.Name, p.Slug, p.Description, p.SourceLanguage, p.Language, p.Open = in.Name, in.Slug, in.Description, in.SourceLanguage, in.Language, in.Open
 	p.Reservations, p.ReservationDays = in.Reservations, 30
 	p.ReviewRequired = in.ReviewRequired
-	for _, d := range ReservationDays { // only the offered choices
+	for _, d := range models.ReservationDays { // only the offered choices
 		if d == in.ReservationDays {
 			p.ReservationDays = d
 		}

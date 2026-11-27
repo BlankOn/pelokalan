@@ -164,3 +164,6 @@ func (r *ModuleReservation) DisplayName() string {
 	}
 	return r.Username
 }
+
+// ReservationDays are the expiry choices in Settings (0 = never)
+var ReservationDays = []int{0, 14, 30, 60}
