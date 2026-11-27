@@ -37,9 +37,6 @@ func scanCatalog(row interface{ Scan(...any) error }) (*models.Catalog, error) {
 	return c, err
 }
 
-// untranslatedExpr is true when at least one plural form is empty
-const untranslatedExpr = `EXISTS (SELECT 1 FROM jsonb_array_elements_text(msgstr) s WHERE s = '')`
-
 func (r *catalogRepository) Create(ctx context.Context, c *models.Catalog, entries []*models.Entry) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
@@ -304,8 +301,8 @@ func (r *catalogRepository) Stats(ctx context.Context, catalogID int64) (models.
 	var s models.CatalogStats
 	err := r.db.QueryRowContext(ctx,
 		`SELECT COUNT(*),
-		        COUNT(*) FILTER (WHERE NOT fuzzy AND origin <> 'ai' AND NOT `+untranslatedExpr+`),
-		        COUNT(*) FILTER (WHERE (fuzzy OR origin = 'ai') AND NOT `+untranslatedExpr+`)
+		        COUNT(*) FILTER (WHERE NOT fuzzy AND origin <> 'ai' AND NOT `+store.UntranslatedExpr+`),
+		        COUNT(*) FILTER (WHERE (fuzzy OR origin = 'ai') AND NOT `+store.UntranslatedExpr+`)
 		 FROM entries WHERE catalog_id = $1 AND NOT obsolete`, catalogID,
 	).Scan(&s.Total, &s.Translated, &s.Fuzzy)
 	s.Untranslated = s.Total - s.Translated - s.Fuzzy

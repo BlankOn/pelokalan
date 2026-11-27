@@ -1,4 +1,4 @@
-package service
+package activity
 
 import (
 	"context"
@@ -158,7 +158,7 @@ func earnedPeriod(key string, t int, days []models.ProfileDay) (earned, from, to
 
 // BadgeDetail gathers what earned tier (1-based) of badge b for the profile's person; loc is the site's
 // time zone (days are dates in it)
-func (s *ActivityService) BadgeDetail(ctx context.Context, p *Profile, b Badge, tier int, loc *time.Location) (*BadgeDetail, error) {
+func (s *Service) BadgeDetail(ctx context.Context, p *Profile, b Badge, tier int, loc *time.Location) (*BadgeDetail, error) {
 	k, ok := badgeKind[b.Key]
 	if !ok {
 		return &BadgeDetail{}, nil

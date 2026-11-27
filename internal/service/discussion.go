@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 
+	"pelokalan/internal/activity"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/blobstore"
@@ -60,7 +61,7 @@ type DiscussionService struct {
 	mailer   mailer.Mailer
 	site     config.SiteConfig
 	notifs   repository.NotificationRepository // members' email choices (nil: email everyone)
-	activity *ActivityService
+	activity *activity.Service
 
 	// reviewFor returns the open review a comment by user on a file's entry belongs to (nil = a plain comment)
 	reviewFor func(ctx context.Context, p *models.Project, catalogID int64, user *models.User) *int64
@@ -126,7 +127,7 @@ func (s *DiscussionService) SaveNotificationSettings(ctx context.Context, user *
 }
 
 // SetActivity makes the service record comments in the activity log
-func (s *DiscussionService) SetActivity(a *ActivityService) { s.activity = a }
+func (s *DiscussionService) SetActivity(a *activity.Service) { s.activity = a }
 
 // NewDiscussionService creates the discussion service
 func NewDiscussionService(repo repository.DiscussionRepository, projects repository.ProjectRepository,

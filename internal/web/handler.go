@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/activity"
 	"pelokalan/internal/langtools"
 	"pelokalan/internal/models"
 	"pelokalan/internal/modulecontext"
@@ -52,7 +53,7 @@ type Handler struct {
 	syncEvery      time.Duration     // automatic glossary/project file sync interval
 	thesaurus      *langtools.ThesaurusService
 	spelling       *langtools.SpellingService
-	activity       *service.ActivityService
+	activity       *activity.Service
 	reservations   *service.ReservationService // module reservations (nil-safe: off)
 	reviews        *service.ReviewService      // reviews and commits to repositories (nil-safe: off)
 	assetVersion   string

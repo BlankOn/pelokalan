@@ -145,7 +145,7 @@ func (s *CatalogService) landingsIn(ctx context.Context, c *models.Catalog, grou
 	if len(out) == 0 {
 		return 0, nil
 	}
-	return s.activity.repo.AddLandings(ctx, out)
+	return s.activity.AddLandings(ctx, out)
 }
 
 // SetReservations lets syncs release a module whose holder's changes are all upstream

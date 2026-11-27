@@ -12,6 +12,7 @@ import (
 
 	"github.com/jackc/pgx/v5/pgconn"
 
+	"pelokalan/internal/activity"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/store"
@@ -24,7 +25,7 @@ type CatalogService struct {
 	catalogs repository.CatalogRepository
 	commits  repository.CommitRepository
 	projects *ProjectService
-	activity *ActivityService
+	activity *activity.Service
 	// reservations: released when a sync shows all the holder's changes upstream (nil = off)
 	reservations *ReservationService
 	// project files, for git patches against the repository's own files (SetProjectFiles)
@@ -32,7 +33,7 @@ type CatalogService struct {
 }
 
 // SetActivity makes the service record entry saves and commits in the activity log
-func (s *CatalogService) SetActivity(a *ActivityService) { s.activity = a }
+func (s *CatalogService) SetActivity(a *activity.Service) { s.activity = a }
 
 // NewCatalogService creates a new catalog service
 func NewCatalogService(catalogs repository.CatalogRepository, commits repository.CommitRepository, projects *ProjectService) *CatalogService {

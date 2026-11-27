@@ -15,6 +15,7 @@ import (
 
 	_ "github.com/jackc/pgx/v5/stdlib"
 
+	"pelokalan/internal/activity"
 	"pelokalan/internal/app"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
@@ -125,7 +126,7 @@ func main() {
 				log.Printf("upstream landings backfill: %d strings accepted upstream recorded (err: %v)", n, err)
 			}
 		}
-		if claimed, err := activityService.ClaimOneTimeJob(ctx, service.BadgeAwardsBaselineJob); err == nil && claimed {
+		if claimed, err := activityService.ClaimOneTimeJob(ctx, activity.BadgeAwardsBaselineJob); err == nil && claimed {
 			_, err := activityService.AwardBadges(ctx, web.SiteLocation(), time.Now(), false)
 			log.Printf("badges: baseline recorded silently (err: %v)", err)
 		}

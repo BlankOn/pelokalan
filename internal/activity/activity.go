@@ -1,4 +1,4 @@
-package service
+package activity
 
 import (
 	"context"
@@ -7,19 +7,18 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
-	"pelokalan/internal/repository"
 )
 
 // ActivityService records what people do (activity_events) and reports it on the Insight tab.
 // Recording never fails the action itself: errors are only logged.
-type ActivityService struct {
-	repo repository.ActivityRepository
+type Service struct {
+	repo Repository
 	mail *badgeMail // emails about new badges (nil = off)
 }
 
 // NewActivityService creates the activity service
-func NewActivityService(repo repository.ActivityRepository) *ActivityService {
-	return &ActivityService{repo: repo}
+func New(repo Repository) *Service {
+	return &Service{repo: repo}
 }
 
 // ActivityRanges are the periods the Insight tab offers (days; 0 = all time)
@@ -29,7 +28,7 @@ var ActivityRanges = []struct {
 }{{"7", 7}, {"30", 30}, {"90", 90}, {"all", 0}}
 
 // Record stores an event; a nil service (tests, tools) records nothing
-func (s *ActivityService) Record(ctx context.Context, e *models.ActivityEvent) {
+func (s *Service) Record(ctx context.Context, e *models.ActivityEvent) {
 	if s == nil || s.repo == nil {
 		return
 	}
@@ -39,7 +38,7 @@ func (s *ActivityService) Record(ctx context.Context, e *models.ActivityEvent) {
 }
 
 // EntrySaved records a person saving an entry: before is the entry as it was, after as saved
-func (s *ActivityService) EntrySaved(ctx context.Context, user *models.User, c *models.Catalog, before, after *models.Entry) {
+func (s *Service) EntrySaved(ctx context.Context, user *models.User, c *models.Catalog, before, after *models.Entry) {
 	if before == nil || after == nil {
 		return
 	}
@@ -67,7 +66,7 @@ func logStatus(e *models.Entry) string {
 
 // Summary returns each member's activity in the project over the range (ActivityRanges key)
 // and when recording started for it
-func (s *ActivityService) Summary(ctx context.Context, p *models.Project, rangeKey string) ([]*models.ActivitySummary, *time.Time, error) {
+func (s *Service) Summary(ctx context.Context, p *models.Project, rangeKey string) ([]*models.ActivitySummary, *time.Time, error) {
 	var since *time.Time
 	for _, r := range ActivityRanges {
 		if r.Key == rangeKey && r.Days > 0 {
@@ -84,14 +83,23 @@ func (s *ActivityService) Summary(ctx context.Context, p *models.Project, rangeK
 }
 
 // HourlyTranslated returns the project's translation output per hour, oldest first
-func (s *ActivityService) HourlyTranslated(ctx context.Context, p *models.Project) ([]models.ActivityDay, error) {
+func (s *Service) HourlyTranslated(ctx context.Context, p *models.Project) ([]models.ActivityDay, error) {
 	return s.repo.HourlyTranslated(ctx, p.ID)
 }
 
 // ClaimOneTimeJob marks a one-time job as started; false when it already ran
-func (s *ActivityService) ClaimOneTimeJob(ctx context.Context, name string) (bool, error) {
+func (s *Service) ClaimOneTimeJob(ctx context.Context, name string) (bool, error) {
 	if s == nil {
 		return false, nil
 	}
 	return s.repo.ClaimOneTimeJob(ctx, name)
+}
+
+// AddLandings records strings members translated that showed up upstream word for word (each once); it returns how
+// many were new
+func (s *Service) AddLandings(ctx context.Context, landings []models.UpstreamLanding) (int, error) {
+	if s == nil {
+		return 0, nil
+	}
+	return s.repo.AddLandings(ctx, landings)
 }

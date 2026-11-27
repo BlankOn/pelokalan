@@ -1,4 +1,4 @@
-package service
+package activity
 
 import (
 	"context"
@@ -12,7 +12,6 @@ import (
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
-	"pelokalan/internal/repository"
 )
 
 // New badges by email. Badges are computed from the activity, so nothing marks the moment one is earned:
@@ -25,20 +24,25 @@ import (
 const BadgeAwardsBaselineJob = "badge-awards-baseline"
 
 type badgeMail struct {
-	users   repository.UserRepository
+	users   UserGetter
 	mailer  mailer.Mailer
 	site    config.SiteConfig
 	allowed func(email string) bool
 }
 
+// UserGetter is what badge emails need from the user store
+type UserGetter interface {
+	GetByID(ctx context.Context, id int64) (*models.User, error)
+}
+
 // SetBadgeMail lets AwardBadges look people up and email them; allowed is the sign-in whitelist
-func (s *ActivityService) SetBadgeMail(users repository.UserRepository, mailer mailer.Mailer, site config.SiteConfig, allowed func(string) bool) {
+func (s *Service) SetBadgeMail(users UserGetter, mailer mailer.Mailer, site config.SiteConfig, allowed func(string) bool) {
 	s.mail = &badgeMail{users: users, mailer: mailer, site: site, allowed: allowed}
 }
 
 // AwardBadges records the badge tiers people reached since the last run and, when notify is set, emails
 // each person about theirs (unless they turned it off). It returns how many people got an email.
-func (s *ActivityService) AwardBadges(ctx context.Context, loc *time.Location, now time.Time, notify bool) (int, error) {
+func (s *Service) AwardBadges(ctx context.Context, loc *time.Location, now time.Time, notify bool) (int, error) {
 	if s == nil || s.mail == nil {
 		return 0, nil
 	}
@@ -94,7 +98,7 @@ func (s *ActivityService) AwardBadges(ctx context.Context, loc *time.Location, n
 }
 
 // badgeMessage is the email about new badges: what was earned, its picture, and links to share it
-func (s *ActivityService) badgeMessage(u *models.User, badges []Badge) *mailer.Message {
+func (s *Service) badgeMessage(u *models.User, badges []Badge) *mailer.Message {
 	lang := i18n.Normalize(u.Lang)
 	base := strings.TrimRight(s.mail.site.BaseURL, "/")
 	shares := make([]BadgeShare, len(badges))

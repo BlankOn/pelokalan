@@ -8,6 +8,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
@@ -180,4 +181,12 @@ func TestReservations(t *testing.T) {
 	if n, _ := s.Expire(ctx, now); n != 0 {
 		t.Fatal("expired although the project never expires reservations")
 	}
+}
+
+// sentMail keeps the emails a test sends
+type sentMail struct{ msgs []*mailer.Message }
+
+func (m *sentMail) Send(_ context.Context, msg *mailer.Message) error {
+	m.msgs = append(m.msgs, msg)
+	return nil
 }

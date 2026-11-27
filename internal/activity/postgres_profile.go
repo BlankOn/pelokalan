@@ -1,4 +1,4 @@
-package postgres
+package activity
 
 import (
 	"context"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 )
 
 // A contribution is an entry save that did translation work, by the same rules as the Statistik tab:
@@ -82,7 +83,7 @@ func (r *activityRepository) UserTotals(ctx context.Context, userID int64) (*mod
 		  (SELECT COUNT(*) FROM catalogs c WHERE c.owner_id = $1 AND NOT c.is_template
 		     AND EXISTS (SELECT 1 FROM entries e WHERE e.catalog_id = c.id AND NOT e.obsolete)
 		     AND NOT EXISTS (SELECT 1 FROM entries e WHERE e.catalog_id = c.id AND NOT e.obsolete
-		                     AND (e.fuzzy OR e.origin = 'ai' OR `+untranslatedExpr+`))
+		                     AND (e.fuzzy OR e.origin = 'ai' OR `+store.UntranslatedExpr+`))
 		     AND EXISTS (SELECT 1 FROM activity_events a WHERE a.user_id = $1 AND a.catalog_id = c.id AND `+evContribute+`)),
 		  (SELECT COUNT(*) FROM comments WHERE author_id = $1 AND deleted_at IS NULL),
 		  (SELECT COUNT(*) FROM discussions WHERE created_by = $1 AND subject_type = 'topic'),

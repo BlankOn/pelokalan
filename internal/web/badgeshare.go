@@ -11,9 +11,9 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/activity"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
-	"pelokalan/internal/service"
 	"pelokalan/pkg/badgecard"
 )
 
@@ -28,13 +28,13 @@ type pageMeta struct {
 }
 
 // badgeShare is one earned badge tier with its share texts (service.BadgeShareFor)
-type badgeShare = service.BadgeShare
+type badgeShare = activity.BadgeShare
 
 func (h *Handler) siteURL() string { return strings.TrimRight(h.siteConfig.BaseURL, "/") }
 
 // shareFor builds the share texts of badge b at tier (1-based) for user u in lang
-func (h *Handler) shareFor(lang string, u *models.User, b service.Badge, tier int) badgeShare {
-	return service.BadgeShareFor(h.siteURL(), lang, u, b, tier)
+func (h *Handler) shareFor(lang string, u *models.User, b activity.Badge, tier int) badgeShare {
+	return activity.BadgeShareFor(h.siteURL(), lang, u, b, tier)
 }
 
 func (h *Handler) ownerLang(u *models.User) string {
@@ -63,7 +63,7 @@ func (h *Handler) badgeImage(u *models.User, s badgeShare) ([]byte, error) {
 		host = pu.Host
 	}
 	data, err := badgecard.Render(badgecard.Card{Icon: s.Icon, Tier: s.TierName, TierIndex: s.Tier, TierCount: s.Tiers,
-		Brand: h.siteConfig.Name, Title: s.Name, TierLabel: s.TierLabel, Desc: service.CapFirst(s.Done),
+		Brand: h.siteConfig.Name, Title: s.Name, TierLabel: s.TierLabel, Desc: activity.CapFirst(s.Done),
 		Person: u.DisplayName() + " (@" + u.Username + ")", Footer: host})
 	if err != nil {
 		return nil, err
@@ -154,7 +154,7 @@ func dateRange(lang string, a, b time.Time) string {
 	return shortDate(lang, a) + " – " + shortDate(lang, b)
 }
 
-func (h *Handler) badgeDetailView(lang string, d *service.BadgeDetail) *badgeDetailView {
+func (h *Handler) badgeDetailView(lang string, d *activity.BadgeDetail) *badgeDetailView {
 	v := &badgeDetailView{CountKey: fmt.Sprintf("badges.count_%s", d.Count), Modules: d.Modules}
 	if d.EarnedOn != nil {
 		e := *d.EarnedOn

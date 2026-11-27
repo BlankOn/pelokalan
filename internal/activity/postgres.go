@@ -1,4 +1,4 @@
-package postgres
+package activity
 
 import (
 	"context"
@@ -12,7 +12,7 @@ import (
 type activityRepository struct{ db *sql.DB }
 
 // NewActivityRepository creates the activity log repository
-func NewActivityRepository(db *sql.DB) *activityRepository { return &activityRepository{db: db} }
+func NewRepository(db *sql.DB) *activityRepository { return &activityRepository{db: db} }
 
 func (r *activityRepository) Record(ctx context.Context, e *models.ActivityEvent) error {
 	data := []byte("{}")

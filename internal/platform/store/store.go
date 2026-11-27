@@ -29,3 +29,6 @@ func NonNil(s []string) []string {
 	}
 	return s
 }
+
+// UntranslatedExpr is an SQL condition on an entry (msgstr: JSON array): at least one plural form is empty
+const UntranslatedExpr = `EXISTS (SELECT 1 FROM jsonb_array_elements_text(msgstr) s WHERE s = '')`

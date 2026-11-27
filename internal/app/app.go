@@ -15,6 +15,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
+	"pelokalan/internal/activity"
 	"pelokalan/internal/langtools"
 	"pelokalan/internal/modulecontext"
 	"pelokalan/internal/platform/blobstore"
@@ -51,7 +52,7 @@ type Repositories struct {
 	AI       repository.AIRepository
 	Commit   repository.CommitRepository
 	Discuss  repository.DiscussionRepository
-	Activity repository.ActivityRepository
+	Activity activity.Repository
 	Reserve  repository.ReservationRepository
 	Review   repository.ReviewRepository
 }
@@ -69,7 +70,7 @@ type App struct {
 	Catalogs     *service.CatalogService
 	Glossary     *service.GlossaryService
 	Discussions  *service.DiscussionService
-	Activity     *service.ActivityService
+	Activity     *activity.Service
 	Reservations *service.ReservationService
 	Reviews      *service.ReviewService
 	Wiki         *service.WikiService
@@ -115,7 +116,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		AI:       postgres.NewAIRepository(db),
 		Commit:   postgres.NewCommitRepository(db),
 		Discuss:  postgres.NewDiscussionRepository(db),
-		Activity: postgres.NewActivityRepository(db),
+		Activity: activity.NewRepository(db),
 		Reserve:  postgres.NewReservationRepository(db),
 		Review:   postgres.NewReviewRepository(db),
 	}
@@ -139,7 +140,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.Catalogs.SetProjectFiles(repos.Glossary) // git patches against repository files
 	a.Discussions = service.NewDiscussionService(repos.Discuss, repos.Project, repos.Glossary, repos.Catalog, a.Blobs, mailer, cfg.Site)
 	// activity log for the Insight tab
-	a.Activity = service.NewActivityService(repos.Activity)
+	a.Activity = activity.New(repos.Activity)
 	a.Activity.SetBadgeMail(repos.User, mailer, cfg.Site, a.Auth.IsAllowed) // emails about new badges
 	// module reservations (Settings → Umum): claimed on edits, released by people, merges and expiry
 	a.Reservations = service.NewReservationService(repos.Reserve, repos.Project, repos.User, mailer, cfg.Site)

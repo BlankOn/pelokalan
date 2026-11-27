@@ -1,4 +1,4 @@
-package service
+package activity
 
 import (
 	"context"
@@ -276,7 +276,7 @@ func EvalBadges(s *ProfileStats) (groups []BadgeGroup, earned, tiers int) {
 }
 
 // Profile gathers a person's public profile; loc is the site's time zone
-func (s *ActivityService) Profile(ctx context.Context, user *models.User, loc *time.Location, now time.Time) (*Profile, error) {
+func (s *Service) Profile(ctx context.Context, user *models.User, loc *time.Location, now time.Time) (*Profile, error) {
 	days, err := s.repo.UserDays(ctx, user.ID, loc.String())
 	if err != nil {
 		return nil, err

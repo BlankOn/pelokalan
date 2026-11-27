@@ -1,4 +1,4 @@
-package service
+package activity
 
 import (
 	"context"
@@ -53,7 +53,7 @@ func (f *fakeActivityRepo) UserTotals(context.Context, int64) (*models.ProfileTo
 
 func TestEntrySavedEvent(t *testing.T) {
 	repo := &fakeActivityRepo{}
-	a := NewActivityService(repo)
+	a := New(repo)
 	u := &models.User{ID: 7}
 	c := &models.Catalog{ID: 3, ProjectID: 2, Language: "id"}
 	before := &models.Entry{ID: 9, MsgID: "Open the file", MsgStr: []string{"Buka berkas"}, Fuzzy: true, Origin: models.OriginAI}
@@ -65,6 +65,6 @@ func TestEntrySavedEvent(t *testing.T) {
 		t.Fatalf("unexpected event: %+v", e)
 	}
 	// a nil service records nothing and does not panic
-	var none *ActivityService
+	var none *Service
 	none.EntrySaved(context.Background(), u, c, before, after)
 }

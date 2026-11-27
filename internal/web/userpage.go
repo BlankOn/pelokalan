@@ -7,10 +7,10 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/activity"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 )
 
 // Public profile pages: /users/{username} shows a person's translation work across all projects (totals,
@@ -122,7 +122,7 @@ func (h *Handler) UserPage(w http.ResponseWriter, r *http.Request) {
 	data.Data["TimeZone"] = loc.String()
 	// share links of the earned badges (the owner sees Share buttons) and the profile's own link preview
 	shares := map[string]badgeShare{}
-	var top *service.Badge
+	var top *activity.Badge
 	for _, g := range prof.Badges {
 		for i, b := range g.Badges {
 			if b.Tier == 0 {

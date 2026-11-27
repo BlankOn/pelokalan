@@ -1,4 +1,4 @@
-package service
+package activity
 
 import (
 	"crypto/sha256"

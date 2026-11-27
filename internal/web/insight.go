@@ -4,13 +4,13 @@ import (
 	"net/http"
 	"time"
 
+	"pelokalan/internal/activity"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 )
 
 // SetActivity gives the handler the activity log for the Insight tab
-func (h *Handler) SetActivity(a *service.ActivityService) { h.activity = a }
+func (h *Handler) SetActivity(a *activity.Service) { h.activity = a }
 
 // insightView is the members' activity part of the Insight tab
 type insightView struct {
@@ -36,7 +36,7 @@ func (h *Handler) InsightPage(w http.ResponseWriter, r *http.Request) {
 		data.Data["GroupChart"] = h.groupChart(r, p, groups)
 	}
 	v := insightView{Range: "30"}
-	for _, rg := range service.ActivityRanges {
+	for _, rg := range activity.ActivityRanges {
 		v.Ranges = append(v.Ranges, rg.Key)
 		if rg.Key == r.URL.Query().Get("r") {
 			v.Range = rg.Key

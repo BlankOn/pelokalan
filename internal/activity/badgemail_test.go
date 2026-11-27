@@ -1,4 +1,4 @@
-package service
+package activity
 
 import (
 	"context"
@@ -58,7 +58,7 @@ func TestAwardBadges(t *testing.T) {
 	repo := &badgeRepo{comments: 12, awards: map[string]int{}}
 	user := &models.User{ID: 7, Email: "ani@example.com", Username: "ani", Name: "Ani", Lang: "id"}
 	mail := &sentMail{}
-	s := NewActivityService(repo)
+	s := New(repo)
 	s.SetBadgeMail(oneUser{u: user}, mail, config.SiteConfig{BaseURL: "https://pelokalan.example", Name: "Pelokalan"}, nil)
 	now := time.Date(2026, 11, 24, 10, 0, 0, 0, time.UTC)
 

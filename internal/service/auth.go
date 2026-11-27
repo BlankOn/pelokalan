@@ -20,6 +20,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 
+	"pelokalan/internal/activity"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/blobstore"
@@ -39,7 +40,7 @@ type AuthService struct {
 	site      config.SiteConfig
 	jwtSecret []byte
 	jwtExpiry time.Duration
-	activity  *ActivityService
+	activity  *activity.Service
 	blobs     blobstore.Store // profile pictures
 }
 
@@ -51,7 +52,7 @@ type Claims struct {
 }
 
 // SetActivity makes the service record sign-ups in the activity log
-func (s *AuthService) SetActivity(a *ActivityService) { s.activity = a }
+func (s *AuthService) SetActivity(a *activity.Service) { s.activity = a }
 
 // SetBlobs gives the service the blob store that keeps profile pictures
 func (s *AuthService) SetBlobs(b blobstore.Store) { s.blobs = b }
