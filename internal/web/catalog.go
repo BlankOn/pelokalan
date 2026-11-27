@@ -258,17 +258,17 @@ func (h *Handler) editorPage(w http.ResponseWriter, r *http.Request, c *models.C
 	if hold != nil {
 		data.Data["Hold"] = hold
 		data.Data["HoldMine"] = hold.UserID == c.OwnerID
-		data.Data["HoldModule"] = service.ModuleOf(c)
+		data.Data["HoldModule"] = models.ModuleOf(c)
 	}
 	if n, err := h.contexts.ForCatalog(r.Context(), c); err == nil {
 		data.Data["FileContext"] = n
 	}
 	if !c.IsTemplate {
 		// the module's Konteks, shared by every member's file of this module
-		data.Data["ContextModule"] = service.ModuleOf(c)
+		data.Data["ContextModule"] = models.ModuleOf(c)
 		data.Data["CanEditContext"] = p.Role.IsMember()
 		data.Data["ContextEdits"] = []models.ContextEdit{} // the history partial needs a list, also when empty
-		if n, err := h.contexts.ForModule(r.Context(), p.ID, service.ModuleOf(c)); err == nil && n != nil {
+		if n, err := h.contexts.ForModule(r.Context(), p.ID, models.ModuleOf(c)); err == nil && n != nil {
 			data.Data["ContextVersion"] = n.Version
 			if edits, err := h.contexts.Edits(r.Context(), n); err == nil && edits != nil {
 				data.Data["ContextEdits"] = edits

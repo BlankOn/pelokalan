@@ -287,7 +287,7 @@ func funcMap() template.FuncMap {
 			}
 		},
 		// module is a file name's module (before the first dot), the unit of reservations
-		"module": service.ModuleKey,
+		"module": models.ModuleKey,
 		// badgeIcon is a badge's line icon (the inside of a 24×24 <svg>), from badgecard.Icons
 		"badgeIcon": func(key string) template.HTML { return template.HTML(badgecard.Icons[key]) },
 		// monthYear formats a time as "Nov 2026" in the site's time zone

@@ -106,7 +106,7 @@ func (h *Handler) contextsPageWith(w http.ResponseWriter, r *http.Request, p *mo
 		byModule := map[string][]*models.Catalog{}
 		for _, c := range files {
 			if !c.IsTemplate {
-				byModule[service.ModuleOf(c)] = append(byModule[service.ModuleOf(c)], c)
+				byModule[models.ModuleOf(c)] = append(byModule[models.ModuleOf(c)], c)
 			}
 		}
 		for _, it := range items {

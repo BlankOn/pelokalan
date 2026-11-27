@@ -684,7 +684,7 @@ func (h *Handler) projectFileKeep(r *http.Request, p *models.Project) func(*mode
 		if len(states) > 0 && !states[f.UpstreamClass()] {
 			return false
 		}
-		return res == nil || res(held[service.ModuleKey(f.Filename)])
+		return res == nil || res(held[models.ModuleKey(f.Filename)])
 	}
 }
 
@@ -701,7 +701,7 @@ func (h *Handler) projectFileOrder(r *http.Request, p *models.Project) service.P
 	held := h.reservations.Map(r.Context(), p)
 	first := o.Sort == "reserved"
 	o.Rank = func(f *models.ProjectFile) int {
-		if (held[service.ModuleKey(f.Filename)] != nil) == first {
+		if (held[models.ModuleKey(f.Filename)] != nil) == first {
 			return 0
 		}
 		return 1
@@ -771,7 +771,7 @@ func (h *Handler) ProjectFileTake(w http.ResponseWriter, r *http.Request) {
 			err = apperr.ErrNotFound
 		}
 		if err == nil { // updating claims the module, unless another member holds it
-			err = h.reservations.Claim(r.Context(), user, p, service.ModuleOf(c))
+			err = h.reservations.Claim(r.Context(), user, p, models.ModuleOf(c))
 		}
 		if err == nil {
 			err = h.catalogService.UpdateFromUpstream(r.Context(), user, c, label, data)
@@ -959,7 +959,7 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 			}
 		}
 		if ok && len(want) > 0 {
-			in := moduleGroups[service.ModuleOf(c)]
+			in := moduleGroups[models.ModuleOf(c)]
 			ok = len(in) == 0 && want[0]
 			for _, g := range in {
 				if want[g] {

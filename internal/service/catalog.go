@@ -3,7 +3,6 @@ package service
 import (
 	"context"
 	"errors"
-	"path"
 	"path/filepath"
 	"slices"
 	"sort"
@@ -251,7 +250,7 @@ func (s *CatalogService) Upload(ctx context.Context, user *models.User, p *model
 	}
 	// taking or adding a module's file claims it (and is refused when another member holds it)
 	if !isTemplate {
-		if err := s.reservations.Claim(ctx, user, p, moduleKey(c.Filename)); err != nil {
+		if err := s.reservations.Claim(ctx, user, p, models.ModuleKey(c.Filename)); err != nil {
 			return nil, nil, err
 		}
 	}
@@ -952,16 +951,6 @@ func isUniqueViolation(err error) bool {
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
-// moduleKey names the module a PO file belongs to: the part before the first dot,
-// so "tecla.po-ui.gnome-51.id.po" and "tecla.gnome-51.id.po" are the same module.
-func moduleKey(filename string) string {
-	name := strings.ToLower(path.Base(filename))
-	if i := strings.IndexByte(name, '.'); i > 0 {
-		name = name[:i]
-	}
-	return name
-}
-
 // MatchOwnFiles sets ProjectFile.Mine to the user's own translation of the same
 // module and language (same file name first, else the most recently updated).
 func (s *CatalogService) MatchOwnFiles(ctx context.Context, user *models.User, p *models.Project, files []*models.ProjectFile) error {
@@ -982,7 +971,7 @@ func (s *CatalogService) MatchOwnFiles(ctx context.Context, user *models.User, p
 				best = c
 				break
 			}
-			if moduleKey(c.Filename) == moduleKey(f.Filename) && (best == nil || c.UpdatedAt.After(best.UpdatedAt)) {
+			if models.ModuleKey(c.Filename) == models.ModuleKey(f.Filename) && (best == nil || c.UpdatedAt.After(best.UpdatedAt)) {
 				best = c
 			}
 		}

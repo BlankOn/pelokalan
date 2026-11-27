@@ -26,7 +26,7 @@ func (h *Handler) loadEditableCatalog(w http.ResponseWriter, r *http.Request) (*
 	if !ok || c.IsTemplate {
 		return c, p, ok
 	}
-	if err := h.reservations.Claim(r.Context(), middleware.GetUser(r.Context()), p, service.ModuleOf(c)); err != nil {
+	if err := h.reservations.Claim(r.Context(), middleware.GetUser(r.Context()), p, models.ModuleOf(c)); err != nil {
 		h.fail(w, r, err)
 		return nil, nil, false
 	}
@@ -39,7 +39,7 @@ func (h *Handler) applyLock(r *http.Request, p *models.Project, c *models.Catalo
 	if c.IsTemplate {
 		return nil
 	}
-	hold := h.reservations.Holder(r.Context(), p, service.ModuleOf(c))
+	hold := h.reservations.Holder(r.Context(), p, models.ModuleOf(c))
 	c.Reservation = hold
 	if hold != nil && c.Owned && hold.UserID != c.OwnerID {
 		c.Owned = false
@@ -52,11 +52,11 @@ func (h *Handler) attachReservations(r *http.Request, p *models.Project, catalog
 	held := h.reservations.Map(r.Context(), p)
 	for _, c := range catalogs {
 		if !c.IsTemplate {
-			c.Reservation = held[service.ModuleOf(c)]
+			c.Reservation = held[models.ModuleOf(c)]
 		}
 	}
 	for _, f := range files {
-		f.Reservation = held[service.ModuleKey(f.Filename)]
+		f.Reservation = held[models.ModuleKey(f.Filename)]
 	}
 	return held
 }

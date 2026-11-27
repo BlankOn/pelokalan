@@ -12,6 +12,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
+	"pelokalan/internal/platform/gz"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
 	"pelokalan/pkg/tpsite"
@@ -64,7 +65,7 @@ func (s *GlossaryService) fetchTP(ctx context.Context, v *models.ModuleGroup, et
 		var data []byte
 		prev := old[d.Name]
 		if prev != nil && prev.Fingerprint == rec.Fingerprint && len(prev.Data) > 0 {
-			data, _ = gunzip(prev.Data)
+			data, _ = gz.Decompress(prev.Data)
 		}
 		if data == nil {
 			if downloads > 0 {
@@ -81,12 +82,12 @@ func (s *GlossaryService) fetchTP(ctx context.Context, v *models.ModuleGroup, et
 				log.Printf("translation project: %s (%s): %v", d.Name, team, err)
 				if prev != nil && len(prev.Data) > 0 { // keep the last good copy; tried again next time
 					rec.Fingerprint = prev.Fingerprint
-					data, _ = gunzip(prev.Data)
+					data, _ = gz.Decompress(prev.Data)
 				} else {
 					rec.Fingerprint = ""
 				}
 			} else {
-				rec.Data = gzipBytes(data)
+				rec.Data = gz.Compress(data)
 			}
 		}
 		if data == nil {
@@ -152,7 +153,7 @@ func (s *GlossaryService) TPDomains(ctx context.Context, p *models.Project) map[
 			out = map[string]*models.TPDomain{}
 		}
 		for _, d := range domains {
-			out[tpKey(d.Team, ModuleKey(tpsite.FileName(d.Domain, d.Team)))] = d
+			out[tpKey(d.Team, models.ModuleKey(tpsite.FileName(d.Domain, d.Team)))] = d
 		}
 	}
 	return out
@@ -177,7 +178,7 @@ func (s *GlossaryService) attachTP(ctx context.Context, p *models.Project, files
 	find := func(language, filename string) *models.TPDomain {
 		for team := range teams {
 			if po.SameLanguage(team, language) {
-				if hit := domains[tpKey(team, ModuleKey(filename))]; hit != nil {
+				if hit := domains[tpKey(team, models.ModuleKey(filename))]; hit != nil {
 					return hit
 				}
 			}
@@ -211,12 +212,4 @@ func (s *GlossaryService) TPFor(ctx context.Context, p *models.Project, c *model
 		return nil, ErrNotTP
 	}
 	return c.TP, nil
-}
-
-func gzipBytes(data []byte) []byte {
-	var buf bytes.Buffer
-	zw := gzip.NewWriter(&buf)
-	_, _ = zw.Write(data)
-	_ = zw.Close()
-	return buf.Bytes()
 }

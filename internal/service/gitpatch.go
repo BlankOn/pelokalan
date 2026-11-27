@@ -1,18 +1,16 @@
 package service
 
 import (
-	"bytes"
-	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
-	"io"
 	"sort"
 	"strings"
 	"time"
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
+	"pelokalan/internal/platform/gz"
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/gitpatch"
@@ -93,15 +91,6 @@ func (s *CatalogService) referenceAt(ctx context.Context, c *models.Catalog, at 
 	return nil
 }
 
-func gunzip(data []byte) ([]byte, error) {
-	zr, err := gzip.NewReader(bytes.NewReader(data))
-	if err != nil {
-		return nil, err
-	}
-	defer zr.Close()
-	return io.ReadAll(zr)
-}
-
 // GitPatch builds one `git am` patch with the member's own changes to repository files (files with a
 // RepoPath, owned by user). Only entries the member changed in Pelokalan since taking or last updating
 // the file go in, against the repository file as last synced, so newer translations in the repository
@@ -133,7 +122,7 @@ func (s *CatalogService) GitPatch(ctx context.Context, user *models.User, p *mod
 		} else if err != nil {
 			return nil, err
 		}
-		base, err := gunzip(pf.Data)
+		base, err := gz.Decompress(pf.Data)
 		if err != nil {
 			return nil, err
 		}

@@ -35,12 +35,6 @@ func NewContextService(repo repository.ContextRepository) *ContextService {
 	return &ContextService{repo: repo}
 }
 
-// ModuleOf returns the module a PO file belongs to
-func ModuleOf(c *models.Catalog) string { return moduleKey(c.Filename) }
-
-// ModuleKey is the module of a file name (the part before the first dot, lowercase)
-func ModuleKey(filename string) string { return moduleKey(filename) }
-
 // ForModule returns a module's Konteks (also when its note is empty), or nil
 func (s *ContextService) ForModule(ctx context.Context, projectID int64, module string) (*models.ModuleContext, error) {
 	n, err := s.repo.Get(ctx, projectID, module)
@@ -55,7 +49,7 @@ func (s *ContextService) ForCatalog(ctx context.Context, c *models.Catalog) (*mo
 	if c.IsTemplate {
 		return nil, nil
 	}
-	n, err := s.ForModule(ctx, c.ProjectID, ModuleOf(c))
+	n, err := s.ForModule(ctx, c.ProjectID, models.ModuleOf(c))
 	if err != nil || n == nil || strings.TrimSpace(n.Note) == "" {
 		return nil, err
 	}
@@ -81,7 +75,7 @@ func (s *ContextService) Save(ctx context.Context, user *models.User, p *models.
 	if len([]rune(note)) > maxContextLen {
 		return nil, apperr.New("err.context_length", maxContextLen)
 	}
-	module := ModuleOf(c)
+	module := models.ModuleOf(c)
 	if cur, err := s.ForModule(ctx, p.ID, module); err == nil && cur != nil && cur.Version == version && cur.Note == note {
 		return cur, nil // nothing changed: no new history entry
 	}

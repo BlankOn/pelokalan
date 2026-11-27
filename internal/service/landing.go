@@ -8,6 +8,7 @@ import (
 	"unicode/utf8"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/gz"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
 )
@@ -87,7 +88,7 @@ func matchUpstream(mine []*models.Catalog, name, repoPath string) []*models.Cata
 			if c.RepoPath == repoPath {
 				out = append(out, c)
 			}
-		case c.Filename == name || moduleKey(c.Filename) == moduleKey(name):
+		case c.Filename == name || models.ModuleKey(c.Filename) == models.ModuleKey(name):
 			out = append(out, c)
 		}
 	}
@@ -135,11 +136,11 @@ func (s *CatalogService) landingsIn(ctx context.Context, c *models.Catalog, grou
 			continue
 		}
 		out = append(out, models.UpstreamLanding{UserID: c.OwnerID, ProjectID: c.ProjectID, CatalogID: c.ID, GroupID: groupID,
-			EntryKey: e.KeyHash(), Module: moduleKey(c.Filename), Filename: c.Filename, Words: len(strings.Fields(e.MsgID)), LandedAt: landedAt})
+			EntryKey: e.KeyHash(), Module: models.ModuleKey(c.Filename), Filename: c.Filename, Words: len(strings.Fields(e.MsgID)), LandedAt: landedAt})
 	}
 	// all the member's changes are upstream: their reservation of the module is done (live syncs only)
 	if refAt == nil && changed > 0 && pending == 0 && s.reservations != nil {
-		s.reservations.ReleaseMerged(ctx, c.ProjectID, moduleKey(c.Filename), c.OwnerID)
+		s.reservations.ReleaseMerged(ctx, c.ProjectID, models.ModuleKey(c.Filename), c.OwnerID)
 	}
 	if len(out) == 0 {
 		return 0, nil
@@ -188,7 +189,7 @@ func (s *CatalogService) BackfillLandings(ctx context.Context, projects []*model
 				if err != nil {
 					continue
 				}
-				data, err := gunzip(full.Data)
+				data, err := gz.Decompress(full.Data)
 				if err != nil {
 					continue
 				}

@@ -10,7 +10,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
-	"pelokalan/internal/service"
 	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/po"
 )
@@ -90,14 +89,14 @@ func (h *Handler) viewAction(r *http.Request, p *models.Project, f *models.Proje
 	list := []*models.ProjectFile{f}
 	_ = h.catalogService.MatchOwnFiles(r.Context(), user, p, list)
 	d["ViewFile"] = f
-	d["ViewModule"] = service.ModuleKey(f.Filename)
+	d["ViewModule"] = models.ModuleKey(f.Filename)
 	d["ViewRes"] = h.reservationView(r, p)
 	if f.Mine != nil {
 		d["ViewMine"] = f.Mine
 		return
 	}
 	if p.Reservations {
-		if hold := h.reservations.Holder(r.Context(), p, service.ModuleKey(f.Filename)); hold != nil && (user == nil || hold.UserID != user.ID) {
+		if hold := h.reservations.Holder(r.Context(), p, models.ModuleKey(f.Filename)); hold != nil && (user == nil || hold.UserID != user.ID) {
 			d["ViewHeld"] = hold
 		}
 	}

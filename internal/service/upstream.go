@@ -288,7 +288,7 @@ func (l *upstreamLookup) projectFileFor(names map[int64][]string, filename strin
 			}
 		}
 	}
-	mod := moduleKey(filename)
+	mod := models.ModuleKey(filename)
 	for _, v := range l.groups {
 		if l.release[v.ID] == "" {
 			continue
@@ -296,7 +296,7 @@ func (l *upstreamLookup) projectFileFor(names map[int64][]string, filename strin
 		list := append([]string(nil), names[v.ID]...)
 		sort.Strings(list) // stable choice when a module has several files
 		for _, n := range list {
-			if moduleKey(n) == mod {
+			if models.ModuleKey(n) == mod {
 				return v.ID, n
 			}
 		}

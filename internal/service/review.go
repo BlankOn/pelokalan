@@ -12,6 +12,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/gz"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
@@ -150,7 +151,7 @@ func (s *ReviewService) lastSent(ctx context.Context, catalogID int64) []byte {
 	if err != nil || data == nil {
 		return nil
 	}
-	out, err := gunzip(data)
+	out, err := gz.Decompress(data)
 	if err != nil {
 		return nil
 	}
@@ -163,7 +164,7 @@ func (s *ReviewService) Changes(ctx context.Context, p *models.Project, c *model
 	if err != nil {
 		return nil, err
 	}
-	base, err := gunzip(pf.Data)
+	base, err := gz.Decompress(pf.Data)
 	if err != nil {
 		return nil, err
 	}
@@ -216,7 +217,7 @@ func (s *ReviewService) Request(ctx context.Context, user *models.User, p *model
 		return nil, apperr.New("err.review_nothing")
 	}
 	gid := g.ID
-	r := &models.ModuleReview{ProjectID: p.ID, CatalogID: c.ID, GroupID: &gid, Module: ModuleOf(c), RepoPath: c.RepoPath,
+	r := &models.ModuleReview{ProjectID: p.ID, CatalogID: c.ID, GroupID: &gid, Module: models.ModuleOf(c), RepoPath: c.RepoPath,
 		Status: models.ReviewRequested, RequestedBy: user.ID, Note: cleanNote(note), Entries: d.Changed}
 	if err := s.repo.Create(ctx, r); errors.Is(err, store.ErrConflict) {
 		return nil, apperr.New("err.review_open")
@@ -317,7 +318,7 @@ func (s *ReviewService) PushNow(ctx context.Context, manager *models.User, p *mo
 	created := false
 	if r == nil || r.Status != models.ReviewRequested { // no open request: one made by the manager's button
 		gid := g.ID
-		r = &models.ModuleReview{ProjectID: p.ID, CatalogID: c.ID, GroupID: &gid, Module: ModuleOf(c), RepoPath: c.RepoPath,
+		r = &models.ModuleReview{ProjectID: p.ID, CatalogID: c.ID, GroupID: &gid, Module: models.ModuleOf(c), RepoPath: c.RepoPath,
 			Status: models.ReviewRequested, RequestedBy: c.OwnerID}
 		if err := s.repo.Create(ctx, r); err != nil {
 			return nil, err
@@ -393,7 +394,7 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 		now := time.Now()
 		r.Status, r.ReviewedBy, r.ReviewedAt = models.ReviewPushed, &reviewer.ID, &now
 		// remember only the strings Pelokalan rewrote: they are "ours" from now on, the rest stays upstream's
-		r.CommitSHA, r.CommitURL, r.Entries, r.Error, r.PushedData = cm.SHA, cm.URL, n, "", gzipBytes(sentEntries(f.Data, want))
+		r.CommitSHA, r.CommitURL, r.Entries, r.Error, r.PushedData = cm.SHA, cm.URL, n, "", gz.Compress(sentEntries(f.Data, want))
 		if err := s.repo.Update(ctx, r); err != nil {
 			return err
 		}

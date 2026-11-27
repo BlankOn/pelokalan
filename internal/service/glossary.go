@@ -906,7 +906,7 @@ func (s *GlossaryService) UpstreamFor(ctx context.Context, p *models.Project, c 
 		if f.Filename == c.Filename {
 			return f, nil
 		}
-		if moduleKey(f.Filename) == moduleKey(c.Filename) && better(f) {
+		if models.ModuleKey(f.Filename) == models.ModuleKey(c.Filename) && better(f) {
 			best = f
 		}
 	}
@@ -924,7 +924,7 @@ func (s *GlossaryService) ModuleGroups(ctx context.Context, p *models.Project) (
 	for vid, files := range names {
 		seen := map[string]bool{}
 		for _, f := range files {
-			if m := moduleKey(f); !seen[m] {
+			if m := models.ModuleKey(f); !seen[m] {
 				seen[m] = true
 				out[m] = append(out[m], vid)
 			}
