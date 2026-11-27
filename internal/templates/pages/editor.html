@@ -363,6 +363,13 @@
         <button type="button" class="rv-view-btn active" data-review-view="table">{{t .Lang "review.view_table"}}</button>
         <button type="button" class="rv-view-btn" data-review-view="diff">{{t .Lang "review.view_diff"}}</button>
     </div>
+    {{if eq $r.Status "requested"}}
+    <form class="rv-open-filter" hx-get="/catalogs/{{.Data.Catalog.ID}}/list" hx-target="#entry-list" hx-trigger="change" hx-include="#filter-selected">
+        <input type="hidden" name="review" value="{{$r.ID}}">
+        <label class="rv-toggle" title="{{t .Lang "review.open_only_help"}}"><input type="checkbox" name="status" value="review">
+            <span class="mark-review" aria-hidden="true"></span> {{t .Lang "review.open_only"}} <span class="rv-open-count">({{$r.OpenComments}})</span></label>
+    </form>
+    {{end}}
     <div class="spacer"></div>
     {{if eq $r.Status "requested"}}
         {{if .Data.CanDecide}}

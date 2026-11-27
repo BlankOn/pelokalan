@@ -138,6 +138,11 @@ func TestGitHubReviews(t *testing.T) {
 		contains(`id="side-review-badge" data-n="1"`, `data-review-open="1"`)
 	owner.get(page).status(http.StatusOK).lacks("side-review-badge")
 	kiki.get(fmt.Sprintf("/catalogs/%d/list?status=review", kc)).status(http.StatusOK).contains("Remove the directory", "mark-review").lacks("Open the file")
+	// the review editor's toggle: only the review's strings that still have an open comment
+	owner.get(page).status(http.StatusOK).contains("Komentar terbuka saja", `name="review" value="`+strconv.FormatInt(rid, 10)+`"`)
+	owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d&status=review", kc, rid)).status(http.StatusOK).
+		contains("Remove the directory", "mark-review").lacks("Close the window")
+	owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d", kc, rid)).status(http.StatusOK).contains("Remove the directory", "Close the window")
 	cmt := scalar[int64](t, `SELECT id FROM comments WHERE review_id = $1`, rid)
 	visitor(t).post(fmt.Sprintf("%s/comments/%d/resolve", base, cmt), nil)
 	if scalar[bool](t, `SELECT resolved_at IS NOT NULL FROM comments WHERE id = $1`, cmt) {
