@@ -155,7 +155,7 @@ func (r *activityRepository) UserModuleWork(ctx context.Context, userID int64, t
 	if !ok {
 		k = moduleWorkKinds["contrib"]
 	}
-	// the module is the file name before the first dot (service.ModuleOf); files deleted since keep their name
+	// the module is the file name before the first dot (models.ModuleOf); files deleted since keep their name
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT p.slug, p.name, split_part(lower(COALESCE(c.filename, '')), '.', 1) AS module,
 		       (array_agg(COALESCE(c.filename, '') ORDER BY a.created_at DESC))[1],

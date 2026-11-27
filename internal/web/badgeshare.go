@@ -27,7 +27,7 @@ type pageMeta struct {
 	Title, Desc, URL, Image, ImageAlt string
 }
 
-// badgeShare is one earned badge tier with its share texts (service.BadgeShareFor)
+// badgeShare is one earned badge tier with its share texts (activity.BadgeShareFor)
 type badgeShare = activity.BadgeShare
 
 func (h *Handler) siteURL() string { return strings.TrimRight(h.siteConfig.BaseURL, "/") }

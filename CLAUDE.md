@@ -21,28 +21,36 @@ invite collaborators and translate in a desktop-style editor.
 ## Project Structure
 
 ```
-cmd/server/main.go   # Bootstrap: config, DB, migrations, background jobs, HTTP server
+cmd/server/main.go     # Bootstrap: config, DB, migrations, background jobs, HTTP server
+pkg/                   # Reusable libraries; never import internal/
+  po/                  # PO/POT parser & writer, MO compiler, validation, plural rules
+  gitpatch/            # Rewrite changed entries in a repository's PO file; git format-patch; header credit
+  gnomel10n/           # Read-only client of the GNOME translation site (API + release pages, cached, rate limited)
+  githubapp/           # GitHub App client (JWT, installation tokens, contents API); githubtest/ = fake for tests
+  tpsite/              # Translation Project team pages (parser, file names, robot address)
+  glossary/            # Read PO archives in memory, aggregate source/translation pairs, SSRF-safe fetcher
+  ai/                  # LLM client (OpenAI-compatible), glossary matching, prompts, verification, estimates
+  netsafe/ badgecard/ spelling/ thesaurus/
 internal/
-  app/               # Wiring of repositories, services, handlers and all routes (app.New, app.Migrate);
-                     # *_test.go: HTTP integration tests
-  testdb/            # Throwaway PostgreSQL database for integration tests
-  config/            # Environment configuration, email whitelist
-  i18n/              # UI strings (id = primary, en); T(lang, key, args...)
-  ai/                # LLM client (OpenAI-compatible), glossary matching, prompts, verification, estimates
-  netsafe/           # HTTP transport refusing private/local addresses (SSRF protection)
-  gnomel10n/         # Read-only client of the GNOME translation site API (cached, rate limited)
-  tpsite/            # Translation Project team pages (parser, file names, robot address)
-  glossary/          # Read PO archives in memory and aggregate source/translation pairs
-  po/                # PO/POT parser & writer, MO compiler, validation, plural rules
-  models/            # User, OTP, Project, Invitation, Catalog, Entry
-  repository/        # Interfaces (repository.go) + postgres/ implementations
-  service/           # Business logic (auth, project, catalog) and Mailer
-  handler/
-    middleware/      # Auth (cookie), Lang, SameOrigin (CSRF), logging
-    web/             # HTML + HTMX handlers
-  templates/         # layouts/, partials/, pages/
-migrations/          # SQL migrations (up/down)
-static/              # CSS, JS, htmx, logo
+  app/                 # Wiring (app.New, app.Migrate) and all routes; *_test.go: HTTP integration tests
+  platform/            # config/ i18n/ blobstore/ mailer/ apperr/ (errors shown to users) store/ (sentinels,
+                       # SQL helpers) gz/ testdb/ (throwaway database for integration tests)
+  models/              # Shared domain types (User, Project, Catalog, Entry …), module naming
+  <domain>/            # service.go (+ more logic files), store.go (the storage interfaces it needs),
+                       # postgres*.go (their Postgres implementation), *_test.go
+    account/           # users, sign-in codes, profile, avatar, patch-link signing
+    project/           # projects, members, invitations, invite links, notification settings
+    catalog/           # PO files, entries, versions, git patches, accepted upstream work, file order
+    source/            # module groups, imports, project files, upstream states, TP, GitHub, glossary
+    review/ reservation/ discussion/ wiki/
+    modulecontext/     # Konteks notes
+    pretranslate/      # AI jobs and single-entry AI
+    activity/          # activity log, profile stats, badges (and their emails/share data)
+    langtools/         # spelling and thesaurus storage
+  web/                 # delivery: handlers (grouped by domain in files), middleware/, templates/
+migrations/            # SQL migrations (up/down)
+static/                # CSS, JS, htmx, logo
+docs/                  # notes (structure-plan.md: how this layout came about)
 ```
 
 ## Common Commands
@@ -53,24 +61,35 @@ make run            # run server (migrations run on start)
 make build
 make test           # unit tests (integration tests skip without TEST_DATABASE_URL)
 make test-integration  # all tests against a throwaway DB on the make prep PostgreSQL
+make check          # gofmt, go vet and every test: run before committing
 make cover          # coverage of every package by every test (bin/coverage.html)
 ```
 
 ## Architecture
 
-`Handlers → Services → Repositories → Models`, constructor injection (`NewXxx`).
+`web` handlers → domain services → their stores (Postgres) → `models`; constructor injection (`New`, `NewRepository`),
+wired in `app.New`. Rules:
+- `pkg/*` imports only the standard library and other `pkg/*`.
+- A domain imports `models`, `platform/*`, `pkg/*` and lower domains only. Order from the bottom: activity, langtools,
+  modulecontext → account → project → reservation, source → catalog → discussion → wiki, pretranslate → review.
+  A call that would point upwards goes through a small interface (e.g. `source.LandingDetector`, `activity.UserGetter`)
+  or a function set in `app` (`discussion.SetReviews`).
+- Each domain defines the storage interfaces it needs in `store.go`; `web` and `app` never touch SQL.
+- Errors shown to people are `apperr.New("i18n.key", args…)` (`apperr.UserError`); stores return `store.ErrNotFound` /
+  `store.ErrConflict`.
+- `make check` (gofmt, go vet, all tests including integration) must pass before a commit.
 
 - **Whitelist:** `config.Whitelist` from `EMAIL_WHITELIST`; empty means open registration
   (`Whitelist.Enabled()` is false and `IsAllowed` accepts any address). Checked on registration,
-  login, code verification, every authenticated request (`AuthService.Authenticate`)
+  login, code verification, every authenticated request (`account.Service.Authenticate`)
   and on invitations.
-- **OTP:** `AuthService` stores an HMAC (keyed by `JWT_SECRET`) of 6-digit codes in
+- **OTP:** `account.Service` stores an HMAC (keyed by `JWT_SECRET`) of 6-digit codes in
   `otp_codes`; codes expire, are single-use and limited by `OTP_MAX_ATTEMPTS`.
 - **Public read access:** project list, glossary (`/projects/{id}`, `/glossary`) and
-  members are served with optional auth. `ProjectService.GetPublic` fills `Project.Role`
+  members are served with optional auth. `project.Service.GetPublic` fills `Project.Role`
   (empty for visitors); handlers use `loadProject` (public) or `loadMemberProject`.
   Member emails and pending invitations are only shown to members/managers.
-- **Role changes** (`ProjectService.ChangeRole`, members page) email the member in their language (`mail.role_*`: who
+- **Role changes** (`project.Service.ChangeRole`, members page) email the member in their language (`mail.role_*`: who
   changed it, from which role to which, a button to the project), in the background; nothing when the role stays.
 - **Roles:** `owner` (one per project), `manager` (shown as "Koordinator" / "Coordinator": glossary, members, approving and
   sending files to repositories), `reviewer` ("Peninjau", migration 051: translates like a translator and reviews: sees the
@@ -80,7 +99,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
   The `{id}` route segment is the slug; `loadProject` also accepts numeric ids and 301-redirects
   page views to the slug URL. Use `Project.Path()` / `Catalog.URL()` for links.
 - **Usernames:** required, unique, `^[a-z0-9][a-z0-9._-]{1,28}[a-z0-9]$`, with reserved
-  words that clash with routes (`service/auth.go`). Chosen at registration (stored on the
+  words that clash with routes (`account/service.go`). Chosen at registration (stored on the
   OTP until verified), editable in the profile. Migration 013 backfilled existing users.
 - **File URLs:** `/projects/{id}/{username}/po/{filename}` (+ `/history`, `/raw`) render the
   editor; `loadCatalog` resolves either that path or `/catalogs/{cid}`. Old `/catalogs/{cid}`
@@ -100,10 +119,10 @@ make cover          # coverage of every package by every test (bin/coverage.html
   `CatalogRedirect` renders it instead of redirecting) with a banner. `Catalog.WritableBy` (owner and not
   deleted) guards every write; `Owned` is false for deleted files. Its entry discussions are `ReadOnly`.
 - **Deleting a discussion:** the project owner, or its starter (`discussions.created_by`) while every comment in it is
-  theirs, can delete a whole discussion with its comments (`DiscussionService.DeleteDiscussion`, `POST .../discussions/{type}/{key}/delete`);
+  theirs, can delete a whole discussion with its comments (`discussion.Service.DeleteDiscussion`, `POST .../discussions/{type}/{key}/delete`);
   not on read-only discussions. A deleted topic sends the user back to the Diskusi list.
 - **PO files ("Berkas PO") are shared read-only:** anyone who can read the project can open,
-  download and view the history of any file; only the owner changes it. `CatalogService.Get`
+  download and view the history of any file; only the owner changes it. `catalog.Service.Get`
   sets `Catalog.Owned`; write handlers use `loadOwnCatalog` and write services check
   `c.OwnerID == user.ID`. Read routes live in the public route group, writes in the signed-in one.
   `Build` stamps the translator identity only when the owner exports their own file.
@@ -111,19 +130,19 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - **Project language** (`projects.language`, migration 034, backfilled from the most common file/import language;
   "" = not chosen): picked in Settings with a searchable `[data-combo]` of `po.LanguageNames` (code + native
   name, "id - Bahasa Indonesia"; plural rules stay in `po.languages`). `checkProjectLanguage` (`po.SameLanguage`:
-  case and -/_ ignored, "pt" ≠ "pt_BR") refuses with `err.language_mismatch`: file uploads (`CatalogService.Upload`,
+  case and -/_ ignored, "pt" ≠ "pt_BR") refuses with `err.language_mismatch`: file uploads (`catalog.Service.Upload`,
   also by link and "Ambil"), module group imports (checked before a group is created), sync links with a chosen
   language, and every downloaded language in `importInto` (so scheduled syncs fail with the message; stored sync
   errors are "key|arg|arg", shown by `errText`). Templates (no language) are always accepted.
-- **Personal files (historical note):** catalogs have `owner_id`; `CatalogService.Get` returns
+- **Personal files (historical note):** catalogs have `owner_id`; `catalog.Service.Get` returns
   ErrNotFound for other users. Any member can upload into their own workspace
   ("Berkas Anda", `/projects/{id}/files`). Translation memory uses the user's own files.
 - **Project files** ("Berkas proyek", `project_files`, migration 027): every glossary import also
   stores its PO files (gzip) with stats, so the Penerjemahan tab has three sections: project files,
   your files, other members' files. Listed 10 at a time (`ProjectFilePageSize`; the "Urutkan"
-  select in `#pf-filter`, param `s`, `service.ProjectFileSorts`; default "Sisa terjemahan terbanyak" (`remaining`): files with
+  select in `#pf-filter`, param `s`, `source.ProjectFileSorts`; default "Sisa terjemahan terbanyak" (`remaining`): files with
   work left, most left first, then files nobody started, then complete files; same rule in SQL (`projectFileOrders`) and Go
-  (`service.CompareProgress`); also least/most complete, most/fewest strings, name, and with reservations on "Direservasi dulu"/"Belum direservasi dulu", which `projectFileOrder` ranks in Go
+  (`catalog.CompareProgress`); also least/most complete, most/fewest strings, name, and with reservations on "Direservasi dulu"/"Belum direservasi dulu", which `projectFileOrder` ranks in Go
   after the database order (`ProjectFileOrder.Rank`);
   "Muat lagi" via `GET /projects/{id}/project-files?offset=`); download, or "Ambil" copies one into
   the member's own files (`catalogService.Upload`). Synced module groups imported before 027 count as due
@@ -142,27 +161,27 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - "Berkas Anda" and "Berkas anggota lain" (one list, owner under each file) show 5 files at a time
   (`FileListPageSize`, `GET /projects/{id}/my-files|member-files?q=&g=&offset=`, `Handler.fileList`, partial
   `file_rows`) (columns: Berkas, Kemajuan, actions; the last edit is the last line under the file name, `files.updated`, and the
-  translated · fuzzy · untranslated counts sit under the progress bar in green, orange and red, `.file-counts`) with the same "Urutkan" select (`service.FileListSorts`: the project file orders plus "Terakhir disunting" = `recent`, last
+  translated · fuzzy · untranslated counts sit under the progress bar in green, orange and red, `.file-counts`) with the same "Urutkan" select (`source.FileListSorts`: the project file orders plus "Terakhir disunting" = `recent`, last
   edit first; default `remaining`), search and the same module group filter: a file is in a group when its module
-  (`service.ModuleOf`) is among that group's project files (`GlossaryService.ModuleGroups`); `g=0` = no group.
+  (`models.ModuleOf`) is among that group's project files (`source.Service.ModuleGroups`); `g=0` = no group.
   Managers get "Sinkronkan dengan upstream" (in Berkas proyek; beside "Tambah berkas manual" in Berkas Anda the same
   button is labelled "Sinkronkan status upstream" / "Sync upstream status", `files.sync_status`, since there it only shows new states;
-  `POST /projects/{id}/project-files/sync` → `GlossaryService.SyncAll`, which ends with `RefreshUpstream`: every
+  `POST /projects/{id}/project-files/sync` → `source.Service.SyncAll`, which ends with `RefreshUpstream`: every
   file state is read again from the release pages, however recent; it also runs for projects without a sync link):
   fetches every module group with a sync link in a background goroutine (requests time out after 30 s);
-  `GlossaryService.syncing` makes it and the hourly `FetchDue` run one at a time. app.js (`form[data-sync]`)
+  `source.Service.syncing` makes it and the hourly `FetchDue` run one at a time. app.js (`form[data-sync]`)
   spins the button and polls `GET .../project-files/sync` (`SyncState`, per project, in memory) until it is
   done, then shows what changed (nothing when no file changed) and refreshes the rows.
-  A project file the member already has (`CatalogService.MatchOwnFiles`: same language and same file name,
+  A project file the member already has (`catalog.Service.MatchOwnFiles`: same language and same file name,
   else same module = name before the first dot) shows "Perbarui" instead of "Ambil": after a confirm it
   replaces that file (`UpdateFromUpstream`: commit before, replace, commit "commit.from_upstream|label"),
-  so the history continues. The editor shows "Tarik upstream" before Riwayat when `GlossaryService.UpstreamFor`
+  so the history continues. The editor shows "Tarik upstream" before Riwayat when `source.Service.UpstreamFor`
   finds a project file for the open file (same name, else same module from the newest module group); it posts to
   the same take route with `into` and the same confirm popup.
   Under the "Berkas proyek" heading: last sync time (newest `last_fetched_at` of module groups with a sync link,
   in the reader's time zone) and the automatic interval (`Handler.SetSyncInterval`).
 - **Upstream update status:** for the user's own files (Berkas Anda, `attachUpstreamNew`) and in the editor (badge on
-  "Tarik upstream"), `CatalogService.UpstreamChanges` compares the newest upstream copy (`GlossaryService.UpstreamData`:
+  "Tarik upstream"), `catalog.Service.UpstreamChanges` compares the newest upstream copy (`source.Service.UpstreamData`:
   the project file with the same repository path, else `UpstreamFor`) with the file: strings it does not have, and
   strings whose upstream translation changed since the file's starting point (`reference`) and differs from the
   member's. The member's own unsent work does not count. Shown as a blue chip "⟳ Pembaruan upstream · N" (`.up-new`).
@@ -174,12 +193,12 @@ make cover          # coverage of every package by every test (bin/coverage.html
   with that email (no tokens in links).
 - **Open or private projects** (`projects.open`, migration 037; private by default): chosen under "Keanggotaan" in
   Settings → Umum (`access` = open|private). Visitors see no button in the project header (the sign-in notice under the tabs asks them). Signed-in non-members see "Gabung" in the project header on open projects
-  (`POST /projects/{id}/join` → `ProjectService.JoinOpen`, joins as translator and returns to the same page) and
+  (`POST /projects/{id}/join` → `project.Service.JoinOpen`, joins as translator and returns to the same page) and
   "🔒 Privat" on private ones; a pending email invitation to the project is accepted instead (its role wins), so it also
   works on private projects. Private projects refuse with `err.project_private`.
 - **Invite links** (`project_invite_links`, migration 018): owners/managers create shareable
   links on the members page with a role, expiry (1/7/30 days or none) and a use limit
-  (`service.InviteLinkDays/Uses`). `/join/{token}` is public: visitors are sent to
+  (`project.InviteLinkDays/Uses`). `/join/{token}` is public: visitors are sent to
   login/register with `next=/join/{token}` and come back to confirm with a POST. `JoinByInviteLink`
   counts the use and adds the member in one transaction (limits hold under concurrency); existing
   members are not counted. Revoking deletes the link.
@@ -188,7 +207,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
   separate column, other flags are comma separated.
 - **Concurrency:** entries have a `version`; `UpdateEntry` only succeeds when the
   submitted version matches (`ErrEntryConflict` otherwise).
-- **Errors shown to users:** `service.UserError{Key}` where Key is an i18n key.
+- **Errors shown to users:** `apperr.UserError{Key}` where Key is an i18n key.
 
 ## Glossary
 
@@ -208,7 +227,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
   Page: `/projects/{id}/glossary/{hash}` (translations, modules, related).
 - Discussions are generic: `discussions(project_id, subject_type, subject_key, title)` +
   `comments` + `comment_mentions`. Subject types are resolved in
-  `DiscussionService.ResolveSubject` / `SubjectURL`: `glossary_term` (key = term hash) and
+  `discussion.Service.ResolveSubject` / `SubjectURL`: `glossary_term` (key = term hash) and
   `po_entry` (key = "<catalog id>-<Entry.KeyHash()>", stable across restores/merges; title "owner/file — source
   text", migration 052 turned older titles around; page =
   file URL + `?entry=<hash>`) and `topic` (free discussion: key = random 12 hex chars, title
@@ -219,14 +238,14 @@ make cover          # coverage of every package by every test (bin/coverage.html
   (`/projects/{id}/threads/{type}/{key}`, `ThreadURL`): `ResolveSubject` returns it with `ReadOnly`, so it can
   be read by everyone but nobody can comment, edit or delete comments there (`ErrDiscussionClosed`).
 - The glossary can be filtered by module (PO file, `GlossaryQuery.Module`); the term still shows
-  all its translations. The module list (`GlossaryRepository.Modules`) feeds a searchable dropdown
+  all its translations. The module list (`source.Repository.Modules`) feeds a searchable dropdown
   (`[data-combo]` in app.js).
 - The sync status above the glossary always describes the newest module group with data.
 - New comments email other project members in the background, filtered by each member's
   notification settings (`notification_settings`, migration 030; Pengaturan tab, visible to every member,
   `POST /projects/{id}/notifications`). A member gets at most one email per comment, sent when any reason that
   applies to them (`models.Notify*`: mention, my_file, started, participated, new_topic, other_topic,
-  other_glossary, other_entry; `DiscussionService.reasons`, strongest first) is on; "muted" turns off all
+  other_glossary, other_entry; `discussion.Service.reasons`, strongest first) is on; "muted" turns off all
   project email. Everything is on by default (kinds are stored as "off"). Emails say which setting caused
   them and link to the settings. Sign-in codes and invitations are always sent. Email buttons use
   `emailButton` (small).
@@ -242,10 +261,10 @@ make cover          # coverage of every package by every test (bin/coverage.html
 
 ## Comment attachments
 
-- Files live in `internal/blobstore` (S3-like `Store`: Put/Get/Delete/GC), implemented on
+- Files live in `internal/platform/blobstore` (S3-like `Store`: Put/Get/Delete/GC), implemented on
   Postgres (`blobs`, content-addressed by SHA-256, deduplicated). `attachments` rows link a
   comment to a blob (migration 017). Only images are accepted (png/jpeg/gif/webp, detected from
-  the content); limits: 5 images, 10 MB each (`service.MaxAttachments*`). The client checks the
+  the content); limits: 5 images, 10 MB each (`discussion.MaxAttachments*`). The client checks the
   same limits; images can be picked, pasted or dropped anywhere on a `.thread`.
 - Clicking an image opens a lightbox (`dialog.lightbox`, app.js): fit to screen, click for the
   original resolution, arrows step through the comment's images.
@@ -263,7 +282,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
 ## Konteks
 
 - One shared note per **module** of a project (`module_contexts`, migration 028; module = file name
-  before the first dot, lowercase, `service.ModuleOf`): every member's file of the module shows the
+  before the first dot, lowercase, `models.ModuleOf`): every member's file of the module shows the
   same note. It does not belong to a file, so it survives file deletion and comes back when someone
   takes/uploads the module again. Kept in Pelokalan only (never exported). Readable by anyone who can
   read the project; any member edits it.
@@ -277,7 +296,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - **General items** (migration 054, `module_contexts.title`): a Konteks item that belongs to no module (style, agreed terms…).
   Stored as a row whose module is "~" + 12 random hex chars (`ModuleContext.IsGeneral`/`GeneralKey`), with a title
   (required, at most 120). Members add them with "+ Konteks baru" beside the search box on the Konteks tab (a popup, `#context-new`) (`POST /projects/{id}/contexts`,
-  `ContextService.CreateGeneral`) and edit them in a popup per item ("Sunting", `#ctx-edit-<key>`; `POST /projects/{id}/contexts/{key}`, `SaveGeneral`, carries
+  `modulecontext.Service.CreateGeneral`) and edit them in a popup per item ("Sunting", `#ctx-edit-<key>`; `POST /projects/{id}/contexts/{key}`, `SaveGeneral`, carries
   `version`; a stale save answers 409 and reopens the popup with the person's text and the message). Emptying the note, or the red "Hapus" after Sunting (`POST …/contexts/{key}/delete`, `DeleteGeneral`, asks first), hides
   the item; its edits stay recorded.
   Not sent to the AI yet (only the file's module note is).
@@ -288,12 +307,12 @@ make cover          # coverage of every package by every test (bin/coverage.html
   whole-string glossary matches containing such a word go to the model instead of being applied.
 - Project tabs carry monochrome line icons (`tab_icon` in project_header.html).
 - The project header shows the overall progress of all modules in the project files after the name (and AI badge):
-  `GlossaryService.ProjectProgress` → `ProjectFileTotals` counts each module per language once, from its newest copy;
+  `source.Service.ProjectProgress` → `ProjectFileTotals` counts each module per language once, from its newest copy;
   filled by `loadProject` on full pages (`Project.Progress`), and on each card of /projects (`renderProjects`).
 - Statistik / Stats tab (`/projects/{id}/insight`, before Anggota, `InsightPage` in insight.go, pages/insight.html):
   the module group chart (moved here from Penerjemahan) and "Aktivitas anggota" (public, like the rest of the
   project): totals and a per-member table. Above the module chart, "Pertumbuhan terjemahan" (`wordschart.go`,
-  `buildWordsChart` from `ActivityRepository.HourlyTranslated`): **strings** people saved with a translation, added up
+  `buildWordsChart` from `activity.Repository.HourlyTranslated`): **strings** people saved with a translation, added up
   hour by hour (one point per hour; quiet stretches of more than a day, `wcQuiet`, are compressed to a fixed-width
   dashed break `.wc-gap` whose tooltip gives its length, so active periods fill the width; labels sit where active
   stretches start; times are shown when the span is 3 days or less). Four lines on one scale, all counted in the green total: typed by hand (blue; empty →
@@ -303,26 +322,26 @@ make cover          # coverage of every package by every test (bin/coverage.html
   hour in the same floating card as the module chart
   (app.js handles `.group-chart` and `.words-chart`; the card's rows come from `.gc-tip[data-rows]`).
 - Activity log (`activity_events`, migration 033, append-only, no FK on catalog/entry so history survives):
-  `ActivityService.Record` (errors only logged, nil-safe) is called from `CatalogService.SaveEntry` (`EntrySaved`:
+  `activity.Service.Record` (errors only logged, nil-safe) is called from `catalog.Service.SaveEntry` (`EntrySaved`:
   status before/after, machine origin before, text changed, source word count), manual commits, comments
-  (`DiscussionService.post`) and sign-ups. Services get it via `SetActivity`. Counting rules (same in the view
-  `activity_daily` and `ActivityRepository.Summary`): translated = untranslated → anything, reviewed = fuzzy →
+  (`discussion.Service.post`) and sign-ups. Services get it via `SetActivity`. Counting rules (same in the view
+  `activity_daily` and `activity.Repository.Summary`): translated = untranslated → anything, reviewed = fuzzy →
   translated, edited = translated with text changed, drafts approved/fixed = origin set and text unchanged/changed.
   Add a `models.Activity*` kind and a Record call to log something new.
 - Module group progress chart (Statistik tab; `group_chart` partial, `groupchart.go`): `group_stats`
   (migration 031) records each group's project file totals per language at every 15-minute check when they
-  changed, and at least hourly (`GlossaryService.RecordStats`, `StatsInterval`), plus after uploads. Groups are
+  changed, and at least hourly (`source.Service.RecordStats`, `StatsInterval`), plus after uploads. Groups are
   chosen with the same `group_filter` dropdown (none = all; several are added up per hour, `sumByHour`);
   ranges Hari ini (last 24 h, hourly points) / 7 / 30 days / all (daily points, `lastPerBucket`). Lines (translated green, fuzzy orange, untranslated red) share one scale with tidy value labels by default (`niceStep`), so distances are real; "Skala per garis" (`cs=each`) zooms each line to its own range and shows [min–max] in the legend; a
   floating card (app.js) shows the nearest point. History starts on the day it was deployed.
-- The "Templat sumber (POT)" section on Penerjemahan is hidden for now (`showTemplateSection` in handler/web/project.go);
+- The "Templat sumber (POT)" section on Penerjemahan is hidden for now (`showTemplateSection` in web/project.go);
   its template upload/merge code stays so it can come back.
 - Penerjemahan (`/projects/{id}/files`) is the first tab and the landing page: `/projects/{id}` redirects
   there (`ProjectHome`, query kept); the glossary lives at `/projects/{id}/glossary`.
 
 ## Thesaurus
 
-- Indonesian synonyms/antonyms (`internal/thesaurus`, table `thesaurus`, migration 024). On start,
+- Indonesian synonyms/antonyms (`pkg/thesaurus`, table `thesaurus`, migration 024). On start,
   if the table is empty, `THESAURUS_URL` (default: victoriasovereigne/tesaurus dict.json) is
   downloaded with the SSRF-safe glossary fetcher and stored; lookups are served from memory.
 - The source repo has no licence (data from Pusat Bahasa's 2008 Tesaurus), so lookups are for
@@ -333,17 +352,17 @@ make cover          # coverage of every package by every test (bin/coverage.html
 
 ## Spelling check (Indonesian)
 
-- `internal/spelling`: `Parse` reads the KBBI v6.1.0 CSV extract (`SPELLING_URL`, default the aryakdaniswara/kbbi-v6-full-csv
+- `pkg/spelling`: `Parse` reads the KBBI v6.1.0 CSV extract (`SPELLING_URL`, default the aryakdaniswara/kbbi-v6-full-csv
   repo; columns kata, turunan, varian, gabungan_kata) into ~119k single words; only words are kept, never meanings.
   `Dict.Known` adds the forms KBBI leaves out: passive di- and bare imperatives from the meN- forms it lists
   ("ditampilkan", "Tampilkan"), clitics (-nya -lah -kah -pun -ku -mu, ku-/kau-), root + -kan/-i/-an, doubled and
   hyphenated words. `Words` skips placeholders, markup, entities, URLs/addresses, mnemonics (`_Berkas`), digits,
   acronyms and words with inner capitals; `Misspelled` also leaves words that appear in the source alone.
   `Suggest` = edit distance ≤ 2 (swaps count once), longest shared start first.
-- Tables (migration 041): `spelling_words` (filled once on start when empty, like the thesaurus; `SpellingService.Load`)
+- Tables (migration 041): `spelling_words` (filled once on start when empty, like the thesaurus; `langtools.SpellingService.Load`)
   and `spelling_extra` (a project's own words: "Kamus proyek"). The source has **no licence**: checks are for project
   members only (never public), and /licenses credits the source.
-- Only Indonesian files (`service.Indonesian`) of signed-in members. Unknown words are **not** a problem in Validasi
+- Only Indonesian files (`langtools.Indonesian`) of signed-in members. Unknown words are **not** a problem in Validasi
   (no issue, no warning box, not counted in "bermasalah"): the underline and its popup are the only marks.
 - Editor (owner's files): the browser's spellcheck is off (`spellcheck="false"`). app.js posts the boxes' text to
   `POST /catalogs/{cid}/spell` (debounced) and draws `.spell-layer` behind each transparent `.tr-input` (metrics
@@ -355,7 +374,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
 
 ## Public API
 
-`internal/handler/web/api.go`, routes under `/api/` in the public group: read-only JSON, no key, the same answer
+`internal/web/api.go`, routes under `/api/` in the public group: read-only JSON, no key, the same answer
 signed in or not, `Access-Control-Allow-Origin: *`, `Cache-Control: public, max-age=60` (`apiJSON`).
 `GET /api/projects/{id}/members` (slug or numeric id; `APIMembers`): project slug, name, URL (`SITE_BASE_URL`), and
 members with username, name, **sign-in email** (the operator chose to publish it here, although the members page
@@ -365,20 +384,20 @@ shows it only to members), role, joined_at. Documented in README.md.
 
 - Project setting "Reservasi modul untuk dikerjakan" (Settings → Umum, `projects.reservations` + `reservation_days` 0/14/30/60, default off/30; migration
   046, `module_reservations` with one active holder per project + module by a partial unique index). Unit = module
-  (`service.ModuleOf` / `ModuleKey`, the file name before the first dot). `ReservationService` (service/reservation.go):
+  (`models.ModuleOf` / `ModuleKey`, the file name before the first dot). `reservation.Service` (reservation/service.go):
   `Claim` (free → yours; held by another → `ErrModuleReserved`), `Check`, `Release` (holder, or owner/manager who
   releases someone else's → the holder is emailed), `ReleaseMerged`, `Expire` (hourly in main.go: reminder email
   `ReminderDays` (3) before, released after `reservation_days` without saves; last save = newest `updated_at` of the
   holder's files of the module).
-- Hard lock: content changes go through `loadEditableCatalog` (handler/web/reservation.go: SaveEntry, AI, pre-translate,
+- Hard lock: content changes go through `loadEditableCatalog` (web/reservation.go: SaveEntry, AI, pre-translate,
   raw, properties, template update, replace, restore, discard), which claims a free module and refuses a held one.
-  `CatalogService.Upload` (take, manual add, link) and "Perbarui" claim too. Commit, messages, delete, downloads and
+  `catalog.Service.Upload` (take, manual add, link) and "Perbarui" claim too. Commit, messages, delete, downloads and
   the spell check do not. The editor/raw/entry pane call `applyLock`: a module another member holds opens read-only
   (`Owned` false) with a banner (`editor-hold`; the holder sees `editor-hold-mine` with "Lepas").
-- Released as "merged" by `CatalogService.landingsIn` after each sync (GNOME archive or GitHub branch) when every string
+- Released as "merged" by `catalog.Service.landingsIn` after each sync (GNOME archive or GitHub branch) when every string
   the holder changed is upstream word for word. Lists: a red lock (`res_lock`, `.res-lock`: red circle, white lock; tooltip "Direservasi oleh @user") right after the file name (blue `.res-lock-mine` when the viewer holds it) and `res_chip` under it, "Reservasi modul" (takes the file; asks first: it reserves the module) / "Sedang direservasi"
   in Berkas proyek, "Reservasi modul" / "Lepas reservasi tugas" in the ⋯ menu, "Reservasi & Terjemahkan" instead of "Terjemahkan" on free modules in Berkas Anda (asks, reserves, opens the editor), `reserve_filter` (`rv` = mine, other, free; Berkas
-  proyek uses `GlossaryService.ProjectFiles` with a keep filter, `KeepStates` for upstream states). Owners/managers release
+  proyek uses `source.Service.ProjectFiles` with a keep filter, `KeepStates` for upstream states). Owners/managers release
   someone else's reservation with a "Lepas" button (`res_release`, holder emailed) in the action column of Berkas proyek
   (instead of "Sedang direservasi") and Berkas anggota lain, and from the ⋯ menu ("Lepas reservasi @user"); Settings no
   longer lists held modules. In the ⋯ menu the review items (Ajukan/Lihat/Batalkan tinjauan, Kirim ke repositori) follow
@@ -386,10 +405,10 @@ shows it only to members), role, joined_at. Documented in README.md.
 
 ## Profile page
 
-`/profile` (pages/profile.html) is one form with one "Simpan" beside the title (`AuthService.UpdateAccount` checks
+`/profile` (pages/profile.html) is one form with one "Simpan" beside the title (`account.Service.UpdateAccount` checks
 every field first and saves only when all are valid): Akun, Identitas penerjemah, Profil publik and Email lencana, in
 two columns from 1000px, one full-width column below (iPad). Profil publik: a short description (`users.bio`, `MaxBio` 300) and links (`users.links`, JSON
-kind → URL, migration 053; `models.LinkKinds` website, github, x, linkedin, mastodon). `service.NormalizeLink` accepts
+kind → URL, migration 053; `models.LinkKinds` website, github, x, linkedin, mastodon). `account.NormalizeLink` accepts
 a handle or an address and stores the full https address (else `err.link_invalid`). The public page shows them under
 the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` and `/profile/badge-emails` routes stay.
 
@@ -400,8 +419,8 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
   move, slider / wheel / arrow and +/- keys to zoom; "Simpan foto" uploads a 512px JPEG (`POST /profile/avatar`, multipart
   `avatar`, JSON answer) and swaps every avatar on the page; "Hapus foto" (`POST /profile/avatar/delete`, asks first).
   Saved right away, apart from the profile form's Simpan.
-- The server never trusts the upload: `service.MakeAvatar` checks size (10 MB) and dimensions before decoding (JPEG, PNG,
-  GIF, WebP), cuts a centred square, scales with CatmullRom and encodes JPEG q85 (`AuthService.SetAvatar`). The old blob is
+- The server never trusts the upload: `account.MakeAvatar` checks size (10 MB) and dimensions before decoding (JPEG, PNG,
+  GIF, WebP), cuts a centred square, scales with CatmullRom and encodes JPEG q85 (`account.Service.SetAvatar`). The old blob is
   left to `blobs.GC`, which keeps blobs referenced by `users.avatar`.
 - Served publicly at `/avatars/{key}.jpg` (`Handler.Avatar`; immutable cache, ETag, sandbox CSP) only while some user uses
   that key, so the address never serves other blobs. "avatars" is a reserved username.
@@ -412,14 +431,14 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
 
 - `/users/{username}` (public, `Handler.UserPage`, pages/user.html; "users" is a reserved username): a person's work
   across all projects, never their email. Linked from the user menu ("Halaman publik saya"), members page, Statistik
-  table and comment authors. Data: `ActivityRepository.UserDays` (per calendar day in `SITE_TIMEZONE`, default
+  table and comment authors. Data: `activity.Repository.UserDays` (per calendar day in `SITE_TIMEZONE`, default
   Asia/Jakarta; `siteLocation`; main.go embeds time/tzdata) and `UserTotals` (projects, files, languages, completed
-  files, comments, topics, wiki/Konteks edits, manual commits) in repository/postgres/profile.go. A **contribution** =
+  files, comments, topics, wiki/Konteks edits, manual commits) in activity/postgres_profile.go. A **contribution** =
   an entry save that translated, reviewed (fuzzy/AI → translated), changed a translated string, or saved a machine
   draft (`evContribute`, the Statistik rules); streaks count days with at least one. Words ("Kata dikerjakan", the
   Statistik "Kata" column and the Juru Kata badge) are the source words of every contribution; "String diterjemahkan dari
   kosong" counts only strings filled from empty.
-- `service/profile.go`: `ComputeProfileStats` (current/best streaks of days, Monday–Sunday weeks and months; the period
+- `activity/profile.go`: `ComputeProfileStats` (current/best streaks of days, Monday–Sunday weeks and months; the period
   not over yet does not break a streak; active days, best day, night 00–05 / early 05–07, weekends, member days) and the
   badge catalog `Badges`: groups (streak, work, reach, community, habits) of badges with up to 5 tiers
   (`BadgeTierNames` bronze…diamond; strings `badges.*`, `badge.<key>` + `badge.<key>_desc` with the target).
@@ -436,7 +455,7 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
   (template func `badgeIcon`); tier colours in `badgecard.Tiers` and the `.tier-*` CSS must stay in step.
 - **Sharing:** every earned tier has a page `/users/{username}/badges/{key}/{tier}` (`BadgeSharePage`; the tier is in the
   address so a shared Silver stays Silver; not or no longer earned → back to the profile) with Open Graph / Twitter tags
-  (`pageMeta` in `Data.Meta`, base.html) and a 1200×630 PNG at the same address + `.png` (`internal/badgecard`: gg + Go
+  (`pageMeta` in `Data.Meta`, base.html) and a 1200×630 PNG at the same address + `.png` (`pkg/badgecard`: gg + Go
   fonts, cached in memory, `Cache-Control` one day). Preview texts are in the owner's language (`ownerLang`); achievement
   lines are `badge.<key>_done`. The owner sees a share button on earned badges (`#share-dialog`, app.js: LinkedIn,
   X, Facebook share URLs, "Salin ke papan klip" (the post text, a blank line, then the link), "Unduh gambar" (`.png?download=1`, to attach the picture by hand: X often draws
@@ -447,8 +466,8 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
   months (`min(BestStreakMonths, MemberMonths)`, tiers 12/24/36/60); `BadgeDef.Div` shows thresholds in years and
   `Unit` adds "bulan" to the progress count. Badge defs use `ID` (not `Key`: the i18n test reads `Key: "…"` literals).
 
-- **Accepted upstream** (`upstream_landings`, migration 043; service/landing.go): after every module group import (sync or
-  upload), `GlossaryService` hands the downloaded files to `CatalogService.DetectLandings` in the background
+- **Accepted upstream** (`upstream_landings`, migration 043; catalog/landing.go): after every module group import (sync or
+  upload), `source.Service` hands the downloaded files to `catalog.Service.DetectLandings` in the background
   (`SetLandings`). For each member file of the same module (git: same `repo_path`; else same name or module, same
   language) a string counts when the member wrote it (it differs from the newest "initial"/"from upstream" snapshot,
   the git patch reference), it is translated, not fuzzy and not an unreviewed AI draft, it is long enough to tell apart
@@ -456,36 +475,36 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
   member, file and string (insert once). Works the same for GNOME (release archives follow the modules' git) and
   GitHub branches, however the work got in. Badges `landed` / `landed_modules` (group "upstream"), tile "Diterima upstream".
 
-- **Badge details** on the share page (`ActivityService.BadgeDetail`, service/badgedetail.go): when the tier was reached
-  and the work behind it per project and module (`ActivityRepository.UserModuleWork`; module = file name before the first
+- **Badge details** on the share page (`activity.Service.BadgeDetail`, activity/badgedetail.go): when the tier was reached
+  and the work behind it per project and module (`activity.Repository.UserModuleWork`; module = file name before the first
   dot, deleted files keep their name). Streak badges use the run that earned the tier (`earnedPeriod`: days, Monday–Sunday
   weeks, months), counting badges the work up to the day the count was reached, community badges per project
   (`UserCommunityWork`, date from `NthTime`), upstream badges the accepted modules (`UserLandingWork`).
 - **One-time jobs** (`one_time_jobs`, migration 044): `ClaimOneTimeJob` marks a start-up job as run. The first one,
   `BackfillLandingsJob` (main.go), recorded work accepted upstream during the month before detection existed
-  (`CatalogService.BackfillLandings`: stored project files, member work measured against their starting point a month
+  (`catalog.Service.BackfillLandings`: stored project files, member work measured against their starting point a month
   earlier via `referenceAt`, dated when that upstream file was stored). It can be removed once it has run.
 
-- **Badge emails** (service/badgemail.go, `badge_awards` + `users.badge_emails_off`, migration 045): badges are computed,
-  so `ActivityService.AwardBadges` (main.go: once silently as `BadgeAwardsBaselineJob`, then hourly) compares everyone
+- **Badge emails** (activity/badgemail.go, `badge_awards` + `users.badge_emails_off`, migration 045): badges are computed,
+  so `activity.Service.AwardBadges` (main.go: once silently as `BadgeAwardsBaselineJob`, then hourly) compares everyone
   with work (`BadgeUsers`) against the tiers recorded in `badge_awards` and emails the new ones in one message per person
   (`badgeMessage`: picture, achievement, "Lihat lencana", LinkedIn/X/Facebook share links, encouragement to share, link
   to turn them off). A tier is recorded once and never announced again, even if the count drops and rises. Recorded
   silently when the person turned them off (profile page `#badge-emails`, `POST /profile/badge-emails`) or is no longer
-  whitelisted. Share texts and links come from `service.BadgeShareFor` (also used by the share page and dialog).
+  whitelisted. Share texts and links come from `activity.BadgeShareFor` (also used by the share page and dialog).
 
 ## Translation Project (translationproject.org)
 
 - The site has no API. A module group can be synced from a **team page** (`/team/<code>.html`): "Tim Translation
   Project" in the add form (`source=tp`, `tp_team` = code or team page address, `tpsite.ParseTeam`); stored in
   `module_groups.tp_team` (migration 047), sync URL = the team page, sync language = the team code.
-- `internal/tpsite`: `ParseTeamPage` reads the domain table with regexes only (untrusted text): domain, version, the
+- `pkg/tpsite`: `ParseTeamPage` reads the domain table with regexes only (untrusted text): domain, version, the
   team's PO file for that version (`PO-files/<team>/…`, already merged with the newest template) or the POT when
   untranslated, translated/total, last submission, assigned translator, restricted (disclaimer needed). Fixture
   `testdata/team_id.html`; if the site changes its markup, save a new copy and adjust the regexes. Do not use
   `latest/` or `backups/` (they hold the last submission, often for an old version). `Prepare` turns Latin-1 into
   UTF-8 and a POT into an empty PO of the team's language (Language, Plural-Forms, plural form count).
-- `GlossaryService.fetchTP` (service/tp.go): team page with ETag; files are downloaded only for rows whose
+- `source.Service.fetchTP` (source/tp.go): team page with ETag; files are downloaded only for rows whose
   `Fingerprint` changed (version, file, counts, date), `tpPause` apart; the rest come from `tp_domains` (shared by
   every project, file kept gzip). All files go into one in-memory .tar.gz (`tpsite.FileName`: "bash.id.po", module =
   domain) handed to `importInto`, so glossary, project files, Ambil/Perbarui and upstream landings work as for other
@@ -502,7 +521,7 @@ the name (`user-bio`, `user-links`, `link_icon`). The old `/profile/identity` an
 
 ## Git-only projects
 
-- When any module group of a project is synced from GitHub (`GlossaryService.HasGitRepo`), Penerjemahan hides
+- When any module group of a project is synced from GitHub (`source.Service.HasGitRepo`), Penerjemahan hides
   "Tambah berkas manual": files come from the repository. (`IsGitProject`, every group from GitHub, still hides the
   template section.)
 
@@ -531,7 +550,7 @@ and a button to the foundation's donate page (https://blankon.id/id/donate, or /
 ## Licenses page
 
 `/licenses` (footer link) lists third-party software and data (`licenseCredits` in
-handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding dependencies.
+web/licenses.go). Keep it in sync with go.mod and static/ when adding dependencies.
 
 ## Wiki
 
@@ -549,7 +568,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - Every create/save is recorded in `wiki_edits` (migration 021, backfilled from created/updated);
   the article lists the latest 50 as "@username · time" in a collapsed `<details>`, converted to the reader's time zone
   (`time[data-local]` in app.js). Moves are not edits.
-- The tree is reorganized only by drag and drop in the sidebar (`WikiService.Move`, modes
+- The tree is reorganized only by drag and drop in the sidebar (`wiki.Service.Move`, modes
   before/after/inside, depth checked for the whole subtree; `Reorder` does not touch updated_at).
 - Rendering: `wikiHTML` (goldmark GFM, safe mode, heading ids). Images are only shown when
   served by this site (`localImages` turns others into links); external links open in a new tab.
@@ -562,14 +581,14 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 
 ## Upstream state (GNOME translation site)
 
-- `internal/gnomel10n` reads the public read-only API of l10n.gnome.org (`/api/v1/releases/`,
+- `pkg/gnomel10n` reads the public read-only API of l10n.gnome.org (`/api/v1/releases/`,
   `/releases/{release}/languages/{lang}`, `/modules/{m}/branches/{b}/domains/{d}/languages/{lang}`) over
   `netsafe`. Write actions (reserving, uploading) need a signed-in session there and are out of scope.
 - The site throttles anonymous API clients (~100 requests/hour per address, then a 429 for most of an hour), and
   the API has no endpoint returning many modules' states at once. So **pages never ask the site for states**: they
   are stored in `upstream_states` (migration 035; shared by all projects, key release + language + file name stem;
   `listed = false` = the release has no such file) and read from there.
-- `GlossaryService.WarmUpstream` (service/upstream.go; at start-up before the first `FetchDue`, then at the end of
+- `source.Service.WarmUpstream` (source/upstream.go; at start-up before the first `FetchDue`, then at the end of
   every `FetchDue` round, i.e. every 15 min; one round at a time) refreshes states older than `UpstreamFresh` (2 h).
   Because the API has no bulk endpoint, it reads the site's **HTML release page** per release and language
   (`/languages/{lang}/{release}/ui/`, plus `/doc/` when a due file is documentation, "…-help.<branch>"):
@@ -585,7 +604,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   (`gnomel10n.DefaultBudget` 40, minus `upstreamReserve` 8 left for people). The client also caches API answers in
   memory (stats 1 h, release lists 12 h, 404s too) and obeys the site's wait time. Pages may only ask for the
   release list (once per 12 h) for module groups named after a release (`upstreamWait` 3 s).
-- Fixtures: `internal/gnomel10n/testdata` has recorded API JSON and a saved release page
+- Fixtures: `pkg/gnomel10n/testdata` has recorded API JSON and a saved release page
   (`page_gnome-51_id_ui.html`); if the site changes its markup, save a new copy and adjust the regexes in page.go.
 - Mapping (`upstreamLookup`): release = the module group's sync link on the site
   (`…/languages/id/gnome-51/ui.tar.gz`), else the group label when the site lists a release of that name;
@@ -599,7 +618,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - State filter (`upstream_filter` partial, checkbox dropdown `[data-multi-filter]`, param `u`, values
   `models.UpstreamFilters`, none ticked = all, with a note that states are checked gradually): next to the module
   group filter in "Berkas proyek" (`#pf-filter`, so "Muat lagi" keeps it; with a state filter
-  `GlossaryService.ProjectFiles` loads all matching rows and pages in Go) and in "Berkas Anda" / "Berkas anggota
+  `source.Service.ProjectFiles` loads all matching rows and pages in Go) and in "Berkas Anda" / "Berkas anggota
   lain" (`file_filter`, `fileList`). Shown when a module group is a release upstream (`HasUpstream`). Both lists show the
   badge (`upstream_badge` partial) under the file name.
 - The module group filter is hidden when the project has only one module group (file lists and the Statistik chart).
@@ -609,7 +628,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   edit only.
 - **A file's own upstream page** (`catalogs.upstream_page`, migration 038): "Tambah berkas manual" and "Perbarui berkas…"
   have an optional "Halaman modul upstream" field (`upstream_page`, e.g. `…/vertimus/gnome-calculator/main/po/id/`;
-  checked and made canonical by `GlossaryService.UpstreamPageURL` via `gnomel10n.ParsePageURL`, else
+  checked and made canonical by `source.Service.UpstreamPageURL` via `gnomel10n.ParsePageURL`, else
   `err.upstream_page`; the update dialog is pre-filled, so emptying it removes the link). Such a file takes its state
   from that page instead of the project file match (`AttachUpstreamToCatalogs`), also in projects without a release.
   The state is fetched right after saving (`CheckUpstreamPage`, one API request, in the background) and refreshed by
@@ -622,14 +641,14 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   the file name (`.up-badge.up-<UpstreamStats.StateClass>`, grey for "None" = no activity and unknown states), linking
   to the site's page with the upstream % and counts in its tooltip; labels are `upstream.state_*`
   (`UpstreamStats.StateKey`; unknown states are shown as sent). The progress column shows only Pelokalan's copy. There is one button per row: "Ambil" / "Perbarui" (and the editor's
-  "Tarik upstream", same take route) first download the current `po_file` from the site (`GlossaryService.UpstreamPO`: the stored `po_file`, looked up
+  "Tarik upstream", same take route) first download the current `po_file` from the site (`source.Service.UpstreamPO`: the stored `po_file`, looked up
   live only when the file was never checked;
   upload size limit; history label "l10n.gnome.org module/branch") and fall back to the copy saved at the last sync
   when the site has no entry or cannot be reached (throttled, down).
 - A file with a release but no stored state shows a grey dashed "Status belum ada ↗" label (`.up-unknown`) linking
-  to the page built from its stem (`GlossaryService.guessPageURL`, `UpstreamInfo.UpstreamLink`), to check by hand.
+  to the page built from its stem (`source.Service.guessPageURL`, `UpstreamInfo.UpstreamLink`), to check by hand.
   Colours: Translating orange, Requested rework (ToReview) red, None/unknown grey.
-- Tests use API JSON and the release page recorded from the site (`internal/gnomel10n/testdata`); never call the site from tests.
+- Tests use API JSON and the release page recorded from the site (`pkg/gnomel10n/testdata`); never call the site from tests.
 
 ## Module groups ("Kelompok modul") and automatic downloads
 
@@ -637,16 +656,16 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   columns `group_id`, `sync_url`, `sync_language`) and in code (`models.ModuleGroup`, `ModuleGroupImport`,
   `ModuleGroupOption`; `GroupID`/`GroupLabel` fields; `ListGroups`, `ImportGroup`, `SetGroupSync`, `FetchGroup`…).
   A module group (name + version, label "gnome-51") holds the PO archives imported per language; they feed the
-  glossary terms and the project files. Sorted naturally (`service.SortGroups`), newest first. Re-importing a
+  glossary terms and the project files. Sorted naturally (`source.SortGroups`), newest first. Re-importing a
   group + language replaces it.
-- A group may have a `sync_url`; `GlossaryService.FetchDue` runs every 15 minutes from main.go and
+- A group may have a `sync_url`; `source.Service.FetchDue` runs every 15 minutes from main.go and
   fetches URLs older than `GLOSSARY_FETCH_INTERVAL_HOURS` (default 1), using ETag/Last-Modified and a
   content hash to skip unchanged archives. `glossary.Fetcher` refuses private/local
   addresses at dial time (SSRF protection) unless `GLOSSARY_ALLOW_PRIVATE_HOSTS=true`.
 
 ## Raw editor and translator identity
 
-- `/catalogs/{cid}/raw`: the file built by `CatalogService.Build` in a textarea; saving
+- `/catalogs/{cid}/raw`: the file built by `catalog.Service.Build` in a textarea; saving
   (`SaveRaw`) re-parses it and replaces header + entries. The form carries the catalog's
   `updated_at` (UnixNano); a newer change is refused (`err.raw_conflict`).
   Leaving with unsaved changes (Penyunting, any link, browser Back via an extra history entry) opens
@@ -662,7 +681,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   put there is moved back; years merge via `po.AddYear`: 2025 + 2026 → "2025-2026", 2024 + 2026 → "2024, 2026"), and
   fills `Language-Team` only when the file has none (file properties win).
 - Translator credits entry (`po.IsCreditsEntry`: translator-credits / translator_credits / translator-credit):
-  for the file owner, validation (`validateEntry` in service/catalog.go, `po.CheckCredits`) adds
+  for the file owner, validation (`validateEntry` in catalog/service.go, `po.CheckCredits`) adds
   `credits_missing` when their name/email is not in it and `credits_year` when their line lists years but
   not this one (lines without years are fine). The editor alert offers "Tambahkan identitas saya" / "Tambahkan
   tahun ini" (`creditFix` → `po.AddCredit`, same year rule), which fills the box (undoable, not saved).
@@ -672,7 +691,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 ## Git repositories (GitHub module groups and patches)
 
 - A module group can be synced from a **GitHub repository branch** (e.g. python/python-docs-id, 3.14): "Repositori
-  GitHub" in the add form (`source=git`, `git_repo`, `git_branch`; `service.ParseGitHubRepo` accepts owner/name or
+  GitHub" in the add form (`source=git`, `git_repo`, `git_branch`; `source.ParseGitHubRepo` accepts owner/name or
   the github.com address, `/tree/<branch>` too). Stored in `module_groups.git_repo/git_branch` (migration 042);
   the sync URL is the branch archive on codeload.github.com (`GitHubArchiveURL`: no API calls, no key), so FetchDue,
   ETag and "Sinkronkan" work as for any archive.
@@ -680,8 +699,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   `project_files.repo_path` ("library/os.po") and gets a flat, collision-free Pelokalan name (`RepoFileName`:
   folders joined with "__", inner dots → "-": "library__os-path.po"), so modules stay unique. Only strings of at
   most `GitTermMaxWords` (12) words become glossary terms (documentation paragraphs are not terms).
-- "Ambil"/"Perbarui" copy `repo_path` to the member's file (`catalogs.repo_path`, `CatalogService.SetRepoPath`).
-- **Patch export** (`internal/gitpatch`, `CatalogService.GitPatch`): starts from the repository's file as last synced
+- "Ambil"/"Perbarui" copy `repo_path` to the member's file (`catalogs.repo_path`, `catalog.Service.SetRepoPath`).
+- **Patch export** (`pkg/gitpatch`, `catalog.Service.GitPatch`): starts from the repository's file as last synced
   (newest project file with that path, `ProjectFileByRepoPath`) and rewrites only entries the member changed in
   Pelokalan since taking/updating the file (compared with the newest "initial" or "from upstream" version in its
   history), so newer repository translations are never reverted; unreviewed AI drafts and emptied strings stay out.
@@ -693,12 +712,12 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   There is no all-files patch. Each repository file's ⋯ menu in Berkas Anda has "Unduh patch git" (`GET /catalogs/{cid}/patch`)
   and "Salin perintah git patch", which copies (`Handler.PatchCommand`):
   `git fetch https://github.com/<repo>.git <branch> && git switch -C pelokalan/<module> FETCH_HEAD && curl -fsSL '<link>' | git am`
-  (repo/branch from the group the file was last synced from, `GlossaryService.GitGroupFor`; branch name
-  `service.GitBranchName`, "library/os.po" → "pelokalan/library-os"; fetched by address, so remote names do not matter;
+  (repo/branch from the group the file was last synced from, `source.Service.GitGroupFor`; branch name
+  `source.GitBranchName`, "library/os.po" → "pelokalan/library-os"; fetched by address, so remote names do not matter;
   `-C` restarts the branch from the newest upstream on a later round, since the patch holds all the member's changes).
   The list shows each file's repository path. Nothing to send → back to Penerjemahan with `flash.git_no_changes`.
   The editor's "Modul" opens the file on GitHub.
-- **Patch links** (`service/patchlink.go`, `GET /git/{token}.patch`, public route, `Handler.GitPatchByLink`): token =
+- **Patch links** (`account/patchlink.go`, `GET /git/{token}.patch`, public route, `Handler.GitPatchByLink`): token =
   "c" + catalog id, user id and expiry (base 36, "-" separated) + "." + HMAC (JWT secret), valid `PatchLinkTTL` (24 h);
   access is checked again when fetched and the patch is built then. Failures are plain text: 403 expired/invalid,
   404 nothing to send.
@@ -707,29 +726,29 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 
 - Three ways to send work back to a GitHub repository: (1) git patch (above), (2) pull requests through the app
   (planned), (3) **full integration**: Pelokalan commits approved modules straight to the branch. (3) is built.
-- `internal/githubapp`: the Pelokalan GitHub App (`GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY[_FILE]`,
+- `pkg/githubapp`: the Pelokalan GitHub App (`GITHUB_APP_ID`, `GITHUB_APP_SLUG`, `GITHUB_APP_PRIVATE_KEY[_FILE]`,
   `config.GitHubConfig`; unset = feature hidden). RS256 app JWT, `Installation` per repo, installation tokens cached
   until 5 min before expiry, `GetFile` (contents API, blob API over 1 MB), `PutFile` (contents API with the blob
   sha; `ErrConflict` when the branch moved). `githubtest` is a fake of those endpoints for tests (never call GitHub).
 - Module group (migration 048): `git_direct` (on/off), `git_installation`, `git_write`, `git_checked_at`,
   `git_access_error`; `ModuleGroup.CanPush`. The popup's `github_integration` block (git groups): install link,
-  "Periksa akses" (`GlossaryService.CheckGitAccess`), "Aktifkan/Matikan integrasi penuh" (`SetGitDirect`, needs write).
+  "Periksa akses" (`source.Service.CheckGitAccess`), "Aktifkan/Matikan integrasi penuh" (`SetGitDirect`, needs write).
   Git groups edit repository + branch in "Ubah repositori atau cabang" instead of the archive link.
-- Reviews (`module_reviews`, `service/review.go`, `handler/web/review.go`): a member asks for a review of their file
+- Reviews (`module_reviews`, `review/service.go`, `web/review.go`): a member asks for a review of their file
   ("Ajukan tinjauan" in the ⋯ menu, and as the main button in Berkas Anda when `Catalog.ReviewReady`: fully translated,
   nothing fuzzy or AI, no open request, and not unchanged since its last commit to the repository; `#review-dialog` with an optional note; `POST /catalogs/{cid}/review`, sent in the background by app.js with
   `X-Requested-With: fetch` → JSON, so the page stays where it is: the popup closes, a toast shows and the file lists
   refresh with their current filters); owners and
   managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan (each request is a clickable row, highlighted on hover); `/projects/{id}/reviews/{rid}` shows the
-  changes (`ReviewService.Changes`: `CatalogService.ChangedTargets` = the git patch rule, against the last synced file)
+  changes (`review.Service.Changes`: `catalog.Service.ChangedTargets` = the git patch rule, against the last synced file)
   with "Setujui & commit" / "Kembalikan dengan catatan" (note required, emailed). Nobody approves their own request.
   Owners/managers may also "Kirim ke repositori" any file directly (`PushNow`), unless the project setting "Wajibkan
   tinjauan" (Settings → Umum, `projects.review_required`, migration 050) is on: then the button is hidden and
   `PushNow` refuses (`err.review_required`). One open request per file.
-- Commit (`ReviewService.commit`): reads the branch's current file, `gitpatch.ApplyCredit` (the whole file with only the
+- Commit (`review.Service.commit`): reads the branch's current file, `gitpatch.ApplyCredit` (the whole file with only the
   member's changed entries rewritten, and the header crediting the translator: their "Name <email>, year." line among
   the header comments via `po.AddContributor`, and an existing Last-Translator field set to them; `TranslatorCredit`,
-  only when some string changes). The review diff and "Lihat" (`ReviewService.Changes`, `gitpatch.DiffCredit`) and the
+  only when some string changes). The review diff and "Lihat" (`review.Service.Changes`, `gitpatch.DiffCredit`) and the
   git patch export show the same header lines. The member's other header edits in Pelokalan are not sent. `PutFile` (one retry on conflict), author = translator's credit identity,
   message "Update translation of <path>" + count + note + `Reviewed-by:` + project link. Only the strings a commit
   rewrote are kept (`pushed_data`, `sentEntries`) and never sent again. Before committing, `UpstreamConflicts` refuses
@@ -742,7 +761,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - File rows show `review_chip` (Menunggu tinjauan / Perlu perbaikan · N (open review comments) / ☑ Sudah masuk repositori · sha
   linking the commit).
 - **Review editor** (`/projects/{id}/reviews/{rid}` = `editorPage` with the review, `reviewData`; class `review-mode`):
-  read-only, lists only the review's strings (`EntryFilter.Only`, `ReviewService.ChangedHashes`), no edit pane (the
+  read-only, lists only the review's strings (`EntryFilter.Only`, `review.Service.ChangedHashes`), no edit pane (the
   status bar stays, without shortcuts or filter links), toolbar `review_toolbar` (back, file + requester, Tabel/Diff `[data-review-view]` toggling
   `#review-diff`, Validasi, Teks, PO, Modul, then the editor's search/filter/order (`editor_filter`, shared with the full
   editor; it carries `review=<id>` so the list stays on the review's strings; the banner's "Tampilkan" ticks its
@@ -755,7 +774,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   with `review-mode`): the review layout without decisions or discussion (`.sb-thread` hidden): back, file + owner,
   "Hanya lihat", and for repository files the Tabel/Diff toggle with the member's changes against the last synced file.
   Links without `?view=1` (discussion emails, `?entry=`) open the normal read-only editor, except that someone who may
-  review a file waiting for review (`ReviewService.OpenFor`) is sent to the review editor with the same query. The
+  review a file waiting for review (`review.Service.OpenFor`) is sent to the review editor with the same query. The
   read-only editor has a yellow bar on top (`othersFileData`, `.editor-others`): whose file it is, and a link to the
   viewer's own copy of the module (`MatchOwnFiles`) or, for members without one, to the module's project file to take it. For owners, coordinators and
   reviewers a file waiting for review shows "Tinjau" (to the review editor) instead of "Lihat". In review and view layouts long
@@ -767,7 +786,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - **Project file viewer** (`/projects/{id}/project-files/{fid}/view`, public; "Lihat" in Berkas proyek; `ProjectFileView`,
   pages/project_file.html): the stored file read-only in the view layout (table, `?q=` search, status bar, PO
   download). Glossary module chips (list and term page) link to `/projects/{id}/project-files/module/{name}?q=<term>`
-  (`ProjectFileByModule`, `GlossaryService.ProjectFileForModule` matches `glossary.ModuleName`, newest group first).
+  (`ProjectFileByModule`, `source.Service.ProjectFileForModule` matches `glossary.ModuleName`, newest group first).
 - The Berkas proyek and Berkas anggota lain rows have no download button: "Lihat" opens the view-only layout, whose toolbar
   has the PO download. View-only toolbars (project files and other members' files) end with `view_action` (partials/view_action.html,
   `viewAction`): "Buka berkas Anda" when the viewer has the module, who holds it when reserved, else "Reservasi
@@ -775,8 +794,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - The GitHub integration block always shows the app's install link (to install it on more repositories or change
   its access); it is the main button only until write access is confirmed.
 - **Review comments** (migration 049, `comments.review_id/resolved_at/resolved_by`): a comment by an owner, coordinator
-  or reviewer (not the requester) on an entry of a file with an open request is tied to it (`ReviewService.OpenFor` via
-  `DiscussionService.SetReviews`). It is open until resolved (green "Sudah diselesaikan" button with a check, `POST /projects/{id}/comments/{cid}/resolve`,
+  or reviewer (not the requester) on an entry of a file with an open request is tied to it (`review.Service.OpenFor` via
+  `discussion.Service.SetReviews`). It is open until resolved (green "Sudah diselesaikan" button with a check, `POST /projects/{id}/comments/{cid}/resolve`,
   file owner, the author or a manager): red dot on the entry row (`Entry.ReviewOpen`, `mark-review`, kept in sync by
   app.js from the thread's `data-review-open`), a "Komentar tinjauan" status filter (`EntryFilter.Review`) and status bar
   count in the translator's editor. Approving or sending (`push`/`PushNow`) waits until none is open
@@ -795,15 +814,15 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 ## AI pre-translation
 
 - Settings per project in `project_ai_settings` (owner/manager): base URL, model (a dropdown of
-  `service.AIModels`, OpenAI chat models, plus "Lainnya…" for any other name; `[data-model-pick]` in app.js). Prices of
-  those models are built in (`service.AIPrices`, USD per 1M tokens from OpenAI's pricing page, updated by hand; shown
+  `pretranslate.AIModels`, OpenAI chat models, plus "Lainnya…" for any other name; `[data-model-pick]` in app.js). Prices of
+  those models are built in (`pretranslate.AIPrices`, USD per 1M tokens from OpenAI's pricing page, updated by hand; shown
   under the dropdown) and replace stored prices on load and save (`applyModelPrice`); the price fields only appear for
   "Lainnya…". API key
   encrypted with `ai.Box` (AES-GCM, key from `AI_SECRET_KEY`), prices per 1M tokens, monthly budget,
   and `extra_context` (migration 023): project-wide guidance sent as `<project_context>` before the
   file's `<file_context>` (the file note is more specific and wins). Words in either can make
   glossary hints optional.
-- `AIService.plan` (service/ai.go): untranslated (optionally fuzzy) entries of the user's own
+- `pretranslate.Service.plan` (pretranslate/service.go): untranslated (optionally fuzzy) entries of the user's own
   catalog. Order of precedence: (1) `ai.Glossary.Exact` — whole string equals a glossary term
   whose top translation has >= 60% share: applied directly, no model call; (2) the model, with
   `ai.Glossary.Matches` (longest phrase first) sent as mandatory term hints.
@@ -822,7 +841,7 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   (golden-angle hues via `--h`; spaces between changed words stay in one change);
   clicking a box (or Enter/Space on it) puts it in the translation box (undoable). With one result it goes straight in.
 - Per-entry AI details:
-  `POST /catalogs/{cid}/entries/{eid}/ai` → `AIService.TranslateEntry` translates one entry with the
+  `POST /catalogs/{cid}/entries/{eid}/ai` → `pretranslate.Service.TranslateEntry` translates one entry with the
   editor's current text as draft and returns it unsaved; cost is recorded as an `ai_jobs` row with
   `single = true` (migration 025), which counts toward the budget but is not shown as the file's job.
 - Glossary hints are re-cased to the sentence (`ai.MatchCase`): a term used in lowercase in the
@@ -839,17 +858,17 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   token usage and cost, honor cancel (`watchCancel` polls every 1.5 s and aborts the in-flight
   model request; finished batches are kept) and the monthly budget, and skip entries edited meanwhile
   (entry version check). Running jobs are marked failed on startup (`RecoverJobs`).
-- Cost estimate: `ai.EstimateTokens` (~3.5 chars/token) via `AIService.Estimate`.
+- Cost estimate: `ai.EstimateTokens` (~3.5 chars/token) via `pretranslate.Service.Estimate`.
 
 ## Editor glossary section
 
 At the top of the right sidebar (`entry_glossary` partial in editor.html, rendered by sidebar.html; while the
-sidebar is closed, and on phones, the copy in the editor pane above the source text shows instead) the editor lists glossary terms found in the entry (`GlossaryService.ForEntry`,
+sidebar is closed, and on phones, the copy in the editor pane above the source text shows instead) the editor lists glossary terms found in the entry (`source.Service.ForEntry`,
 all versions, preferred translation + share). Chips insert the translation at the cursor; ↗ opens
 the term page. Orange text when nothing matches or the language has no glossary. Chips the project AI
 context or the file's Konteks talks about (`ai.Mentioned`, same rule as pre-translation) are orange
 (`EntryTerm.Overridden`). Term matchers are
-cached per project+language and rebuilt only when `GlossaryRepository.Stamp` (imports) changes.
+cached per project+language and rebuilt only when `source.Repository.Stamp` (imports) changes.
 
 ## Entry origin
 
@@ -858,10 +877,10 @@ by a person (`SaveEntry` clears it).
 
 **"AI perlu ditinjau" / "AI needs review"** (`Entry.Status()` = "ai", ahead of fuzzy): an AI draft no person has
 saved. AI results are stored without the fuzzy flag (migration 040 cleared it on existing drafts) and
-`CatalogService.Build` exports them as `#, fuzzy`, so unreviewed AI text never leaves as final. Counted as "needs
+`catalog.Service.Build` exports them as `#, fuzzy`, so unreviewed AI text never leaves as final. Counted as "needs
 review" in `CatalogStats.Fuzzy` (progress bars, SQL `Stats`, history), but the editor status bar shows plain fuzzy
 (`EntryListing.FuzzyOnly`) and AI drafts (`AI`) apart; purple rows (`.st-ai`), filter/status value "ai", on by default
-in Validasi (`service.EditorStatuses`). In the editor the review box is ticked and labelled "AI perlu ditinjau", so
+in Validasi (`account.EditorStatuses`). In the editor the review box is ticked and labelled "AI perlu ditinjau", so
 "Lepas pratinjau, simpan & lanjut" approves it (clears fuzzy and origin). Translation memory skips AI drafts
 (`origin <> 'ai'`). Diffs compare "needs review" (fuzzy or AI) so older snapshots with the flag show no change. The
 activity log records an AI draft's status as "fuzzy" (`logStatus`) so its counting rules stay as before. The
@@ -874,14 +893,14 @@ pre-translation checkbox `mark_fuzzy` now only applies to memory and glossary re
 
 - `catalog_commits`: linear history per catalog, gzip PO snapshot + stats + diff counts.
   Kinds: manual, auto (safety), restore, initial. Auto messages are i18n keys ("key|arg").
-- `CatalogService.SafetyCommit` runs before replace/raw save/template merge/memory
+- `catalog.Service.SafetyCommit` runs before replace/raw save/template merge/memory
   pre-translate/AI job, and after AI jobs; `EnsureBaseline` gives files without history a
   first version. `Restore` commits the current state first, then records a restore commit, so
   every step can be undone. `Discard` = restore latest commit.
 - The Commit button badge (`commit_badge`/`commit_status` partials) is refreshed out-of-band after
   every entry save, so needs-work and origin changes show up immediately.
 - The owner can change a version's message: select it on the history page, "Ubah pesan" (before Unduh) turns the
-  title into a field (`POST /catalogs/{cid}/history/{hid}/message`, `CatalogService.EditCommitMessage`, same
+  title into a field (`POST /catalogs/{cid}/history/{hid}/message`, `catalog.Service.EditCommitMessage`, same
   limits as Commit, no "|"); the response re-renders the details and the timeline label (`tl_msg`, out of band).
 - History page `/catalogs/{cid}/history`: timeline, progress chart (SVG), diff panel (HTMX). It is a full
   page with the editor-style toolbar (back to the editor, PO download); the content scrolls below it.
@@ -897,7 +916,7 @@ pre-translation checkbox `mark_fuzzy` now only applies to memory and glossary re
 ## Pre-translation
 
 One dialog (`#ai-dialog` in the editor): sources in order memory → glossary → AI (optional,
-needs project AI settings). Implemented by `AIService.Start` / jobs in `ai_jobs`.
+needs project AI settings). Implemented by `pretranslate.Service.Start` / jobs in `ai_jobs`.
 
 ## Top bar
 
@@ -923,9 +942,9 @@ deploys never run stale JS/CSS.
 
 ## i18n
 
-- All UI strings live in `internal/i18n/messages.go`; Bahasa Indonesia is primary.
+- All UI strings live in `internal/platform/i18n/messages.go`; Bahasa Indonesia is primary.
 - Templates: `{{t .Lang "key"}}` (use `$.Lang` inside range/with).
-- Tests in `internal/i18n` fail when a key is missing in one language or used but undefined.
+- Tests in `internal/platform/i18n` fail when a key is missing in one language or used but undefined.
 - Language comes from the `lang` cookie (`/lang?l=en`), overridden by the user's saved preference.
 
 ## Editor (HTMX)
@@ -979,7 +998,7 @@ deploys never run stale JS/CSS.
   apply to every file: `users.editor_checks_off` (migration 032, `User.ChecksOff`/`CheckOn`, everything on by
   default so new checks start on). Users untick validation rules (`po.Checks`; switched-off issues are dropped in
   `validateEntry` via `Catalog.ChecksOff`, so they are not marked or counted) and the statuses Validasi ticks
-  (`service.EditorStatuses`; `#btn-validate[data-statuses]`). Saved with `POST /editor-settings` (back to `next`).
+  (`account.EditorStatuses`; `#btn-validate[data-statuses]`). Saved with `POST /editor-settings` (back to `next`).
 - The editor's Bantuan button (and `?` outside text fields) opens `#help-dialog` with all shortcuts;
   update it when adding shortcuts.
 - Save buttons: the main one is green with a check and is what Ctrl+Enter presses: "Lepas pratinjau,

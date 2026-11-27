@@ -535,7 +535,7 @@ const projectFileColumns = `f.id, f.import_id, f.project_id, f.group_id, v.name 
 	f.total, f.translated, f.fuzzy, f.size, f.created_at, f.repo_path`
 
 // projectFileOrders are the ORDER BY clauses of the project file sorts (default: "remaining", most left first,
-// files nobody started after those with work left, complete files last; service.CompareProgress is the same in Go)
+// files nobody started after those with work left, complete files last; catalog.CompareProgress is the same in Go)
 var projectFileOrders = map[string]string{
 	"incomplete": `f.translated::float8 / GREATEST(f.total, 1), f.total - f.translated DESC, f.filename, f.id DESC`,
 	"complete":   `f.translated::float8 / GREATEST(f.total, 1) DESC, f.translated DESC, f.filename, f.id DESC`,

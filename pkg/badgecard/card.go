@@ -29,7 +29,7 @@ func rgb(hex uint32) color.RGBA {
 	return color.RGBA{uint8(hex >> 16), uint8(hex >> 8), uint8(hex), 255}
 }
 
-// Tiers by name (service.BadgeTierNames); keep in step with the .tier-* colours in style.css
+// Tiers by name (activity.BadgeTierNames); keep in step with the .tier-* colours in style.css
 var Tiers = map[string]Tier{
 	"bronze":   {rgb(0xf3c39a), rgb(0xd98c4e), rgb(0xa45a24), rgb(0x7a3f14), rgb(0x9c5a2a)},
 	"silver":   {rgb(0xffffff), rgb(0xc4d3e6), rgb(0x7f93ad), rgb(0x4d6584), rgb(0x4d6584)},

@@ -18,7 +18,7 @@ import (
 	"pelokalan/pkg/tpsite"
 )
 
-// Module groups synced from a Translation Project team page (internal/tpsite). The site has no API:
+// Module groups synced from a Translation Project team page (pkg/tpsite). The site has no API:
 // FetchGroup reads the team page (ETag/Last-Modified as for any link), downloads the team's file of
 // every domain whose row changed (others come from tp_domains, shared by all projects), and imports
 // them as one archive, so the glossary, project files, "Ambil"/"Perbarui" and the upstream landings

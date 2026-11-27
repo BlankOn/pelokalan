@@ -690,7 +690,7 @@ func (h *Handler) projectFileKeep(r *http.Request, p *models.Project) func(*mode
 	}
 }
 
-// projectFileOrder is the project files order from the request (s): one of service.ProjectFileSorts;
+// projectFileOrder is the project files order from the request (s): one of source.ProjectFileSorts;
 // "reserved" / "free" put reserved (or free) modules first, least complete first within each
 func (h *Handler) projectFileOrder(r *http.Request, p *models.Project) source.ProjectFileOrder {
 	o := source.ProjectFileOrder{Sort: r.URL.Query().Get("s")}
@@ -979,7 +979,7 @@ func (h *Handler) fileList(r *http.Request, p *models.Project, all []*models.Cat
 			list = append(list, c)
 		}
 	}
-	// the order picked in "Urutkan" (s, service.FileListSorts; default most left). "recent" = most recently edited
+	// the order picked in "Urutkan" (s, source.FileListSorts; default most left). "recent" = most recently edited
 	// first (entry saves bump catalogs.updated_at), with the user's own files whose upstream state needs them on
 	// top: requested rework, proofreading, translating. "reserved" / "free" put reserved (or free) modules first.
 	order := r.URL.Query().Get("s")

@@ -191,7 +191,7 @@ func (e *Entry) Status() string {
 }
 
 // SpellChecker returns the words of a translation it does not know; words also in the source are
-// left alone (service.SpellingService)
+// left alone (langtools.SpellingService)
 type SpellChecker interface {
 	Misspelled(text, source string) []string
 }

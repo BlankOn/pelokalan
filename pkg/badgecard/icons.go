@@ -1,7 +1,7 @@
 package badgecard
 
 // Icons are the badge line icons (24×24 SVG elements drawn with a stroke, no fill), keyed by
-// service.BadgeDef.Icon. The profile page puts them in an <svg> (template func badgeIcon); Render
+// activity.BadgeDef.Icon. The profile page puts them in an <svg> (template func badgeIcon); Render
 // draws them into the share image. Only path (M L H V C A Z, absolute or relative), circle and rect
 // elements are used, which is all draw.go understands.
 var Icons = map[string]string{

@@ -19,7 +19,7 @@ func NewRepository(db *sql.DB) Repository {
 }
 
 // reservationSelect reads active reservations with the holder and the newest save in their files of the
-// module (module = file name before the first dot, lowercase, as service.ModuleOf)
+// module (module = file name before the first dot, lowercase, as models.ModuleOf)
 const reservationSelect = `
 	SELECT r.id, r.project_id, r.module, r.user_id, u.username, u.name, r.reserved_at, r.reminded_at,
 	       GREATEST(r.reserved_at, COALESCE((SELECT MAX(c.updated_at) FROM catalogs c

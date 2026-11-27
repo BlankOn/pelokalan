@@ -799,7 +799,7 @@ var ProjectFileSorts = []string{"remaining", "incomplete", "complete", "most", "
 // FileListSorts are the orders of "Berkas Anda" / "Berkas anggota lain": the project file orders plus last edit
 var FileListSorts = []string{"remaining", "incomplete", "complete", "most", "fewest", "name", "recent", "reserved", "free"}
 
-// ProjectFileOrder orders the project file list: Sort is done by the database (repository.ProjectFileSort),
+// ProjectFileOrder orders the project file list: Sort is done by the database (Repository.ListProjectFiles),
 // Rank (lower first, ties keep that order) after loading every matching row, for orders the database
 // cannot know (reservations)
 type ProjectFileOrder struct {

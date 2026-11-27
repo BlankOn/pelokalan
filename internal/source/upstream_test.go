@@ -85,7 +85,7 @@ func (r *upstreamRepo) SaveUpstreamState(_ context.Context, rec *models.Upstream
 	return nil
 }
 
-// upstreamSite serves the API answers recorded in internal/gnomel10n/testdata
+// upstreamSite serves the API answers recorded in pkg/gnomel10n/testdata
 func upstreamSite(t *testing.T) (*httptest.Server, *int) {
 	apiCalls := new(int)
 	files := map[string]string{
