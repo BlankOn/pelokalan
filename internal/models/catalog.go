@@ -62,6 +62,25 @@ type Catalog struct {
 	Stats CatalogStats
 }
 
+// ReviewReady reports whether the file is ready to be sent for review: it can go to the repository, every string is
+// translated with nothing left to review (no fuzzy or AI drafts), no review is open, and it was not left unchanged
+// since its last commit to the repository ("Ajukan tinjauan" gets its own button then)
+func (c *Catalog) ReviewReady() bool {
+	if !c.CanPush || c.IsTemplate || c.IsDeleted() || c.Stats.Total == 0 ||
+		c.Stats.Translated < c.Stats.Total || c.Stats.Fuzzy > 0 || c.Stats.Untranslated > 0 {
+		return false
+	}
+	if r := c.Review; r != nil {
+		if r.Status == ReviewRequested {
+			return false
+		}
+		if r.Status == ReviewPushed && r.ReviewedAt != nil && !c.UpdatedAt.After(*r.ReviewedAt) {
+			return false // already in the repository as it is
+		}
+	}
+	return true
+}
+
 // IsDeleted reports whether the file was deleted (kept read-only)
 func (c *Catalog) IsDeleted() bool { return c.DeletedAt != nil }
 

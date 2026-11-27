@@ -173,7 +173,8 @@ func TestGitHubReviews(t *testing.T) {
 		}
 	}
 	mails.waitFor(t, kiki.Email, "masuk repositori")
-	kiki.get(base+"/my-files").status(http.StatusOK).contains("☑ Sudah masuk repositori", cm.SHA[:7])
+	kiki.get(base+"/my-files").status(http.StatusOK).contains("☑ Sudah masuk repositori", cm.SHA[:7]).
+		lacks("Semua string sudah diterjemahkan") // in the repository unchanged: no "Ajukan tinjauan" button
 	// "Lihat" opens another member's file view-only: the review layout without actions or discussion
 	owner.get(base + "/member-files").status(http.StatusOK).contains("library__os.po?view=1")
 	owner.get(base+"/"+kiki.Username+"/po/library__os.po?view=1").status(http.StatusOK).
