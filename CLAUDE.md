@@ -935,6 +935,7 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
 
 ## Editor glossary section
 
+The sidebar's list takes at most 30% of the sidebar's height and scrolls inside (`.sidebar` is a size container, `30cqh`).
 At the top of the right sidebar (`entry_glossary` partial in editor.html, rendered by sidebar.html; while the
 sidebar is closed, and on phones, the copy in the editor pane above the source text shows instead) the editor lists glossary terms found in the entry (`source.Service.ForEntry`,
 all versions, preferred translation + share). Chips insert the translation at the cursor; ↗ opens

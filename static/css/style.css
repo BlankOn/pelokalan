@@ -1129,8 +1129,12 @@ h1 .ai-badge { font-size: 12px; }
 .ed-gl-none { text-transform: none; letter-spacing: 0; font-weight: 500; font-size: 12px; color: #c2620a; }
 .ed-gl-none a { color: #c2620a; text-decoration: underline; }
 /* in the sidebar: one term per line, translation can wrap */
-.sb-glossary .gl-terms { flex-direction: column; align-items: stretch; }
-.sb-glossary .gl-term { display: flex; }
+/* the sidebar's glossary takes at most 30% of the sidebar's height and scrolls inside (cqh: the sidebar is a size
+   container; vh where container units are missing) */
+.sidebar { container-type: size; }
+.sb-glossary .gl-terms { flex-direction: column; align-items: stretch; flex-wrap: nowrap; max-height: 30vh; max-height: 30cqh;
+    overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.sb-glossary .gl-term { display: flex; flex-shrink: 0; }
 .sb-glossary .gl-insert { flex: 1; min-width: 0; overflow-wrap: anywhere; }
 .sb-glossary .ed-label { margin-bottom: 8px; flex-wrap: wrap; }
 .sb-glossary .ed-gl-none { display: block; margin-top: 4px; }
