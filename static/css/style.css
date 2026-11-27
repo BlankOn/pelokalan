@@ -1578,7 +1578,10 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 /* narrow screens: buttons wrap onto more lines instead of running past the edge */
 .pf-actions > * { flex: 0 0 auto; }
 .pf-actions form { display: flex; }
-.pf-actions .btn { display: inline-flex; align-items: center; line-height: 1; margin: 0; }
+/* every button of a file row has the same height, with or without an icon (the lock of "Lepas reservasi") */
+.pf-actions .btn { display: inline-flex; align-items: center; justify-content: center; line-height: 1; margin: 0;
+    height: 30px; box-sizing: border-box; padding-top: 0; padding-bottom: 0; }
+.pf-actions .btn .res-lock { width: 14px; height: 14px; }
 .project-files td.actions form .btn { min-width: 84px; justify-content: center; text-align: center; }
 .project-files td.actions .btn { height: 30px; box-sizing: border-box; }
 .project-files td.actions { white-space: nowrap; }
