@@ -75,6 +75,7 @@ func TestMembership(t *testing.T) {
 	if r := role(t, slug, dodi); r != "manager" {
 		t.Fatalf("role change: %q", r)
 	}
+	mails.waitFor(t, dodi.Email, "dari Penerjemah menjadi Koordinator") // the member is told who changed it and how
 
 	// the members page is public, emails only for members
 	visitor(t).get(base + "/members").status(http.StatusOK).contains("@" + cici.Username).lacks(cici.Email)

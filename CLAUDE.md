@@ -70,6 +70,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
   members are served with optional auth. `ProjectService.GetPublic` fills `Project.Role`
   (empty for visitors); handlers use `loadProject` (public) or `loadMemberProject`.
   Member emails and pending invitations are only shown to members/managers.
+- **Role changes** (`ProjectService.ChangeRole`, members page) email the member in their language (`mail.role_*`: who
+  changed it, from which role to which, a button to the project), in the background; nothing when the role stays.
 - **Roles:** `owner` (one per project), `manager` (shown as "Koordinator" / "Coordinator": glossary, members, approving and
   sending files to repositories), `reviewer` ("Peninjau", migration 051: translates like a translator and reviews: sees the
   review queue and review editor, leaves review comments, but does not approve or send; `ProjectRole.CanReview`),
@@ -287,7 +289,7 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - Project tabs carry monochrome line icons (`tab_icon` in project_header.html).
 - The project header shows the overall progress of all modules in the project files after the name (and AI badge):
   `GlossaryService.ProjectProgress` → `ProjectFileTotals` counts each module per language once, from its newest copy;
-  filled by `loadProject` on full pages (`Project.Progress`).
+  filled by `loadProject` on full pages (`Project.Progress`), and on each card of /projects (`renderProjects`).
 - Statistik / Stats tab (`/projects/{id}/insight`, before Anggota, `InsightPage` in insight.go, pages/insight.html):
   the module group chart (moved here from Penerjemahan) and "Aktivitas anggota" (public, like the rest of the
   project): totals and a per-member table. Above the module chart, "Pertumbuhan terjemahan" (`wordschart.go`,

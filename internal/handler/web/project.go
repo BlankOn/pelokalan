@@ -43,6 +43,7 @@ func (h *Handler) renderProjects(w http.ResponseWriter, r *http.Request, errMsg 
 	}
 	var mine, others []*models.Project
 	for _, p := range projects {
+		p.Progress = h.glossary.ProjectProgress(r.Context(), p) // the card's progress bar
 		if p.Role.IsMember() {
 			mine = append(mine, p)
 		} else {
@@ -392,7 +393,7 @@ func (h *Handler) ChangeMemberRole(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	err := h.projectService.ChangeRole(r.Context(), p, idParam(r, "uid"), models.ProjectRole(r.FormValue("role")))
+	err := h.projectService.ChangeRole(r.Context(), middleware.GetUser(r.Context()), p, idParam(r, "uid"), models.ProjectRole(r.FormValue("role")))
 	if err != nil {
 		h.renderMembers(w, r, p, h.errorMessage(r, err), "")
 		return

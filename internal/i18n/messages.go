@@ -125,6 +125,10 @@ var messages = map[string]map[string]string{
 		"mail.invite_intro":         "%s mengundang Anda untuk bergabung ke proyek \"%s\" sebagai %s.",
 		"mail.invite_button":        "Lihat undangan",
 		"mail.invite_footer":        "Masuk ke %s dengan alamat email ini untuk menerima undangan.",
+		"mail.role_subject":         "Peran Anda di proyek %s diubah",
+		"mail.role_intro":           "%s mengubah peran Anda di proyek \"%s\" dari %s menjadi %s.",
+		"mail.role_button":          "Buka proyek",
+		"mail.role_footer":          "Anda menerima email ini dari %s karena Anda anggota proyek ini.",
 		"mail.invite_body":          "%s mengundang Anda untuk bergabung ke proyek \"%s\" sebagai %s.\n\nBuka %s dan masuk dengan alamat email ini untuk menerima undangan.\n\n— %s",
 
 		// Roles
@@ -1686,6 +1690,10 @@ var messages = map[string]map[string]string{
 		"mail.invite_intro":         "%s invited you to join the \"%s\" project as %s.",
 		"mail.invite_button":        "View invitation",
 		"mail.invite_footer":        "Sign in to %s with this email address to accept the invitation.",
+		"mail.role_subject":         "Your role in %s has changed",
+		"mail.role_intro":           "%s changed your role in the \"%s\" project from %s to %s.",
+		"mail.role_button":          "Open the project",
+		"mail.role_footer":          "You get this email from %s because you are a member of this project.",
 		"mail.invite_body":          "%s invited you to join the \"%s\" project as %s.\n\nOpen %s and sign in with this email address to accept the invitation.\n\n— %s",
 
 		// Roles

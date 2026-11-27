@@ -416,7 +416,7 @@ func (s *ProjectService) DeclineInvitation(ctx context.Context, user *models.Use
 }
 
 // ChangeRole updates a member's role
-func (s *ProjectService) ChangeRole(ctx context.Context, p *models.Project, userID int64, role models.ProjectRole) error {
+func (s *ProjectService) ChangeRole(ctx context.Context, actor *models.User, p *models.Project, userID int64, role models.ProjectRole) error {
 	if !p.Role.CanManage() {
 		return ErrForbidden
 	}
@@ -430,7 +430,42 @@ func (s *ProjectService) ChangeRole(ctx context.Context, p *models.Project, user
 	if current == models.RoleOwner {
 		return ErrCannotChangeOwner
 	}
-	return s.projects.UpdateMemberRole(ctx, p.ID, userID, role)
+	if current == role {
+		return nil
+	}
+	if err := s.projects.UpdateMemberRole(ctx, p.ID, userID, role); err != nil {
+		return err
+	}
+	if actor != nil && actor.ID != userID {
+		go s.notifyRoleChange(context.Background(), actor, p, userID, current, role)
+	}
+	return nil
+}
+
+// notifyRoleChange emails a member whose role someone else changed (in their language): who, from what, to what
+func (s *ProjectService) notifyRoleChange(ctx context.Context, actor *models.User, p *models.Project, userID int64, from, to models.ProjectRole) {
+	if s.mailer == nil {
+		return
+	}
+	u, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return
+	}
+	lang := i18n.Normalize(u.Lang)
+	link := strings.TrimRight(s.site.BaseURL, "/") + p.Path() + "/files"
+	fromName, toName := i18n.T(lang, "role."+string(from)), i18n.T(lang, "role."+string(to))
+	subject := i18n.T(lang, "mail.role_subject", p.Name)
+	intro := i18n.T(lang, "mail.role_intro", actor.DisplayName(), p.Name, fromName, toName)
+	text := intro + "\n\n" + link + "\n\n— " + s.site.Name
+	htmlBody := fmt.Sprintf(`<div style="font-family:sans-serif;max-width:480px"><p>%s</p>
+<p>%s</p>
+<p style="color:#666">%s</p></div>`,
+		html.EscapeString(intro),
+		emailButton(link, i18n.T(lang, "mail.role_button")),
+		html.EscapeString(i18n.T(lang, "mail.role_footer", s.site.Name)))
+	if err := s.mailer.Send(ctx, &Message{To: u.Email, Subject: subject, Text: text, HTML: htmlBody, Category: "role"}); err != nil {
+		log.Printf("role change email to user %d: %v", userID, err)
+	}
 }
 
 // RemoveMember removes a member. Members may always remove themselves (leave),
