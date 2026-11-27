@@ -1,4 +1,4 @@
-package service
+package pretranslate
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 	"pelokalan/internal/source"
 	"pelokalan/pkg/ai"
 	"pelokalan/pkg/glossary"
@@ -74,8 +73,8 @@ const (
 )
 
 // AIService runs LLM pre-translation with glossary constraints
-type AIService struct {
-	repo         repository.AIRepository
+type Service struct {
+	repo         Repository
 	catalogs     catalog.Repository
 	glossary     source.Repository
 	box          *ai.Box
@@ -97,10 +96,10 @@ type fileContexts interface {
 }
 
 // SetContexts makes prompts include the PO file's Konteks note
-func (s *AIService) SetContexts(c fileContexts) { s.contexts = c }
+func (s *Service) SetContexts(c fileContexts) { s.contexts = c }
 
 // SetHistory makes jobs record catalog versions before and after running
-func (s *AIService) SetHistory(h historyRecorder) { s.history = h }
+func (s *Service) SetHistory(h historyRecorder) { s.history = h }
 
 type chatClient interface {
 	Chat(ctx context.Context, system, user string) (string, ai.Usage, error)
@@ -108,9 +107,9 @@ type chatClient interface {
 }
 
 // NewAIService creates the AI service
-func NewAIService(repo repository.AIRepository, catalogs catalog.Repository, glossaryRepo source.Repository,
-	box *ai.Box, allowPrivate bool) *AIService {
-	s := &AIService{repo: repo, catalogs: catalogs, glossary: glossaryRepo, box: box, allowPrivate: allowPrivate}
+func New(repo Repository, catalogs catalog.Repository, glossaryRepo source.Repository,
+	box *ai.Box, allowPrivate bool) *Service {
+	s := &Service{repo: repo, catalogs: catalogs, glossary: glossaryRepo, box: box, allowPrivate: allowPrivate}
 	s.newClient = func(st *models.AISettings, key string) chatClient {
 		return ai.NewClient(st.BaseURL, key, st.Model, s.allowPrivate)
 	}
@@ -118,10 +117,10 @@ func NewAIService(repo repository.AIRepository, catalogs catalog.Repository, glo
 }
 
 // RecoverJobs marks jobs interrupted by a restart as failed
-func (s *AIService) RecoverJobs(ctx context.Context) error { return s.repo.FailRunning(ctx) }
+func (s *Service) RecoverJobs(ctx context.Context) error { return s.repo.FailRunning(ctx) }
 
 // Settings returns the project's AI settings, or nil when not configured
-func (s *AIService) Settings(ctx context.Context, p *models.Project) (*models.AISettings, error) {
+func (s *Service) Settings(ctx context.Context, p *models.Project) (*models.AISettings, error) {
 	st, err := s.repo.GetSettings(ctx, p.ID)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil
@@ -153,7 +152,7 @@ func parseMoney(v string) (float64, bool) {
 }
 
 // SaveSettings stores the AI settings (owner or manager)
-func (s *AIService) SaveSettings(ctx context.Context, user *models.User, p *models.Project, in AISettingsInput) error {
+func (s *Service) SaveSettings(ctx context.Context, user *models.User, p *models.Project, in AISettingsInput) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -207,14 +206,14 @@ func (s *AIService) SaveSettings(ctx context.Context, user *models.User, p *mode
 }
 
 // RemoveSettings deletes the stored key and settings
-func (s *AIService) RemoveSettings(ctx context.Context, p *models.Project) error {
+func (s *Service) RemoveSettings(ctx context.Context, p *models.Project) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
 	return s.repo.DeleteSettings(ctx, p.ID)
 }
 
-func (s *AIService) client(st *models.AISettings) (chatClient, error) {
+func (s *Service) client(st *models.AISettings) (chatClient, error) {
 	key, err := s.box.Open(st.APIKeyEnc)
 	if err != nil {
 		return nil, apperr.New("err.ai_key_unreadable")
@@ -223,7 +222,7 @@ func (s *AIService) client(st *models.AISettings) (chatClient, error) {
 }
 
 // TestConnection checks the key and model against the API
-func (s *AIService) TestConnection(ctx context.Context, p *models.Project) error {
+func (s *Service) TestConnection(ctx context.Context, p *models.Project) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -256,7 +255,7 @@ func translateAIError(err error) error {
 }
 
 // MonthSpend returns the project's AI cost since the start of the month (UTC)
-func (s *AIService) MonthSpend(ctx context.Context, p *models.Project) (float64, error) {
+func (s *Service) MonthSpend(ctx context.Context, p *models.Project) (float64, error) {
 	now := time.Now().UTC()
 	return s.repo.Spend(ctx, p.ID, time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, time.UTC))
 }
@@ -302,7 +301,7 @@ type AIEstimate struct {
 	OverBudget       bool
 }
 
-func (s *AIService) plan(ctx context.Context, p *models.Project, c *models.Catalog, opts AIOptions) (*aiPlan, error) {
+func (s *Service) plan(ctx context.Context, p *models.Project, c *models.Catalog, opts AIOptions) (*aiPlan, error) {
 	entries, err := s.catalogs.ListEntries(ctx, c.ID, false)
 	if err != nil {
 		return nil, err
@@ -407,7 +406,7 @@ func languageLabel(code string) string {
 }
 
 // Estimate predicts the work and cost of pre-translating a catalog
-func (s *AIService) Estimate(ctx context.Context, p *models.Project, c *models.Catalog, opts AIOptions) (*AIEstimate, error) {
+func (s *Service) Estimate(ctx context.Context, p *models.Project, c *models.Catalog, opts AIOptions) (*AIEstimate, error) {
 	st, err := s.Settings(ctx, p)
 	if err != nil {
 		return nil, err
@@ -448,7 +447,7 @@ func (s *AIService) Estimate(ctx context.Context, p *models.Project, c *models.C
 }
 
 // LatestJob returns the most recent job of a catalog, or nil
-func (s *AIService) LatestJob(ctx context.Context, c *models.Catalog) (*models.AIJob, error) {
+func (s *Service) LatestJob(ctx context.Context, c *models.Catalog) (*models.AIJob, error) {
 	j, err := s.repo.LatestJob(ctx, c.ID)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil
@@ -457,7 +456,7 @@ func (s *AIService) LatestJob(ctx context.Context, c *models.Catalog) (*models.A
 }
 
 // Job returns a job of the catalog
-func (s *AIService) Job(ctx context.Context, c *models.Catalog, id int64) (*models.AIJob, error) {
+func (s *Service) Job(ctx context.Context, c *models.Catalog, id int64) (*models.AIJob, error) {
 	j, err := s.repo.GetJob(ctx, id)
 	if err != nil || j.CatalogID != c.ID {
 		return nil, apperr.ErrNotFound
@@ -467,7 +466,7 @@ func (s *AIService) Job(ctx context.Context, c *models.Catalog, id int64) (*mode
 
 // Cancel asks a running job to stop; the job aborts its current model request within a
 // couple of seconds (see watchCancel)
-func (s *AIService) Cancel(ctx context.Context, c *models.Catalog, id int64) error {
+func (s *Service) Cancel(ctx context.Context, c *models.Catalog, id int64) error {
 	j, err := s.Job(ctx, c, id)
 	if err != nil {
 		return err
@@ -476,7 +475,7 @@ func (s *AIService) Cancel(ctx context.Context, c *models.Catalog, id int64) err
 }
 
 // Start begins pre-translating a catalog in the background
-func (s *AIService) Start(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, opts AIOptions) (*models.AIJob, error) {
+func (s *Service) Start(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, opts AIOptions) (*models.AIJob, error) {
 	if c.IsTemplate || !c.WritableBy(user.ID) {
 		return nil, apperr.ErrForbidden
 	}
@@ -543,7 +542,7 @@ func (s *AIService) Start(ctx context.Context, user *models.User, p *models.Proj
 	return job, nil
 }
 
-func (s *AIService) run(job *models.AIJob, st *models.AISettings, cl chatClient, c *models.Catalog, pl *aiPlan, opts AIOptions, userID int64) {
+func (s *Service) run(job *models.AIJob, st *models.AISettings, cl chatClient, c *models.Catalog, pl *aiPlan, opts AIOptions, userID int64) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Hour)
 	defer cancel()
 	defer func() {
@@ -658,7 +657,7 @@ func (s *AIService) run(job *models.AIJob, st *models.AISettings, cl chatClient,
 var cancelPollInterval = 1500 * time.Millisecond
 
 // watchCancel calls abort as soon as a cancel is requested for the job
-func (s *AIService) watchCancel(ctx context.Context, jobID int64, abort context.CancelFunc) {
+func (s *Service) watchCancel(ctx context.Context, jobID int64, abort context.CancelFunc) {
 	t := time.NewTicker(cancelPollInterval)
 	defer t.Stop()
 	for {
@@ -684,7 +683,7 @@ func joinArgs(args []any) string {
 
 func toString(v any) string { return fmt.Sprint(v) }
 
-func (s *AIService) finish(job *models.AIJob) {
+func (s *Service) finish(job *models.AIJob) {
 	now := time.Now()
 	job.FinishedAt = &now
 	if err := s.repo.UpdateJob(context.Background(), job); err != nil {
@@ -709,7 +708,7 @@ const (
 )
 
 // apply stores a translation unless the entry changed since the run was planned
-func (s *AIService) apply(ctx context.Context, c *models.Catalog, id int64, version int, forms []string, fuzzy bool, userID int64, origin string) applyResult {
+func (s *Service) apply(ctx context.Context, c *models.Catalog, id int64, version int, forms []string, fuzzy bool, userID int64, origin string) applyResult {
 	e, err := s.catalogs.GetEntry(ctx, id)
 	if err != nil || e.CatalogID != c.ID || e.Obsolete {
 		return applySkipped
@@ -778,7 +777,7 @@ const MaxAIAlternatives = 4
 // TranslateEntry asks the model to translate one entry for its owner, with the same glossary,
 // Konteks and draft rules as pre-translation. current is the text in the editor (a draft to
 // improve when not empty). Nothing is saved; the cost is recorded toward the monthly budget.
-func (s *AIService) TranslateEntry(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, e *models.Entry, current []string, alternatives int) (*EntryAIResult, error) {
+func (s *Service) TranslateEntry(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, e *models.Entry, current []string, alternatives int) (*EntryAIResult, error) {
 	alternatives = min(max(alternatives, 1), MaxAIAlternatives)
 	if c.IsTemplate || !c.WritableBy(user.ID) {
 		return nil, apperr.ErrForbidden

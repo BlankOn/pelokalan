@@ -7,7 +7,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
+	"pelokalan/internal/pretranslate"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -22,9 +22,9 @@ func (h *Handler) aiSettingsData(r *http.Request, p *models.Project, data PageDa
 	}
 	data.Data["AI"] = st
 	data.Data["AIDefaults"] = map[string]any{
-		"Model":       service.DefaultAIModel,
-		"PriceInput":  service.DefaultAIPriceInput,
-		"PriceOutput": service.DefaultAIPriceOutput,
+		"Model":       pretranslate.DefaultAIModel,
+		"PriceInput":  pretranslate.DefaultAIPriceInput,
+		"PriceOutput": pretranslate.DefaultAIPriceOutput,
 	}
 	if spent, err := h.ai.MonthSpend(r.Context(), p); err == nil {
 		data.Data["AISpent"] = spent
@@ -76,7 +76,7 @@ func (h *Handler) SaveAISettings(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	err := h.ai.SaveSettings(r.Context(), middleware.GetUser(r.Context()), p, service.AISettingsInput{
+	err := h.ai.SaveSettings(r.Context(), middleware.GetUser(r.Context()), p, pretranslate.AISettingsInput{
 		BaseURL:       r.FormValue("base_url"),
 		Model:         r.FormValue("model"),
 		APIKey:        r.FormValue("api_key"),
@@ -118,8 +118,8 @@ func (h *Handler) DeleteAISettings(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, p.Path()+"/settings?flash=ai_removed#ai", http.StatusSeeOther)
 }
 
-func aiOptionsFromRequest(r *http.Request) service.AIOptions {
-	opts := service.AIOptions{
+func aiOptionsFromRequest(r *http.Request) pretranslate.AIOptions {
+	opts := pretranslate.AIOptions{
 		UseMemory:    r.FormValue("use_memory") == "1",
 		UseAI:        r.FormValue("use_ai") == "1",
 		IncludeFuzzy: r.FormValue("include_fuzzy") == "1",

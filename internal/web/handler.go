@@ -30,10 +30,10 @@ import (
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
+	"pelokalan/internal/pretranslate"
 	"pelokalan/internal/project"
 	"pelokalan/internal/reservation"
 	"pelokalan/internal/review"
-	"pelokalan/internal/service"
 	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 	"pelokalan/internal/wiki"
@@ -53,7 +53,7 @@ type Handler struct {
 	projectService *project.Service
 	catalogService *catalog.Service
 	glossary       *source.Service
-	ai             *service.AIService
+	ai             *pretranslate.Service
 	discuss        *discussion.Service
 	wiki           *wiki.Service
 	contexts       *modulecontext.Service
@@ -77,7 +77,7 @@ func NewHandler(
 	projectService *project.Service,
 	catalogService *catalog.Service,
 	glossaryService *source.Service,
-	aiService *service.AIService,
+	aiService *pretranslate.Service,
 	discussionService *discussion.Service,
 	wikiService *wiki.Service,
 	contextService *modulecontext.Service,
@@ -195,8 +195,8 @@ func funcMap() template.FuncMap {
 		// editor settings: every check, and the statuses Validasi ticks for the user
 		"editorChecks":   func() []string { return po.Checks },
 		"editorStatuses": func() []string { return account.EditorStatuses },
-		"aiModels":       func() []string { return service.AIModels },
-		"aiPrice":        func(model string) service.AIPrice { return service.AIPrices[model] },
+		"aiModels":       func() []string { return pretranslate.AIModels },
+		"aiPrice":        func(model string) pretranslate.AIPrice { return pretranslate.AIPrices[model] },
 		"validateStatuses": func(u *models.User) string {
 			var out []string
 			for _, c := range po.Checks {

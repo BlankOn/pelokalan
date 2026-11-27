@@ -1,4 +1,4 @@
-package postgres
+package pretranslate
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 type aiRepository struct {
@@ -16,7 +15,7 @@ type aiRepository struct {
 }
 
 // NewAIRepository creates a new PostgreSQL AI repository
-func NewAIRepository(db *sql.DB) repository.AIRepository {
+func NewRepository(db *sql.DB) Repository {
 	return &aiRepository{db: db}
 }
 

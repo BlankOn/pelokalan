@@ -24,12 +24,10 @@ import (
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/mailer"
+	"pelokalan/internal/pretranslate"
 	"pelokalan/internal/project"
-	"pelokalan/internal/repository"
-	"pelokalan/internal/repository/postgres"
 	"pelokalan/internal/reservation"
 	"pelokalan/internal/review"
-	"pelokalan/internal/service"
 	"pelokalan/internal/source"
 	"pelokalan/internal/web"
 	"pelokalan/internal/web/middleware"
@@ -57,7 +55,7 @@ type Repositories struct {
 	Project  project.Repository
 	Catalog  catalog.Repository
 	Glossary source.Repository
-	AI       repository.AIRepository
+	AI       pretranslate.Repository
 	Commit   catalog.CommitRepository
 	Discuss  discussion.Repository
 	Activity activity.Repository
@@ -83,7 +81,7 @@ type App struct {
 	Reviews      *review.Service
 	Wiki         *wiki.Service
 	Contexts     *modulecontext.Service
-	AI           *service.AIService
+	AI           *pretranslate.Service
 	Thesaurus    *langtools.ThesaurusService
 	Spelling     *langtools.SpellingService
 	Handler      *web.Handler
@@ -121,7 +119,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		Project:  project.NewRepository(db),
 		Catalog:  catalog.NewRepository(db),
 		Glossary: source.NewRepository(db),
-		AI:       postgres.NewAIRepository(db),
+		AI:       pretranslate.NewRepository(db),
 		Commit:   catalog.NewCommitRepository(db),
 		Discuss:  discussion.NewRepository(db),
 		Activity: activity.NewRepository(db),
@@ -176,7 +174,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.Discussions.SetNotifications(project.NewNotificationRepository(db))
 	a.Wiki = wiki.New(wiki.NewRepository(db), a.Blobs)
 	a.Contexts = modulecontext.New(modulecontext.NewRepository(db))
-	a.AI = service.NewAIService(repos.AI, repos.Catalog, repos.Glossary, ai.NewBox(cfg.AI.SecretKey), cfg.AI.AllowPrivateHosts)
+	a.AI = pretranslate.New(repos.AI, repos.Catalog, repos.Glossary, ai.NewBox(cfg.AI.SecretKey), cfg.AI.AllowPrivateHosts)
 	a.AI.SetHistory(a.Catalogs)
 	a.AI.SetContexts(a.Contexts)
 
