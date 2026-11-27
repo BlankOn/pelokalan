@@ -139,7 +139,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
   localStorage per project and section (`data-collapse-key` "files:<slug>:project|mine|others").
 - "Berkas Anda" and "Berkas anggota lain" (one list, owner under each file) show 5 files at a time
   (`FileListPageSize`, `GET /projects/{id}/my-files|member-files?q=&g=&offset=`, `Handler.fileList`, partial
-  `file_rows`) with the same "Urutkan" select (`service.FileListSorts`: the project file orders plus "Terakhir disunting" = `recent`, last
+  `file_rows`) (columns: Berkas, Kemajuan, actions; the last edit is the last line under the file name, `files.updated`, and the
+  translated · fuzzy · untranslated counts sit under the progress bar in green, orange and red, `.file-counts`) with the same "Urutkan" select (`service.FileListSorts`: the project file orders plus "Terakhir disunting" = `recent`, last
   edit first; default `remaining`), search and the same module group filter: a file is in a group when its module
   (`service.ModuleOf`) is among that group's project files (`GlossaryService.ModuleGroups`); `g=0` = no group.
   Managers get "Sinkronkan dengan upstream" (in Berkas proyek; beside "Tambah berkas manual" in Berkas Anda the same

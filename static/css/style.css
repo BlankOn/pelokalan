@@ -612,11 +612,8 @@ h1 .ai-badge { font-size: 12px; }
     .editor-app:has(.workspace:not(.sidebar-hidden)) > .editor-flash,
     .editor-app:has(.workspace:not(.sidebar-hidden)) > .statusbar { display: none; }
 }
-/* tablets (e.g. iPad mini portrait, 744px): the file tables drop the three count columns,
-   the progress bar and percentage already show them, so name, progress, date and buttons fit */
+/* tablets (e.g. iPad mini portrait, 744px): name, progress (counts under the bar) and buttons */
 @media (max-width: 960px) {
-    .files-table:not(.project-files) th:nth-child(n+3):nth-child(-n+5),
-    .files-table:not(.project-files) td:nth-child(n+3):nth-child(-n+5) { display: none; }
     .files-table td.actions { white-space: nowrap; }
 }
 @media (max-width: 700px) {
@@ -627,7 +624,6 @@ h1 .ai-badge { font-size: 12px; }
     .tb-search { flex-basis: 100%; max-width: none; }
     .list-header, .entry-row { grid-template-columns: 18px 1fr 1fr; }
     .page-head { flex-direction: column; }
-    .files-table:not(.project-files) th:nth-child(n+3):nth-child(-n+6), .files-table:not(.project-files) td:nth-child(n+3):nth-child(-n+6) { display: none; }
     .src-plural { grid-template-columns: 1fr; }
 }
 
@@ -1699,6 +1695,11 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .review-link:focus-visible { outline: none; }
 .review-list li:has(.review-link:focus-visible) { box-shadow: 0 0 0 2px var(--accent); }
 .review-list .rv-chip[title] { position: relative; z-index: 1; cursor: help; } /* the error tooltip stays reachable */
+/* members' file lists: translated · fuzzy · untranslated under the progress bar */
+.file-counts { margin-top: 3px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.file-counts .fc-done { color: var(--ok, #2f9e44); font-weight: 600; }
+.file-counts .fc-fuzzy { color: var(--fuzzy, #e8930c); font-weight: 600; }
+.file-counts .fc-left { color: var(--error, #d1342f); font-weight: 600; }
 .review-end { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; } /* labels at the right, before › */
 .review-go { color: var(--muted); font-size: 20px; line-height: 1; }
 .review-list li:hover .review-go { color: var(--accent); }

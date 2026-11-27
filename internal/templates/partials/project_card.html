@@ -138,12 +138,11 @@
         <div class="muted small">{{if .IsTemplate}}{{t $v.Lang "project.template"}}{{else}}{{.LanguageName}} · {{.Language}}{{end}}{{if not $v.Mine}} · @{{.OwnerUsername}}{{end}}</div>
         {{if .RepoPath}}<div class="small muted repo-path" title="{{t $v.Lang "git.repo_path"}}">{{.RepoPath}}</div>{{end}}
         {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}{{template "tp_badge" (dict "Lang" $v.Lang "D" .TP)}}{{with .Review}}{{template "review_chip" (dict "Lang" $v.Lang "R" . "P" $v.Project)}}{{end}}{{if .UpstreamNew}}<a class="rv-chip up-new" href="{{.URL}}" title="{{t $v.Lang "upstream.new_help" .UpstreamNew}}">⟳ {{t $v.Lang "upstream.new" .UpstreamNew}}</a>{{end}}
-        {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}</td>
-    <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>{{end}}</td>
-    <td class="num">{{if not .IsTemplate}}{{.Stats.Translated}}{{end}}</td>
-    <td class="num">{{if not .IsTemplate}}{{.Stats.Fuzzy}}{{end}}</td>
-    <td class="num">{{if not .IsTemplate}}{{.Stats.Untranslated}}{{else}}{{t $v.Lang "project.template_strings" .Stats.Total}}{{end}}</td>
-    <td class="small muted">{{timeAgo $v.Lang .UpdatedAt}}</td>
+        {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}
+        <div class="small muted file-updated">{{t $v.Lang "files.updated" (timeAgo $v.Lang .UpdatedAt)}}</div></td>
+    <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>
+        <div class="file-counts small"><span class="fc-done" title="{{t $v.Lang "stats.translated"}}">{{.Stats.Translated}}</span> · <span class="fc-fuzzy" title="{{t $v.Lang "stats.fuzzy"}}">{{.Stats.Fuzzy}}</span> · <span class="fc-left" title="{{t $v.Lang "stats.untranslated"}}">{{.Stats.Untranslated}}</span></div>
+        {{else}}<span class="small muted">{{t $v.Lang "project.template_strings" .Stats.Total}}</span>{{end}}</td>
     <td class="actions">
         {{if $v.Mine}}{{$heldOther := and .Reservation (ne .Reservation.UserID $v.Res.UserID)}}
         {{if and $v.Res.On (not .IsTemplate) (not .Reservation)}}<form method="post" action="{{$v.Project.Path}}/reservations" class="inline-form" data-confirm="{{t $v.Lang "reserve.translate_confirm" (module .Filename)}}{{if $v.Res.Days}} {{t $v.Lang "reserve.take_confirm_days" $v.Res.Days}}{{end}}" data-confirm-ok="{{t $v.Lang "reserve.translate"}}"><input type="hidden" name="module" value="{{module .Filename}}"><input type="hidden" name="next" value="{{.URL}}"><button class="btn btn-small btn-primary" title="{{t $v.Lang "reserve.reserve_help"}}">{{t $v.Lang "reserve.translate"}}</button></form>
@@ -183,10 +182,10 @@
     </td>
 </tr>
 {{else}}
-{{if .Searched}}<tr class="pf-more"><td colspan="7" class="muted">{{t .Lang "files.project_none"}}</td></tr>{{end}}
+{{if .Searched}}<tr class="pf-more"><td colspan="3" class="muted">{{t .Lang "files.project_none"}}</td></tr>{{end}}
 {{end}}
 {{if lt .Next .Total}}
-<tr class="pf-more"><td colspan="7"><button type="button" class="btn btn-block gl-more" hx-get="{{.Project.Path}}/{{if .Mine}}my-files{{else}}member-files{{end}}?offset={{.Next}}" hx-include="#{{if .Mine}}my{{else}}member{{end}}-filter" hx-target="closest tr" hx-swap="outerHTML">{{t .Lang "files.load_more" .Next .Total}}</button></td></tr>
+<tr class="pf-more"><td colspan="3"><button type="button" class="btn btn-block gl-more" hx-get="{{.Project.Path}}/{{if .Mine}}my-files{{else}}member-files{{end}}?offset={{.Next}}" hx-include="#{{if .Mine}}my{{else}}member{{end}}-filter" hx-target="closest tr" hx-swap="outerHTML">{{t .Lang "files.load_more" .Next .Total}}</button></td></tr>
 {{end}}
 {{end}}
 

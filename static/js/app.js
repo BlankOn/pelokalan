@@ -142,6 +142,15 @@
             });
         }).observe(toastArea, { childList: true });
     }
+    // a short message in the corner, on every page (the element <div id="toast"> would otherwise be window.toast)
+    window.toast = function (message, isError) {
+        var area = document.getElementById("toast");
+        if (!area || !message) return;
+        var t = document.createElement("div");
+        t.className = "toast" + (isError ? " toast-error" : "");
+        t.textContent = message;
+        area.appendChild(t);
+    };
 
     // Sinkronkan (project files): start the sync, spin until it is done, then report and refresh the list
     document.addEventListener("submit", function (ev) {
