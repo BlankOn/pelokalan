@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -50,7 +51,7 @@ func (r *projectRepository) GetByID(ctx context.Context, id int64) (*models.Proj
 	).Scan(&p.ID, &p.Name, &p.Slug, &p.Description, &p.SourceLanguage, &p.Language, &p.Open, &p.Reservations, &p.ReservationDays, &p.ReviewRequired,
 		&p.OwnerID, &p.CreatedAt, &p.UpdatedAt, &p.AIEnabled)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return p, err
 }
@@ -59,7 +60,7 @@ func (r *projectRepository) GetBySlug(ctx context.Context, slug string) (*models
 	var id int64
 	err := r.db.QueryRowContext(ctx, `SELECT id FROM projects WHERE slug = $1`, slug).Scan(&id)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
@@ -139,7 +140,7 @@ func (r *projectRepository) GetMemberRole(ctx context.Context, projectID, userID
 		`SELECT role FROM project_members WHERE project_id = $1 AND user_id = $2`, projectID, userID,
 	).Scan(&role)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", repository.ErrNotFound
+		return "", store.ErrNotFound
 	}
 	return role, err
 }
@@ -199,7 +200,7 @@ func scanInvitation(row interface{ Scan(...any) error }) (*models.Invitation, er
 	err := row.Scan(&inv.ID, &inv.ProjectID, &inv.Email, &inv.Role, &inv.InvitedBy, &inv.ExpiresAt,
 		&inv.AcceptedAt, &inv.DeclinedAt, &inv.CreatedAt, &inv.ProjectName, &inv.InviterName)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return inv, err
 }
@@ -271,7 +272,7 @@ func scanInviteLink(row interface{ Scan(...any) error }) (*models.InviteLink, er
 	var maxUses sql.NullInt64
 	err := row.Scan(&l.ID, &l.ProjectID, &l.Token, &l.Role, &l.CreatedBy, &l.ExpiresAt, &maxUses, &l.Uses, &l.CreatedAt, &l.CreatorName)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	if maxUses.Valid {
 		n := int(maxUses.Int64)
@@ -316,7 +317,7 @@ func (r *projectRepository) DeleteInviteLink(ctx context.Context, projectID, id 
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return repository.ErrNotFound
+		return store.ErrNotFound
 	}
 	return nil
 }
@@ -336,7 +337,7 @@ func (r *projectRepository) JoinByInviteLink(ctx context.Context, linkID, userID
 		 WHERE id = $1 AND (expires_at IS NULL OR expires_at > NOW()) AND (max_uses IS NULL OR uses < max_uses)
 		 RETURNING project_id, role`, linkID).Scan(&projectID, &role)
 	if errors.Is(err, sql.ErrNoRows) {
-		return repository.ErrNotFound
+		return store.ErrNotFound
 	}
 	if err != nil {
 		return err

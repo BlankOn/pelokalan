@@ -18,6 +18,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/glossary"
@@ -583,7 +584,7 @@ func countFiles(files []glossary.File, built *glossary.Result, lang string) int 
 // Term returns one glossary string by its hash
 func (s *GlossaryService) Term(ctx context.Context, p *models.Project, hash string) (*models.GlossaryTerm, error) {
 	t, err := s.repo.Term(ctx, p.ID, strings.ToLower(hash))
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
 	}
 	return t, err
@@ -862,7 +863,7 @@ func (s *GlossaryService) GroupsWithFiles(ctx context.Context, p *models.Project
 // ProjectFile returns one source PO file with its uncompressed contents
 func (s *GlossaryService) ProjectFile(ctx context.Context, p *models.Project, id int64) (*models.ProjectFile, []byte, error) {
 	f, err := s.repo.GetProjectFile(ctx, p.ID, id)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, nil, err

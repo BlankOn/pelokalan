@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -29,7 +30,7 @@ func scanDiscussion(row interface{ Scan(...any) error }, extra ...any) (*models.
 		&d.LastActivityAt, &d.CreatedAt}, extra...)
 	err := row.Scan(dest...)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return d, err
 }
@@ -65,7 +66,7 @@ func (r *discussionRepository) List(ctx context.Context, projectID int64, f repo
 	if f.MentionedUserID > 0 {
 		args = append(args, f.MentionedUserID)
 		where += ` AND EXISTS (SELECT 1 FROM comments c JOIN comment_mentions m ON m.comment_id = c.id
-		           WHERE c.discussion_id = d.id AND c.deleted_at IS NULL AND m.user_id = $` + itoaArg(len(args)) + `)`
+		           WHERE c.discussion_id = d.id AND c.deleted_at IS NULL AND m.user_id = $` + store.Arg(len(args)) + `)`
 	}
 	// search: each word must appear in the title or in a visible comment (case-insensitive)
 	// the preview under each discussion: its newest visible comment (when searching, the newest one that matches)
@@ -76,8 +77,8 @@ func (r *discussionRepository) List(ctx context.Context, projectID int64, f repo
 		words = words[:8]
 	}
 	for i, w := range words {
-		args = append(args, "%"+escapeLike(w)+"%")
-		n := itoaArg(len(args))
+		args = append(args, "%"+store.EscapeLike(w)+"%")
+		n := store.Arg(len(args))
 		where += ` AND (d.title ILIKE $` + n + ` OR EXISTS (SELECT 1 FROM comments c
 		           WHERE c.discussion_id = d.id AND c.deleted_at IS NULL AND c.body ILIKE $` + n + `))`
 		if i == 0 {
@@ -101,7 +102,7 @@ func (r *discussionRepository) List(ctx context.Context, projectID int64, f repo
 		        (SELECT COUNT(DISTINCT c.author_id) FROM comments c WHERE c.discussion_id = d.id AND c.deleted_at IS NULL),
 		        `+snippet+`
 		 FROM discussions d WHERE `+where+`
-		 ORDER BY d.last_activity_at DESC LIMIT $`+itoaArg(len(args)-1)+` OFFSET $`+itoaArg(len(args)), args...)
+		 ORDER BY d.last_activity_at DESC LIMIT $`+store.Arg(len(args)-1)+` OFFSET $`+store.Arg(len(args)), args...)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -118,13 +119,6 @@ func (r *discussionRepository) List(ctx context.Context, projectID int64, f repo
 		out = append(out, d)
 	}
 	return out, total, rows.Err()
-}
-
-func itoaArg(n int) string {
-	if n < 10 {
-		return string(rune('0' + n))
-	}
-	return string(rune('0'+n/10)) + string(rune('0'+n%10))
 }
 
 func (r *discussionRepository) Counts(ctx context.Context, projectID int64, subjectType string, keys []string) (map[string]int, error) {
@@ -202,7 +196,7 @@ func scanComment(row interface{ Scan(...any) error }) (*models.Comment, error) {
 	err := row.Scan(&c.ID, &c.DiscussionID, &c.AuthorID, &c.AuthorName, &c.AuthorUsername, &c.AuthorAvatar, &c.Body, &c.CreatedAt,
 		&c.EditedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName, &c.ReviewID, &c.ResolvedAt, &c.ResolverName)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return c, err
 }
@@ -262,7 +256,7 @@ func (r *discussionRepository) Attachment(ctx context.Context, id int64) (*model
 		 WHERE a.id = $1 AND c.deleted_at IS NULL`, id,
 	).Scan(&a.ID, &a.CommentID, &a.BlobKey, &a.Filename, &a.ContentType, &a.Size, &a.CreatedAt, &projectID)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, 0, repository.ErrNotFound
+		return nil, 0, store.ErrNotFound
 	}
 	return a, projectID, err
 }

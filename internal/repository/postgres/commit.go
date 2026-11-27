@@ -9,6 +9,7 @@ import (
 	"io"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -30,7 +31,7 @@ func scanCommit(row interface{ Scan(...any) error }) (*models.Commit, error) {
 	err := row.Scan(&c.ID, &c.CatalogID, &c.ParentID, &c.Kind, &c.Message, &c.AuthorID, &c.AuthorName,
 		&c.ContentHash, &c.Total, &c.Translated, &c.Fuzzy, &c.Added, &c.Changed, &c.Removed, &c.Reviewed, &c.RestoredFrom, &c.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return c, err
 }
@@ -87,7 +88,7 @@ func (r *commitRepository) Snapshot(ctx context.Context, id int64) ([]byte, erro
 	var data []byte
 	err := r.db.QueryRowContext(ctx, `SELECT snapshot FROM catalog_commits WHERE id = $1`, id).Scan(&data)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	if err != nil {
 		return nil, err

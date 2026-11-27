@@ -2,18 +2,11 @@ package repository
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"pelokalan/internal/models"
 	"pelokalan/pkg/thesaurus"
 )
-
-// ErrNotFound is returned when a record does not exist
-var ErrNotFound = errors.New("not found")
-
-// ErrConflict is returned when a record was changed by someone else
-var ErrConflict = errors.New("conflict")
 
 // UserRepository defines methods for user data access
 type UserRepository interface {

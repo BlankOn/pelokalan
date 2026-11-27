@@ -11,6 +11,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/ai"
 	"pelokalan/pkg/glossary"
@@ -120,7 +121,7 @@ func (s *AIService) RecoverJobs(ctx context.Context) error { return s.repo.FailR
 // Settings returns the project's AI settings, or nil when not configured
 func (s *AIService) Settings(ctx context.Context, p *models.Project) (*models.AISettings, error) {
 	st, err := s.repo.GetSettings(ctx, p.ID)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil
 	}
 	if st != nil {
@@ -447,7 +448,7 @@ func (s *AIService) Estimate(ctx context.Context, p *models.Project, c *models.C
 // LatestJob returns the most recent job of a catalog, or nil
 func (s *AIService) LatestJob(ctx context.Context, c *models.Catalog) (*models.AIJob, error) {
 	j, err := s.repo.LatestJob(ctx, c.ID)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil
 	}
 	return j, err
@@ -724,7 +725,7 @@ func (s *AIService) apply(ctx context.Context, c *models.Catalog, id int64, vers
 	e.Fuzzy = fuzzy
 	e.Origin = origin
 	if err := s.catalogs.UpdateEntry(ctx, e, userID); err != nil {
-		if errors.Is(err, repository.ErrConflict) {
+		if errors.Is(err, store.ErrConflict) {
 			return applySkipped
 		}
 		log.Printf("ai: save entry %d: %v", id, err)

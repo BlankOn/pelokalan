@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -34,7 +35,7 @@ func scanUser(row interface{ Scan(...any) error }) (*models.User, error) {
 		u.ChecksOff = strings.Split(off, ",")
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return u, err
 }

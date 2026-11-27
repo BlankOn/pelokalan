@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -59,7 +60,7 @@ func (r *reservationRepository) ActiveFor(ctx context.Context, projectID int64, 
 		return nil, err
 	}
 	if len(list) == 0 {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return list[0], nil
 }
@@ -69,7 +70,7 @@ func (r *reservationRepository) Create(ctx context.Context, projectID int64, mod
 		projectID, module, userID)
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) && pg.Code == "23505" { // someone else got it first
-		return repository.ErrConflict
+		return store.ErrConflict
 	}
 	return err
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -34,7 +35,7 @@ func (r *otpRepository) GetLatest(ctx context.Context, email, purpose string) (*
 		 ORDER BY created_at DESC, id DESC LIMIT 1`, email, purpose,
 	).Scan(&o.ID, &o.Email, &o.Purpose, &o.CodeHash, &o.Name, &o.Username, &o.Attempts, &o.ExpiresAt, &o.UsedAt, &o.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return o, err
 }
@@ -46,7 +47,7 @@ func (r *otpRepository) LatestForEmail(ctx context.Context, email string) (*mode
 		 FROM otp_codes WHERE email = $1 ORDER BY created_at DESC, id DESC LIMIT 1`, email,
 	).Scan(&o.ID, &o.Email, &o.Purpose, &o.CodeHash, &o.Name, &o.Username, &o.Attempts, &o.ExpiresAt, &o.UsedAt, &o.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return o, err
 }
@@ -62,7 +63,7 @@ func (r *otpRepository) MarkUsed(ctx context.Context, id int64) error {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return repository.ErrConflict
+		return store.ErrConflict
 	}
 	return nil
 }

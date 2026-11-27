@@ -13,6 +13,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/gitpatch"
 	"pelokalan/pkg/po"
@@ -127,7 +128,7 @@ func (s *CatalogService) GitPatch(ctx context.Context, user *models.User, p *mod
 			continue
 		}
 		pf, g, err := s.projectFiles.ProjectFileByRepoPath(ctx, p.ID, c.RepoPath)
-		if errors.Is(err, repository.ErrNotFound) {
+		if errors.Is(err, store.ErrNotFound) {
 			continue
 		} else if err != nil {
 			return nil, err

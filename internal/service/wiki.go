@@ -10,6 +10,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/blobstore"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -166,7 +167,7 @@ func (t *WikiTree) Breadcrumbs(page *models.WikiPage) []*models.WikiPage {
 // Redirect finds where a page that used to have this address lives now
 func (s *WikiService) Redirect(ctx context.Context, p *models.Project, slug string) (string, error) {
 	cur, err := s.repo.Redirect(ctx, p.ID, strings.ToLower(slug))
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return "", apperr.ErrNotFound
 	}
 	return cur, err
@@ -183,7 +184,7 @@ func (s *WikiService) Edits(ctx context.Context, pg *models.WikiPage) ([]models.
 // Page loads one page with its body
 func (s *WikiService) Page(ctx context.Context, p *models.Project, slug string) (*models.WikiPage, error) {
 	pg, err := s.repo.GetPage(ctx, p.ID, strings.ToLower(slug))
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
 	}
 	return pg, err
@@ -323,7 +324,7 @@ func (s *WikiService) Update(ctx context.Context, user *models.User, p *models.P
 	}
 	// the place in the tree changes only by moving (Move)
 	pg.Title, pg.Body, pg.UpdatedBy = in.Title, in.Body, &user.ID
-	if err := s.repo.UpdatePage(ctx, pg, in.Version); errors.Is(err, repository.ErrConflict) {
+	if err := s.repo.UpdatePage(ctx, pg, in.Version); errors.Is(err, store.ErrConflict) {
 		return nil, ErrWikiConflict
 	} else if err != nil {
 		return nil, err
@@ -467,7 +468,7 @@ func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.P
 // File returns an uploaded file with its bytes
 func (s *WikiService) File(ctx context.Context, p *models.Project, id int64) (*models.WikiFile, []byte, error) {
 	f, err := s.repo.GetFile(ctx, p.ID, id)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, nil, err

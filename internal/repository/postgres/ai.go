@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -28,7 +29,7 @@ func (r *aiRepository) GetSettings(ctx context.Context, projectID int64) (*model
 	).Scan(&s.ProjectID, &s.BaseURL, &s.Model, &s.APIKeyEnc, &s.APIKeyHint, &s.PriceInput, &s.PriceOutput,
 		&s.MonthlyBudget, &s.ExtraContext, &s.UpdatedBy, &s.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return s, err
 }
@@ -64,7 +65,7 @@ func scanJob(row interface{ Scan(...any) error }) (*models.AIJob, error) {
 		&j.FromMemory, &j.FromGlossary, &j.Translated, &j.Flagged, &j.Skipped, &j.PromptTokens, &j.CompletionTokens, &j.Cost,
 		&j.EstimatedCost, &j.CancelRequested, &j.Error, &j.CreatedAt, &j.FinishedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return j, err
 }

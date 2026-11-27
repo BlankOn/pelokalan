@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/json"
 
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/thesaurus"
 )
@@ -57,18 +58,11 @@ func (r *thesaurusRepository) ReplaceAll(ctx context.Context, entries []thesauru
 	}
 	defer stmt.Close()
 	for _, e := range entries {
-		syn, _ := json.Marshal(nonNil(e.Synonyms))
-		ant, _ := json.Marshal(nonNil(e.Antonyms))
+		syn, _ := json.Marshal(store.NonNil(e.Synonyms))
+		ant, _ := json.Marshal(store.NonNil(e.Antonyms))
 		if _, err := stmt.ExecContext(ctx, e.Word, e.Tag, syn, ant); err != nil {
 			return err
 		}
 	}
 	return tx.Commit()
-}
-
-func nonNil(s []string) []string {
-	if s == nil {
-		return []string{}
-	}
-	return s
 }

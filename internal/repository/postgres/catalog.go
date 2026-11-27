@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -31,7 +32,7 @@ func scanCatalog(row interface{ Scan(...any) error }) (*models.Catalog, error) {
 	err := row.Scan(&c.ID, &c.ProjectID, &c.OwnerID, &c.OwnerUsername, &c.ProjectSlug, &c.IsTemplate, &c.Language, &c.Filename, &c.Header, &c.HeaderComments,
 		&c.PluralForms, &c.NPlurals, &c.CreatedBy, &c.CreatedAt, &c.UpdatedAt, &c.DeletedAt, &c.DeletedBy, &c.DeleterName, &c.SourceURL, &c.UpstreamPage, &c.RepoPath)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return c, err
 }
@@ -216,7 +217,7 @@ func scanEntry(row interface{ Scan(...any) error }) (*models.Entry, error) {
 		&e.TranslatorComments, &e.ExtractedComments, &e.References, &e.Previous, &e.Obsolete, &e.Version, &e.UpdatedBy,
 		&e.UpdatedByName, &e.UpdatedAt, &e.Origin, &replaced)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	if err != nil {
 		return nil, err
@@ -288,7 +289,7 @@ func (r *catalogRepository) UpdateEntry(ctx context.Context, e *models.Entry, us
 		e.ID, e.Version, string(msgstr), e.Fuzzy, e.TranslatorComments, userID, e.Origin, replaced,
 	).Scan(&e.Version, &e.UpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return repository.ErrConflict
+		return store.ErrConflict
 	}
 	if err != nil {
 		return err

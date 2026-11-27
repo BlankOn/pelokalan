@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -28,7 +29,7 @@ func scanWiki(row interface{ Scan(...any) error }, withBody bool) (*models.WikiP
 	}
 	err := row.Scan(dest...)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return p, err
 }
@@ -117,13 +118,13 @@ func (r *wikiRepository) UpdatePage(ctx context.Context, p *models.WikiPage, ver
 	err = tx.QueryRowContext(ctx, `SELECT updated_at FROM wiki_pages WHERE id = $1 AND project_id = $2 FOR UPDATE`,
 		p.ID, p.ProjectID).Scan(&cur)
 	if errors.Is(err, sql.ErrNoRows) {
-		return repository.ErrNotFound
+		return store.ErrNotFound
 	} else if err != nil {
 		return err
 	}
 	// timestamps come back with microsecond precision
 	if cur.Time.UnixMicro() != version/1000 {
-		return repository.ErrConflict
+		return store.ErrConflict
 	}
 	var oldSlug string
 	if err := tx.QueryRowContext(ctx, `SELECT slug FROM wiki_pages WHERE id = $1`, p.ID).Scan(&oldSlug); err != nil {
@@ -159,7 +160,7 @@ func (r *wikiRepository) DeletePage(ctx context.Context, projectID, id int64) er
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
-		return repository.ErrNotFound
+		return store.ErrNotFound
 	}
 	return nil
 }
@@ -185,7 +186,7 @@ func (r *wikiRepository) GetFile(ctx context.Context, projectID, id int64) (*mod
 		 FROM wiki_files WHERE id = $1 AND project_id = $2`, id, projectID,
 	).Scan(&f.ID, &f.ProjectID, &f.BlobKey, &f.Filename, &f.ContentType, &f.Size, &f.UploadedBy, &f.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return f, err
 }
@@ -212,7 +213,7 @@ func (r *wikiRepository) Redirect(ctx context.Context, projectID int64, slug str
 		`SELECT w.slug FROM wiki_redirects x JOIN wiki_pages w ON w.id = x.page_id
 		 WHERE x.project_id = $1 AND x.slug = $2`, projectID, slug).Scan(&cur)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", repository.ErrNotFound
+		return "", store.ErrNotFound
 	}
 	return cur, err
 }

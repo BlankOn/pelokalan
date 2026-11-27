@@ -9,7 +9,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
-	"pelokalan/internal/repository"
+	"pelokalan/internal/platform/store"
 )
 
 // Allowed choices for invite links (days 0 = no expiry, uses 0 = unlimited)
@@ -78,7 +78,7 @@ func (s *ProjectService) DeleteInviteLink(ctx context.Context, p *models.Project
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
-	if err := s.projects.DeleteInviteLink(ctx, p.ID, id); errors.Is(err, repository.ErrNotFound) {
+	if err := s.projects.DeleteInviteLink(ctx, p.ID, id); errors.Is(err, store.ErrNotFound) {
 		return apperr.ErrNotFound
 	} else if err != nil {
 		return err
@@ -94,7 +94,7 @@ func (s *ProjectService) InviteLink(ctx context.Context, user *models.User, toke
 		return nil, nil, apperr.ErrInviteLinkInvalid
 	}
 	l, err := s.projects.GetInviteLinkByToken(ctx, token)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, apperr.ErrInviteLinkInvalid
 	} else if err != nil {
 		return nil, nil, err
@@ -119,7 +119,7 @@ func (s *ProjectService) JoinByInviteLink(ctx context.Context, user *models.User
 	if !l.IsActive() {
 		return nil, apperr.ErrInviteLinkInvalid
 	}
-	if err := s.projects.JoinByInviteLink(ctx, l.ID, user.ID); errors.Is(err, repository.ErrNotFound) {
+	if err := s.projects.JoinByInviteLink(ctx, l.ID, user.ID); errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrInviteLinkInvalid
 	} else if err != nil {
 		return nil, err

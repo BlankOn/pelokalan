@@ -15,6 +15,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/po"
 )
@@ -96,7 +97,7 @@ func (s *CatalogService) List(ctx context.Context, user *models.User, p *models.
 // change them, which c.Owned reports and every write method checks.
 func (s *CatalogService) Get(ctx context.Context, user *models.User, id int64) (*models.Catalog, *models.Project, error) {
 	c, err := s.catalogs.GetByID(ctx, id)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, nil, err
@@ -121,7 +122,7 @@ func (s *CatalogService) Get(ctx context.Context, user *models.User, id int64) (
 // Template returns the owner's template in the project, or nil
 func (s *CatalogService) Template(ctx context.Context, p *models.Project, ownerID int64) (*models.Catalog, error) {
 	c, err := s.catalogs.GetTemplate(ctx, p.ID, ownerID)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil
 	}
 	return c, err
@@ -772,7 +773,7 @@ func (s *CatalogService) SaveEntry(ctx context.Context, user *models.User, c *mo
 	e.Origin = "" // saved by a person: no longer an unreviewed machine translation
 	e.ReplacedMsgStr = nil
 	if err := s.catalogs.UpdateEntry(ctx, e, user.ID); err != nil {
-		if errors.Is(err, repository.ErrConflict) {
+		if errors.Is(err, store.ErrConflict) {
 			return nil, apperr.ErrEntryConflict
 		}
 		return nil, err
@@ -938,7 +939,7 @@ func (s *CatalogService) uniqueFilename(ctx context.Context, c *models.Catalog, 
 // GetByPath returns one of the user's files by its URL parts
 func (s *CatalogService) GetByPath(ctx context.Context, user *models.User, projectID int64, username, filename string) (*models.Catalog, *models.Project, error) {
 	c, err := s.catalogs.GetByPath(ctx, projectID, username, filename)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, nil, err

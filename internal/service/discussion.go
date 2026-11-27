@@ -20,6 +20,7 @@ import (
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -152,7 +153,7 @@ func (s *DiscussionService) ResolveSubject(ctx context.Context, p *models.Projec
 			return nil, apperr.ErrNotFound
 		}
 		term, err := s.glossary.Term(ctx, p.ID, key)
-		if errors.Is(err, repository.ErrNotFound) {
+		if errors.Is(err, store.ErrNotFound) {
 			// the term may have left the glossary; keep its discussion reachable
 			if d, derr := s.repo.Get(ctx, p.ID, subjectType, key); derr == nil {
 				return &Subject{Type: subjectType, Key: key, Title: d.Title, URL: GlossaryTermURL(p, key)}, nil
@@ -193,7 +194,7 @@ func (s *DiscussionService) ResolveSubject(ctx context.Context, p *models.Projec
 			return nil, apperr.ErrNotFound
 		}
 		d, err := s.repo.Get(ctx, p.ID, subjectType, key)
-		if errors.Is(err, repository.ErrNotFound) {
+		if errors.Is(err, store.ErrNotFound) {
 			return nil, apperr.ErrNotFound
 		} else if err != nil {
 			return nil, err
@@ -279,7 +280,7 @@ func (s *DiscussionService) Thread(ctx context.Context, p *models.Project, subje
 	}
 	t := &Thread{Subject: subj}
 	d, err := s.repo.Get(ctx, p.ID, subjectType, key)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return t, nil
 	} else if err != nil {
 		return nil, err

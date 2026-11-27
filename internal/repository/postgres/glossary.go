@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/glossary"
 )
@@ -46,7 +47,7 @@ func scanGroup(row interface{ Scan(...any) error }) (*models.ModuleGroup, error)
 		&v.FeedCreatedBy, &v.LastFetchedAt, &v.LastChangedAt, &v.LastFetchError, &v.FetchETag, &v.FetchLastModified,
 		&v.FetchContentHash, &v.GitRepo, &v.GitBranch, &v.TPTeam, &v.GitDirect, &v.GitInstallation, &v.GitWrite, &v.GitCheckedAt, &v.GitAccessError, &v.ImportCount)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return v, err
 }
@@ -169,7 +170,7 @@ func scanImport(row interface{ Scan(...any) error }) (*models.ModuleGroupImport,
 	err := row.Scan(&imp.ID, &imp.ProjectID, &imp.GroupID, &imp.GroupLabel, &imp.Filename, &imp.Language, &imp.FileCount, &imp.EntryCount,
 		&imp.TermCount, &imp.UploadedBy, &imp.UploaderName, &imp.CreatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return imp, err
 }
@@ -259,7 +260,7 @@ func (r *glossaryRepository) Term(ctx context.Context, projectID int64, hash str
 		return nil, err
 	}
 	if len(term.Rows) == 0 {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return term, nil
 }
@@ -299,10 +300,6 @@ func (r *glossaryRepository) PreferredTerms(ctx context.Context, projectID int64
 	return out, rows.Err()
 }
 
-func escapeLike(s string) string {
-	return strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`).Replace(s)
-}
-
 func (r *glossaryRepository) Search(ctx context.Context, q repository.GlossaryQuery) ([]*models.GlossaryGroup, int, error) {
 	args := []any{q.ProjectID, q.Language}
 	// scope applies to every glossary_terms reference (alias t)
@@ -318,7 +315,7 @@ func (r *glossaryRepository) Search(ctx context.Context, q repository.GlossaryQu
 	where := []string{"TRUE"}
 	query := strings.ToLower(strings.TrimSpace(q.Query))
 	if query != "" {
-		args = append(args, "%"+escapeLike(query)+"%")
+		args = append(args, "%"+store.EscapeLike(query)+"%")
 		n := len(args)
 		where = append(where, fmt.Sprintf("(t.source_norm LIKE $%d OR t.translation_norm LIKE $%d)", n, n))
 	}
@@ -498,7 +495,7 @@ func (r *glossaryRepository) ProjectFileByRepoPath(ctx context.Context, projectI
 		WHERE f.project_id = $1 AND f.repo_path = $2 AND v.git_repo <> ''
 		ORDER BY f.created_at DESC, f.id DESC LIMIT 1`, projectID, path).Scan(&fid, &gid)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, nil, repository.ErrNotFound
+		return nil, nil, store.ErrNotFound
 	} else if err != nil {
 		return nil, nil, err
 	}
@@ -557,7 +554,7 @@ func (r *glossaryRepository) ListProjectFiles(ctx context.Context, projectID int
 		where += fmt.Sprintf(` AND f.group_id = ANY($%d)`, len(args))
 	}
 	for _, w := range strings.Fields(query) {
-		args = append(args, "%"+escapeLike(w)+"%")
+		args = append(args, "%"+store.EscapeLike(w)+"%")
 		where += fmt.Sprintf(` AND (f.filename || ' ' || f.language || ' ' || v.name || '-' || v.version) ILIKE $%d`, len(args))
 	}
 	from := ` FROM project_files f JOIN module_groups v ON v.id = f.group_id WHERE ` + where
@@ -597,7 +594,7 @@ func (r *glossaryRepository) GetProjectFile(ctx context.Context, projectID, id i
 		WHERE f.project_id = $1 AND f.id = $2`, projectID, id).Scan(&f.ID, &f.ImportID, &f.ProjectID, &f.GroupID,
 		&f.GroupLabel, &f.Filename, &f.Language, &f.Total, &f.Translated, &f.Fuzzy, &f.Size, &f.CreatedAt, &f.RepoPath, &f.Data)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return f, err
 }

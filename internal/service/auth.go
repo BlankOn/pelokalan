@@ -26,6 +26,7 @@ import (
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -136,7 +137,7 @@ func (s *AuthService) usernameAvailable(ctx context.Context, u string, selfID in
 	}
 	existing, err := s.users.GetByUsername(ctx, u)
 	switch {
-	case errors.Is(err, repository.ErrNotFound):
+	case errors.Is(err, store.ErrNotFound):
 		return nil
 	case err != nil:
 		return err
@@ -165,7 +166,7 @@ func (s *AuthService) StartRegistration(ctx context.Context, email, username, na
 	}
 	if _, err := s.users.GetByEmail(ctx, email); err == nil {
 		return email, apperr.ErrUserExists
-	} else if !errors.Is(err, repository.ErrNotFound) {
+	} else if !errors.Is(err, store.ErrNotFound) {
 		return email, err
 	}
 	return email, s.sendCode(ctx, email, models.OTPPurposeRegister, name, username, lang)
@@ -180,7 +181,7 @@ func (s *AuthService) StartLogin(ctx context.Context, email, lang string) (strin
 	if !s.IsAllowed(email) {
 		return email, apperr.ErrNotWhitelisted
 	}
-	if _, err := s.users.GetByEmail(ctx, email); errors.Is(err, repository.ErrNotFound) {
+	if _, err := s.users.GetByEmail(ctx, email); errors.Is(err, store.ErrNotFound) {
 		return email, apperr.ErrUserNotFound
 	} else if err != nil {
 		return email, err
@@ -267,7 +268,7 @@ func (s *AuthService) Verify(ctx context.Context, email, purpose, code, lang str
 	code = strings.Join(strings.Fields(code), "")
 
 	otp, err := s.otps.GetLatest(ctx, email, purpose)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrOTPInvalid
 	} else if err != nil {
 		return nil, err
@@ -294,7 +295,7 @@ func (s *AuthService) Verify(ctx context.Context, email, purpose, code, lang str
 	user, err := s.users.GetByEmail(ctx, email)
 	switch {
 	case err == nil:
-	case errors.Is(err, repository.ErrNotFound) && purpose == models.OTPPurposeRegister:
+	case errors.Is(err, store.ErrNotFound) && purpose == models.OTPPurposeRegister:
 		user = &models.User{Email: email, Username: otp.Username, Name: otp.Name, Lang: i18n.Normalize(lang)}
 		if user.Username == "" { // registration started before usernames existed
 			return nil, apperr.ErrOTPExpired
@@ -306,7 +307,7 @@ func (s *AuthService) Verify(ctx context.Context, email, purpose, code, lang str
 			return nil, err
 		}
 		s.activity.Record(ctx, &models.ActivityEvent{Kind: models.ActivityUserRegistered, UserID: &user.ID})
-	case errors.Is(err, repository.ErrNotFound):
+	case errors.Is(err, store.ErrNotFound):
 		return nil, apperr.ErrUserNotFound
 	default:
 		return nil, err

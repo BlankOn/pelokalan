@@ -10,7 +10,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
-	"pelokalan/internal/repository"
+	"pelokalan/internal/platform/store"
 	"pelokalan/pkg/po"
 )
 
@@ -72,7 +72,7 @@ func (s *CatalogService) snapshot(ctx context.Context, c *models.Catalog) ([]byt
 
 func (s *CatalogService) latestCommit(ctx context.Context, c *models.Catalog) (*models.Commit, error) {
 	l, err := s.commits.Latest(ctx, c.ID)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil
 	}
 	return l, err
@@ -245,7 +245,7 @@ func (s *CatalogService) CommitDiff(ctx context.Context, c *models.Catalog, id i
 	}
 	var old []byte
 	if cm.ParentID != nil {
-		if old, err = s.commits.Snapshot(ctx, *cm.ParentID); err != nil && !errors.Is(err, repository.ErrNotFound) {
+		if old, err = s.commits.Snapshot(ctx, *cm.ParentID); err != nil && !errors.Is(err, store.ErrNotFound) {
 			return nil, nil, err
 		}
 	}

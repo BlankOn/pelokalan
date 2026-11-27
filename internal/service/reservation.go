@@ -14,6 +14,7 @@ import (
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -98,7 +99,7 @@ func (s *ReservationService) Claim(ctx context.Context, user *models.User, p *mo
 		return nil // theirs already
 	}
 	err := s.repo.Create(ctx, p.ID, module, user.ID)
-	if errors.Is(err, repository.ErrConflict) { // someone was quicker
+	if errors.Is(err, store.ErrConflict) { // someone was quicker
 		return s.Check(ctx, user, p, module)
 	}
 	return err

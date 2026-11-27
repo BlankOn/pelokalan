@@ -8,6 +8,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -43,11 +44,11 @@ func (m *memReservations) ActiveFor(_ context.Context, projectID int64, module s
 		}
 		return r, nil
 	}
-	return nil, repository.ErrNotFound
+	return nil, store.ErrNotFound
 }
 func (m *memReservations) Create(_ context.Context, projectID int64, module string, userID int64) error {
 	if _, ok := m.active[key(projectID, module)]; ok {
-		return repository.ErrConflict
+		return store.ErrConflict
 	}
 	m.next++
 	now := time.Now()

@@ -18,6 +18,7 @@ import (
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -95,7 +96,7 @@ func (s *ProjectService) uniqueSlug(ctx context.Context, slug string, selfID int
 			cand = slug + "-" + strconv.Itoa(i)
 		}
 		existing, err := s.projects.GetBySlug(ctx, cand)
-		if errors.Is(err, repository.ErrNotFound) || (err == nil && existing.ID == selfID) {
+		if errors.Is(err, store.ErrNotFound) || (err == nil && existing.ID == selfID) {
 			return cand, nil
 		}
 		if err != nil {
@@ -119,7 +120,7 @@ func (s *ProjectService) resolveSlug(ctx context.Context, in *ProjectInput, self
 	if err == nil && existing.ID != selfID {
 		return apperr.ErrSlugTaken
 	}
-	if err != nil && !errors.Is(err, repository.ErrNotFound) {
+	if err != nil && !errors.Is(err, store.ErrNotFound) {
 		return err
 	}
 	return nil
@@ -193,14 +194,14 @@ func (s *ProjectService) ListAll(ctx context.Context, user *models.User) ([]*mod
 // for visitors and non-members. user may be nil.
 func (s *ProjectService) GetPublic(ctx context.Context, user *models.User, id int64) (*models.Project, error) {
 	p, err := s.projects.GetByID(ctx, id)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
 	if user != nil {
 		role, err := s.projects.GetMemberRole(ctx, id, user.ID)
-		if err != nil && !errors.Is(err, repository.ErrNotFound) {
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
 			return nil, err
 		}
 		p.Role = role
@@ -211,7 +212,7 @@ func (s *ProjectService) GetPublic(ctx context.Context, user *models.User, id in
 // GetPublicBySlug is GetPublic for a project address such as "gnome-id"
 func (s *ProjectService) GetPublicBySlug(ctx context.Context, user *models.User, slug string) (*models.Project, error) {
 	p, err := s.projects.GetBySlug(ctx, strings.ToLower(slug))
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, err
@@ -222,13 +223,13 @@ func (s *ProjectService) GetPublicBySlug(ctx context.Context, user *models.User,
 // Get returns a project with the user's role, or ErrNotFound when the user is not a member
 func (s *ProjectService) Get(ctx context.Context, user *models.User, id int64) (*models.Project, error) {
 	role, err := s.projects.GetMemberRole(ctx, id, user.ID)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, err
 	}
 	p, err := s.projects.GetByID(ctx, id)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
 	} else if err != nil {
 		return nil, err

@@ -14,6 +14,7 @@ import (
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/platform/mailer"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/gitpatch"
@@ -137,7 +138,7 @@ func (s *ReviewService) Open(ctx context.Context, p *models.Project) ([]*models.
 // Get returns a review of the project
 func (s *ReviewService) Get(ctx context.Context, p *models.Project, id int64) (*models.ModuleReview, error) {
 	r, err := s.repo.Get(ctx, id)
-	if errors.Is(err, repository.ErrNotFound) || err == nil && r.ProjectID != p.ID {
+	if errors.Is(err, store.ErrNotFound) || err == nil && r.ProjectID != p.ID {
 		return nil, apperr.ErrNotFound
 	}
 	return r, err
@@ -217,7 +218,7 @@ func (s *ReviewService) Request(ctx context.Context, user *models.User, p *model
 	gid := g.ID
 	r := &models.ModuleReview{ProjectID: p.ID, CatalogID: c.ID, GroupID: &gid, Module: ModuleOf(c), RepoPath: c.RepoPath,
 		Status: models.ReviewRequested, RequestedBy: user.ID, Note: cleanNote(note), Entries: d.Changed}
-	if err := s.repo.Create(ctx, r); errors.Is(err, repository.ErrConflict) {
+	if err := s.repo.Create(ctx, r); errors.Is(err, store.ErrConflict) {
 		return nil, apperr.New("err.review_open")
 	} else if err != nil {
 		return nil, err

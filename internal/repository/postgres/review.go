@@ -8,6 +8,7 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -35,7 +36,7 @@ func scanReview(row interface{ Scan(...any) error }) (*models.ModuleReview, erro
 		&r.Entries, &r.CreatedAt, &r.ReviewedBy, &r.ReviewedAt, &r.ReviewNote, &r.CommitSHA, &r.CommitURL, &r.Error,
 		&r.RequesterUsername, &r.RequesterName, &r.ReviewerUsername, &r.Filename, &r.OwnerUsername, &r.ProjectSlug)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return r, err
 }
@@ -65,7 +66,7 @@ func (s *reviewRepository) Create(ctx context.Context, r *models.ModuleReview) e
 		r.ReviewedBy, r.ReviewedAt, r.CommitSHA, r.CommitURL, r.PushedData).Scan(&r.ID, &r.CreatedAt)
 	var pg *pgconn.PgError
 	if errors.As(err, &pg) && pg.Code == "23505" {
-		return repository.ErrConflict
+		return store.ErrConflict
 	}
 	return err
 }

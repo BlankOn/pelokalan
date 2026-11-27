@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/service"
 )
@@ -107,7 +108,7 @@ func (emptyGlossaryRepo) ProjectFilesForLanguage(context.Context, int64, string)
 }
 
 func (emptyGlossaryRepo) ProjectFileByRepoPath(context.Context, int64, string) (*models.ProjectFile, *models.ModuleGroup, error) {
-	return nil, nil, repository.ErrNotFound
+	return nil, nil, store.ErrNotFound
 }
 
 func (emptyGlossaryRepo) ProjectFileNames(context.Context, int64) (map[int64][]string, error) {

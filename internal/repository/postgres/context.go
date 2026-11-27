@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -22,7 +23,7 @@ func scanContext(row interface{ Scan(...any) error }) (*models.ModuleContext, er
 	c := &models.ModuleContext{}
 	err := row.Scan(&c.ID, &c.ProjectID, &c.Module, &c.Title, &c.Note, &c.Version, &c.UpdatedBy, &c.UpdatedAt, &c.UpdaterName)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, repository.ErrNotFound
+		return nil, store.ErrNotFound
 	}
 	return c, err
 }
@@ -51,7 +52,7 @@ func (r *contextRepository) Save(ctx context.Context, c *models.ModuleContext, v
 			 RETURNING id, version, updated_at`, c.ProjectID, c.Module, c.Note, c.UpdatedBy, version, c.Title).Scan(&c.ID, &c.Version, &c.UpdatedAt)
 	}
 	if errors.Is(err, sql.ErrNoRows) {
-		return repository.ErrConflict
+		return store.ErrConflict
 	}
 	if err != nil {
 		return err
@@ -86,9 +87,9 @@ func (r *contextRepository) ListForProject(ctx context.Context, projectID int64,
 	args := []any{projectID}
 	filter := ""
 	for _, w := range strings.Fields(strings.ToLower(q)) {
-		args = append(args, "%"+escapeLike(w)+"%")
+		args = append(args, "%"+store.EscapeLike(w)+"%")
 		n := len(args)
-		filter += ` AND (lower(x.note) LIKE $` + itoaArg(n) + ` OR x.module LIKE $` + itoaArg(n) + ` OR lower(x.title) LIKE $` + itoaArg(n) + `)`
+		filter += ` AND (lower(x.note) LIKE $` + store.Arg(n) + ` OR x.module LIKE $` + store.Arg(n) + ` OR lower(x.title) LIKE $` + store.Arg(n) + `)`
 	}
 	rows, err := r.db.QueryContext(ctx, `SELECT `+contextColumns+` FROM module_contexts x
 		WHERE x.project_id = $1 AND btrim(x.note) <> ''`+filter+` ORDER BY x.updated_at DESC LIMIT 500`, args...)

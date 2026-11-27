@@ -9,6 +9,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
+	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
 )
 
@@ -43,7 +44,7 @@ func ModuleKey(filename string) string { return moduleKey(filename) }
 // ForModule returns a module's Konteks (also when its note is empty), or nil
 func (s *ContextService) ForModule(ctx context.Context, projectID int64, module string) (*models.ModuleContext, error) {
 	n, err := s.repo.Get(ctx, projectID, module)
-	if errors.Is(err, repository.ErrNotFound) {
+	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil
 	}
 	return n, err
@@ -86,7 +87,7 @@ func (s *ContextService) Save(ctx context.Context, user *models.User, p *models.
 	}
 	n := &models.ModuleContext{ProjectID: p.ID, Module: module, Note: note, UpdatedBy: &user.ID, UpdaterName: user.DisplayName()}
 	err := s.repo.Save(ctx, n, version)
-	if errors.Is(err, repository.ErrConflict) {
+	if errors.Is(err, store.ErrConflict) {
 		latest, _ := s.ForModule(ctx, p.ID, module)
 		return latest, ErrContextConflict
 	}
@@ -143,7 +144,7 @@ func (s *ContextService) SaveGeneral(ctx context.Context, user *models.User, p *
 	}
 	n := &models.ModuleContext{ProjectID: p.ID, Module: key, Title: title, Note: note, UpdatedBy: &user.ID, UpdaterName: user.DisplayName()}
 	err = s.repo.Save(ctx, n, version)
-	if errors.Is(err, repository.ErrConflict) {
+	if errors.Is(err, store.ErrConflict) {
 		latest, _ := s.ForModule(ctx, p.ID, key)
 		return latest, ErrContextConflict
 	}
@@ -163,7 +164,7 @@ func (s *ContextService) DeleteGeneral(ctx context.Context, user *models.User, p
 		return nil
 	}
 	n := &models.ModuleContext{ProjectID: p.ID, Module: key, Title: cur.Title, Note: "", UpdatedBy: &user.ID, UpdaterName: user.DisplayName()}
-	if err := s.repo.Save(ctx, n, cur.Version); errors.Is(err, repository.ErrConflict) {
+	if err := s.repo.Save(ctx, n, cur.Version); errors.Is(err, store.ErrConflict) {
 		return ErrContextConflict
 	} else if err != nil {
 		return err
