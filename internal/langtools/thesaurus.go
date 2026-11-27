@@ -1,4 +1,4 @@
-package service
+package langtools
 
 import (
 	"context"
@@ -7,7 +7,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
-	"pelokalan/internal/repository"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/thesaurus"
 )
@@ -15,14 +14,14 @@ import (
 // ThesaurusService offers Indonesian synonyms to project members in the editor. The data is
 // downloaded once (when the database has none) and kept in memory.
 type ThesaurusService struct {
-	repo    repository.ThesaurusRepository
+	repo    ThesaurusRepository
 	fetcher *glossary.Fetcher
 	url     string
 	index   thesaurus.Index
 }
 
 // NewThesaurusService creates the thesaurus service; an empty url disables downloading
-func NewThesaurusService(repo repository.ThesaurusRepository, fetcher *glossary.Fetcher, url string) *ThesaurusService {
+func NewThesaurusService(repo ThesaurusRepository, fetcher *glossary.Fetcher, url string) *ThesaurusService {
 	return &ThesaurusService{repo: repo, fetcher: fetcher, url: url}
 }
 

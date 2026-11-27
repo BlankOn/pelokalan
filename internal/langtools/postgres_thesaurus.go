@@ -1,4 +1,4 @@
-package postgres
+package langtools
 
 import (
 	"context"
@@ -6,14 +6,13 @@ import (
 	"encoding/json"
 
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 	"pelokalan/pkg/thesaurus"
 )
 
 type thesaurusRepository struct{ db *sql.DB }
 
 // NewThesaurusRepository creates the thesaurus repository
-func NewThesaurusRepository(db *sql.DB) repository.ThesaurusRepository {
+func NewThesaurusRepository(db *sql.DB) ThesaurusRepository {
 	return &thesaurusRepository{db: db}
 }
 

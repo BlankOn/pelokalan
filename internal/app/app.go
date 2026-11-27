@@ -15,6 +15,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/pgx/v5"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
+	"pelokalan/internal/langtools"
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/mailer"
@@ -73,8 +74,8 @@ type App struct {
 	Wiki         *service.WikiService
 	Contexts     *service.ContextService
 	AI           *service.AIService
-	Thesaurus    *service.ThesaurusService
-	Spelling     *service.SpellingService
+	Thesaurus    *langtools.ThesaurusService
+	Spelling     *langtools.SpellingService
 	Handler      *web.Handler
 }
 
@@ -188,9 +189,9 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	}
 	a.Handler = h
 	// Indonesian thesaurus and spelling check: loaded by the caller (cmd/server downloads them on first start)
-	a.Thesaurus = service.NewThesaurusService(postgres.NewThesaurusRepository(db), fetcher, cfg.Glossary.ThesaurusURL)
+	a.Thesaurus = langtools.NewThesaurusService(langtools.NewThesaurusRepository(db), fetcher, cfg.Glossary.ThesaurusURL)
 	h.SetThesaurus(a.Thesaurus)
-	a.Spelling = service.NewSpellingService(postgres.NewSpellingRepository(db), fetcher, cfg.Glossary.SpellingURL)
+	a.Spelling = langtools.NewSpellingService(langtools.NewSpellingRepository(db), fetcher, cfg.Glossary.SpellingURL)
 	h.SetSpelling(a.Spelling)
 	h.SetSyncInterval(cfg.Glossary.FetchInterval)
 	h.SetActivity(a.Activity)

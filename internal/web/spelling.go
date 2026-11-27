@@ -7,8 +7,8 @@ import (
 	"strings"
 	"unicode/utf8"
 
+	"pelokalan/internal/langtools"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -17,7 +17,7 @@ import (
 // asks for suggestions; "Tambahkan ke kamus proyek" accepts a word for the whole project.
 
 // SetSpelling enables the spelling check
-func (h *Handler) SetSpelling(s *service.SpellingService) { h.spelling = s }
+func (h *Handler) SetSpelling(s *langtools.SpellingService) { h.spelling = s }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {
 	w.Header().Set("Content-Type", "application/json")

@@ -20,6 +20,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"pelokalan/internal/langtools"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
@@ -48,8 +49,8 @@ type Handler struct {
 	contexts       *service.ContextService
 	poFetcher      *glossary.Fetcher // downloads PO files from a URL (SSRF-safe)
 	syncEvery      time.Duration     // automatic glossary/project file sync interval
-	thesaurus      *service.ThesaurusService
-	spelling       *service.SpellingService
+	thesaurus      *langtools.ThesaurusService
+	spelling       *langtools.SpellingService
 	activity       *service.ActivityService
 	reservations   *service.ReservationService // module reservations (nil-safe: off)
 	reviews        *service.ReviewService      // reviews and commits to repositories (nil-safe: off)
@@ -103,7 +104,7 @@ func NewHandler(
 }
 
 // SetThesaurus enables synonym suggestions in the editor
-func (h *Handler) SetThesaurus(t *service.ThesaurusService) { h.thesaurus = t }
+func (h *Handler) SetThesaurus(t *langtools.ThesaurusService) { h.thesaurus = t }
 
 // SetPOFetcher enables creating PO files from a URL
 func (h *Handler) SetPOFetcher(f *glossary.Fetcher) { h.poFetcher = f }

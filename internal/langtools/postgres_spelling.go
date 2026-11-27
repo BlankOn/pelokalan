@@ -1,10 +1,8 @@
-package postgres
+package langtools
 
 import (
 	"context"
 	"database/sql"
-
-	"pelokalan/internal/repository"
 )
 
 type spellingRepository struct {
@@ -12,7 +10,7 @@ type spellingRepository struct {
 }
 
 // NewSpellingRepository creates the PostgreSQL spelling repository
-func NewSpellingRepository(db *sql.DB) repository.SpellingRepository {
+func NewSpellingRepository(db *sql.DB) SpellingRepository {
 	return &spellingRepository{db: db}
 }
 
@@ -59,7 +57,7 @@ func (r *spellingRepository) ReplaceWords(ctx context.Context, words []string) e
 	return tx.Commit()
 }
 
-func (r *spellingRepository) ExtraWords(ctx context.Context, projectID int64) ([]repository.ExtraWord, error) {
+func (r *spellingRepository) ExtraWords(ctx context.Context, projectID int64) ([]ExtraWord, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT x.word, COALESCE(u.username, ''), x.created_at
 		 FROM spelling_extra x LEFT JOIN users u ON u.id = x.added_by
@@ -68,9 +66,9 @@ func (r *spellingRepository) ExtraWords(ctx context.Context, projectID int64) ([
 		return nil, err
 	}
 	defer rows.Close()
-	var out []repository.ExtraWord
+	var out []ExtraWord
 	for rows.Next() {
-		var w repository.ExtraWord
+		var w ExtraWord
 		if err := rows.Scan(&w.Word, &w.AddedBy, &w.CreatedAt); err != nil {
 			return nil, err
 		}

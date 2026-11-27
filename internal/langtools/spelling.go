@@ -1,4 +1,4 @@
-package service
+package langtools
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
-	"pelokalan/internal/repository"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
 	"pelokalan/pkg/spelling"
@@ -20,7 +19,7 @@ import (
 // The source has no licence, so checks are for project members only and the list is never
 // published.
 type SpellingService struct {
-	repo    repository.SpellingRepository
+	repo    SpellingRepository
 	fetcher *glossary.Fetcher
 	url     string
 	dict    spelling.Dict
@@ -30,7 +29,7 @@ type SpellingService struct {
 }
 
 // NewSpellingService creates the spelling service; an empty url disables downloading
-func NewSpellingService(repo repository.SpellingRepository, fetcher *glossary.Fetcher, url string) *SpellingService {
+func NewSpellingService(repo SpellingRepository, fetcher *glossary.Fetcher, url string) *SpellingService {
 	return &SpellingService{repo: repo, fetcher: fetcher, url: url, extras: map[int64]map[string]bool{}}
 }
 
@@ -141,7 +140,7 @@ func (s *SpellingService) Suggest(p *models.Project, word string) ([]string, err
 }
 
 // ExtraWords lists the project's own words (members)
-func (s *SpellingService) ExtraWords(ctx context.Context, p *models.Project) ([]repository.ExtraWord, error) {
+func (s *SpellingService) ExtraWords(ctx context.Context, p *models.Project) ([]ExtraWord, error) {
 	if !p.Role.IsMember() {
 		return nil, apperr.ErrForbidden
 	}
