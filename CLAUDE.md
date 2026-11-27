@@ -992,7 +992,8 @@ deploys never run stale JS/CSS.
   `glossary.Fetcher` (`Handler.SetPOFetcher`, upload size limit) and then handled like uploads.
 - The status filter is a dropdown of checkboxes (`#filter-status`, `EntryFilter.Statuses`): an entry
   shows when it matches any ticked status; none = all. Status bar counts tick one; Validasi ticks
-  Bermasalah, Belum diterjemahkan and Perlu ditinjau.
+  Bermasalah, Belum diterjemahkan, Perlu ditinjau and Komentar tinjauan; when nothing matches, the filter goes back to
+  what it was (all strings stay) and a toast says all is clear (`editor.validate_all_clear`).
 - Entry load/save deliberately use `fetch` (not htmx): a new load aborts the previous one,
   requests time out after 20 s, navigation during a save waits for it, and a failed save asks
   before moving on. htmx's per-element request queue could otherwise freeze the editor after

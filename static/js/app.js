@@ -965,10 +965,24 @@
     });
 
     var validate = document.getElementById("btn-validate");
-    // Validasi ticks the statuses the user's editor settings keep on (data-statuses)
+    // Validasi ticks the statuses the user's editor settings keep on (data-statuses) and open review comments. When
+    // nothing matches, the filter goes back to what it was (every string stays in view) and a toast says all is well.
+    var validating = null;
     if (validate) validate.addEventListener("click", function () {
         var st = (validate.dataset.statuses || "issues,untranslated,fuzzy").split(",").filter(Boolean);
-        setFilter(st.length ? st : ["issues"]);
+        if (st.indexOf("review") < 0) st.push("review");
+        validating = filterBoxes().filter(function (cb) { return cb.checked; }).map(function (cb) { return cb.value; });
+        setFilter(st);
+    });
+    document.body.addEventListener("htmx:afterSettle", function (ev) {
+        if (!validating || !ev.detail || !ev.detail.target || ev.detail.target.id !== "entry-list") return;
+        var before = validating;
+        validating = null;
+        var list = document.getElementById("entry-list");
+        if (list && !list.querySelector(".entry-row")) {
+            setFilter(before);
+            if (window.toast) window.toast(validate.dataset.allClear);
+        }
     });
 
     document.addEventListener("input", function (ev) {

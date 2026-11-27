@@ -47,7 +47,7 @@
             <span>{{t .Lang "editor.pretranslate"}}</span>
         </button>
         {{end}}
-        <button type="button" class="tb-btn" id="btn-validate" data-statuses="{{if .User}}{{validateStatuses .User}}{{else}}issues,untranslated,fuzzy{{end}}" title="{{t .Lang "editor.validate_help"}}">
+        <button type="button" class="tb-btn" id="btn-validate" data-statuses="{{if .User}}{{validateStatuses .User}}{{else}}issues,untranslated,fuzzy{{end}}" data-all-clear="{{t .Lang "editor.validate_all_clear"}}" title="{{t .Lang "editor.validate_help"}}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
             <span>{{t .Lang "editor.validate"}}</span>
         </button>
@@ -337,7 +337,7 @@
     </div>
     <div class="tb-sep"></div>
     {{$c := .Data.Catalog}}
-    <button type="button" class="tb-btn" id="btn-validate" data-statuses="{{if .User}}{{validateStatuses .User}}{{else}}issues,untranslated,fuzzy{{end}}" title="{{t .Lang "editor.validate_help"}}">
+    <button type="button" class="tb-btn" id="btn-validate" data-statuses="{{if .User}}{{validateStatuses .User}}{{else}}issues,untranslated,fuzzy{{end}}" data-all-clear="{{t .Lang "editor.validate_all_clear"}}" title="{{t .Lang "editor.validate_help"}}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
         <span>{{t .Lang "editor.validate"}}</span>
     </button>
