@@ -8,17 +8,34 @@
 <section class="card review-queue">
     <h2 class="review-queue-title"><svg class="rq-icon" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5"/><path d="M15.5 15.5L21 21"/></svg>{{t $.Lang "review.queue_title"}} <span class="muted small">({{len .}})</span></h2>
     <p class="muted small">{{t $.Lang "review.queue_help"}}</p>
+    <div class="context-search pf-toolbar rq-toolbar">
+        <form class="pf-filter" data-review-queue>
+            <input type="search" name="q" placeholder="{{t $.Lang "review.queue_search"}}" aria-label="{{t $.Lang "review.queue_search"}}" autocomplete="off">
+            <select name="s" class="pf-sort" aria-label="{{t $.Lang "files.sort"}}" title="{{t $.Lang "files.sort"}}">
+                <option value="oldest">{{t $.Lang "review.sort_oldest"}}</option>
+                <option value="newest">{{t $.Lang "review.sort_newest"}}</option>
+                <option value="fixed">{{t $.Lang "review.sort_fixed"}}</option>
+                <option value="most">{{t $.Lang "files.sort_most"}}</option>
+                <option value="fewest">{{t $.Lang "files.sort_fewest"}}</option>
+                <option value="name">{{t $.Lang "files.sort_name"}}</option>
+                <option value="user">{{t $.Lang "review.sort_user"}}</option>
+            </select>
+        </form>
+    </div>
     <ul class="review-list">
-        {{range .}}<li>
+        {{range $i, $r := .}}<li data-i="{{$i}}" data-name="{{.RepoPath}}" data-user="{{.RequesterUsername}}" data-n="{{.Entries}}"
+            data-t="{{.CreatedAt.Unix}}" data-state="{{if .Error}}0{{else if .OpenComments}}2{{else if .ResolvedComments}}1{{else}}3{{end}}">
             <a class="review-link" href="{{$p.Path}}/reviews/{{.ID}}" title="{{t $.Lang "review.open"}}"><strong>{{.RepoPath}}</strong></a>
             <span class="muted small">@{{.RequesterUsername}} · {{t $.Lang "review.strings" .Entries}} · {{timeAgo $.Lang .CreatedAt}}</span>
             <span class="review-end">
                 {{if .Error}}<span class="rv-chip rv-rejected small" title="{{errText $.Lang .Error}}">{{t $.Lang "review.failed"}}</span>{{end}}
-                {{if .OpenComments}}<span class="rv-chip rv-rejected small"><span class="mark-review"></span> {{t $.Lang "review.state_changes" .OpenComments}}</span>{{end}}
+                {{if .OpenComments}}<span class="rv-chip rv-rejected small"><span class="mark-review"></span> {{t $.Lang "review.state_changes" .OpenComments}}</span>
+                {{else if .ResolvedComments}}<span class="rv-chip rv-fixed small" title="{{t $.Lang "review.state_fixed_help" .ResolvedComments}}">✓ {{t $.Lang "review.state_fixed"}}</span>{{end}}
                 <span class="review-go" aria-hidden="true">›</span>
             </span>
         </li>{{end}}
     </ul>
+    <p class="muted small rq-none" hidden>{{t $.Lang "review.queue_none"}}</p>
 </section>
 {{end}}
 {{with .Data.ProjectFiles}}{{if .Files}}
@@ -219,4 +236,5 @@
 </dialog>
 {{end}}
 {{end}}
+{{template "merge_dialog" .}}
 {{end}}

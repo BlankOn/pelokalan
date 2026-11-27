@@ -3385,3 +3385,174 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
         });
     });
 })();
+
+// "Tarik upstream" ([data-merge-upstream]: the file's /upstream-merge address): the merge is planned first (nothing
+// changes), the popup shows what it would do and every string changed on both sides with a choice; "Gabungkan"
+// applies it once each has one. A changed upstream since the check asks to check again.
+(function () {
+    var dlg = document.getElementById("merge-dialog");
+    if (!dlg) return;
+    var body = dlg.querySelector(".merge-body");
+    var apply = dlg.querySelector("[data-merge-apply]");
+    var recheck = dlg.querySelector("[data-merge-recheck]");
+    var url = "", plan = null;
+
+    function el(tag, cls, text) {
+        var e = document.createElement(tag);
+        if (cls) e.className = cls;
+        if (text != null) e.textContent = text;
+        return e;
+    }
+    function count(tpl, n) { return tpl.replace(/\d+/, String(n)); }
+    function forms(list, fuzzy) {
+        var box = el("div", "merge-text");
+        (list && list.length ? list : [""]).forEach(function (t, i) {
+            var line = el("div", "merge-form", t === "" ? "—" : t);
+            if (list && list.length > 1) line.setAttribute("data-form", "[" + i + "]");
+            box.appendChild(line);
+        });
+        if (fuzzy) box.appendChild(el("span", "merge-fuzzy", dlg.dataset.fuzzy));
+        return box;
+    }
+    function ready() {
+        if (!plan) { apply.disabled = true; return; }
+        var missing = plan.conflicts.some(function (c) { return !body.querySelector('input[name="c_' + c.key + '"]:checked'); });
+        var nothing = !plan.updated && !plan.added && !plan.removed && !plan.conflicts.length;
+        apply.disabled = missing || nothing;
+    }
+    function render() {
+        body.innerHTML = "";
+        body.appendChild(el("p", "small muted", dlg.dataset.source.replace("%s", plan.label || "")));
+        var ul = el("ul", "merge-summary");
+        if (plan.updated + plan.added) ul.appendChild(el("li", "", count(dlg.dataset.updated, plan.updated + plan.added)));
+        if (plan.kept) ul.appendChild(el("li", "", count(dlg.dataset.kept, plan.kept)));
+        if (plan.removed) ul.appendChild(el("li", "", count(dlg.dataset.removed, plan.removed)));
+        if (ul.children.length) body.appendChild(ul);
+        if (!plan.updated && !plan.added && !plan.removed && !plan.conflicts.length) {
+            body.appendChild(el("p", "merge-nothing", dlg.dataset.nothing));
+        }
+        if (plan.conflicts.length) {
+            body.appendChild(el("p", "merge-conflict-head", count(dlg.dataset.conflicts, plan.conflicts.length)));
+            plan.conflicts.forEach(function (c) {
+                var item = el("div", "merge-conflict");
+                var src = el("div", "merge-src");
+                if (c.context) src.appendChild(el("span", "ctx-tag", c.context));
+                src.appendChild(document.createTextNode(c.source));
+                item.appendChild(src);
+                var opts = el("div", "merge-opts");
+                [["upstream", dlg.dataset.pickUpstream, c.upstream, c.upstream_fuzzy], ["mine", dlg.dataset.pickMine, c.mine, c.mine_fuzzy]].forEach(function (o) {
+                    var label = el("label", "merge-opt");
+                    var input = el("input");
+                    input.type = "radio"; input.name = "c_" + c.key; input.value = o[0];
+                    label.appendChild(input);
+                    var head = el("span", "merge-opt-head", o[1]);
+                    label.appendChild(head);
+                    label.appendChild(forms(o[2], o[3]));
+                    opts.appendChild(label);
+                });
+                item.appendChild(opts);
+                body.appendChild(item);
+            });
+        }
+        ready();
+    }
+    function load() {
+        plan = null;
+        apply.disabled = true;
+        recheck.hidden = true;
+        body.innerHTML = "";
+        body.appendChild(el("p", "muted", dlg.dataset.loading));
+        fetch(url, { credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.j.error || "");
+                plan = res.j;
+                plan.conflicts = plan.conflicts || [];
+                render();
+            })
+            .catch(function (err) {
+                body.innerHTML = "";
+                body.appendChild(el("p", "alert alert-error", err.message || "Error"));
+                recheck.hidden = false;
+            });
+    }
+    document.addEventListener("click", function (ev) {
+        var btn = ev.target.closest && ev.target.closest("[data-merge-upstream]");
+        if (!btn) return;
+        ev.preventDefault();
+        url = btn.getAttribute("data-merge-upstream");
+        var menu = btn.closest("details");
+        if (menu) menu.open = false;
+        dlg.showModal();
+        load();
+    });
+    body.addEventListener("change", ready);
+    recheck.addEventListener("click", load);
+    apply.addEventListener("click", function () {
+        if (!plan) return;
+        var fd = new FormData();
+        fd.append("version", plan.version);
+        body.querySelectorAll("input[type=radio]:checked").forEach(function (i) { fd.append(i.name, i.value); });
+        apply.disabled = true;
+        fetch(url, { method: "POST", body: fd, credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+            .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
+            .then(function (res) {
+                if (!res.ok) throw new Error(res.j.error || "");
+                // the file changed everywhere: reload the page, with the summary as a toast
+                try { sessionStorage.setItem("pendingToast", res.j.message); } catch (e) { /* storage off */ }
+                location.reload();
+            })
+            .catch(function (err) {
+                body.insertBefore(el("p", "alert alert-error", err.message || "Error"), body.firstChild);
+                recheck.hidden = false;
+                ready();
+            });
+    });
+})();
+
+// a toast a page left for the next one (after a reload)
+(function () {
+    var msg = null;
+    try { msg = sessionStorage.getItem("pendingToast"); sessionStorage.removeItem("pendingToast"); } catch (e) { /* storage off */ }
+    if (msg && window.toast) window.toast(msg);
+})();
+
+// Menunggu tinjauan: search (every word in the file name or the translator) and order, in the page (the list is short)
+(function () {
+    var form = document.querySelector("[data-review-queue]");
+    if (!form) return;
+    var list = form.closest(".review-queue").querySelector(".review-list");
+    var none = form.closest(".review-queue").querySelector(".rq-none");
+    var items = Array.prototype.slice.call(list.children);
+    var key = "reviewQueueSort";
+    try { var saved = localStorage.getItem(key); if (saved) form.s.value = saved; } catch (e) { /* storage off */ }
+    function num(li, k) { return parseFloat(li.dataset[k]) || 0; }
+    var orders = {
+        oldest: function (a, b) { return num(a, "t") - num(b, "t"); },
+        newest: function (a, b) { return num(b, "t") - num(a, "t"); },
+        fixed: function (a, b) { return (a.dataset.state === "1" ? 0 : 1) - (b.dataset.state === "1" ? 0 : 1) || num(a, "t") - num(b, "t"); },
+        most: function (a, b) { return num(b, "n") - num(a, "n"); },
+        fewest: function (a, b) { return num(a, "n") - num(b, "n"); },
+        name: function (a, b) { return a.dataset.name.localeCompare(b.dataset.name); },
+        user: function (a, b) { return a.dataset.user.localeCompare(b.dataset.user) || num(a, "t") - num(b, "t"); }
+    };
+    function apply() {
+        var words = form.q.value.toLowerCase().split(/\s+/).filter(Boolean);
+        var shown = 0;
+        items.slice().sort(orders[form.s.value] || orders.oldest).forEach(function (li) {
+            var hay = (li.dataset.name + " @" + li.dataset.user).toLowerCase();
+            var ok = words.every(function (w) { return hay.indexOf(w) >= 0; });
+            li.hidden = !ok;
+            if (ok) shown++;
+            list.appendChild(li); // in the chosen order
+        });
+        if (none) none.hidden = shown > 0;
+    }
+    form.addEventListener("submit", function (ev) { ev.preventDefault(); });
+    form.q.addEventListener("input", apply);
+    form.s.addEventListener("change", function () {
+        try { localStorage.setItem(key, form.s.value); } catch (e) { /* storage off */ }
+        apply();
+    });
+    apply();
+})();

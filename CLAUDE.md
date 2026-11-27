@@ -160,8 +160,9 @@ wired in `app.New`. Rules:
   localStorage per project and section (`data-collapse-key` "files:<slug>:project|mine|others").
 - "Berkas Anda" and "Berkas anggota lain" (one list, owner under each file) show 5 files at a time
   (`FileListPageSize`, `GET /projects/{id}/my-files|member-files?q=&g=&offset=`, `Handler.fileList`, partial
-  `file_rows`) (columns: Berkas, Kemajuan, actions; the last edit is the last line under the file name, `files.updated`, and the
-  translated · fuzzy · untranslated counts sit under the progress bar in green, orange and red, `.file-counts`) with the same "Urutkan" select (`source.FileListSorts`: the project file orders plus "Terakhir disunting" = `recent`, last
+  `file_rows`) (columns: Berkas, Status Terjemahan, actions; the last edit is the last line under the file name, `files.updated`, and the
+  translated · fuzzy · untranslated counts sit under the progress bar in green, orange and red, `file_counts` partial,
+  also used by Berkas proyek) with the same "Urutkan" select (`source.FileListSorts`: the project file orders plus "Terakhir disunting" = `recent`, last
   edit first; default `remaining`), search and the same module group filter: a file is in a group when its module
   (`models.ModuleOf`) is among that group's project files (`source.Service.ModuleGroups`); `g=0` = no group.
   Managers get "Sinkronkan dengan upstream" (in Berkas proyek; beside "Tambah berkas manual" in Berkas Anda the same
@@ -173,11 +174,22 @@ wired in `app.New`. Rules:
   spins the button and polls `GET .../project-files/sync` (`SyncState`, per project, in memory) until it is
   done, then shows what changed (nothing when no file changed) and refreshes the rows.
   A project file the member already has (`catalog.Service.MatchOwnFiles`: same language and same file name,
-  else same module = name before the first dot) shows "Perbarui" instead of "Ambil": after a confirm it
-  replaces that file (`UpdateFromUpstream`: commit before, replace, commit "commit.from_upstream|label"),
-  so the history continues. The editor shows "Tarik upstream" before Riwayat when `source.Service.UpstreamFor`
-  finds a project file for the open file (same name, else same module from the newest module group); it posts to
-  the same take route with `into` and the same confirm popup.
+  else same module = name before the first dot) shows "Perbarui" instead of "Ambil", which opens the merge popup
+  below. The editor shows "Tarik upstream" before Riwayat when `source.Service.UpstreamFor` finds a project file
+  for the open file (same name, else same module from the newest module group); it opens the same popup.
+- **Pulling upstream merges, never replaces** ("Tarik upstream" in the editor and the review editor, "Perbarui" in
+  Berkas proyek; `#merge-dialog`, partials/merge_dialog.html, app.js `[data-merge-upstream]`; `catalog/merge.go`,
+  `review/merge.go`, `web/merge.go`). Upstream = the branch's file for repositories Pelokalan writes to (GitHub App),
+  else the site's current PO (`UpstreamPO`), else the copy saved at the last sync (`review.Service.UpstreamFile`).
+  `GET /catalogs/{cid}/upstream-merge` plans a three-way merge per string against the member's starting point (what
+  Pelokalan last committed for it, else the reference version): only upstream changed → upstream's; only the member
+  → the member's (text, fuzzy and AI origin); both, differently → a conflict; upstream decides which strings exist.
+  Nothing changes until `POST` with the plan's `version` (hash of the upstream file; a different one → `err.merge_stale`,
+  "Periksa ulang") and a choice `c_<key>` = mine|upstream for every conflict. Applying saves a version first, then the
+  upstream copy (`commit.from_upstream`, the new starting point, so the conflict check of "Setujui & commit" passes
+  for the chosen strings), then the result (`commit.upstream_merged|user|kept|conflicts`). The file's owner may do it
+  (claims the module), and owners/coordinators for any member (`review.CanMergeUpstream`), who is then emailed. The
+  old replace (`UpdateFromUpstream`, take route with `into`) is kept for the API but no longer used by the pages.
   Under the "Berkas proyek" heading: last sync time (newest `last_fetched_at` of module groups with a sync link,
   in the reader's time zone) and the automatic interval (`Handler.SetSyncInterval`).
 - **Upstream update status:** for the user's own files (Berkas Anda, `attachUpstreamNew`) and in the editor (badge on
@@ -185,7 +197,7 @@ wired in `app.New`. Rules:
   the project file with the same repository path, else `UpstreamFor`) with the file: strings it does not have, and
   strings whose upstream translation changed since the file's starting point (`reference`) and differs from the
   member's. The member's own unsent work does not count. Shown as a blue chip "⟳ Pembaruan upstream · N" (`.up-new`).
-  Pulling is still "Perbarui"/"Tarik upstream" (replace, with a version saved first).
+  Pulling is "Perbarui"/"Tarik upstream" (the merge above).
 - **Template merge only touches files of the same module:** `templateFits` requires at least half of
   a file's strings to be in the template; "Perbarui semua terjemahan" (and template re-upload) skips
   other modules and reports how many it skipped (`MergeResult.Skipped`).
@@ -739,7 +751,9 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   nothing fuzzy or AI, no open request, and not unchanged since its last commit to the repository; `#review-dialog` with an optional note; `POST /catalogs/{cid}/review`, sent in the background by app.js with
   `X-Requested-With: fetch` → JSON, so the page stays where it is: the popup closes, a toast shows and the file lists
   refresh with their current filters); owners and
-  managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan (each request is a clickable row, highlighted on hover); `/projects/{id}/reviews/{rid}` shows the
+  managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan (each request is a clickable row, highlighted on hover; search by file
+  or translator and an order select, `[data-review-queue]` in app.js, filtered in the page; a request whose review
+  comments are all resolved shows a green "✓ Sudah diperbaiki" (`ModuleReview.ResolvedComments`), also on file rows); `/projects/{id}/reviews/{rid}` shows the
   changes (`review.Service.Changes`: `catalog.Service.ChangedTargets` = the git patch rule, against the last synced file)
   with "Setujui & commit" / "Kembalikan dengan catatan" (note required, emailed). Nobody approves their own request.
   Owners/managers may also "Kirim ke repositori" any file directly (`PushNow`), unless the project setting "Wajibkan
@@ -1017,6 +1031,11 @@ deploys never run stale JS/CSS.
   requests time out after 20 s, navigation during a save waits for it, and a failed save asks
   before moving on. htmx's per-element request queue could otherwise freeze the editor after
   one stalled request. The entry list filter still uses htmx.
+
+## Stored messages
+
+Version messages, sync errors and review errors are stored as "key|arg|arg"; `storedText` (template funcs `errText`,
+`commitMsg`) renders them and turns the arguments a message formats with `%d` back into numbers.
 
 ## Toasts and background forms
 

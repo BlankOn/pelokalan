@@ -1,0 +1,17 @@
+{{/* "Tarik upstream": what merging with upstream would do, conflicts decided one by one (app.js [data-merge-upstream]) */}}
+{{define "merge_dialog"}}
+<dialog id="merge-dialog" class="dialog merge-dialog"
+        data-loading="{{t .Lang "merge.loading"}}" data-source="{{t .Lang "merge.source" "%s"}}"
+        data-updated="{{t .Lang "merge.updated" 0}}" data-kept="{{t .Lang "merge.kept" 0}}" data-removed="{{t .Lang "merge.removed" 0}}"
+        data-nothing="{{t .Lang "merge.nothing"}}" data-conflicts="{{t .Lang "merge.conflicts" 0}}"
+        data-pick-upstream="{{t .Lang "merge.pick_upstream"}}" data-pick-mine="{{t .Lang "merge.pick_mine"}}" data-fuzzy="{{t .Lang "merge.fuzzy"}}">
+    <h2>{{t .Lang "merge.title"}}</h2>
+    <p class="muted small">{{t .Lang "merge.help"}}</p>
+    <div class="merge-body" aria-live="polite"></div>
+    <div class="dialog-actions">
+        <button type="button" class="btn" data-close-dialog>{{t .Lang "action.cancel"}}</button>
+        <button type="button" class="btn" data-merge-recheck hidden>{{t .Lang "merge.recheck"}}</button>
+        <button type="button" class="btn btn-primary" data-merge-apply disabled>{{t .Lang "merge.apply"}}</button>
+    </div>
+</dialog>
+{{end}}

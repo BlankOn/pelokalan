@@ -14,6 +14,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -234,18 +235,8 @@ func funcMap() template.FuncMap {
 		"nativeLanguage": po.NativeLanguageName,
 		"uiLanguages":    func() any { return i18n.Languages },
 		"isPlural":       func(e *models.Entry) bool { return e.IsPlural() },
-		"errText": func(lang, s string) string {
-			// stored errors are an i18n key, optionally with arguments: "key|arg|arg"
-			parts := strings.Split(s, "|")
-			if i18n.Has(parts[0]) {
-				args := make([]any, 0, len(parts)-1)
-				for _, a := range parts[1:] {
-					args = append(args, a)
-				}
-				return i18n.T(lang, parts[0], args...)
-			}
-			return s
-		},
+		// stored errors are an i18n key, optionally with arguments: "key|arg|arg"
+		"errText": storedText,
 		"usd": func(v float64) string {
 			switch {
 			case v == 0:
@@ -271,17 +262,7 @@ func funcMap() template.FuncMap {
 			}
 			return x / w * 100
 		},
-		"commitMsg": func(lang, s string) string {
-			parts := strings.Split(s, "|")
-			if len(parts) > 0 && i18n.Has(parts[0]) {
-				args := make([]any, 0, len(parts)-1)
-				for _, a := range parts[1:] {
-					args = append(args, a)
-				}
-				return i18n.T(lang, parts[0], args...)
-			}
-			return s
-		},
+		"commitMsg":   storedText,
 		"hasPrefix":   strings.HasPrefix,
 		"commentHTML": commentHTML,
 		"wikiHTML":    wikiHTML,
@@ -616,4 +597,36 @@ func assetVersion(dir string) string {
 		return nil
 	})
 	return hex.EncodeToString(hash.Sum(nil))[:10]
+}
+
+// verbRe finds the formatting verbs of a message ("%%" is not one)
+var verbRe = regexp.MustCompile(`%[-+# 0]*\d*(?:\.\d+)?([a-zA-Z%])`)
+
+// storedText renders a message stored as text, "key|arg|arg" (version messages, sync errors, review errors): the
+// arguments come back as text, so those the message formats as numbers (%d) are turned back into numbers
+func storedText(lang, s string) string {
+	parts := strings.Split(s, "|")
+	if len(parts) == 0 || !i18n.Has(parts[0]) {
+		return s
+	}
+	if len(parts) == 1 {
+		return i18n.T(lang, parts[0])
+	}
+	var verbs []string
+	for _, m := range verbRe.FindAllStringSubmatch(i18n.T(lang, parts[0]), -1) {
+		if m[1] != "%" {
+			verbs = append(verbs, m[1])
+		}
+	}
+	args := make([]any, 0, len(parts)-1)
+	for i, a := range parts[1:] {
+		if i < len(verbs) && verbs[i] == "d" {
+			if n, err := strconv.Atoi(a); err == nil {
+				args = append(args, n)
+				continue
+			}
+		}
+		args = append(args, a)
+	}
+	return i18n.T(lang, parts[0], args...)
 }

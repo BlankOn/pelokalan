@@ -13,14 +13,11 @@
         </a>
         <div class="tb-sep"></div>
         {{with .Data.Upstream}}
-        <form method="post" action="{{$p.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $.Lang "files.update_confirm" $c.Filename .GroupLabel}}" data-confirm-ok="{{t $.Lang "files.update"}}">
-            <input type="hidden" name="into" value="{{$c.ID}}">
-            <button type="submit" class="tb-btn" title="{{t $.Lang "editor.pull_upstream_help" .Filename .GroupLabel}}">
-                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17H6.5a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 17.6 8a4 4 0 0 1-.1 9H17"/><path d="M12 11v9"/><path d="M9 17l3 3 3-3"/></svg>
-                <span>{{t $.Lang "editor.pull_upstream"}}</span>
-                {{with $.Data.UpstreamNew}}<span class="tb-badge tb-badge-up" title="{{t $.Lang "upstream.new_help" .}}">{{.}}</span>{{end}}
-            </button>
-        </form>
+        <button type="button" class="tb-btn" data-merge-upstream="/catalogs/{{$c.ID}}/upstream-merge" title="{{t $.Lang "editor.pull_upstream_help" .Filename .GroupLabel}}">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17H6.5a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 17.6 8a4 4 0 0 1-.1 9H17"/><path d="M12 11v9"/><path d="M9 17l3 3 3-3"/></svg>
+            <span>{{t $.Lang "editor.pull_upstream"}}</span>
+            {{with $.Data.UpstreamNew}}<span class="tb-badge tb-badge-up" title="{{t $.Lang "upstream.new_help" .}}">{{.}}</span>{{end}}
+        </button>
         {{end}}
         <a class="tb-btn" href="{{$c.URL}}/history" title="{{t .Lang "history.title"}}">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5M12 7v5l3 2"/></svg>
@@ -165,6 +162,7 @@
         </div>
     </form>
 </dialog>
+{{template "merge_dialog" .}}
 {{end}}
 <dialog id="help-dialog" class="dialog help-dialog">
     <h2>⌨ {{t .Lang "help.title"}}</h2>
@@ -353,6 +351,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4h6v6"/><path d="M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></svg>
         <span>{{t $.Lang "editor.module_page"}}</span>
     </a>{{end}}
+    {{if .Data.CanMerge}}<button type="button" class="tb-btn" data-merge-upstream="/catalogs/{{$c.ID}}/upstream-merge" title="{{t .Lang "merge.title"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 17H6.5a4.5 4.5 0 0 1-.4-9A6 6 0 0 1 17.6 8a4 4 0 0 1-.1 9H17"/><path d="M12 11v9"/><path d="M9 17l3 3 3-3"/></svg>
+        <span>{{t .Lang "editor.pull_upstream"}}</span>
+    </button>{{end}}
     <div class="tb-sep"></div>
     {{template "editor_filter" (dict "Lang" .Lang "C" $c "F" .Data.Filter "Review" (or (and (eq $r.Status "requested") $r.ID) 0))}}
     {{if eq $r.Status "requested"}}

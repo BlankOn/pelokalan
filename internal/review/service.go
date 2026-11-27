@@ -86,6 +86,14 @@ func (s *Service) openComments(ctx context.Context, p *models.Project, catalogID
 	return n
 }
 
+// resolvedComments counts a request's resolved review comments
+func (s *Service) resolvedComments(ctx context.Context, reviewID int64) int {
+	if s.discuss == nil {
+		return 0
+	}
+	return s.discuss.ResolvedReviewComments(ctx, reviewID)
+}
+
 // NewReviewService creates the review service
 func New(repo Repository, catalogs *catalog.Service, glossary *source.Service,
 	reservations *reservation.Service, projects project.Repository, users account.UserRepository,
@@ -126,6 +134,7 @@ func (s *Service) Attach(ctx context.Context, p *models.Project, catalogs []*mod
 		c.Review = latest[c.ID]
 		if c.Review != nil && c.Review.Status == models.ReviewRequested {
 			c.Review.OpenComments = s.openComments(ctx, p, c.ID)
+			c.Review.ResolvedComments = s.resolvedComments(ctx, c.Review.ID)
 		}
 	}
 }
@@ -138,6 +147,7 @@ func (s *Service) Open(ctx context.Context, p *models.Project) ([]*models.Module
 	list, err := s.repo.Open(ctx, p.ID)
 	for _, r := range list {
 		r.OpenComments = s.openComments(ctx, p, r.CatalogID)
+		r.ResolvedComments = s.resolvedComments(ctx, r.ID)
 	}
 	return list, err
 }

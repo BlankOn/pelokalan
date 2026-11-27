@@ -666,6 +666,15 @@ func (s *Service) OpenReviewComments(ctx context.Context, p *models.Project, cat
 	return out
 }
 
+// ResolvedReviewComments counts the resolved comments of a review request (0 on errors)
+func (s *Service) ResolvedReviewComments(ctx context.Context, reviewID int64) int {
+	n, err := s.repo.ResolvedReviewComments(ctx, reviewID)
+	if err != nil {
+		return 0
+	}
+	return n
+}
+
 // List returns the discussions of a project, newest activity first
 func (s *Service) List(ctx context.Context, p *models.Project, f DiscussionFilter) ([]*models.Discussion, int, error) {
 	return s.repo.List(ctx, p.ID, f)

@@ -57,8 +57,9 @@ func TestProjectFileRowsUpstream(t *testing.T) {
 	if strings.Contains(out, `value="upstream"`) {
 		t.Error("separate upstream button still rendered")
 	}
-	if n := strings.Count(out, `/take"`); n != 3 {
-		t.Errorf("%d take forms, want one per row (3)", n)
+	// one action per row: take a file, or merge one the member already has with upstream ("Perbarui")
+	if n := strings.Count(out, `/take"`) + strings.Count(out, `/upstream-merge"`); n != 3 {
+		t.Errorf("%d take or merge buttons, want one per row (3)", n)
 	}
 }
 

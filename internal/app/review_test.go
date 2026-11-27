@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -162,6 +163,9 @@ func TestGitHubReviews(t *testing.T) {
 		t.Fatal("a visitor resolved a review comment")
 	}
 	kiki.hx(fmt.Sprintf("%s/comments/%d/resolve", base, cmt), nil).status(http.StatusOK).contains("Diselesaikan oleh", `data-review-open="0"`)
+	// every review comment resolved: the request says so in green (queue and the translator's list)
+	owner.get(base+"/files").status(http.StatusOK).contains("rv-fixed", "Sudah diperbaiki")
+	kiki.get(base+"/my-files").status(http.StatusOK).contains("rv-fixed", "Sudah diperbaiki").lacks("Perlu perbaikan")
 
 	// the diff shows the header credit the commit adds for the translator
 	year := strconv.Itoa(time.Now().Year())
@@ -235,4 +239,48 @@ func TestGitHubReviews(t *testing.T) {
 		"docs.tar.gz", targz(t, map[string][]byte{"library/os.po": newer})).redirectsTo(base + "/settings?")
 	kiki.get(base + "/my-files").status(http.StatusOK).contains("Pembaruan upstream · 2")
 	kiki.get(base + "/" + kiki.Username + "/po/library__os.po").status(http.StatusOK).contains("tb-badge-up")
+
+	// "Tarik upstream" merges instead of replacing. The branch still has someone else's "Buka berkas tersebut" for
+	// "Open the file" while kiki wrote "Buka berkas": the only conflict. The plan changes nothing.
+	mergeURL := fmt.Sprintf("/catalogs/%d/upstream-merge", kc)
+	visitor(t).get(mergeURL).status(http.StatusSeeOther)
+	r := owner.get(mergeURL).status(http.StatusOK)
+	var plan struct {
+		Version   string
+		Conflicts []struct {
+			Key, Source    string
+			Mine, Upstream []string
+		}
+	}
+	if err := json.Unmarshal([]byte(r.Body), &plan); err != nil || len(plan.Conflicts) != 1 {
+		t.Fatalf("merge plan: %v\n%s", err, r.Body)
+	}
+	cf := plan.Conflicts[0]
+	if cf.Source != "Open the file" || cf.Upstream[0] != "Buka berkas tersebut" || cf.Mine[0] != "Buka berkas" {
+		t.Fatalf("conflict = %+v", cf)
+	}
+	if got := scalar[string](t, `SELECT msgstr->>0 FROM entries WHERE catalog_id = $1 AND msgid = 'Open the file'`, kc); got != "Buka berkas" {
+		t.Fatalf("the plan changed the file: %q", got)
+	}
+	inPage := func(u *user, form url.Values) *response {
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+mergeURL, strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Requested-With", "fetch")
+		return u.do(req)
+	}
+	inPage(owner, url.Values{"version": {plan.Version}}).status(http.StatusBadRequest).contains("Pilih versi")                    // every conflict needs a choice
+	inPage(owner, url.Values{"version": {"old"}, "c_" + cf.Key: {"mine"}}).status(http.StatusBadRequest).contains("berubah lagi") // a stale plan
+	inPage(owner, url.Values{"version": {plan.Version}, "c_" + cf.Key: {"mine"}}).status(http.StatusOK).contains("Digabung dengan upstream")
+	if got := scalar[string](t, `SELECT msgstr->>0 FROM entries WHERE catalog_id = $1 AND msgid = 'Open the file'`, kc); got != "Buka berkas" {
+		t.Fatalf("kept version = %q", got)
+	}
+	if n := scalar[int](t, `SELECT count(*) FROM catalog_commits WHERE catalog_id = $1 AND message LIKE 'commit.upstream_merged|%'`, kc); n != 1 {
+		t.Fatalf("merge versions = %d", n)
+	}
+	mails.waitFor(t, kiki.Email, "digabung dengan upstream")
+	// upstream is now kiki's starting point for that string: sending her choice no longer counts as a conflict
+	owner.post(fmt.Sprintf("/catalogs/%d/push", kc), nil).redirectsTo(base)
+	if got := string(ghFake.File(repo, "3.14", "library/os.po")); !strings.Contains(got, `msgstr "Buka berkas"`) {
+		t.Fatalf("the chosen version was not sent:\n%s", got)
+	}
 }

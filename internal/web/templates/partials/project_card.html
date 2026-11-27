@@ -28,14 +28,13 @@
         {{template "upstream_badge" (dict "Lang" $v.Lang "U" .Upstream "L" .UpstreamLink)}}{{template "tp_badge" (dict "Lang" $v.Lang "D" .TP)}}
         {{with .Mine}}<div class="small pf-mine">{{t $v.Lang "files.mine_copy"}} <a href="{{.URL}}">{{.Filename}}</a></div>{{end}}
         {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}</td>
-    <td>{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Percent}}% · {{.Translated}}/{{.Total}}{{if .Fuzzy}} · <span class="c-fuzzy">{{t $v.Lang "files.fuzzy_count" .Fuzzy}}</span>{{end}}</span></td>
+    <td>{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Percent}}%</span>
+        {{template "file_counts" (dict "Lang" $v.Lang "S" .Stats)}}</td>
     <td class="small"><span class="version-badge">{{.GroupLabel}}</span></td>
     <td class="actions"><div class="pf-actions">
         <a class="btn btn-small" href="{{$v.Project.Path}}/project-files/{{.ID}}/view">{{t $v.Lang "action.view"}}</a>
         {{if $v.CanTake}}{{if and $v.Res.On .Reservation (ne .Reservation.UserID $v.Res.UserID)}}{{if $v.Res.Manager}}{{template "res_release" (dict "Lang" $v.Lang "R" .Reservation "Project" $v.Project)}}{{else}}<span class="res-locked small" title="{{t $v.Lang "reserve.locked_help"}}">{{template "lock_icon"}}{{t $v.Lang "reserve.locked"}}</span>{{end}}
-        {{else if .Mine}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take" data-confirm="{{t $v.Lang "files.update_confirm" .Mine.Filename .GroupLabel}}" data-confirm-ok="{{t $v.Lang "files.update"}}">
-            <input type="hidden" name="into" value="{{.Mine.ID}}">
-            <button class="btn btn-small btn-primary" title="{{t $v.Lang "files.update_help"}}">{{t $v.Lang "files.update"}}</button></form>
+        {{else if .Mine}}<button type="button" class="btn btn-small btn-primary" data-merge-upstream="/catalogs/{{.Mine.ID}}/upstream-merge" title="{{t $v.Lang "merge.title"}}">{{t $v.Lang "files.update"}}</button>
         {{else}}<form method="post" action="{{$v.Project.Path}}/project-files/{{.ID}}/take"{{if $v.Res.On}} data-confirm="{{t $v.Lang "reserve.take_confirm" (module .Filename)}}{{if $v.Res.Days}} {{t $v.Lang "reserve.take_confirm_days" $v.Res.Days}}{{end}}" data-confirm-ok="{{t $v.Lang "reserve.take"}}"{{end}}><button class="btn btn-small btn-primary" title="{{if $v.Res.On}}{{t $v.Lang "reserve.take_help"}}{{else}}{{t $v.Lang "files.take_help"}}{{end}}">{{if $v.Res.On}}{{t $v.Lang "reserve.take"}}{{else}}{{t $v.Lang "files.take"}}{{end}}</button></form>{{end}}{{end}}
     </div></td>
 </tr>
@@ -122,6 +121,7 @@
 {{define "res_lock"}}{{$label := ""}}{{if eq .R.UserID .Me}}{{$label = t .Lang "reserve.by_me"}}{{else}}{{$label = printf "%s @%s" (t .Lang "reserve.by") .R.Username}}{{end}}<span class="res-lock-wrap{{if eq .R.UserID .Me}} res-lock-mine{{end}}" title="{{$label}}" role="img" aria-label="{{$label}}">{{template "lock_icon"}}</span>{{end}}
 {{/* a file's newest review for the repository Pelokalan writes to */}}
 {{define "review_chip"}}{{$r := .R}}{{if and (eq $r.Status "requested") $r.OpenComments}}<a class="rv-chip rv-rejected" href="{{.P.Path}}/reviews/{{$r.ID}}" title="{{t .Lang "review.open_comments" $r.OpenComments}}"><span class="mark-review"></span> {{t .Lang "review.state_changes" $r.OpenComments}}</a>
+{{else if and (eq $r.Status "requested") $r.ResolvedComments}}<a class="rv-chip rv-fixed" href="{{.P.Path}}/reviews/{{$r.ID}}" title="{{t .Lang "review.state_fixed_help" $r.ResolvedComments}}">✓ {{t .Lang "review.state_fixed"}}</a>
 {{else if eq $r.Status "requested"}}<a class="rv-chip rv-requested" href="{{.P.Path}}/reviews/{{$r.ID}}">{{t .Lang "review.state_requested"}}</a>
 {{else if eq $r.Status "rejected"}}<a class="rv-chip rv-rejected" href="{{.P.Path}}/reviews/{{$r.ID}}" title="{{$r.ReviewNote}}">{{t .Lang "review.state_rejected"}}</a>
 {{else if eq $r.Status "pushed"}}<a class="rv-chip rv-pushed" href="{{$r.CommitURL}}" target="_blank" rel="noopener" title="{{t .Lang "review.pushed_help" $r.Entries}}">☑ {{t .Lang "review.state_pushed"}} · {{$r.ShortSHA}}</a>{{end}}{{end}}
@@ -140,7 +140,7 @@
         {{with .Reservation}}{{template "res_chip" (dict "Lang" $v.Lang "R" . "Me" $v.Res.UserID "Manager" $v.Res.Manager "Project" $v.Project)}}{{end}}
         <div class="small muted file-updated">{{t $v.Lang "files.updated" (timeAgo $v.Lang .UpdatedAt)}}</div></td>
     <td>{{if not .IsTemplate}}{{template "progress" (dict "Stats" .Stats "Lang" $v.Lang)}} <span class="small muted">{{.Stats.Percent}}%</span>
-        <div class="file-counts small"><span class="fc-done" title="{{t $v.Lang "stats.translated"}}">{{.Stats.Translated}}</span> · <span class="fc-fuzzy" title="{{t $v.Lang "stats.fuzzy"}}">{{.Stats.Fuzzy}}</span> · <span class="fc-left" title="{{t $v.Lang "stats.untranslated"}}">{{.Stats.Untranslated}}</span></div>
+        {{template "file_counts" (dict "Lang" $v.Lang "S" .Stats)}}
         {{else}}<span class="small muted">{{t $v.Lang "project.template_strings" .Stats.Total}}</span>{{end}}</td>
     <td class="actions">
         {{if $v.Mine}}{{$heldOther := and .Reservation (ne .Reservation.UserID $v.Res.UserID)}}
@@ -228,3 +228,6 @@
     </div>
 </section>
 {{end}}
+
+{{/* translated · needs review · untranslated under a progress bar, in green, orange and red */}}
+{{define "file_counts"}}<div class="file-counts small"><span class="fc-done" title="{{t .Lang "stats.translated"}}">{{.S.Translated}}</span> · <span class="fc-fuzzy" title="{{t .Lang "stats.fuzzy"}}">{{.S.Fuzzy}}</span> · <span class="fc-left" title="{{t .Lang "stats.untranslated"}}">{{.S.Untranslated}}</span></div>{{end}}

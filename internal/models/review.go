@@ -34,6 +34,7 @@ type ModuleReview struct {
 
 	// Filled by queries
 	OpenComments      int // open review comments on the file (ReviewService.Attach/Open)
+	ResolvedComments  int // its resolved review comments: with none open, the translator fixed everything
 	RequesterUsername string
 	RequesterName     string
 	ReviewerUsername  string

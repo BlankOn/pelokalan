@@ -313,6 +313,8 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Post("/projects/{id}/module-groups/{gid}/github/check", h.CheckModuleGroupGitHub)
 		r.Post("/projects/{id}/module-groups/{gid}/github/direct", h.SetModuleGroupDirect)
 		r.Post("/catalogs/{cid}/review", h.RequestReview)
+		r.Get("/catalogs/{cid}/upstream-merge", h.UpstreamMergePlan)
+		r.Post("/catalogs/{cid}/upstream-merge", h.UpstreamMerge)
 		r.Post("/catalogs/{cid}/push", h.PushCatalog)
 		r.Post("/projects/{id}/reservations/release", h.ReleaseModule)
 		r.Post("/editor-settings", h.UpdateEditorSettings)

@@ -323,6 +323,13 @@ func (r *discussionRepository) ResolveComment(ctx context.Context, id, byUserID 
 	return err
 }
 
+func (r *discussionRepository) ResolvedReviewComments(ctx context.Context, reviewID int64) (int, error) {
+	var n int
+	err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM comments
+		WHERE review_id = $1 AND resolved_at IS NOT NULL AND deleted_at IS NULL`, reviewID).Scan(&n)
+	return n, err
+}
+
 func (r *discussionRepository) OpenReviewComments(ctx context.Context, projectID, catalogID int64) (map[string]int, error) {
 	prefix := fmt.Sprintf("%d-", catalogID)
 	rows, err := r.db.QueryContext(ctx, `SELECT d.subject_key, COUNT(*) FROM comments c JOIN discussions d ON d.id = c.discussion_id

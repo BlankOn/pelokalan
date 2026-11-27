@@ -1308,6 +1308,25 @@ h1 .ai-badge { font-size: 12px; }
 .context-actions { display: flex; gap: 14px; align-items: center; }
 .context-actions form { margin: 0; }
 .context-dialog { width: min(640px, calc(100vw - 24px)); }
+/* "Tarik upstream": the merge plan and one choice per string changed on both sides */
+.merge-dialog { width: min(820px, calc(100vw - 24px)); max-height: calc(100vh - 40px); }
+.merge-body { display: flex; flex-direction: column; gap: 10px; max-height: min(60vh, 560px); overflow-y: auto; }
+.merge-body p { margin: 0; }
+.merge-summary { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 2px; }
+.merge-nothing { color: var(--ok); font-weight: 600; }
+.merge-conflict-head { font-weight: 600; margin-top: 4px !important; }
+.merge-conflict { border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px; display: flex; flex-direction: column; gap: 8px; }
+.merge-src { font-size: 13px; color: var(--muted); overflow-wrap: anywhere; }
+.merge-opts { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.merge-opt { display: flex; flex-direction: column; gap: 4px; border: 1px solid var(--border); border-radius: 6px; padding: 8px; cursor: pointer; }
+.merge-opt input { position: absolute; opacity: 0; pointer-events: none; }
+.merge-opt:has(input:checked) { border-color: var(--accent); background: var(--accent-soft); box-shadow: 0 0 0 1px var(--accent); }
+.merge-opt:has(input:focus-visible) { outline: 2px solid var(--accent); outline-offset: 2px; }
+.merge-opt-head { font-size: 12px; font-weight: 600; color: var(--muted); }
+.merge-opt:has(input:checked) .merge-opt-head::before { content: "✓ "; color: var(--accent); }
+.merge-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.merge-form[data-form]::before { content: attr(data-form) " "; color: var(--muted); font-size: 11px; }
+.merge-fuzzy { display: inline-block; margin-top: 2px; font-size: 11px; color: var(--fuzzy); }
 .context-dialog textarea { width: 100%; resize: vertical; }
 .context-status { margin: 0; }
 .context-read { max-height: 60vh; overflow: auto; }
@@ -1709,6 +1728,9 @@ form[data-sync].is-syncing .sync-icon { animation: pf-spin 1s linear infinite; }
 .file-counts .fc-done { color: var(--ok, #2f9e44); font-weight: 600; }
 .file-counts .fc-fuzzy { color: var(--fuzzy, #e8930c); font-weight: 600; }
 .file-counts .fc-left { color: var(--error, #d1342f); font-weight: 600; }
+.rv-chip.rv-fixed { background: var(--ok-soft); color: #1d5e39; border-color: #bfe3cc; } /* every review comment resolved */
+.rq-toolbar { margin: 10px 0 2px; }
+.review-list li[hidden] { display: none; }
 .review-end { margin-left: auto; display: inline-flex; align-items: center; gap: 10px; } /* labels at the right, before › */
 .review-go { color: var(--muted); font-size: 20px; line-height: 1; }
 .review-list li:hover .review-go { color: var(--accent); }
@@ -1896,6 +1918,8 @@ select.role-locked, form[action$="/role"] select[name="role"] { min-width: 150px
     /* card heads with buttons (Berkas Anda: add file, sync status): the buttons wrap instead of running off the card */
     .card-head-end .row-actions { flex-wrap: wrap; justify-content: flex-end; flex: 1 1 100%; min-width: 0; }
     .card-head-end .row-actions > *, .card-head-end .row-actions form .btn { max-width: 100%; }
+    /* "Tarik upstream" popup: the two versions of a clashing string stack */
+    .merge-opts { grid-template-columns: minmax(0, 1fr); }
     /* AI alternatives stack on phones */
     .ai-alts-grid { grid-template-columns: minmax(0, 1fr) !important; }
 }

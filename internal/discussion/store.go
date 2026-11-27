@@ -34,6 +34,8 @@ type Repository interface {
 	ResolveComment(ctx context.Context, id, byUserID int64) error
 	// OpenReviewComments counts the open review comments on a file's entries, by entry key hash
 	OpenReviewComments(ctx context.Context, projectID, catalogID int64) (map[string]int, error)
+	// ResolvedReviewComments counts the resolved (not deleted) comments tied to a review request
+	ResolvedReviewComments(ctx context.Context, reviewID int64) (int, error)
 	UpdateComment(ctx context.Context, id int64, body string, mentions []int64) error
 	DeleteComment(ctx context.Context, id, byUserID int64) error
 	// DeleteDiscussion removes a discussion with its comments, mentions and attachment links
