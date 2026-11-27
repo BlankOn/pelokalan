@@ -13,6 +13,7 @@ import (
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
+	"pelokalan/internal/source"
 	"pelokalan/pkg/ai"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
@@ -75,7 +76,7 @@ const (
 type AIService struct {
 	repo         repository.AIRepository
 	catalogs     repository.CatalogRepository
-	glossary     repository.GlossaryRepository
+	glossary     source.Repository
 	box          *ai.Box
 	allowPrivate bool
 	// history records versions before and after a job (optional)
@@ -106,7 +107,7 @@ type chatClient interface {
 }
 
 // NewAIService creates the AI service
-func NewAIService(repo repository.AIRepository, catalogs repository.CatalogRepository, glossaryRepo repository.GlossaryRepository,
+func NewAIService(repo repository.AIRepository, catalogs repository.CatalogRepository, glossaryRepo source.Repository,
 	box *ai.Box, allowPrivate bool) *AIService {
 	s := &AIService{repo: repo, catalogs: catalogs, glossary: glossaryRepo, box: box, allowPrivate: allowPrivate}
 	s.newClient = func(st *models.AISettings, key string) chatClient {

@@ -27,6 +27,7 @@ import (
 	"pelokalan/internal/repository/postgres"
 	"pelokalan/internal/reservation"
 	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web"
 	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/ai"
@@ -51,7 +52,7 @@ type Repositories struct {
 	OTP      account.OTPRepository
 	Project  project.Repository
 	Catalog  repository.CatalogRepository
-	Glossary repository.GlossaryRepository
+	Glossary source.Repository
 	AI       repository.AIRepository
 	Commit   repository.CommitRepository
 	Discuss  repository.DiscussionRepository
@@ -71,7 +72,7 @@ type App struct {
 	Auth         *account.Service
 	Projects     *project.Service
 	Catalogs     *service.CatalogService
-	Glossary     *service.GlossaryService
+	Glossary     *source.Service
 	Discussions  *service.DiscussionService
 	Activity     *activity.Service
 	Reservations *reservation.Service
@@ -115,7 +116,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		OTP:      account.NewOTPRepository(db),
 		Project:  project.NewRepository(db),
 		Catalog:  postgres.NewCatalogRepository(db),
-		Glossary: postgres.NewGlossaryRepository(db),
+		Glossary: source.NewRepository(db),
 		AI:       postgres.NewAIRepository(db),
 		Commit:   postgres.NewCommitRepository(db),
 		Discuss:  postgres.NewDiscussionRepository(db),
@@ -139,7 +140,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.Catalogs = service.NewCatalogService(repos.Catalog, repos.Commit, a.Projects)
 	fetcher := glossary.NewFetcher(cfg.Glossary.MaxDownloadMB<<20, cfg.Glossary.AllowPrivateHosts,
 		cfg.Site.Name+" glossary fetcher (+"+cfg.Site.BaseURL+")")
-	a.Glossary = service.NewGlossaryService(repos.Glossary, fetcher)
+	a.Glossary = source.New(repos.Glossary, fetcher)
 	a.Catalogs.SetProjectFiles(repos.Glossary) // git patches against repository files
 	a.Discussions = service.NewDiscussionService(repos.Discuss, repos.Project, repos.Glossary, repos.Catalog, a.Blobs, mailer, cfg.Site)
 	// activity log for the Insight tab

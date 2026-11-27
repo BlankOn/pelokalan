@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"pelokalan/internal/platform/apperr"
-	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -20,7 +20,7 @@ func (h *Handler) DownloadTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := h.glossary.TPFor(r.Context(), p, c)
-	if errors.Is(err, service.ErrNotTP) {
+	if errors.Is(err, source.ErrNotTP) {
 		h.fail(w, r, apperr.ErrNotFound)
 		return
 	}
@@ -29,6 +29,6 @@ func (h *Handler) DownloadTP(w http.ResponseWriter, r *http.Request) {
 		h.fail(w, r, err)
 		return
 	}
-	name, body := service.TPSubmit(pc, d)
+	name, body := source.TPSubmit(pc, d)
 	sendFile(w, name, "text/x-gettext-translation; charset=utf-8", body)
 }

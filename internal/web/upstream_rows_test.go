@@ -12,8 +12,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
-	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 )
 
 // Project file rows show the upstream state; one Take/Update button per row fetches the latest file
@@ -98,7 +97,7 @@ func TestFileRowsUpstream(t *testing.T) {
 }
 
 // emptyGlossaryRepo has no versions or project files
-type emptyGlossaryRepo struct{ repository.GlossaryRepository }
+type emptyGlossaryRepo struct{ source.Repository }
 
 func (emptyGlossaryRepo) GroupsWithFiles(context.Context, int64) ([]*models.ModuleGroupOption, error) {
 	return nil, nil
@@ -118,7 +117,7 @@ func (emptyGlossaryRepo) ProjectFileNames(context.Context, int64) (map[int64][]s
 // "Berkas Anda": requested rework, proofreading, translating first, then by last edit;
 // the same order on every page and with filters. Other members' files: last edit only.
 func TestOwnFilesUpstreamOrder(t *testing.T) {
-	h := &Handler{glossary: service.NewGlossaryService(emptyGlossaryRepo{}, nil)}
+	h := &Handler{glossary: source.New(emptyGlossaryRepo{}, nil)}
 	base := time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC)
 	file := func(id int64, state string, hoursAgo int, owned bool) *models.Catalog {
 		c := &models.Catalog{ID: id, Filename: fmt.Sprintf("f%d.id.po", id), Language: "id", Owned: owned,

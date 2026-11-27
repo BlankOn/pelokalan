@@ -1,4 +1,4 @@
-package postgres
+package source
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 	"pelokalan/pkg/glossary"
 )
 
@@ -19,7 +18,7 @@ type glossaryRepository struct {
 }
 
 // NewGlossaryRepository creates a new PostgreSQL glossary repository
-func NewGlossaryRepository(db *sql.DB) repository.GlossaryRepository {
+func NewRepository(db *sql.DB) Repository {
 	return &glossaryRepository{db: db}
 }
 
@@ -111,7 +110,7 @@ func (r *glossaryRepository) RecordFetch(ctx context.Context, v *models.ModuleGr
 	return err
 }
 
-func (r *glossaryRepository) CreateGroupImport(ctx context.Context, imp *models.ModuleGroupImport, terms []repository.GlossaryTerm) error {
+func (r *glossaryRepository) CreateGroupImport(ctx context.Context, imp *models.ModuleGroupImport, terms []GlossaryTerm) error {
 	tx, err := r.db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
@@ -265,7 +264,7 @@ func (r *glossaryRepository) Term(ctx context.Context, projectID int64, hash str
 	return term, nil
 }
 
-func (r *glossaryRepository) PreferredTerms(ctx context.Context, projectID int64, language string, groupID int64) ([]repository.PreferredTerm, error) {
+func (r *glossaryRepository) PreferredTerms(ctx context.Context, projectID int64, language string, groupID int64) ([]PreferredTerm, error) {
 	args := []any{projectID, language}
 	filter := ""
 	if groupID > 0 {
@@ -289,9 +288,9 @@ func (r *glossaryRepository) PreferredTerms(ctx context.Context, projectID int64
 		return nil, err
 	}
 	defer rows.Close()
-	var out []repository.PreferredTerm
+	var out []PreferredTerm
 	for rows.Next() {
-		var t repository.PreferredTerm
+		var t PreferredTerm
 		if err := rows.Scan(&t.Source, &t.Translation, &t.Share, &t.Words); err != nil {
 			return nil, err
 		}
@@ -300,7 +299,7 @@ func (r *glossaryRepository) PreferredTerms(ctx context.Context, projectID int64
 	return out, rows.Err()
 }
 
-func (r *glossaryRepository) Search(ctx context.Context, q repository.GlossaryQuery) ([]*models.GlossaryGroup, int, error) {
+func (r *glossaryRepository) Search(ctx context.Context, q GlossaryQuery) ([]*models.GlossaryGroup, int, error) {
 	args := []any{q.ProjectID, q.Language}
 	// scope applies to every glossary_terms reference (alias t)
 	scope := "t.project_id = $1 AND t.language = $2"
@@ -446,7 +445,7 @@ func (r *glossaryRepository) Stamp(ctx context.Context, projectID int64, languag
 	return fmt.Sprintf("%d-%d-%d", n, maxID, terms), nil
 }
 
-func (r *glossaryRepository) Modules(ctx context.Context, projectID int64, language string, groupID int64) ([]repository.ModuleCount, error) {
+func (r *glossaryRepository) Modules(ctx context.Context, projectID int64, language string, groupID int64) ([]ModuleCount, error) {
 	args := []any{projectID, language, listSep}
 	filter := ""
 	if groupID > 0 {
@@ -461,9 +460,9 @@ func (r *glossaryRepository) Modules(ctx context.Context, projectID int64, langu
 		return nil, err
 	}
 	defer rows.Close()
-	var out []repository.ModuleCount
+	var out []ModuleCount
 	for rows.Next() {
-		var m repository.ModuleCount
+		var m ModuleCount
 		if err := rows.Scan(&m.Name, &m.Terms); err != nil {
 			return nil, err
 		}

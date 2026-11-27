@@ -22,6 +22,7 @@ import (
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/project"
 	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/glossary"
 )
@@ -180,7 +181,7 @@ func (h *Handler) renderProject(w http.ResponseWriter, r *http.Request, p *model
 	data.Data["MyFiles"] = h.fileList(r, p, catalogs, true, "", nil, nil, 0)
 	data.Data["MemberFiles"] = h.fileList(r, p, catalogs, false, "", nil, nil, 0)
 	data.Data["Tab"] = "files"
-	if pf, total, err := h.glossary.ProjectFiles(r.Context(), p, "", nil, nil, service.ProjectFileOrder{}, 0); err == nil {
+	if pf, total, err := h.glossary.ProjectFiles(r.Context(), p, "", nil, nil, source.ProjectFileOrder{}, 0); err == nil {
 		_ = h.catalogService.MatchOwnFiles(r.Context(), middleware.GetUser(r.Context()), p, pf)
 		h.attachReservations(r, p, nil, pf)
 		view := projectFilesView{Lang: data.Lang, Project: p, Files: pf, Total: total,
@@ -691,13 +692,13 @@ func (h *Handler) projectFileKeep(r *http.Request, p *models.Project) func(*mode
 
 // projectFileOrder is the project files order from the request (s): one of service.ProjectFileSorts;
 // "reserved" / "free" put reserved (or free) modules first, least complete first within each
-func (h *Handler) projectFileOrder(r *http.Request, p *models.Project) service.ProjectFileOrder {
-	o := service.ProjectFileOrder{Sort: r.URL.Query().Get("s")}
+func (h *Handler) projectFileOrder(r *http.Request, p *models.Project) source.ProjectFileOrder {
+	o := source.ProjectFileOrder{Sort: r.URL.Query().Get("s")}
 	if o.Sort != "reserved" && o.Sort != "free" {
 		return o
 	}
 	if !p.Reservations {
-		return service.ProjectFileOrder{}
+		return source.ProjectFileOrder{}
 	}
 	held := h.reservations.Map(r.Context(), p)
 	first := o.Sort == "reserved"

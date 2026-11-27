@@ -1,4 +1,4 @@
-package service
+package source
 
 import (
 	"context"
@@ -15,14 +15,14 @@ import (
 // (ReviewService). Managers check the app's access and turn the integration on per module group.
 
 // SetGitHub turns on the GitHub App (nil = not configured)
-func (s *GlossaryService) SetGitHub(c *githubapp.Client) { s.github = c }
+func (s *Service) SetGitHub(c *githubapp.Client) { s.github = c }
 
 // GitHubApp is the configured GitHub App (nil = none)
-func (s *GlossaryService) GitHubApp() *githubapp.Client { return s.github }
+func (s *Service) GitHubApp() *githubapp.Client { return s.github }
 
 // CheckGitAccess asks GitHub whether the app is installed on the group's repository and may write it, and
 // stores the answer (no write access also turns full integration off)
-func (s *GlossaryService) CheckGitAccess(ctx context.Context, p *models.Project, groupID int64) (*models.ModuleGroup, error) {
+func (s *Service) CheckGitAccess(ctx context.Context, p *models.Project, groupID int64) (*models.ModuleGroup, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -52,7 +52,7 @@ func (s *GlossaryService) CheckGitAccess(ctx context.Context, p *models.Project,
 
 // SetGitDirect turns full integration with the group's repository on (after a fresh access check that
 // must allow writing) or off
-func (s *GlossaryService) SetGitDirect(ctx context.Context, p *models.Project, groupID int64, on bool) error {
+func (s *Service) SetGitDirect(ctx context.Context, p *models.Project, groupID int64, on bool) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}

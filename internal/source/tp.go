@@ -1,4 +1,4 @@
-package service
+package source
 
 import (
 	"archive/tar"
@@ -29,7 +29,7 @@ import (
 var tpPause = 300 * time.Millisecond
 
 // fetchTP downloads a team page and the files of its domains as one .tar.gz
-func (s *GlossaryService) fetchTP(ctx context.Context, v *models.ModuleGroup, etag, lastMod string) (*glossary.FetchResult, error) {
+func (s *Service) fetchTP(ctx context.Context, v *models.ModuleGroup, etag, lastMod string) (*glossary.FetchResult, error) {
 	page, err := s.fetcher.Fetch(ctx, v.SyncURL, etag, lastMod)
 	if err != nil {
 		return nil, err
@@ -123,7 +123,7 @@ func (s *GlossaryService) fetchTP(ctx context.Context, v *models.ModuleGroup, et
 }
 
 // tpFile downloads one domain's file and prepares it (UTF-8, a template becomes an empty PO file)
-func (s *GlossaryService) tpFile(ctx context.Context, d tpsite.Domain, team string) ([]byte, error) {
+func (s *Service) tpFile(ctx context.Context, d tpsite.Domain, team string) ([]byte, error) {
 	res, err := s.fetcher.Fetch(ctx, d.FileURL, "", "")
 	if err != nil {
 		return nil, err
@@ -132,7 +132,7 @@ func (s *GlossaryService) tpFile(ctx context.Context, d tpsite.Domain, team stri
 }
 
 // TPDomains returns the Translation Project domains of a project's TP module groups by module (nil = none)
-func (s *GlossaryService) TPDomains(ctx context.Context, p *models.Project) map[string]*models.TPDomain {
+func (s *Service) TPDomains(ctx context.Context, p *models.Project) map[string]*models.TPDomain {
 	groups, err := s.Groups(ctx, p)
 	if err != nil {
 		return nil
@@ -163,7 +163,7 @@ func tpKey(team, module string) string { return team + "\x00" + module }
 
 // attachTP fills UpstreamInfo.TP of project files and members' files whose module is a domain of a
 // Translation Project team the project syncs from (same language as the team)
-func (s *GlossaryService) attachTP(ctx context.Context, p *models.Project, files []*models.ProjectFile, catalogs []*models.Catalog) {
+func (s *Service) attachTP(ctx context.Context, p *models.Project, files []*models.ProjectFile, catalogs []*models.Catalog) {
 	if len(files) == 0 && len(catalogs) == 0 {
 		return
 	}
@@ -206,7 +206,7 @@ func TPSubmit(pc *po.Catalog, d *models.TPDomain) (string, []byte) {
 var ErrNotTP = errors.New("not a translation project domain")
 
 // TPFor returns the Translation Project domain of a member's file (ErrNotTP when there is none)
-func (s *GlossaryService) TPFor(ctx context.Context, p *models.Project, c *models.Catalog) (*models.TPDomain, error) {
+func (s *Service) TPFor(ctx context.Context, p *models.Project, c *models.Catalog) (*models.TPDomain, error) {
 	s.attachTP(ctx, p, nil, []*models.Catalog{c})
 	if c.TP == nil {
 		return nil, ErrNotTP

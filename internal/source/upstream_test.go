@@ -1,4 +1,4 @@
-package service
+package source
 
 import (
 	"context"
@@ -11,14 +11,13 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/repository"
 	"pelokalan/pkg/gnomel10n"
 )
 
 // upstreamRepo keeps groups, project files and stored upstream states in memory;
 // other calls are not used by these tests
 type upstreamRepo struct {
-	repository.GlossaryRepository
+	Repository
 	groups []*models.ModuleGroup
 	files  []*models.ProjectFile
 	states map[string]*models.UpstreamRecord // release/lang/stem
@@ -129,7 +128,7 @@ func TestUpstreamWarmAndFilter(t *testing.T) {
 		{ID: 13, GroupID: 3, Filename: "konsole.id.po", Language: "id"},
 		{ID: 14, GroupID: 1, Filename: "gone.main.id.po", Language: "id"},
 	}}
-	s := NewGlossaryService(repo, nil)
+	s := New(repo, nil)
 	client := gnomel10n.New(srv.URL, true, "test")
 	s.SetUpstream(client)
 	p := &models.Project{ID: 1, Language: "id"}
@@ -215,7 +214,7 @@ func TestUpstreamWarmBudget(t *testing.T) {
 		{ID: 11, GroupID: 1, Filename: "gnome-maps.gnome-51.id.po", Language: "id"},
 		{ID: 12, GroupID: 1, Filename: "glib.glib-2-90.id.po", Language: "id"},
 	}}
-	s := NewGlossaryService(repo, nil)
+	s := New(repo, nil)
 	client := gnomel10n.New(srv.URL, true, "test")
 	client.SetBudget(upstreamReserve + 3) // the release page (not served here), the release list and one module
 	s.SetUpstream(client)
@@ -282,7 +281,7 @@ func TestUpstreamWarmFromPage(t *testing.T) {
 		{ID: 2, GroupID: 1, Filename: "gtk.gtk-4-24.id.po", Language: "id"},
 		{ID: 3, GroupID: 1, Filename: "gone.main.id.po", Language: "id"},
 	}}
-	s := NewGlossaryService(repo, nil)
+	s := New(repo, nil)
 	s.SetUpstream(gnomel10n.New(srv.URL, true, "test"))
 	s.WarmUpstream(ctx)
 	if len(asked) != 1 {
@@ -325,7 +324,7 @@ func TestUpstreamWarmFromPage(t *testing.T) {
 }
 
 func TestGuessUpstreamPage(t *testing.T) {
-	s := &GlossaryService{}
+	s := &Service{}
 	s.SetUpstream(gnomel10n.New("https://l10n.gnome.org", false, "test"))
 	cases := map[string]string{
 		"gnome-calculator.gnome-51": "https://l10n.gnome.org/vertimus/gnome-calculator/gnome-51/po/id/",
@@ -344,7 +343,7 @@ func TestGuessUpstreamPage(t *testing.T) {
 func TestUpstreamLinkedPage(t *testing.T) {
 	srv, calls := upstreamSite(t)
 	repo := &upstreamRepo{states: map[string]*models.UpstreamRecord{}}
-	s := NewGlossaryService(repo, nil)
+	s := New(repo, nil)
 	s.SetUpstream(gnomel10n.New(srv.URL, true, "test"))
 
 	for _, bad := range []string{"https://example.com/vertimus/a/b/po/id/", srv.URL + "/module/gnome-maps/",

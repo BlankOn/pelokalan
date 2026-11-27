@@ -11,6 +11,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/repository"
+	"pelokalan/internal/source"
 )
 
 type catalogRepository struct {
@@ -309,7 +310,7 @@ func (r *catalogRepository) Stats(ctx context.Context, catalogID int64) (models.
 	return s, err
 }
 
-func (r *catalogRepository) Suggestions(ctx context.Context, userID int64, language, msgid string, excludeEntryID int64, limit int) ([]repository.Suggestion, error) {
+func (r *catalogRepository) Suggestions(ctx context.Context, userID int64, language, msgid string, excludeEntryID int64, limit int) ([]source.Suggestion, error) {
 	rows, err := r.db.QueryContext(ctx,
 		`SELECT e.msgstr->>0 AS t, MIN(p.name), COUNT(*)
 		 FROM entries e
@@ -323,9 +324,9 @@ func (r *catalogRepository) Suggestions(ctx context.Context, userID int64, langu
 		return nil, err
 	}
 	defer rows.Close()
-	var out []repository.Suggestion
+	var out []source.Suggestion
 	for rows.Next() {
-		var s repository.Suggestion
+		var s source.Suggestion
 		if err := rows.Scan(&s.Text, &s.ProjectName, &s.Count); err != nil {
 			return nil, err
 		}

@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"pelokalan/internal/models"
-	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -54,7 +54,7 @@ type groupChart struct {
 	Groups   []*models.ModuleGroupOption
 	Selected map[int64]bool // ticked groups (none = all)
 	Range    string
-	Ranges   []service.StatsRange
+	Ranges   []source.StatsRange
 	Series   []gcSeries
 	Points   []gcPoint
 	XLabels  []gcLabel
@@ -71,7 +71,7 @@ func (h *Handler) groupChart(r *http.Request, p *models.Project, groups []*model
 	if len(groups) == 0 {
 		return nil
 	}
-	c := &groupChart{Lang: middleware.GetLang(r.Context()), Project: p, Groups: groups, Ranges: service.StatsRanges,
+	c := &groupChart{Lang: middleware.GetLang(r.Context()), Project: p, Groups: groups, Ranges: source.StatsRanges,
 		W: gcW, H: gcH, PlotTop: gcTop, PlotBot: gcH - gcBottom, Range: "30", Selected: map[int64]bool{}}
 	known := map[int64]bool{}
 	for _, g := range groups {
@@ -86,7 +86,7 @@ func (h *Handler) groupChart(r *http.Request, p *models.Project, groups []*model
 		c.Scale = "each"
 	}
 	days := 30
-	for _, rg := range service.StatsRanges {
+	for _, rg := range source.StatsRanges {
 		if rg.Key == r.URL.Query().Get("cr") {
 			c.Range, days = rg.Key, rg.Days
 		}

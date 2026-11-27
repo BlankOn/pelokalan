@@ -20,6 +20,7 @@ import (
 	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/reservation"
+	"pelokalan/internal/source"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/gitpatch"
 	"pelokalan/pkg/po"
@@ -39,7 +40,7 @@ const MaxReviewNote = 2000
 type ReviewService struct {
 	repo         repository.ReviewRepository
 	catalogs     *CatalogService
-	glossary     *GlossaryService
+	glossary     *source.Service
 	reservations *reservation.Service
 	projects     project.Repository
 	users        account.UserRepository
@@ -84,7 +85,7 @@ func (s *ReviewService) openComments(ctx context.Context, p *models.Project, cat
 }
 
 // NewReviewService creates the review service
-func NewReviewService(repo repository.ReviewRepository, catalogs *CatalogService, glossary *GlossaryService,
+func NewReviewService(repo repository.ReviewRepository, catalogs *CatalogService, glossary *source.Service,
 	reservations *reservation.Service, projects project.Repository, users account.UserRepository,
 	mailer mailer.Mailer, site config.SiteConfig) *ReviewService {
 	return &ReviewService{repo: repo, catalogs: catalogs, glossary: glossary, reservations: reservations,
@@ -163,7 +164,7 @@ func (s *ReviewService) lastSent(ctx context.Context, catalogID int64) []byte {
 
 // Changes is what a review would send, against the repository file as last synced (for the review page)
 func (s *ReviewService) Changes(ctx context.Context, p *models.Project, c *models.Catalog) (*gitpatch.FileDiff, error) {
-	pf, _, err := s.glossary.repo.ProjectFileByRepoPath(ctx, p.ID, c.RepoPath)
+	pf, _, err := s.glossary.ProjectFileByRepoPath(ctx, p.ID, c.RepoPath)
 	if err != nil {
 		return nil, err
 	}
@@ -346,7 +347,7 @@ func (s *ReviewService) push(ctx context.Context, reviewer *models.User, p *mode
 	}
 	r.Error = err.Error()
 	if ue, ok := apperr.AsUserError(err); ok {
-		r.Error = fetchErrorText(ue)
+		r.Error = source.FetchErrorText(ue)
 	}
 	if uerr := s.repo.Update(ctx, r); uerr != nil {
 		log.Printf("reviews: record failure of %d: %v", r.ID, uerr)
@@ -403,7 +404,7 @@ func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *mo
 		}
 		s.reservations.ReleasePushed(ctx, p.ID, r.Module, c.OwnerID)
 		if g.HasFeed() {
-			s.glossary.fetchInBackground(g) // project files, glossary and "accepted upstream" follow the new branch
+			s.glossary.FetchInBackground(g) // project files, glossary and "accepted upstream" follow the new branch
 		}
 		if reviewer.ID != c.OwnerID {
 			go s.notifyTranslator(context.Background(), p, r, reviewer, "pushed")

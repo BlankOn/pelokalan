@@ -7,7 +7,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -114,7 +114,7 @@ func (h *Handler) AddModuleGroupSource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if src := r.FormValue("source"); src == "url" || src == "git" || src == "tp" {
-		in := service.GroupSyncInput{
+		in := source.GroupSyncInput{
 			Name:     r.FormValue("name"),
 			Version:  r.FormValue("version_name"),
 			URL:      r.FormValue("url"),
@@ -140,8 +140,8 @@ func (h *Handler) AddModuleGroupSource(w http.ResponseWriter, r *http.Request) {
 
 	name, body, err := h.readUpload(w, r)
 	if err == nil {
-		var res *service.ModuleGroupImportResult
-		res, err = h.glossary.ImportGroup(r.Context(), user, p, service.ModuleGroupImportInput{
+		var res *source.ModuleGroupImportResult
+		res, err = h.glossary.ImportGroup(r.Context(), user, p, source.ModuleGroupImportInput{
 			Name:     r.FormValue("name"),
 			Version:  r.FormValue("version_name"),
 			Filename: name,
@@ -167,7 +167,7 @@ func (h *Handler) ImportModuleGroup(w http.ResponseWriter, r *http.Request) {
 		h.renderModuleGroups(w, r, p, h.errorMessage(r, err), "add")
 		return
 	}
-	res, err := h.glossary.ImportGroup(r.Context(), middleware.GetUser(r.Context()), p, service.ModuleGroupImportInput{
+	res, err := h.glossary.ImportGroup(r.Context(), middleware.GetUser(r.Context()), p, source.ModuleGroupImportInput{
 		Name:     r.FormValue("name"),
 		Version:  r.FormValue("version_name"),
 		Filename: name,
@@ -181,7 +181,7 @@ func (h *Handler) ImportModuleGroup(w http.ResponseWriter, r *http.Request) {
 	h.importRedirect(w, r, p, res)
 }
 
-func (h *Handler) importRedirect(w http.ResponseWriter, r *http.Request, p *models.Project, res *service.ModuleGroupImportResult) {
+func (h *Handler) importRedirect(w http.ResponseWriter, r *http.Request, p *models.Project, res *source.ModuleGroupImportResult) {
 	terms, files := 0, 0
 	for _, imp := range res.Imports {
 		terms += imp.TermCount
@@ -192,7 +192,7 @@ func (h *Handler) importRedirect(w http.ResponseWriter, r *http.Request, p *mode
 	http.Redirect(w, r, moduleGroupsPath(p, q, "list"), http.StatusSeeOther)
 }
 
-func (h *Handler) syncRedirect(w http.ResponseWriter, r *http.Request, p *models.Project, g *models.ModuleGroup, out *service.FetchOutcome) {
+func (h *Handler) syncRedirect(w http.ResponseWriter, r *http.Request, p *models.Project, g *models.ModuleGroup, out *source.FetchOutcome) {
 	q := url.Values{"label": {g.Label()}}
 	switch {
 	case out == nil: // downloading in the background (Translation Project)
@@ -246,7 +246,7 @@ func (h *Handler) SetModuleGroupSync(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	g, out, err := h.glossary.SetGroupSync(r.Context(), middleware.GetUser(r.Context()), p, service.GroupSyncInput{
+	g, out, err := h.glossary.SetGroupSync(r.Context(), middleware.GetUser(r.Context()), p, source.GroupSyncInput{
 		Name:     r.FormValue("name"),
 		Version:  r.FormValue("version_name"),
 		URL:      r.FormValue("url"),

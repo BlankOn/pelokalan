@@ -8,8 +8,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/repository"
-	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -18,12 +17,12 @@ type glossaryView struct {
 	Lang        string
 	ProjectID   int64
 	ProjectPath string
-	Search      service.GlossarySearch
+	Search      source.GlossarySearch
 	Groups      []*models.ModuleGroup
 	Group       string // selected module group id, or "all"
-	Page        *service.GlossaryPage
+	Page        *source.GlossaryPage
 	MoreQuery   string
-	Modules     []repository.ModuleCount
+	Modules     []source.ModuleCount
 }
 
 // selectGroup resolves the "group" parameter: "all", a module group id, or
@@ -47,9 +46,9 @@ func selectGroup(param string, groups []*models.ModuleGroup) (int64, string) {
 	return 0, "all"
 }
 
-func glossarySearchFromRequest(r *http.Request, languages []string) service.GlossarySearch {
+func glossarySearchFromRequest(r *http.Request, languages []string) source.GlossarySearch {
 	q := r.URL.Query()
-	s := service.GlossarySearch{
+	s := source.GlossarySearch{
 		Language:     q.Get("lang"),
 		Query:        q.Get("q"),
 		TermsOnly:    true,
@@ -114,7 +113,7 @@ func (h *Handler) glossaryResults(r *http.Request, p *models.Project, languages 
 	s.GroupID, selected = selectGroup(param, groups)
 	v := glossaryView{Lang: middleware.GetLang(r.Context()), ProjectID: p.ID, ProjectPath: p.Path(), Search: s, Groups: groups, Group: selected}
 	if len(languages) == 0 {
-		v.Page = &service.GlossaryPage{}
+		v.Page = &source.GlossaryPage{}
 		return v, nil
 	}
 	if v.Modules, err = h.glossary.Modules(r.Context(), p, s.Language, s.GroupID); err != nil {

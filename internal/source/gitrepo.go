@@ -1,4 +1,4 @@
-package service
+package source
 
 import (
 	"context"
@@ -92,7 +92,7 @@ func RepoFileName(p string) string {
 // IsGitProject tells whether a project's files come from git repositories only (it has module groups
 // and every one is synced from GitHub): files then come from the repository, so the Penerjemahan page
 // has no template section and no manual upload. A project that also has other groups keeps both.
-func (s *GlossaryService) IsGitProject(ctx context.Context, p *models.Project) bool {
+func (s *Service) IsGitProject(ctx context.Context, p *models.Project) bool {
 	groups, err := s.Groups(ctx, p)
 	if err != nil || len(groups) == 0 {
 		return false
@@ -107,7 +107,7 @@ func (s *GlossaryService) IsGitProject(ctx context.Context, p *models.Project) b
 
 // HasGitRepo reports whether any of the project's module groups is synced from a GitHub repository: files then
 // come from the repository, so members do not add files by hand
-func (s *GlossaryService) HasGitRepo(ctx context.Context, p *models.Project) bool {
+func (s *Service) HasGitRepo(ctx context.Context, p *models.Project) bool {
 	groups, err := s.Groups(ctx, p)
 	if err != nil {
 		return false
@@ -121,7 +121,7 @@ func (s *GlossaryService) HasGitRepo(ctx context.Context, p *models.Project) boo
 }
 
 // GitGroupFor returns the module group a repository file was last synced from (nil = unknown)
-func (s *GlossaryService) GitGroupFor(ctx context.Context, p *models.Project, repoPath string) *models.ModuleGroup {
+func (s *Service) GitGroupFor(ctx context.Context, p *models.Project, repoPath string) *models.ModuleGroup {
 	if repoPath == "" {
 		return nil
 	}
@@ -152,7 +152,7 @@ func GitBranchName(repoPath string) string {
 }
 
 // GitFileURL is a repository file's address on GitHub ("" when its group is unknown)
-func (s *GlossaryService) GitFileURL(ctx context.Context, p *models.Project, repoPath string) string {
+func (s *Service) GitFileURL(ctx context.Context, p *models.Project, repoPath string) string {
 	if repoPath == "" {
 		return ""
 	}

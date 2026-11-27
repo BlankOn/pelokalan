@@ -10,6 +10,7 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/gz"
 	"pelokalan/internal/reservation"
+	"pelokalan/internal/source"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
 )
@@ -22,13 +23,6 @@ import (
 // took it or last updated it from upstream (the same reference as git patches), so translations that were
 // already upstream, or that someone else's earlier work put there, never count for them.
 
-// UpstreamFile is a PO file as just downloaded from upstream
-type UpstreamFile struct {
-	Name     string // Pelokalan file name
-	RepoPath string // path in a git repository ("" otherwise)
-	Data     []byte
-}
-
 // landingWorthy leaves out strings too short to tell one person's work from a coincidence ("OK", "_Save")
 func landingWorthy(msgid string) bool {
 	return len(strings.Fields(msgid)) >= 3 || utf8.RuneCountInString(msgid) >= 15
@@ -37,7 +31,7 @@ func landingWorthy(msgid string) bool {
 // DetectLandings records the strings of members' files in project projectID (language lang) that the
 // just-imported upstream files of module group groupID now contain as the member wrote them. language
 // forces the files' language ("" = detect per file, as imports do). It returns how many are new.
-func (s *CatalogService) DetectLandings(ctx context.Context, projectID, groupID int64, lang, language string, files []UpstreamFile) (int, error) {
+func (s *CatalogService) DetectLandings(ctx context.Context, projectID, groupID int64, lang, language string, files []source.UpstreamFile) (int, error) {
 	if s.activity == nil || len(files) == 0 {
 		return 0, nil
 	}

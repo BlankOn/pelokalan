@@ -24,6 +24,7 @@ import (
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
+	"pelokalan/internal/source"
 )
 
 // Subject is the thing a discussion is about
@@ -56,7 +57,7 @@ type Thread struct {
 type DiscussionService struct {
 	repo     repository.DiscussionRepository
 	projects project.Repository
-	glossary repository.GlossaryRepository
+	glossary source.Repository
 	catalogs repository.CatalogRepository
 	blobs    blobstore.Store
 	mailer   mailer.Mailer
@@ -132,7 +133,7 @@ func (s *DiscussionService) SetActivity(a *activity.Service) { s.activity = a }
 
 // NewDiscussionService creates the discussion service
 func NewDiscussionService(repo repository.DiscussionRepository, projects project.Repository,
-	glossaryRepo repository.GlossaryRepository, catalogs repository.CatalogRepository, blobs blobstore.Store,
+	glossaryRepo source.Repository, catalogs repository.CatalogRepository, blobs blobstore.Store,
 	mailer mailer.Mailer, site config.SiteConfig) *DiscussionService {
 	return &DiscussionService{repo: repo, projects: projects, glossary: glossaryRepo, catalogs: catalogs, blobs: blobs,
 		mailer: mailer, site: site}

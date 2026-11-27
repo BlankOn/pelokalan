@@ -31,6 +31,7 @@ import (
 	"pelokalan/internal/project"
 	"pelokalan/internal/reservation"
 	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/badgecard"
 	"pelokalan/pkg/glossary"
@@ -47,7 +48,7 @@ type Handler struct {
 	authService    *account.Service
 	projectService *project.Service
 	catalogService *service.CatalogService
-	glossary       *service.GlossaryService
+	glossary       *source.Service
 	ai             *service.AIService
 	discuss        *service.DiscussionService
 	wiki           *service.WikiService
@@ -71,7 +72,7 @@ func NewHandler(
 	authService *account.Service,
 	projectService *project.Service,
 	catalogService *service.CatalogService,
-	glossaryService *service.GlossaryService,
+	glossaryService *source.Service,
 	aiService *service.AIService,
 	discussionService *service.DiscussionService,
 	wikiService *service.WikiService,
@@ -143,7 +144,7 @@ func funcMap() template.FuncMap {
 		// sortOptions are the project file orders; the reservation ones only when the project uses them
 		"sortOptions": func(reservations bool) []string {
 			var out []string
-			for _, s := range service.ProjectFileSorts {
+			for _, s := range source.ProjectFileSorts {
 				if reservations || s != "reserved" && s != "free" {
 					out = append(out, s)
 				}
@@ -154,7 +155,7 @@ func funcMap() template.FuncMap {
 		"fileSortOptions": func(res any) []string {
 			reservations, _ := res.(bool) // missing = off
 			var out []string
-			for _, s := range service.FileListSorts {
+			for _, s := range source.FileListSorts {
 				if reservations || s != "reserved" && s != "free" {
 					out = append(out, s)
 				}

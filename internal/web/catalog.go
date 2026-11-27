@@ -18,8 +18,8 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/repository"
 	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -127,13 +127,13 @@ type editorView struct {
 	Catalog     *models.Catalog
 	Project     *models.Project
 	Entry       *models.Entry
-	Suggestions []repository.Suggestion
+	Suggestions []source.Suggestion
 	ReadOnly    bool
 	Error       string
 	Notice      string
 	Draft       []string // the user's text when a save conflicted
 	Thread      string   // URL of the entry's discussion component
-	Glossary    *service.EntryGlossary
+	Glossary    *source.EntryGlossary
 	OOB         bool
 }
 

@@ -1,4 +1,4 @@
-package service
+package source
 
 import (
 	"context"
@@ -45,7 +45,7 @@ type matcherCache struct {
 // stampCheckInterval limits how often the cheap "did the glossary change" query runs
 const stampCheckInterval = 30 * time.Second
 
-func (s *GlossaryService) matcher(ctx context.Context, projectID int64, language string) (*ai.Glossary, error) {
+func (s *Service) matcher(ctx context.Context, projectID int64, language string) (*ai.Glossary, error) {
 	key := language + "/" + strconv.FormatInt(projectID, 10)
 	c := &s.matchers
 	c.mu.Lock()
@@ -92,7 +92,7 @@ func (s *GlossaryService) matcher(ctx context.Context, projectID int64, language
 }
 
 // ForEntry finds glossary terms (all versions) that occur in an entry's source text
-func (s *GlossaryService) ForEntry(ctx context.Context, projectID int64, language, source, plural string) (*EntryGlossary, error) {
+func (s *Service) ForEntry(ctx context.Context, projectID int64, language, source, plural string) (*EntryGlossary, error) {
 	g, err := s.matcher(ctx, projectID, language)
 	if err != nil {
 		return nil, err

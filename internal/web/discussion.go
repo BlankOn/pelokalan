@@ -23,6 +23,7 @@ import (
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -167,7 +168,7 @@ func (h *Handler) GlossaryTermPage(w http.ResponseWriter, r *http.Request) {
 	if term != nil {
 		data.Data["Summary"] = summarizeTerm(term)
 		// longer glossary strings containing this one
-		if page, err := h.glossary.Search(r.Context(), p, service.GlossarySearch{Query: term.Source, Language: firstLanguage(term)}); err == nil {
+		if page, err := h.glossary.Search(r.Context(), p, source.GlossarySearch{Query: term.Source, Language: firstLanguage(term)}); err == nil {
 			var related []*models.GlossaryGroup
 			for _, g := range page.Groups {
 				if g.Hash != hash && len(related) < 12 {
@@ -266,7 +267,7 @@ func summarizeTerm(t *models.GlossaryTerm) termSummary {
 		groups = append(groups, pv)
 		lookup[pv] = tv
 	}
-	service.SortGroups(groups)
+	source.SortGroups(groups)
 	for i, pv := range groups {
 		tv := lookup[pv]
 		sort.Strings(tv.Translations)

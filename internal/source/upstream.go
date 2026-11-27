@@ -1,4 +1,4 @@
-package service
+package source
 
 import (
 	"context"
@@ -46,7 +46,7 @@ type upstreamDue struct {
 
 // UpstreamPageURL checks a file's page on the GNOME translation site as entered by a person and
 // returns it in its canonical form ("" stays ""); anything else is refused with err.upstream_page
-func (s *GlossaryService) UpstreamPageURL(raw string) (string, error) {
+func (s *Service) UpstreamPageURL(raw string) (string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
 		return "", nil
@@ -62,7 +62,7 @@ func (s *GlossaryService) UpstreamPageURL(raw string) (string, error) {
 }
 
 // pageKey is the stored state's key of a file's own page
-func (s *GlossaryService) pageKey(page string) (upstreamKey, gnomel10n.Entry, bool) {
+func (s *Service) pageKey(page string) (upstreamKey, gnomel10n.Entry, bool) {
 	if s.upstream == nil || page == "" {
 		return upstreamKey{}, gnomel10n.Entry{}, false
 	}
@@ -75,7 +75,7 @@ func (s *GlossaryService) pageKey(page string) (upstreamKey, gnomel10n.Entry, bo
 
 // CheckUpstreamPage fetches and stores the state of a file's own page now (one request), so the
 // badge shows right after the page was entered. Errors are only logged: the background round retries.
-func (s *GlossaryService) CheckUpstreamPage(ctx context.Context, page string) {
+func (s *Service) CheckUpstreamPage(ctx context.Context, page string) {
 	k, e, ok := s.pageKey(page)
 	if !ok || s.upstream.Remaining() <= 0 {
 		return
@@ -88,7 +88,7 @@ func (s *GlossaryService) CheckUpstreamPage(ctx context.Context, page string) {
 // checkPage asks the site for the state of one entry given by its page and stores it
 // (not found = stored as not listed); the client's cached answer is used when younger than
 // maxAge. An error means the site could not be asked.
-func (s *GlossaryService) checkPage(ctx context.Context, k upstreamKey, e gnomel10n.Entry, maxAge time.Duration) (*models.UpstreamRecord, error) {
+func (s *Service) checkPage(ctx context.Context, k upstreamKey, e gnomel10n.Entry, maxAge time.Duration) (*models.UpstreamRecord, error) {
 	rec := &models.UpstreamRecord{Release: k.release, Language: k.lang, Stem: k.stem, CheckedAt: time.Now()}
 	st, err := s.upstream.StatsMaxAge(ctx, e, maxAge)
 	switch {
@@ -117,7 +117,7 @@ func upstreamLang(projectLang, fileLang string) string {
 // releaseOf is the site's release of a module group: from its sync link on the site
 // (…/languages/id/gnome-51/ui.tar.gz), else its label when the site lists a release of
 // that name (known is asked lazily, it may cost a request every 12 hours)
-func (s *GlossaryService) releaseOf(glossaryURL, label string, known func() map[string]bool) string {
+func (s *Service) releaseOf(glossaryURL, label string, known func() map[string]bool) string {
 	if r := s.upstream.ReleaseFromURL(glossaryURL); r != "" {
 		return r
 	}
@@ -127,7 +127,7 @@ func (s *GlossaryService) releaseOf(glossaryURL, label string, known func() map[
 	return ""
 }
 
-func (s *GlossaryService) knownReleases(ctx context.Context) func() map[string]bool {
+func (s *Service) knownReleases(ctx context.Context) func() map[string]bool {
 	var known map[string]bool
 	return func() map[string]bool {
 		if known == nil {
@@ -143,7 +143,7 @@ func (s *GlossaryService) knownReleases(ctx context.Context) func() map[string]b
 // upstreamLookup reads stored states for one project: groups → releases, and the
 // stored rows per release and language (loaded once each)
 type upstreamLookup struct {
-	s       *GlossaryService
+	s       *Service
 	ctx     context.Context
 	p       *models.Project
 	groups  []*models.ModuleGroup // newest first
@@ -151,7 +151,7 @@ type upstreamLookup struct {
 	rows    map[[2]string]map[string]*models.UpstreamRecord
 }
 
-func (s *GlossaryService) newUpstreamLookup(ctx context.Context, p *models.Project) *upstreamLookup {
+func (s *Service) newUpstreamLookup(ctx context.Context, p *models.Project) *upstreamLookup {
 	if s.upstream == nil {
 		return nil
 	}
@@ -175,7 +175,7 @@ func (s *GlossaryService) newUpstreamLookup(ctx context.Context, p *models.Proje
 
 // HasUpstream reports whether some module group of the project is a release on the GNOME
 // translation site (the upstream state filter is shown then)
-func (s *GlossaryService) HasUpstream(ctx context.Context, p *models.Project) bool {
+func (s *Service) HasUpstream(ctx context.Context, p *models.Project) bool {
 	l := s.newUpstreamLookup(ctx, p)
 	return l != nil && len(l.release) > 0
 }
@@ -206,7 +206,7 @@ func (l *upstreamLookup) record(k upstreamKey) *models.UpstreamRecord {
 
 // info turns a stored row into what pages show. Without a known state the file still gets a
 // link to where the site would show it (UpstreamLink), so people can check for themselves.
-func (s *GlossaryService) info(k upstreamKey, rec *models.UpstreamRecord) models.UpstreamInfo {
+func (s *Service) info(k upstreamKey, rec *models.UpstreamRecord) models.UpstreamInfo {
 	switch {
 	case rec == nil:
 		return models.UpstreamInfo{UpstreamLink: s.guessPageURL(k)}
@@ -221,7 +221,7 @@ func (s *GlossaryService) info(k upstreamKey, rec *models.UpstreamRecord) models
 
 // AttachUpstream fills each project file's upstream state from the stored states (no
 // request to the site, except the release list every 12 hours for groups named after a release)
-func (s *GlossaryService) AttachUpstream(ctx context.Context, p *models.Project, files []*models.ProjectFile) {
+func (s *Service) AttachUpstream(ctx context.Context, p *models.Project, files []*models.ProjectFile) {
 	s.attachTP(ctx, p, files, nil)
 	l := s.newUpstreamLookup(ctx, p)
 	if l == nil {
@@ -237,7 +237,7 @@ func (s *GlossaryService) AttachUpstream(ctx context.Context, p *models.Project,
 // AttachUpstreamToCatalogs fills the upstream state of members' PO files: from the file's own page
 // when one was entered (Catalog.UpstreamPage), else through the project file they come from: the
 // same file name, else the same module (newest module group first)
-func (s *GlossaryService) AttachUpstreamToCatalogs(ctx context.Context, p *models.Project, catalogs []*models.Catalog) {
+func (s *Service) AttachUpstreamToCatalogs(ctx context.Context, p *models.Project, catalogs []*models.Catalog) {
 	s.attachTP(ctx, p, nil, catalogs)
 	l := s.newUpstreamLookup(ctx, p)
 	if l == nil {
@@ -307,7 +307,7 @@ func (l *upstreamLookup) projectFileFor(names map[int64][]string, filename strin
 // UpstreamPO downloads the current PO file of a project file from the GNOME translation
 // site (newer than the release archive). label names the source for the history.
 // The file's address comes from the stored state; when none is stored yet it is looked up.
-func (s *GlossaryService) UpstreamPO(ctx context.Context, p *models.Project, f *models.ProjectFile, maxBytes int64) ([]byte, string, error) {
+func (s *Service) UpstreamPO(ctx context.Context, p *models.Project, f *models.ProjectFile, maxBytes int64) ([]byte, string, error) {
 	unavailable := apperr.New("err.upstream_unavailable")
 	l := s.newUpstreamLookup(ctx, p)
 	if l == nil {
@@ -337,7 +337,7 @@ func (s *GlossaryService) UpstreamPO(ctx context.Context, p *models.Project, f *
 // checkUpstream asks the site for one file's state and stores it. listings caches the
 // release lists of this round. An error means the site could not be asked (budget,
 // throttled, unreachable): nothing is stored.
-func (s *GlossaryService) checkUpstream(ctx context.Context, k upstreamKey, listings map[[2]string]map[string]gnomel10n.Entry) (*models.UpstreamRecord, error) {
+func (s *Service) checkUpstream(ctx context.Context, k upstreamKey, listings map[[2]string]map[string]gnomel10n.Entry) (*models.UpstreamRecord, error) {
 	rk := [2]string{k.release, k.lang}
 	index, ok := listings[rk]
 	if !ok {
@@ -377,14 +377,14 @@ func (s *GlossaryService) checkUpstream(ctx context.Context, k upstreamKey, list
 // release fall back to one API request each: never checked first, then the oldest, until
 // the hourly budget (minus a reserve for people) is used up. Runs at start-up and with
 // every sync round; one round at a time.
-func (s *GlossaryService) WarmUpstream(ctx context.Context) {
+func (s *Service) WarmUpstream(ctx context.Context) {
 	s.warmUpstream(ctx, UpstreamFresh)
 }
 
 // RefreshUpstream checks every file state again now, however recently it was checked (the
 // "Sinkronkan dengan upstream" button); with the release pages this is one request per release
 // (it waits for a background round that is running, instead of skipping)
-func (s *GlossaryService) RefreshUpstream(ctx context.Context) {
+func (s *Service) RefreshUpstream(ctx context.Context) {
 	if s.upstream == nil {
 		return
 	}
@@ -393,7 +393,7 @@ func (s *GlossaryService) RefreshUpstream(ctx context.Context) {
 	s.warmLocked(ctx, time.Minute)
 }
 
-func (s *GlossaryService) warmUpstream(ctx context.Context, fresh time.Duration) {
+func (s *Service) warmUpstream(ctx context.Context, fresh time.Duration) {
 	if s.upstream == nil || !s.warming.TryLock() {
 		return
 	}
@@ -402,7 +402,7 @@ func (s *GlossaryService) warmUpstream(ctx context.Context, fresh time.Duration)
 }
 
 // warmLocked is one round of WarmUpstream / RefreshUpstream; the caller holds s.warming
-func (s *GlossaryService) warmLocked(ctx context.Context, fresh time.Duration) {
+func (s *Service) warmLocked(ctx context.Context, fresh time.Duration) {
 	cands, err := s.repo.UpstreamCandidates(ctx)
 	if err != nil {
 		log.Printf("upstream: list project files: %v", err)
@@ -518,7 +518,7 @@ func (s *GlossaryService) warmLocked(ctx context.Context, fresh time.Duration) {
 // module they list. Due files the pages do not list are stored as not upstream. The doc
 // page is read only when a due file is documentation ("…-help.<branch>"); when it cannot be
 // read, those files are returned for the API fallback. An error means the ui page failed.
-func (s *GlossaryService) warmFromPages(ctx context.Context, release, lang string, files []upstreamDue, stored map[string]*models.UpstreamRecord) (int, []upstreamDue, error) {
+func (s *Service) warmFromPages(ctx context.Context, release, lang string, files []upstreamDue, stored map[string]*models.UpstreamRecord) (int, []upstreamDue, error) {
 	isDoc := func(stem string) bool { return strings.Contains(stem, "-help.") }
 	page := func(kind string) ([]gnomel10n.PageRow, error) {
 		if s.upstream.Remaining() <= upstreamReserve {
@@ -585,7 +585,7 @@ func (s *GlossaryService) warmFromPages(ctx context.Context, release, lang strin
 // guessPageURL is the site's page for a file whose state is not known: the workflow page built
 // from the file name stem ("gnome-calculator.gnome-51" → module gnome-calculator, branch gnome-51,
 // domain po; "<module>-help.<branch>" → domain help)
-func (s *GlossaryService) guessPageURL(k upstreamKey) string {
+func (s *Service) guessPageURL(k upstreamKey) string {
 	i := strings.LastIndex(k.stem, ".")
 	if s.upstream == nil || i <= 0 || i == len(k.stem)-1 {
 		return ""

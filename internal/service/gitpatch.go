@@ -12,13 +12,13 @@ import (
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/gz"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
+	"pelokalan/internal/source"
 	"pelokalan/pkg/gitpatch"
 	"pelokalan/pkg/po"
 )
 
 // SetProjectFiles gives the service access to project files, for git patches against the repository's files
-func (s *CatalogService) SetProjectFiles(r repository.GlossaryRepository) { s.projectFiles = r }
+func (s *CatalogService) SetProjectFiles(r source.Repository) { s.projectFiles = r }
 
 // SetRepoPath stores a file's path in its module group's git repository
 func (s *CatalogService) SetRepoPath(ctx context.Context, user *models.User, c *models.Catalog, path string) error {

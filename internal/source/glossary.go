@@ -1,4 +1,4 @@
-package service
+package source
 
 import (
 	"bytes"
@@ -20,7 +20,6 @@ import (
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/project"
-	"pelokalan/internal/repository"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/gnomel10n"
@@ -29,8 +28,8 @@ import (
 )
 
 // GlossaryService builds and searches project glossaries
-type GlossaryService struct {
-	repo     repository.GlossaryRepository
+type Service struct {
+	repo     Repository
 	fetcher  *glossary.Fetcher
 	matchers matcherCache
 	syncing  sync.Mutex         // one download round at a time (hourly sync or the Sync button)
@@ -46,6 +45,13 @@ type GlossaryService struct {
 	github *githubapp.Client // the Pelokalan GitHub App (nil = not configured)
 }
 
+// UpstreamFile is a PO file as just downloaded from upstream
+type UpstreamFile struct {
+	Name     string // Pelokalan file name
+	RepoPath string // path in a git repository ("" otherwise)
+	Data     []byte
+}
+
 // LandingDetector finds members' translations that a just-imported upstream file now contains
 // (CatalogService.DetectLandings)
 type LandingDetector interface {
@@ -53,13 +59,13 @@ type LandingDetector interface {
 }
 
 // SetLandings turns on detecting members' work accepted upstream
-func (s *GlossaryService) SetLandings(d LandingDetector) { s.landings = d }
+func (s *Service) SetLandings(d LandingDetector) { s.landings = d }
 
 // SetProjects lets imports and syncs check the project's language
-func (s *GlossaryService) SetProjects(r project.Repository) { s.projects = r }
+func (s *Service) SetProjects(r project.Repository) { s.projects = r }
 
 // SetUpstream shows the state of project files on the GNOME translation site
-func (s *GlossaryService) SetUpstream(c *gnomel10n.Client) { s.upstream = c }
+func (s *Service) SetUpstream(c *gnomel10n.Client) { s.upstream = c }
 
 // SyncStatus is the progress of a project's Sync button run
 type SyncStatus struct {
@@ -71,8 +77,8 @@ type SyncStatus struct {
 }
 
 // NewGlossaryService creates a new glossary service
-func NewGlossaryService(repo repository.GlossaryRepository, fetcher *glossary.Fetcher) *GlossaryService {
-	return &GlossaryService{repo: repo, fetcher: fetcher}
+func New(repo Repository, fetcher *glossary.Fetcher) *Service {
+	return &Service{repo: repo, fetcher: fetcher}
 }
 
 // ModuleGroupImportInput is an upload request
@@ -113,7 +119,7 @@ func cleanGroup(name, version string) (string, string, error) {
 // ImportGroup reads an archive or PO file and adds its translations to the glossary
 // under the given module group. Files of different languages create one import per
 // language; an earlier import of the same module group and language is replaced.
-func (s *GlossaryService) ImportGroup(ctx context.Context, user *models.User, p *models.Project, in ModuleGroupImportInput) (*ModuleGroupImportResult, error) {
+func (s *Service) ImportGroup(ctx context.Context, user *models.User, p *models.Project, in ModuleGroupImportInput) (*ModuleGroupImportResult, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -148,7 +154,7 @@ func (s *GlossaryService) ImportGroup(ctx context.Context, user *models.User, p 
 	return s.importInto(ctx, v, in.Filename, in.Data, language, &user.ID)
 }
 
-func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup, filename string, data []byte, language string, uploadedBy *int64) (*ModuleGroupImportResult, error) {
+func (s *Service) importInto(ctx context.Context, v *models.ModuleGroup, filename string, data []byte, language string, uploadedBy *int64) (*ModuleGroupImportResult, error) {
 	files, err := glossary.ReadFiles(filename, data, glossary.Limits{})
 	switch {
 	case errors.Is(err, glossary.ErrUnsupported):
@@ -188,10 +194,10 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 		}
 	}
 
-	byLang := map[string][]repository.GlossaryTerm{}
+	byLang := map[string][]GlossaryTerm{}
 	entries := map[string]int{}
 	for _, t := range built.Terms {
-		byLang[t.Language] = append(byLang[t.Language], repository.GlossaryTerm{
+		byLang[t.Language] = append(byLang[t.Language], GlossaryTerm{
 			Source: t.Source, SourceNorm: t.SourceNorm,
 			Translation: t.Translation, TranslationNorm: t.TranslationNorm,
 			WordCount: t.WordCount, Occurrences: t.Occurrences,
@@ -206,7 +212,7 @@ func (s *GlossaryService) importInto(ctx context.Context, v *models.ModuleGroup,
 		imp := &models.ModuleGroupImport{
 			ProjectID:  v.ProjectID,
 			GroupID:    v.ID,
-			Filename:   cleanFilename(filename, "glossary"),
+			Filename:   models.CleanFilename(filename, "glossary"),
 			Language:   lang,
 			FileCount:  countFiles(files, built, lang),
 			EntryCount: entries[lang],
@@ -262,7 +268,7 @@ type GroupSyncInput struct {
 
 // SetGroupSync stores a download URL for a module group and fetches it right away. The
 // URL is kept even when this first download fails; the error is returned.
-func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p *models.Project, in GroupSyncInput) (*models.ModuleGroup, *FetchOutcome, error) {
+func (s *Service) SetGroupSync(ctx context.Context, user *models.User, p *models.Project, in GroupSyncInput) (*models.ModuleGroup, *FetchOutcome, error) {
 	if !p.Role.CanManage() {
 		return nil, nil, apperr.ErrForbidden
 	}
@@ -317,14 +323,14 @@ func (s *GlossaryService) SetGroupSync(ctx context.Context, user *models.User, p
 		return nil, nil, err
 	}
 	if v.IsTP() { // one file per domain: too slow to wait for
-		s.fetchInBackground(v)
+		s.FetchInBackground(v)
 		return v, nil, nil
 	}
 	out := s.FetchGroup(ctx, v)
 	return v, out, nil
 }
 
-func (s *GlossaryService) projectGroup(ctx context.Context, p *models.Project, groupID int64) (*models.ModuleGroup, error) {
+func (s *Service) projectGroup(ctx context.Context, p *models.Project, groupID int64) (*models.ModuleGroup, error) {
 	v, err := s.repo.GetGroup(ctx, groupID)
 	if err != nil || v.ProjectID != p.ID {
 		return nil, apperr.ErrNotFound
@@ -333,7 +339,7 @@ func (s *GlossaryService) projectGroup(ctx context.Context, p *models.Project, g
 }
 
 // DeleteGroup removes a module group and everything imported for it
-func (s *GlossaryService) DeleteGroup(ctx context.Context, p *models.Project, groupID int64) error {
+func (s *Service) DeleteGroup(ctx context.Context, p *models.Project, groupID int64) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -345,7 +351,7 @@ func (s *GlossaryService) DeleteGroup(ctx context.Context, p *models.Project, gr
 }
 
 // RemoveGroupSync stops the automatic download of a module group (its content stays)
-func (s *GlossaryService) RemoveGroupSync(ctx context.Context, p *models.Project, groupID int64) error {
+func (s *Service) RemoveGroupSync(ctx context.Context, p *models.Project, groupID int64) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -357,7 +363,7 @@ func (s *GlossaryService) RemoveGroupSync(ctx context.Context, p *models.Project
 }
 
 // FetchGroupNow downloads a module group's source immediately
-func (s *GlossaryService) FetchGroupNow(ctx context.Context, p *models.Project, groupID int64) (*FetchOutcome, error) {
+func (s *Service) FetchGroupNow(ctx context.Context, p *models.Project, groupID int64) (*FetchOutcome, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -369,15 +375,15 @@ func (s *GlossaryService) FetchGroupNow(ctx context.Context, p *models.Project, 
 		return nil, apperr.ErrNotFound
 	}
 	if v.IsTP() { // nil outcome: running in the background
-		s.fetchInBackground(v)
+		s.FetchInBackground(v)
 		return nil, nil
 	}
 	return s.FetchGroup(ctx, v), nil
 }
 
-// fetchInBackground downloads a module group after the request (sources with one file per module),
+// FetchInBackground downloads a module group after the request (sources with one file per module),
 // one download round at a time like the hourly sync
-func (s *GlossaryService) fetchInBackground(v *models.ModuleGroup) {
+func (s *Service) FetchInBackground(v *models.ModuleGroup) {
 	go func() {
 		s.syncing.Lock()
 		defer s.syncing.Unlock()
@@ -391,7 +397,7 @@ func (s *GlossaryService) fetchInBackground(v *models.ModuleGroup) {
 
 // SyncAll downloads every module group with a sync link again in the background and
 // re-imports the ones that changed (glossary and project files). Managers only.
-func (s *GlossaryService) SyncAll(ctx context.Context, p *models.Project) error {
+func (s *Service) SyncAll(ctx context.Context, p *models.Project) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -424,7 +430,7 @@ func (s *GlossaryService) SyncAll(ctx context.Context, p *models.Project) error 
 			switch {
 			case out.Err != nil:
 				log.Printf("glossary: sync %s (version %d): %v", v.SyncURL, v.ID, out.Err)
-				st.Failed = append(st.Failed, v.Label()+": "+fetchErrorText(out.Err))
+				st.Failed = append(st.Failed, v.Label()+": "+FetchErrorText(out.Err))
 			case out.Changed:
 				log.Printf("glossary: synced version %d from %s", v.ID, v.SyncURL)
 				st.Changed = append(st.Changed, v.Label())
@@ -440,7 +446,7 @@ func (s *GlossaryService) SyncAll(ctx context.Context, p *models.Project) error 
 	return nil
 }
 
-func (s *GlossaryService) setSync(projectID int64, st *SyncStatus) {
+func (s *Service) setSync(projectID int64, st *SyncStatus) {
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()
 	if s.syncState == nil {
@@ -450,7 +456,7 @@ func (s *GlossaryService) setSync(projectID int64, st *SyncStatus) {
 }
 
 // SyncState returns a copy of the project's latest Sync button run (nil = none)
-func (s *GlossaryService) SyncState(p *models.Project) *SyncStatus {
+func (s *Service) SyncState(p *models.Project) *SyncStatus {
 	s.stateMu.Lock()
 	defer s.stateMu.Unlock()
 	st := s.syncState[p.ID]
@@ -472,7 +478,7 @@ type FetchOutcome struct {
 
 // FetchGroup downloads a module group's source and re-imports it when the content changed.
 // The outcome is recorded on the module group.
-func (s *GlossaryService) FetchGroup(ctx context.Context, v *models.ModuleGroup) *FetchOutcome {
+func (s *Service) FetchGroup(ctx context.Context, v *models.ModuleGroup) *FetchOutcome {
 	out := &FetchOutcome{}
 	if s.fetcher == nil {
 		out.Err = errors.New("fetcher not configured")
@@ -502,7 +508,7 @@ func (s *GlossaryService) FetchGroup(ctx context.Context, v *models.ModuleGroup)
 		v.LastFetchError = ""
 	case err != nil:
 		out.Err = err
-		v.LastFetchError = fetchErrorText(err)
+		v.LastFetchError = FetchErrorText(err)
 	default:
 		sum := sha256.Sum256(res.Data)
 		hash := hex.EncodeToString(sum[:])
@@ -514,7 +520,7 @@ func (s *GlossaryService) FetchGroup(ctx context.Context, v *models.ModuleGroup)
 		imported, err := s.importInto(ctx, v, res.Filename, res.Data, v.SyncLanguage, v.FeedCreatedBy)
 		if err != nil {
 			out.Err = err
-			v.LastFetchError = fetchErrorText(err)
+			v.LastFetchError = FetchErrorText(err)
 			v.FetchETag, v.FetchLastModified = "", ""
 			break
 		}
@@ -529,7 +535,8 @@ func (s *GlossaryService) FetchGroup(ctx context.Context, v *models.ModuleGroup)
 	return out
 }
 
-func fetchErrorText(err error) string {
+// FetchErrorText is how a failed download is stored for the sync status: a message key with its arguments
+func FetchErrorText(err error) string {
 	if ue, ok := apperr.AsUserError(err); ok {
 		// "key|arg|arg" keeps the message's details (shown with errText)
 		parts := []string{ue.Key}
@@ -546,7 +553,7 @@ func fetchErrorText(err error) string {
 }
 
 // FetchDue downloads every source not fetched within the interval
-func (s *GlossaryService) FetchDue(ctx context.Context, interval time.Duration) {
+func (s *Service) FetchDue(ctx context.Context, interval time.Duration) {
 	s.syncing.Lock()
 	defer s.syncing.Unlock()
 	due, err := s.repo.DueGroupSyncs(ctx, time.Now().Add(-interval))
@@ -583,7 +590,7 @@ func countFiles(files []glossary.File, built *glossary.Result, lang string) int 
 }
 
 // Term returns one glossary string by its hash
-func (s *GlossaryService) Term(ctx context.Context, p *models.Project, hash string) (*models.GlossaryTerm, error) {
+func (s *Service) Term(ctx context.Context, p *models.Project, hash string) (*models.GlossaryTerm, error) {
 	t, err := s.repo.Term(ctx, p.ID, strings.ToLower(hash))
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
@@ -592,12 +599,12 @@ func (s *GlossaryService) Term(ctx context.Context, p *models.Project, hash stri
 }
 
 // GroupImports lists the uploads of a project
-func (s *GlossaryService) GroupImports(ctx context.Context, p *models.Project) ([]*models.ModuleGroupImport, error) {
+func (s *Service) GroupImports(ctx context.Context, p *models.Project) ([]*models.ModuleGroupImport, error) {
 	return s.repo.ListGroupImports(ctx, p.ID)
 }
 
 // DeleteGroupImport removes an upload and its terms
-func (s *GlossaryService) DeleteGroupImport(ctx context.Context, p *models.Project, id int64) error {
+func (s *Service) DeleteGroupImport(ctx context.Context, p *models.Project, id int64) error {
 	if !p.Role.CanManage() {
 		return apperr.ErrForbidden
 	}
@@ -610,7 +617,7 @@ func (s *GlossaryService) DeleteGroupImport(ctx context.Context, p *models.Proje
 
 // Groups lists the project groups, newest release first ("gnome-51"
 // before "gnome-50", "gnome-100" before "gnome-99")
-func (s *GlossaryService) Groups(ctx context.Context, p *models.Project) ([]*models.ModuleGroup, error) {
+func (s *Service) Groups(ctx context.Context, p *models.Project) ([]*models.ModuleGroup, error) {
 	groups, err := s.repo.ListGroups(ctx, p.ID)
 	if err != nil {
 		return nil, err
@@ -666,7 +673,7 @@ func digitRun(s string) (string, string) {
 }
 
 // Languages lists the glossary languages of a project
-func (s *GlossaryService) Languages(ctx context.Context, p *models.Project) ([]string, error) {
+func (s *Service) Languages(ctx context.Context, p *models.Project) ([]string, error) {
 	return s.repo.Languages(ctx, p.ID)
 }
 
@@ -684,7 +691,7 @@ type GlossarySearch struct {
 }
 
 // Modules lists the modules (PO files) of a language's glossary, for the filter
-func (s *GlossaryService) Modules(ctx context.Context, p *models.Project, language string, groupID int64) ([]repository.ModuleCount, error) {
+func (s *Service) Modules(ctx context.Context, p *models.Project, language string, groupID int64) ([]ModuleCount, error) {
 	return s.repo.Modules(ctx, p.ID, language, groupID)
 }
 
@@ -701,11 +708,11 @@ type GlossaryPage struct {
 const GlossaryPageSize = 50
 
 // Search finds glossary terms
-func (s *GlossaryService) Search(ctx context.Context, p *models.Project, in GlossarySearch) (*GlossaryPage, error) {
+func (s *Service) Search(ctx context.Context, p *models.Project, in GlossarySearch) (*GlossaryPage, error) {
 	if in.Offset < 0 {
 		in.Offset = 0
 	}
-	q := repository.GlossaryQuery{
+	q := GlossaryQuery{
 		ProjectID:    p.ID,
 		Language:     in.Language,
 		GroupID:      in.GroupID,
@@ -800,7 +807,7 @@ type ProjectFileOrder struct {
 	Rank func(*models.ProjectFile) int
 }
 
-func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, query string, groupIDs []int64, keep func(*models.ProjectFile) bool, order ProjectFileOrder, offset int) ([]*models.ProjectFile, int, error) {
+func (s *Service) ProjectFiles(ctx context.Context, p *models.Project, query string, groupIDs []int64, keep func(*models.ProjectFile) bool, order ProjectFileOrder, offset int) ([]*models.ProjectFile, int, error) {
 	if offset < 0 {
 		offset = 0
 	}
@@ -837,7 +844,7 @@ func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, q
 
 // ProjectProgress is the translation state of all modules in the project files (the newest copy of each), for the
 // project header; nil when the project has no project files
-func (s *GlossaryService) ProjectProgress(ctx context.Context, p *models.Project) *models.CatalogStats {
+func (s *Service) ProjectProgress(ctx context.Context, p *models.Project) *models.CatalogStats {
 	total, translated, fuzzy, err := s.repo.ProjectFileTotals(ctx, p.ID)
 	if err != nil || total == 0 {
 		return nil
@@ -846,7 +853,7 @@ func (s *GlossaryService) ProjectProgress(ctx context.Context, p *models.Project
 }
 
 // GroupsWithFiles lists the groups that have project files, newest first
-func (s *GlossaryService) GroupsWithFiles(ctx context.Context, p *models.Project) ([]*models.ModuleGroupOption, error) {
+func (s *Service) GroupsWithFiles(ctx context.Context, p *models.Project) ([]*models.ModuleGroupOption, error) {
 	list, err := s.repo.GroupsWithFiles(ctx, p.ID)
 	if err != nil {
 		return nil, err
@@ -862,7 +869,7 @@ func (s *GlossaryService) GroupsWithFiles(ctx context.Context, p *models.Project
 }
 
 // ProjectFile returns one source PO file with its uncompressed contents
-func (s *GlossaryService) ProjectFile(ctx context.Context, p *models.Project, id int64) (*models.ProjectFile, []byte, error) {
+func (s *Service) ProjectFile(ctx context.Context, p *models.Project, id int64) (*models.ProjectFile, []byte, error) {
 	f, err := s.repo.GetProjectFile(ctx, p.ID, id)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, apperr.ErrNotFound
@@ -882,7 +889,7 @@ func (s *GlossaryService) ProjectFile(ctx context.Context, p *models.Project, id
 
 // UpstreamFor returns the project file a translation can be updated from: same
 // language, the same file name, else the same module from the newest module group (nil = none).
-func (s *GlossaryService) UpstreamFor(ctx context.Context, p *models.Project, c *models.Catalog) (*models.ProjectFile, error) {
+func (s *Service) UpstreamFor(ctx context.Context, p *models.Project, c *models.Catalog) (*models.ProjectFile, error) {
 	if c.IsTemplate {
 		return nil, nil
 	}
@@ -916,7 +923,7 @@ func (s *GlossaryService) UpstreamFor(ctx context.Context, p *models.Project, c 
 
 // ModuleGroups maps each module (file name before the first dot) to the module groups
 // (glossary groups with project files, e.g. "gnome-51") whose project files include it
-func (s *GlossaryService) ModuleGroups(ctx context.Context, p *models.Project) (map[string][]int64, error) {
+func (s *Service) ModuleGroups(ctx context.Context, p *models.Project) (map[string][]int64, error) {
 	names, err := s.repo.ProjectFileNames(ctx, p.ID)
 	if err != nil {
 		return nil, err
@@ -939,7 +946,7 @@ func (s *GlossaryService) ModuleGroups(ctx context.Context, p *models.Project) (
 const StatsInterval = 55 * time.Minute
 
 // RecordStats stores the current totals of every module group for the progress chart
-func (s *GlossaryService) RecordStats(ctx context.Context) {
+func (s *Service) RecordStats(ctx context.Context) {
 	if err := s.repo.RecordGroupStats(ctx, 0, StatsInterval); err != nil {
 		log.Printf("glossary: record group stats: %v", err)
 	}
@@ -956,7 +963,7 @@ var StatsRanges = []StatsRange{{"1", 1}, {"7", 7}, {"30", 30}, {"all", 0}}
 
 // GroupStats returns a module group's recorded totals for a language within the last days
 // (0 = all), oldest first
-func (s *GlossaryService) GroupStats(ctx context.Context, p *models.Project, groupID int64, language string, days int) ([]models.GroupStat, error) {
+func (s *Service) GroupStats(ctx context.Context, p *models.Project, groupID int64, language string, days int) ([]models.GroupStat, error) {
 	if _, err := s.projectGroup(ctx, p, groupID); err != nil {
 		return nil, err
 	}
@@ -968,7 +975,7 @@ func (s *GlossaryService) GroupStats(ctx context.Context, p *models.Project, gro
 }
 
 // UpstreamData is the contents of the project file a member's file follows (UpstreamFor; nil = none)
-func (s *GlossaryService) UpstreamData(ctx context.Context, p *models.Project, c *models.Catalog) ([]byte, *models.ProjectFile, error) {
+func (s *Service) UpstreamData(ctx context.Context, p *models.Project, c *models.Catalog) ([]byte, *models.ProjectFile, error) {
 	var f *models.ProjectFile
 	if c.RepoPath != "" { // a repository file: the newest copy of the same path
 		if pf, _, err := s.repo.ProjectFileByRepoPath(ctx, p.ID, c.RepoPath); err == nil {
@@ -994,7 +1001,7 @@ func (s *GlossaryService) UpstreamData(ctx context.Context, p *models.Project, c
 
 // ProjectFileForModule finds the project file a glossary module name comes from (glossary.ModuleName of its
 // file name), from the newest module group first; nil when none
-func (s *GlossaryService) ProjectFileForModule(ctx context.Context, p *models.Project, module string) (*models.ProjectFile, error) {
+func (s *Service) ProjectFileForModule(ctx context.Context, p *models.Project, module string) (*models.ProjectFile, error) {
 	files, _, err := s.repo.ListProjectFiles(ctx, p.ID, "", nil, "", 1<<30, 0)
 	if err != nil {
 		return nil, err
@@ -1018,4 +1025,9 @@ func (s *GlossaryService) ProjectFileForModule(ctx context.Context, p *models.Pr
 		}
 	}
 	return best, nil
+}
+
+// ProjectFileByRepoPath returns the newest project file with this repository path (git module groups) and its group
+func (s *Service) ProjectFileByRepoPath(ctx context.Context, projectID int64, path string) (*models.ProjectFile, *models.ModuleGroup, error) {
+	return s.repo.ProjectFileByRepoPath(ctx, projectID, path)
 }

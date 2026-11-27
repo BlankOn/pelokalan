@@ -12,6 +12,7 @@ import (
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/service"
+	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -65,7 +66,7 @@ func (h *Handler) PatchLink(user *models.User, c *models.Catalog) string {
 // changes anyway) and apply the patch
 func PatchCommand(g *models.ModuleGroup, repoPath, link string) string {
 	return "git fetch https://github.com/" + g.GitRepo + ".git " + g.GitBranch +
-		" && git switch -C " + service.GitBranchName(repoPath) + " FETCH_HEAD" +
+		" && git switch -C " + source.GitBranchName(repoPath) + " FETCH_HEAD" +
 		" && curl -fsSL '" + link + "' | git am"
 }
 

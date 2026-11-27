@@ -19,6 +19,7 @@ import (
 	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/reservation"
+	"pelokalan/internal/source"
 	"pelokalan/pkg/po"
 )
 
@@ -31,7 +32,7 @@ type CatalogService struct {
 	// reservations: released when a sync shows all the holder's changes upstream (nil = off)
 	reservations *reservation.Service
 	// project files, for git patches against the repository's own files (SetProjectFiles)
-	projectFiles repository.GlossaryRepository
+	projectFiles source.Repository
 }
 
 // SetActivity makes the service record entry saves and commits in the activity log
@@ -130,20 +131,12 @@ func (s *CatalogService) Template(ctx context.Context, p *models.Project, ownerI
 	return c, err
 }
 
-func cleanFilename(name, fallback string) string {
-	name = filepath.Base(strings.ReplaceAll(name, "\\", "/"))
-	if name == "." || name == "/" || name == "" {
-		return fallback
-	}
-	return name
-}
-
 // uploadFilename names an uploaded file. A name that says nothing about the program, such as
 // "id.po", "pt_BR.po" or "messages.pot", is replaced by one built from Project-Id-Version:
 // "Constrict main" becomes "constrict.main.id.po" (or "constrict.main.pot" for a template), so the
 // module (the part before the first dot) is the program's name.
 func uploadFilename(filename, projectVersion, language string, isTemplate bool) string {
-	name := cleanFilename(filename, "messages.po")
+	name := models.CleanFilename(filename, "messages.po")
 	if !genericFilename(name, language) {
 		return name
 	}
@@ -326,7 +319,7 @@ func (s *CatalogService) Replace(ctx context.Context, user *models.User, p *mode
 		return apperr.ErrForbidden
 	}
 	s.SafetyCommit(ctx, user.ID, c, CommitMsgBeforeReplace)
-	name, err := s.uniqueFilename(ctx, c, cleanFilename(filename, c.Filename))
+	name, err := s.uniqueFilename(ctx, c, models.CleanFilename(filename, c.Filename))
 	if err != nil {
 		return err
 	}
@@ -788,7 +781,7 @@ func (s *CatalogService) SaveEntry(ctx context.Context, user *models.User, c *mo
 }
 
 // Suggestions returns translation memory matches for an entry
-func (s *CatalogService) Suggestions(ctx context.Context, user *models.User, c *models.Catalog, e *models.Entry) ([]repository.Suggestion, error) {
+func (s *CatalogService) Suggestions(ctx context.Context, user *models.User, c *models.Catalog, e *models.Entry) ([]source.Suggestion, error) {
 	if c.IsTemplate || e.IsPlural() {
 		return nil, nil
 	}
