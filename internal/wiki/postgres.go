@@ -1,4 +1,4 @@
-package postgres
+package wiki
 
 import (
 	"context"
@@ -7,13 +7,12 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 type wikiRepository struct{ db *sql.DB }
 
 // NewWikiRepository creates the wiki repository
-func NewWikiRepository(db *sql.DB) repository.WikiRepository { return &wikiRepository{db: db} }
+func NewRepository(db *sql.DB) Repository { return &wikiRepository{db: db} }
 
 const wikiColumns = `w.id, w.project_id, w.parent_id, w.slug, w.title, w.position, w.created_by, w.updated_by,
 	w.created_at, w.updated_at, COALESCE(NULLIF(u.name, ''), u.username, '')`

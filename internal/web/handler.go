@@ -35,6 +35,7 @@ import (
 	"pelokalan/internal/service"
 	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
+	"pelokalan/internal/wiki"
 	"pelokalan/pkg/badgecard"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
@@ -53,7 +54,7 @@ type Handler struct {
 	glossary       *source.Service
 	ai             *service.AIService
 	discuss        *discussion.Service
-	wiki           *service.WikiService
+	wiki           *wiki.Service
 	contexts       *modulecontext.Service
 	poFetcher      *glossary.Fetcher // downloads PO files from a URL (SSRF-safe)
 	syncEvery      time.Duration     // automatic glossary/project file sync interval
@@ -77,7 +78,7 @@ func NewHandler(
 	glossaryService *source.Service,
 	aiService *service.AIService,
 	discussionService *discussion.Service,
-	wikiService *service.WikiService,
+	wikiService *wiki.Service,
 	contextService *modulecontext.Service,
 ) (*Handler, error) {
 	if loc, err := time.LoadLocation(siteConfig.TimeZone); err == nil {

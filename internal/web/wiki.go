@@ -16,12 +16,12 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 	"pelokalan/internal/web/middleware"
+	"pelokalan/internal/wiki"
 )
 
 // wikiPageData fills the data shared by the wiki view and editor
-func (h *Handler) wikiPageData(r *http.Request, p *models.Project, tree *service.WikiTree, current *models.WikiPage) PageData {
+func (h *Handler) wikiPageData(r *http.Request, p *models.Project, tree *wiki.WikiTree, current *models.WikiPage) PageData {
 	data := h.page(r, "")
 	data.Title = i18n.T(data.Lang, "title.wiki") + " · " + p.Name
 	data.Data["Project"] = p
@@ -93,12 +93,12 @@ func (h *Handler) WikiPage(w http.ResponseWriter, r *http.Request) {
 	if edits, err := h.wiki.Edits(r.Context(), pg); err == nil {
 		data.Data["Edits"] = edits
 	}
-	data.Data["CanDelete"] = service.CanDeleteWikiPage(middleware.GetUser(r.Context()), p, pg)
+	data.Data["CanDelete"] = wiki.CanDeleteWikiPage(middleware.GetUser(r.Context()), p, pg)
 	h.render(w, "wiki", data)
 }
 
 // renderWikiEdit shows the editor for a new (page nil) or existing page
-func (h *Handler) renderWikiEdit(w http.ResponseWriter, r *http.Request, p *models.Project, pg *models.WikiPage, in service.WikiInput, errMsg string) {
+func (h *Handler) renderWikiEdit(w http.ResponseWriter, r *http.Request, p *models.Project, pg *models.WikiPage, in wiki.WikiInput, errMsg string) {
 	tree, err := h.wiki.Tree(r.Context(), p)
 	if err != nil {
 		h.fail(w, r, err)
@@ -122,7 +122,7 @@ func (h *Handler) renderWikiEdit(w http.ResponseWriter, r *http.Request, p *mode
 
 // renderWikiConflict shows the editor with the user's unsaved text and how to resolve
 // a conflict: copy the text, reload to get the latest version, then edit again.
-func (h *Handler) renderWikiConflict(w http.ResponseWriter, r *http.Request, p *models.Project, cur *models.WikiPage, in service.WikiInput) {
+func (h *Handler) renderWikiConflict(w http.ResponseWriter, r *http.Request, p *models.Project, cur *models.WikiPage, in wiki.WikiInput) {
 	tree, err := h.wiki.Tree(r.Context(), p)
 	if err != nil {
 		h.fail(w, r, err)
@@ -137,11 +137,11 @@ func (h *Handler) renderWikiConflict(w http.ResponseWriter, r *http.Request, p *
 	h.render(w, "wiki_edit", data)
 }
 
-func wikiInput(r *http.Request) service.WikiInput {
+func wikiInput(r *http.Request) wiki.WikiInput {
 	parent, _ := strconv.ParseInt(r.FormValue("parent_id"), 10, 64)
 	pos, _ := strconv.Atoi(r.FormValue("position"))
 	ver, _ := strconv.ParseInt(r.FormValue("version"), 10, 64)
-	return service.WikiInput{Title: r.FormValue("title"), Slug: r.FormValue("slug"), Body: r.FormValue("body"),
+	return wiki.WikiInput{Title: r.FormValue("title"), Slug: r.FormValue("slug"), Body: r.FormValue("body"),
 		ParentID: parent, Position: pos, Version: ver}
 }
 
@@ -152,7 +152,7 @@ func (h *Handler) WikiNew(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	parent, _ := strconv.ParseInt(r.URL.Query().Get("parent"), 10, 64)
-	h.renderWikiEdit(w, r, p, nil, service.WikiInput{ParentID: parent}, "")
+	h.renderWikiEdit(w, r, p, nil, wiki.WikiInput{ParentID: parent}, "")
 }
 
 // WikiCreate saves a new page
@@ -187,7 +187,7 @@ func (h *Handler) WikiEdit(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	in := service.WikiInput{Title: pg.Title, Slug: pg.Slug, Body: pg.Body, Version: pg.Version()}
+	in := wiki.WikiInput{Title: pg.Title, Slug: pg.Slug, Body: pg.Body, Version: pg.Version()}
 	if pg.ParentID != nil {
 		in.ParentID = *pg.ParentID
 	}
@@ -209,7 +209,7 @@ func (h *Handler) WikiSave(w http.ResponseWriter, r *http.Request) {
 				h.fail(w, r, perr)
 				return
 			}
-			if err == service.ErrWikiConflict {
+			if err == wiki.ErrWikiConflict {
 				// keep the old version: saving again is refused until the user reloads,
 				// copies their text into the latest version and saves that
 				h.renderWikiConflict(w, r, p, cur, in)

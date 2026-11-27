@@ -32,6 +32,7 @@ import (
 	"pelokalan/internal/source"
 	"pelokalan/internal/web"
 	"pelokalan/internal/web/middleware"
+	"pelokalan/internal/wiki"
 	"pelokalan/pkg/ai"
 	"pelokalan/pkg/githubapp"
 	"pelokalan/pkg/glossary"
@@ -79,7 +80,7 @@ type App struct {
 	Activity     *activity.Service
 	Reservations *reservation.Service
 	Reviews      *service.ReviewService
-	Wiki         *service.WikiService
+	Wiki         *wiki.Service
 	Contexts     *modulecontext.Service
 	AI           *service.AIService
 	Thesaurus    *langtools.ThesaurusService
@@ -172,7 +173,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.Catalogs.SetActivity(a.Activity)
 	a.Discussions.SetActivity(a.Activity)
 	a.Discussions.SetNotifications(project.NewNotificationRepository(db))
-	a.Wiki = service.NewWikiService(postgres.NewWikiRepository(db), a.Blobs)
+	a.Wiki = wiki.New(wiki.NewRepository(db), a.Blobs)
 	a.Contexts = modulecontext.New(modulecontext.NewRepository(db))
 	a.AI = service.NewAIService(repos.AI, repos.Catalog, repos.Glossary, ai.NewBox(cfg.AI.SecretKey), cfg.AI.AllowPrivateHosts)
 	a.AI.SetHistory(a.Catalogs)

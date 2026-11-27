@@ -1,4 +1,4 @@
-package service
+package wiki
 
 import (
 	"context"
@@ -13,7 +13,6 @@ import (
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/project"
-	"pelokalan/internal/repository"
 )
 
 // Wiki limits
@@ -36,14 +35,14 @@ var (
 var wikiReserved = map[string]bool{"new": true, "files": true, "preview": true}
 
 // WikiService manages project wiki pages and their files
-type WikiService struct {
-	repo  repository.WikiRepository
+type Service struct {
+	repo  Repository
 	blobs blobstore.Store
 }
 
 // NewWikiService creates the wiki service
-func NewWikiService(repo repository.WikiRepository, blobs blobstore.Store) *WikiService {
-	return &WikiService{repo: repo, blobs: blobs}
+func New(repo Repository, blobs blobstore.Store) *Service {
+	return &Service{repo: repo, blobs: blobs}
 }
 
 // WikiInput is the editable part of a page
@@ -91,7 +90,7 @@ func isWithin(p, node *models.WikiPage) bool {
 }
 
 // Tree loads all pages of a project (without bodies) and links them up
-func (s *WikiService) Tree(ctx context.Context, p *models.Project) (*WikiTree, error) {
+func (s *Service) Tree(ctx context.Context, p *models.Project) (*WikiTree, error) {
 	pages, err := s.repo.ListPages(ctx, p.ID)
 	if err != nil {
 		return nil, err
@@ -167,7 +166,7 @@ func (t *WikiTree) Breadcrumbs(page *models.WikiPage) []*models.WikiPage {
 }
 
 // Redirect finds where a page that used to have this address lives now
-func (s *WikiService) Redirect(ctx context.Context, p *models.Project, slug string) (string, error) {
+func (s *Service) Redirect(ctx context.Context, p *models.Project, slug string) (string, error) {
 	cur, err := s.repo.Redirect(ctx, p.ID, strings.ToLower(slug))
 	if errors.Is(err, store.ErrNotFound) {
 		return "", apperr.ErrNotFound
@@ -179,12 +178,12 @@ func (s *WikiService) Redirect(ctx context.Context, p *models.Project, slug stri
 const wikiHistoryLimit = 50
 
 // Edits lists who saved the page and when, newest first
-func (s *WikiService) Edits(ctx context.Context, pg *models.WikiPage) ([]models.WikiEdit, error) {
+func (s *Service) Edits(ctx context.Context, pg *models.WikiPage) ([]models.WikiEdit, error) {
 	return s.repo.Edits(ctx, pg.ID, wikiHistoryLimit)
 }
 
 // Page loads one page with its body
-func (s *WikiService) Page(ctx context.Context, p *models.Project, slug string) (*models.WikiPage, error) {
+func (s *Service) Page(ctx context.Context, p *models.Project, slug string) (*models.WikiPage, error) {
 	pg, err := s.repo.GetPage(ctx, p.ID, strings.ToLower(slug))
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, apperr.ErrNotFound
@@ -192,7 +191,7 @@ func (s *WikiService) Page(ctx context.Context, p *models.Project, slug string) 
 	return pg, err
 }
 
-func (s *WikiService) validate(in *WikiInput) error {
+func (s *Service) validate(in *WikiInput) error {
 	in.Title = strings.TrimSpace(in.Title)
 	in.Body = strings.ReplaceAll(in.Body, "\r\n", "\n")
 	if in.Title == "" || len([]rune(in.Title)) > wikiMaxTitle {
@@ -205,7 +204,7 @@ func (s *WikiService) validate(in *WikiInput) error {
 }
 
 // checkParent verifies the parent exists and the page (with its subtree) still fits the depth limit
-func (s *WikiService) checkParent(t *WikiTree, page *models.WikiPage, parentID int64) (*int64, error) {
+func (s *Service) checkParent(t *WikiTree, page *models.WikiPage, parentID int64) (*int64, error) {
 	if parentID == 0 {
 		return nil, nil
 	}
@@ -217,7 +216,7 @@ func (s *WikiService) checkParent(t *WikiTree, page *models.WikiPage, parentID i
 	return nil, ErrWikiParent
 }
 
-func (s *WikiService) uniqueSlug(ctx context.Context, projectID int64, base string) (string, error) {
+func (s *Service) uniqueSlug(ctx context.Context, projectID int64, base string) (string, error) {
 	for i := 1; i < 1000; i++ {
 		cand := base
 		if i > 1 {
@@ -253,7 +252,7 @@ func wikiSlug(title string) string {
 }
 
 // Create adds a page (project members)
-func (s *WikiService) Create(ctx context.Context, user *models.User, p *models.Project, in WikiInput) (*models.WikiPage, error) {
+func (s *Service) Create(ctx context.Context, user *models.User, p *models.Project, in WikiInput) (*models.WikiPage, error) {
 	if !p.Role.IsMember() {
 		return nil, apperr.ErrForbidden
 	}
@@ -301,7 +300,7 @@ func (s *WikiService) Create(ctx context.Context, user *models.User, p *models.P
 }
 
 // Update saves a page (project members); a change made meanwhile by someone else is refused
-func (s *WikiService) Update(ctx context.Context, user *models.User, p *models.Project, slug string, in WikiInput) (*models.WikiPage, error) {
+func (s *Service) Update(ctx context.Context, user *models.User, p *models.Project, slug string, in WikiInput) (*models.WikiPage, error) {
 	if !p.Role.IsMember() {
 		return nil, apperr.ErrForbidden
 	}
@@ -337,7 +336,7 @@ func (s *WikiService) Update(ctx context.Context, user *models.User, p *models.P
 // Move places a page before or after another page ("before", "after") or as its last
 // subpage ("inside"); project members may reorganize the wiki. The depth limit applies to
 // the moved page together with its subpages.
-func (s *WikiService) Move(ctx context.Context, user *models.User, p *models.Project, slug string, targetID int64, mode string) error {
+func (s *Service) Move(ctx context.Context, user *models.User, p *models.Project, slug string, targetID int64, mode string) error {
 	if !p.Role.IsMember() {
 		return apperr.ErrForbidden
 	}
@@ -410,7 +409,7 @@ func CanDeleteWikiPage(user *models.User, p *models.Project, pg *models.WikiPage
 }
 
 // Delete removes a page without subpages
-func (s *WikiService) Delete(ctx context.Context, user *models.User, p *models.Project, slug string) error {
+func (s *Service) Delete(ctx context.Context, user *models.User, p *models.Project, slug string) error {
 	pg, err := s.Page(ctx, p, slug)
 	if err != nil {
 		return err
@@ -429,7 +428,7 @@ func (s *WikiService) Delete(ctx context.Context, user *models.User, p *models.P
 // Upload stores files for wiki pages (project members): 10 MB each, 5 per request. Any
 // type is accepted; images (png/jpeg/gif/webp, detected from the content) are shown in the
 // page, everything else is served as a download (application/octet-stream, sandboxed).
-func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.Project, uploads []discussion.Upload) ([]*models.WikiFile, error) {
+func (s *Service) Upload(ctx context.Context, user *models.User, p *models.Project, uploads []discussion.Upload) ([]*models.WikiFile, error) {
 	if !p.Role.IsMember() {
 		return nil, apperr.ErrForbidden
 	}
@@ -468,7 +467,7 @@ func (s *WikiService) Upload(ctx context.Context, user *models.User, p *models.P
 }
 
 // File returns an uploaded file with its bytes
-func (s *WikiService) File(ctx context.Context, p *models.Project, id int64) (*models.WikiFile, []byte, error) {
+func (s *Service) File(ctx context.Context, p *models.Project, id int64) (*models.WikiFile, []byte, error) {
 	f, err := s.repo.GetFile(ctx, p.ID, id)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil, apperr.ErrNotFound
