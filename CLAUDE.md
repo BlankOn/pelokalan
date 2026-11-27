@@ -252,7 +252,8 @@ make cover          # coverage of every package by every test (bin/coverage.html
 - Deleting a comment removes its attachment rows; `blobs.GC` (hourly) deletes unreferenced
   blobs older than 24 h. Swap the `Store` implementation to move files to real object storage.
 - The Diskusi tab is searchable (`DiscussionFilter.Query`): every word must appear in the title or a
-  visible comment (ILIKE); results show the newest matching comment. If it gets slow, add a pg_trgm
+  visible comment (ILIKE). Each discussion previews its newest visible comment (when searching, the newest matching one),
+  as plain text (`plainMarkdown`, 180 characters). If it gets slow, add a pg_trgm
   or full-text index rather than a separate search service.
 - Thread component `discussion_thread` is used on the term page and lazily in the glossary
   list (`.gl-thread[data-thread-url]`); "Diskusi" tab lists all threads (`?mentions=1`).
@@ -746,7 +747,8 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
 - **View-only layout** ("Lihat" on another member's file, `?view=1`; `viewData`, `view_toolbar`, class `view-mode`
   with `review-mode`): the review layout without decisions or discussion (`.sb-thread` hidden): back, file + owner,
   "Hanya lihat", and for repository files the Tabel/Diff toggle with the member's changes against the last synced file.
-  Links without `?view=1` (discussion emails, `?entry=`) still open the normal read-only editor. For owners, coordinators and
+  Links without `?view=1` (discussion emails, `?entry=`) open the normal read-only editor, except that someone who may
+  review a file waiting for review (`ReviewService.OpenFor`) is sent to the review editor with the same query. For owners, coordinators and
   reviewers a file waiting for review shows "Tinjau" (to the review editor) instead of "Lihat". In review and view layouts long
   strings wrap in the table, and the selected row is only lightly marked (pale blue, dark text) since there is no edit
   pane below.

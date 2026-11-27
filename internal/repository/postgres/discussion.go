@@ -68,7 +68,9 @@ func (r *discussionRepository) List(ctx context.Context, projectID int64, f repo
 		           WHERE c.discussion_id = d.id AND c.deleted_at IS NULL AND m.user_id = $` + itoaArg(len(args)) + `)`
 	}
 	// search: each word must appear in the title or in a visible comment (case-insensitive)
-	snippet := `''`
+	// the preview under each discussion: its newest visible comment (when searching, the newest one that matches)
+	snippet := `COALESCE((SELECT c.body FROM comments c WHERE c.discussion_id = d.id AND c.deleted_at IS NULL
+	           ORDER BY c.id DESC LIMIT 1), '')`
 	words := strings.Fields(strings.ToLower(f.Query))
 	if len(words) > 8 {
 		words = words[:8]

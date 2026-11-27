@@ -477,7 +477,7 @@ func (h *Handler) DiscussionsPage(w http.ResponseWriter, r *http.Request) {
 	}
 	rows := make([]discussionRow, len(list))
 	for i, d := range list {
-		rows[i] = discussionRow{D: d, URL: h.discuss.SubjectURL(r.Context(), p, d), Snippet: shortText(d.Snippet, 180)}
+		rows[i] = discussionRow{D: d, URL: h.discuss.SubjectURL(r.Context(), p, d), Snippet: shortText(plainMarkdown(d.Snippet), 180)}
 	}
 	data := h.page(r, "")
 	data.Title = i18n.T(data.Lang, "title.discussions") + " · " + p.Name
@@ -584,6 +584,22 @@ func (h *Handler) TopicCreate(w http.ResponseWriter, r *http.Request) {
 }
 
 // shortText flattens whitespace and cuts text to n characters
+var (
+	mdImage  = regexp.MustCompile(`!\[([^\]]*)\]\([^)]*\)`)
+	mdLink   = regexp.MustCompile(`\[([^\]]+)\]\([^)]*\)`)
+	mdMarks  = regexp.MustCompile("(\\*\\*|__|`+|~~)")
+	mdPrefix = regexp.MustCompile(`(?m)^\s*(>+|#{1,6}|[-*+]|\d+\.)\s+`)
+)
+
+// plainMarkdown turns a comment's Markdown into plain text for a one-line preview (links keep their text,
+// pictures their description, emphasis, code marks, quotes, headings and list bullets go)
+func plainMarkdown(s string) string {
+	s = mdImage.ReplaceAllString(s, "🖼 $1")
+	s = mdLink.ReplaceAllString(s, "$1")
+	s = mdPrefix.ReplaceAllString(s, "")
+	return mdMarks.ReplaceAllString(s, "")
+}
+
 func shortText(s string, n int) string {
 	s = strings.Join(strings.Fields(s), " ")
 	if r := []rune(s); len(r) > n {

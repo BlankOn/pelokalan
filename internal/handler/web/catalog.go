@@ -179,6 +179,18 @@ func (h *Handler) Editor(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
+	// another member's file waiting for a review this person may give (discussion links, emails): the review editor,
+	// on the same string (?entry= is kept)
+	if user := middleware.GetUser(r.Context()); user != nil && c.OwnerID != user.ID && r.URL.Query().Get("view") != "1" {
+		if rid := h.reviews.OpenFor(r.Context(), p, c.ID, user); rid != nil {
+			target := fmt.Sprintf("%s/reviews/%d", p.Path(), *rid)
+			if r.URL.RawQuery != "" {
+				target += "?" + r.URL.RawQuery
+			}
+			http.Redirect(w, r, target, http.StatusSeeOther)
+			return
+		}
+	}
 	h.editorPage(w, r, c, p, nil)
 }
 

@@ -26,7 +26,7 @@ type Discussion struct {
 	// Filled by listing queries
 	LastAuthor   string
 	Participants int
-	Snippet      string // a matching comment when searching
+	Snippet      string // the newest visible comment (when searching: the newest matching one), for the list preview
 }
 
 // Comment is one message of a discussion

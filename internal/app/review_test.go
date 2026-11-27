@@ -151,6 +151,11 @@ func TestGitHubReviews(t *testing.T) {
 	owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d&status=review", kc, rid)).status(http.StatusOK).
 		contains("Remove the directory", "mark-review").lacks("Close the window")
 	owner.get(fmt.Sprintf("/catalogs/%d/list?review=%d", kc, rid)).status(http.StatusOK).contains("Remove the directory", "Close the window")
+	// a link to the translator's file (discussion, email) takes a reviewer to the review editor on the same string
+	fileURL := fmt.Sprintf("%s/%s/po/library__os.po", base, kiki.Username)
+	owner.get(fileURL + "?entry=abc123").redirectsTo(page + "?entry=abc123")
+	owner.get(fileURL + "?view=1").status(http.StatusOK)      // "Lihat" stays the view-only layout
+	kiki.get(fileURL + "?entry=abc123").status(http.StatusOK) // the translator keeps their own editor
 	cmt := scalar[int64](t, `SELECT id FROM comments WHERE review_id = $1`, rid)
 	visitor(t).post(fmt.Sprintf("%s/comments/%d/resolve", base, cmt), nil)
 	if scalar[bool](t, `SELECT resolved_at IS NOT NULL FROM comments WHERE id = $1`, cmt) {
