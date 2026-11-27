@@ -22,6 +22,7 @@ import (
 
 	"pelokalan/internal/langtools"
 	"pelokalan/internal/models"
+	"pelokalan/internal/modulecontext"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
@@ -46,7 +47,7 @@ type Handler struct {
 	ai             *service.AIService
 	discuss        *service.DiscussionService
 	wiki           *service.WikiService
-	contexts       *service.ContextService
+	contexts       *modulecontext.Service
 	poFetcher      *glossary.Fetcher // downloads PO files from a URL (SSRF-safe)
 	syncEvery      time.Duration     // automatic glossary/project file sync interval
 	thesaurus      *langtools.ThesaurusService
@@ -70,7 +71,7 @@ func NewHandler(
 	aiService *service.AIService,
 	discussionService *service.DiscussionService,
 	wikiService *service.WikiService,
-	contextService *service.ContextService,
+	contextService *modulecontext.Service,
 ) (*Handler, error) {
 	if loc, err := time.LoadLocation(siteConfig.TimeZone); err == nil {
 		siteLocation = loc

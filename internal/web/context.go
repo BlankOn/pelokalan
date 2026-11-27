@@ -10,9 +10,9 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	"pelokalan/internal/models"
+	"pelokalan/internal/modulecontext"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -45,7 +45,7 @@ func (h *Handler) SaveCatalogContext(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	version, _ := strconv.ParseInt(r.FormValue("version"), 10, 64)
 	n, err := h.contexts.Save(r.Context(), middleware.GetUser(r.Context()), p, c, r.FormValue("note"), version)
-	if errors.Is(err, service.ErrContextConflict) {
+	if errors.Is(err, modulecontext.ErrContextConflict) {
 		w.WriteHeader(http.StatusConflict)
 		res := map[string]any{"conflict": true, "error": i18n.T(lang, "context.conflict_title")}
 		if n != nil {
@@ -172,7 +172,7 @@ func (h *Handler) SaveGeneralContext(w http.ResponseWriter, r *http.Request) {
 			h.fail(w, r, err)
 			return
 		}
-		if errors.Is(err, service.ErrContextConflict) {
+		if errors.Is(err, modulecontext.ErrContextConflict) {
 			w.Header().Set("Content-Type", "text/html; charset=utf-8")
 			w.WriteHeader(http.StatusConflict)
 		}

@@ -16,6 +16,7 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 
 	"pelokalan/internal/langtools"
+	"pelokalan/internal/modulecontext"
 	"pelokalan/internal/platform/blobstore"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/mailer"
@@ -72,7 +73,7 @@ type App struct {
 	Reservations *service.ReservationService
 	Reviews      *service.ReviewService
 	Wiki         *service.WikiService
-	Contexts     *service.ContextService
+	Contexts     *modulecontext.Service
 	AI           *service.AIService
 	Thesaurus    *langtools.ThesaurusService
 	Spelling     *langtools.SpellingService
@@ -165,7 +166,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.Discussions.SetActivity(a.Activity)
 	a.Discussions.SetNotifications(postgres.NewNotificationRepository(db))
 	a.Wiki = service.NewWikiService(postgres.NewWikiRepository(db), a.Blobs)
-	a.Contexts = service.NewContextService(postgres.NewContextRepository(db))
+	a.Contexts = modulecontext.New(modulecontext.NewRepository(db))
 	a.AI = service.NewAIService(repos.AI, repos.Catalog, repos.Glossary, ai.NewBox(cfg.AI.SecretKey), cfg.AI.AllowPrivateHosts)
 	a.AI.SetHistory(a.Catalogs)
 	a.AI.SetContexts(a.Contexts)

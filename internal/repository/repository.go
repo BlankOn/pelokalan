@@ -394,14 +394,3 @@ type NotificationRepository interface {
 	Settings(ctx context.Context, projectID int64, userIDs []int64) (map[int64]*models.NotificationSettings, error)
 	Save(ctx context.Context, userID, projectID int64, s *models.NotificationSettings) error
 }
-
-// ContextRepository stores Konteks notes, one per module of a project
-type ContextRepository interface {
-	Get(ctx context.Context, projectID int64, module string) (*models.ModuleContext, error)
-	// Save stores the note and records the edit. version is the version the editor
-	// started from (0 = none yet); ErrConflict when someone saved in between.
-	Save(ctx context.Context, c *models.ModuleContext, version int64) error
-	Edits(ctx context.Context, contextID int64, limit int) ([]models.ContextEdit, error)
-	// ListForProject lists the project's non-empty notes, optionally matching q
-	ListForProject(ctx context.Context, projectID int64, q string) ([]*models.ModuleContext, error)
-}

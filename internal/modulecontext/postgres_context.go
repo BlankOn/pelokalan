@@ -1,4 +1,4 @@
-package postgres
+package modulecontext
 
 import (
 	"context"
@@ -8,13 +8,12 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 type contextRepository struct{ db *sql.DB }
 
 // NewContextRepository creates the Konteks repository
-func NewContextRepository(db *sql.DB) repository.ContextRepository { return &contextRepository{db: db} }
+func NewRepository(db *sql.DB) Repository { return &contextRepository{db: db} }
 
 const contextColumns = `x.id, x.project_id, x.module, x.title, x.note, x.version, x.updated_by, x.updated_at,
 	COALESCE((SELECT COALESCE(NULLIF(u.name, ''), u.username) FROM users u WHERE u.id = x.updated_by), '')`

@@ -1,4 +1,4 @@
-package service
+package modulecontext
 
 import (
 	"context"
@@ -10,7 +10,6 @@ import (
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 const (
@@ -26,17 +25,17 @@ var ErrContextConflict = apperr.New("err.context_conflict")
 // name starts with the same word), kept in Pelokalan only. Everyone who can read the
 // project reads it; members edit it together. It does not depend on any one file, so it
 // comes back when someone takes the module again.
-type ContextService struct {
-	repo repository.ContextRepository
+type Service struct {
+	repo Repository
 }
 
 // NewContextService creates the Konteks service
-func NewContextService(repo repository.ContextRepository) *ContextService {
-	return &ContextService{repo: repo}
+func New(repo Repository) *Service {
+	return &Service{repo: repo}
 }
 
 // ForModule returns a module's Konteks (also when its note is empty), or nil
-func (s *ContextService) ForModule(ctx context.Context, projectID int64, module string) (*models.ModuleContext, error) {
+func (s *Service) ForModule(ctx context.Context, projectID int64, module string) (*models.ModuleContext, error) {
 	n, err := s.repo.Get(ctx, projectID, module)
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, nil
@@ -45,7 +44,7 @@ func (s *ContextService) ForModule(ctx context.Context, projectID int64, module 
 }
 
 // ForCatalog returns the Konteks note of a PO file's module, or nil when there is none
-func (s *ContextService) ForCatalog(ctx context.Context, c *models.Catalog) (*models.ModuleContext, error) {
+func (s *Service) ForCatalog(ctx context.Context, c *models.Catalog) (*models.ModuleContext, error) {
 	if c.IsTemplate {
 		return nil, nil
 	}
@@ -57,7 +56,7 @@ func (s *ContextService) ForCatalog(ctx context.Context, c *models.Catalog) (*mo
 }
 
 // Edits lists the latest saves of a module's Konteks
-func (s *ContextService) Edits(ctx context.Context, n *models.ModuleContext) ([]models.ContextEdit, error) {
+func (s *Service) Edits(ctx context.Context, n *models.ModuleContext) ([]models.ContextEdit, error) {
 	if n == nil {
 		return nil, nil
 	}
@@ -67,7 +66,7 @@ func (s *ContextService) Edits(ctx context.Context, n *models.ModuleContext) ([]
 // Save stores the Konteks of a file's module (members only). version is the version
 // the editor started from (0 = there was none). If someone saved in between, nothing is
 // stored: it returns the latest Konteks with ErrContextConflict.
-func (s *ContextService) Save(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, note string, version int64) (*models.ModuleContext, error) {
+func (s *Service) Save(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, note string, version int64) (*models.ModuleContext, error) {
 	if user == nil || !p.Role.IsMember() || c.IsTemplate {
 		return nil, apperr.ErrForbidden
 	}
@@ -95,7 +94,7 @@ func (s *ContextService) Save(ctx context.Context, user *models.User, p *models.
 const maxContextTitle = 120
 
 // CreateGeneral adds a Konteks item that belongs to no module (members only)
-func (s *ContextService) CreateGeneral(ctx context.Context, user *models.User, p *models.Project, title, note string) (*models.ModuleContext, error) {
+func (s *Service) CreateGeneral(ctx context.Context, user *models.User, p *models.Project, title, note string) (*models.ModuleContext, error) {
 	if user == nil || !p.Role.IsMember() {
 		return nil, apperr.ErrForbidden
 	}
@@ -117,7 +116,7 @@ func (s *ContextService) CreateGeneral(ctx context.Context, user *models.User, p
 
 // SaveGeneral changes a Konteks item without a module (members only; an empty note hides it). version is the
 // version the form started from; ErrContextConflict with the latest when someone saved in between.
-func (s *ContextService) SaveGeneral(ctx context.Context, user *models.User, p *models.Project, key, title, note string, version int64) (*models.ModuleContext, error) {
+func (s *Service) SaveGeneral(ctx context.Context, user *models.User, p *models.Project, key, title, note string, version int64) (*models.ModuleContext, error) {
 	if user == nil || !p.Role.IsMember() {
 		return nil, apperr.ErrForbidden
 	}
@@ -146,7 +145,7 @@ func (s *ContextService) SaveGeneral(ctx context.Context, user *models.User, p *
 }
 
 // DeleteGeneral removes an item without a module (like emptying its note: it leaves the list, its edits stay)
-func (s *ContextService) DeleteGeneral(ctx context.Context, user *models.User, p *models.Project, key string) error {
+func (s *Service) DeleteGeneral(ctx context.Context, user *models.User, p *models.Project, key string) error {
 	if user == nil || !p.Role.IsMember() {
 		return apperr.ErrForbidden
 	}
@@ -167,7 +166,7 @@ func (s *ContextService) DeleteGeneral(ctx context.Context, user *models.User, p
 }
 
 // List returns the project's Konteks notes, most recently changed first
-func (s *ContextService) List(ctx context.Context, p *models.Project, q string) ([]*models.ModuleContext, error) {
+func (s *Service) List(ctx context.Context, p *models.Project, q string) ([]*models.ModuleContext, error) {
 	return s.repo.ListForProject(ctx, p.ID, q)
 }
 
