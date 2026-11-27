@@ -285,6 +285,9 @@ make cover          # coverage of every package by every test (bin/coverage.html
   `ai.ContextWords`/`ai.Mentioned`; plain sentences and examples do not count) are sent as `optional` hints (not enforced by `ai.Verify`), and
   whole-string glossary matches containing such a word go to the model instead of being applied.
 - Project tabs carry monochrome line icons (`tab_icon` in project_header.html).
+- The project header shows the overall progress of all modules in the project files after the name (and AI badge):
+  `GlossaryService.ProjectProgress` → `ProjectFileTotals` counts each module per language once, from its newest copy;
+  filled by `loadProject` on full pages (`Project.Progress`).
 - Statistik / Stats tab (`/projects/{id}/insight`, before Anggota, `InsightPage` in insight.go, pages/insight.html):
   the module group chart (moved here from Penerjemahan) and "Aktivitas anggota" (public, like the rest of the
   project): totals and a per-member table. Above the module chart, "Pertumbuhan terjemahan" (`wordschart.go`,
@@ -990,8 +993,8 @@ deploys never run stale JS/CSS.
 
 ## Toasts and background forms
 
-- Flash messages (`?flash=<key>`, `flash.*` strings) are floating toasts on every page (`#toast` in base.html, removed
-  after 4.5 s; app.js drops `flash` from the address so a reload does not repeat it). From JS: `window.toast(msg, isError)`
+- Flash messages (`?flash=<key>`, `flash.*` strings) are floating toasts on every page (`#toast` in base.html: centred at
+  the top below the top bar, light green, light yellow for errors (`toast-error`); removed after 4.5 s; app.js drops `flash` from the address so a reload does not repeat it). From JS: `window.toast(msg, isError)`
   (defined for every page: the `#toast` element would otherwise be `window.toast`).
 - Forms with `data-ajax` (⋯ menu: reserve, release, withdraw a review; the coordinators' "Lepas") and the review popup
   are sent in the background with `X-Requested-With: fetch`; handlers answer JSON through `Handler.finish` /

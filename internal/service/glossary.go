@@ -832,6 +832,16 @@ func (s *GlossaryService) ProjectFiles(ctx context.Context, p *models.Project, q
 	return kept[offset:min(offset+ProjectFilePageSize, len(kept))], len(kept), nil
 }
 
+// ProjectProgress is the translation state of all modules in the project files (the newest copy of each), for the
+// project header; nil when the project has no project files
+func (s *GlossaryService) ProjectProgress(ctx context.Context, p *models.Project) *models.CatalogStats {
+	total, translated, fuzzy, err := s.repo.ProjectFileTotals(ctx, p.ID)
+	if err != nil || total == 0 {
+		return nil
+	}
+	return &models.CatalogStats{Total: total, Translated: translated, Fuzzy: fuzzy, Untranslated: max(0, total-translated-fuzzy)}
+}
+
 // GroupsWithFiles lists the groups that have project files, newest first
 func (s *GlossaryService) GroupsWithFiles(ctx context.Context, p *models.Project) ([]*models.ModuleGroupOption, error) {
 	list, err := s.repo.GroupsWithFiles(ctx, p.ID)

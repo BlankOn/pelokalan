@@ -115,14 +115,17 @@ func (h *Handler) loadProject(w http.ResponseWriter, r *http.Request) (*models.P
 		h.fail(w, r, err)
 		return nil, false
 	}
+	if !isHTMX(r) { // the header's progress bar (full pages only)
+		p.Progress = h.glossary.ProjectProgress(r.Context(), p)
+	}
 	return p, true
 }
 
-// loadMemberProject loads a project the signed-in user belongs to
 // showTemplateSection shows the "Templat sumber (POT)" section on Penerjemahan. Hidden for now; the
 // template upload and merge code stays so the section can come back by turning this on.
 const showTemplateSection = false
 
+// loadMemberProject loads a project the signed-in user belongs to
 func (h *Handler) loadMemberProject(w http.ResponseWriter, r *http.Request) (*models.Project, bool) {
 	p, ok := h.loadProject(w, r)
 	if ok && !p.Role.IsMember() {

@@ -2,7 +2,7 @@
 <div class="page-head">
     <div>
         <div class="crumbs"><a href="/projects">{{t .Lang "nav.projects"}}</a> /</div>
-        <h1>{{$p.Name}}{{if $p.AIEnabled}} {{template "ai_badge" .Lang}}{{end}}</h1>
+        <h1>{{$p.Name}}{{if $p.AIEnabled}} {{template "ai_badge" .Lang}}{{end}}{{with $p.Progress}}<span class="project-progress" title="{{t $.Lang "project.progress_help" .Translated .Total .Fuzzy}}">{{template "progress" (dict "Stats" . "Lang" $.Lang)}}<span class="pp-pct">{{.Percent}}%</span></span>{{end}}</h1>
         {{if $p.Description}}<p class="muted project-desc">{{linkify $p.Description}}</p>{{end}}
     </div>
     {{if $p.Role.IsMember}}<span class="role-badge role-{{$p.Role}}">{{roleName .Lang $p.Role}}</span>

@@ -157,6 +157,8 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 	// Settings lists the held module for managers
 	owner.get(base + "/settings").status(http.StatusOK).contains("Reservasi modul untuk dikerjakan").lacks("held-modules")
 
+	// the header shows the progress of all modules in the project files
+	visitor(t).get(base + "/files").status(http.StatusOK).contains(`class="project-progress"`, "Semua modul: ")
 	// the reservation filter on Berkas proyek
 	visitor(t).get(base + "/project-files?rv=free").status(http.StatusOK).contains("edit.main.id.po").lacks("calc.main.id.po")
 

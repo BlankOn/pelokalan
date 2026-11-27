@@ -608,6 +608,16 @@ func (r *glossaryRepository) CountGroupFiles(ctx context.Context, groupID int64)
 	return n, err
 }
 
+func (r *glossaryRepository) ProjectFileTotals(ctx context.Context, projectID int64) (int, int, int, error) {
+	var total, translated, fuzzy int
+	err := r.db.QueryRowContext(ctx, `SELECT COALESCE(SUM(total), 0), COALESCE(SUM(translated), 0), COALESCE(SUM(fuzzy), 0)
+		FROM (SELECT DISTINCT ON (lower(split_part(f.filename, '.', 1)), lower(f.language)) f.total, f.translated, f.fuzzy
+		      FROM project_files f WHERE f.project_id = $1
+		      ORDER BY lower(split_part(f.filename, '.', 1)), lower(f.language), f.created_at DESC, f.id DESC) newest`,
+		projectID).Scan(&total, &translated, &fuzzy)
+	return total, translated, fuzzy, err
+}
+
 func (r *glossaryRepository) ProjectFilesForLanguage(ctx context.Context, projectID int64, language string) ([]*models.ProjectFile, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT `+projectFileColumns+`
 		FROM project_files f JOIN module_groups v ON v.id = f.group_id

@@ -144,13 +144,15 @@ img.avatar, img.user-avatar { object-fit: cover; background: var(--surface-2); d
 .alert-error { background: var(--error-soft); color: #8f1f1b; border: 1px solid #f5c2bf; }
 .alert-warn { background: var(--fuzzy-soft); color: #7a4d05; border: 1px solid #f1d29a; }
 .alert-warn a { color: inherit; font-weight: 600; text-decoration: underline; }
-.toast-area { position: fixed; right: 16px; bottom: 40px; z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+/* toasts: centred at the top, just below the top bar; light green for confirmations, light yellow for problems */
+.toast-area { position: fixed; top: 58px; left: 50%; transform: translateX(-50%); z-index: 100; display: flex; flex-direction: column;
+    align-items: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); pointer-events: none; }
 .toast {
-    background: #24272e; color: #fff; padding: 10px 14px; border-radius: var(--radius);
-    box-shadow: 0 6px 20px rgba(0,0,0,.2); max-width: 360px; animation: toast-in .15s ease-out;
+    background: var(--ok-soft); color: #1d5e39; border: 1px solid #bfe3cc; padding: 9px 16px; border-radius: var(--radius);
+    box-shadow: 0 6px 20px rgba(0,0,0,.12); max-width: 520px; font-size: 14px; pointer-events: auto; animation: toast-in .15s ease-out;
 }
-.toast-error { background: var(--error); }
-@keyframes toast-in { from { transform: translateY(8px); opacity: 0; } }
+.toast-error { background: var(--fuzzy-soft); color: #7a4d05; border-color: #f1d29a; }
+@keyframes toast-in { from { transform: translateY(-8px); opacity: 0; } }
 
 /* ---------- Buttons / forms ---------- */
 .btn {
@@ -757,6 +759,11 @@ h1 .ai-badge { font-size: 12px; }
 .form fieldset.access-choice label.check { align-items: baseline; margin-top: 4px; }
 .join-form { margin: 0; }
 #my-files { scroll-margin-top: 100px; }
+/* the project's overall progress (all modules of the project files) after its name */
+.project-progress { display: inline-flex; align-items: center; gap: 8px; margin-left: 12px; vertical-align: middle; font-size: 13px;
+    font-weight: 600; color: var(--muted); }
+.project-progress .progress { width: 140px; }
+@media (max-width: 700px) { .project-progress { display: flex; margin: 6px 0 0; } .project-progress .progress { width: 100%; max-width: 220px; } }
 .project-contribute { position: relative; z-index: 1; } /* above the card's stretched link */
 .join-private { white-space: nowrap; }
 .form [data-source] { display: flex; flex-direction: column; gap: 6px; }

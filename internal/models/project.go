@@ -59,12 +59,13 @@ type Project struct {
 	UpdatedAt      time.Time `json:"updated_at"`
 
 	// Filled by listing queries
-	Role         ProjectRole `json:"role,omitempty"`
-	MemberCount  int         `json:"member_count,omitempty"`
-	CatalogCount int         `json:"catalog_count,omitempty"`
-	GroupCount   int         `json:"group_count,omitempty"`
-	TermCount    int         `json:"term_count,omitempty"`
-	AIEnabled    bool        `json:"ai_enabled,omitempty"` // an LLM API key is configured
+	Role         ProjectRole   `json:"role,omitempty"`
+	MemberCount  int           `json:"member_count,omitempty"`
+	CatalogCount int           `json:"catalog_count,omitempty"`
+	GroupCount   int           `json:"group_count,omitempty"`
+	TermCount    int           `json:"term_count,omitempty"`
+	AIEnabled    bool          `json:"ai_enabled,omitempty"` // an LLM API key is configured
+	Progress     *CatalogStats `json:"-"`                    // all modules of the project files (newest copy of each), for the header; nil = none
 }
 
 // Path is the project's address, e.g. /projects/gnome-id

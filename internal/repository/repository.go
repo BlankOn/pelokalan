@@ -178,6 +178,9 @@ type GlossaryRepository interface {
 	GetProjectFile(ctx context.Context, projectID, id int64) (*models.ProjectFile, error)
 	CountGroupFiles(ctx context.Context, groupID int64) (int, error)
 	ProjectFilesForLanguage(ctx context.Context, projectID int64, language string) ([]*models.ProjectFile, error)
+	// ProjectFileTotals adds up the project files' strings, counting each module (per language) once, from its
+	// newest copy
+	ProjectFileTotals(ctx context.Context, projectID int64) (total, translated, fuzzy int, err error)
 	// Stamp changes whenever imports of a project and language are added, replaced or removed
 	Stamp(ctx context.Context, projectID int64, language string) (string, error)
 	GetOrCreateGroup(ctx context.Context, projectID int64, name, version string) (*models.ModuleGroup, error)
