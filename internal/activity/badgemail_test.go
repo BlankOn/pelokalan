@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"pelokalan/internal/account"
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/mailer"
@@ -40,8 +39,8 @@ func (f *badgeRepo) AddAwards(_ context.Context, _ int64, a []models.BadgeAward,
 	return nil
 }
 
+// oneUser is a UserGetter that knows one person
 type oneUser struct {
-	account.UserRepository
 	u *models.User
 }
 
