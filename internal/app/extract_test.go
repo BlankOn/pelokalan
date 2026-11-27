@@ -1,8 +1,6 @@
 package app_test
 
 import (
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -127,10 +125,15 @@ func TestGlossaryExtraction(t *testing.T) {
 	visitor(t).get(base + "/glossary").status(http.StatusOK).lacks("Ekstrak istilah dengan AI")
 	visitor(t).get(base + "/glossary-extract?group=" + g).redirectsTo("/login")
 
-	owner.get(base+"/glossary-extract?group="+g).status(http.StatusOK).contains(`"to_send":2`, "2 string panjang")
-	owner.post(base+"/glossary-extract", url.Values{"group": {g}}).status(http.StatusOK).contains("dimulai")
+	// two modules: one has to be chosen, to keep the spending small
+	owner.get(base+"/glossary-extract?group="+g).status(http.StatusOK).
+		contains(`"to_send":2`, "2 string panjang", `"need_module":true`, "os — 1 string panjang, 1 belum diekstrak")
+	owner.post(base+"/glossary-extract", url.Values{"group": {g}}).status(http.StatusBadRequest).contains("Pilih satu modul")
+	owner.post(base+"/glossary-extract", url.Values{"group": {g}, "module": {"nope"}}).status(http.StatusBadRequest)
+	owner.get(base+"/glossary-extract?group="+g+"&module=os").status(http.StatusOK).contains(`"to_send":1`, "1 string panjang")
+	owner.post(base+"/glossary-extract", url.Values{"group": {g}, "module": {"os"}}).status(http.StatusOK).contains("dimulai")
 	waitExtract(t, pid, 1)
-	if reqs := fake.requests(); len(reqs) != 1 || len(reqs[0]) != 2 {
+	if reqs := fake.requests(); len(reqs) != 1 || len(reqs[0]) != 1 || reqs[0][0] != long {
 		t.Fatalf("requests = %q", reqs)
 	}
 
@@ -148,11 +151,7 @@ func TestGlossaryExtraction(t *testing.T) {
 	}
 	owner.get(base+"/glossary-extract/status").status(http.StatusOK).contains(`"running":false`, "Ekstraksi selesai")
 
-	// sys.po's string was never extracted (as if the first run had been stopped)
-	sum := sha256.Sum256([]byte(backlog + "\x00" + backlogTr))
-	if _, err := env.DB.Exec(`DELETE FROM term_extractions WHERE string_hash = $1`, hex.EncodeToString(sum[:])); err != nil {
-		t.Fatal(err)
-	}
+	// sys.po's string is not extracted yet (another module)
 	// a sync that changes os.po only: just its new string is sent (not sys.po's backlog), the earlier pairs come back
 	// from the stored results
 	upload("Library", "Pustaka", long, longTr, added, addedTr)

@@ -3697,6 +3697,8 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
     var status = document.getElementById("extract-status");
     var group = dlg.querySelector("[data-extract-group]");
     var box = dlg.querySelector("[data-extract-estimate]");
+    var modField = dlg.querySelector("[data-extract-module-field]");
+    var modSel = dlg.querySelector("[data-extract-module]");
     var start = dlg.querySelector("[data-extract-start]");
     var stop = dlg.querySelector("[data-extract-cancel]");
     var stopBar = document.querySelector("[data-extract-stop]"); // beside the progress line
@@ -3715,16 +3717,28 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
     function estimate() {
         box.textContent = dlg.dataset.starting;
         start.disabled = true;
-        fetch(base + "?group=" + encodeURIComponent(group.value), {credentials: "same-origin"})
+        fetch(base + "?group=" + encodeURIComponent(group.value) + "&module=" + encodeURIComponent(modSel.value),
+            {credentials: "same-origin"})
             .then(function (r) { return r.json(); })
             .then(function (d) {
                 box.textContent = "";
                 if (d.error) { line(d.error, "c-err"); return; }
                 if (!d.configured) { line(dlg.dataset.noai || "", "c-err"); return; }
+                if (d.modules) { // the group's modules: with several, one must be chosen (keeps token use small)
+                    while (modSel.options.length > 1) modSel.remove(1);
+                    d.modules.forEach(function (m) {
+                        var o = document.createElement("option");
+                        o.value = m.name;
+                        o.textContent = m.label;
+                        modSel.appendChild(o);
+                    });
+                    modField.hidden = !d.need_module;
+                }
+                var choose = !modField.hidden && !modSel.value;
                 line(d.summary);
-                if (d.cost) line(d.cost);
+                if (d.cost && !choose) line(d.cost);
                 if (d.budget) line(d.budget, d.over_budget ? "c-err" : "muted");
-                start.disabled = running || d.over_budget;
+                start.disabled = running || d.over_budget || choose;
             })
             .catch(function () { box.textContent = ""; });
     }
@@ -3769,11 +3783,17 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
         if (typeof dlg.showModal === "function") dlg.showModal(); else dlg.setAttribute("open", "");
         estimate();
     });
-    group.addEventListener("change", estimate);
+    group.addEventListener("change", function () {
+        modSel.value = "";
+        modField.hidden = true;
+        estimate();
+    });
+    modSel.addEventListener("change", estimate);
     start.addEventListener("click", function () {
         start.disabled = true;
         var fd = new FormData();
         fd.append("group", group.value);
+        fd.append("module", modSel.value);
         post(base, fd).then(function (d) {
             if (d.error) { window.toast(d.error, true); start.disabled = false; return; }
             window.toast(d.message);

@@ -25,8 +25,10 @@
     <ul class="review-list">
         {{range $i, $r := .}}<li data-i="{{$i}}" data-name="{{.RepoPath}}" data-user="{{.RequesterUsername}}" data-n="{{.Entries}}"
             data-t="{{.CreatedAt.Unix}}" data-state="{{if .Error}}0{{else if .OpenComments}}2{{else if .ResolvedComments}}1{{else}}3{{end}}">
-            <a class="review-link" href="{{$p.Path}}/reviews/{{.ID}}" title="{{t $.Lang "review.open"}}"><strong>{{.RepoPath}}</strong></a>
-            <span class="muted small">@{{.RequesterUsername}} · {{t $.Lang "review.strings" .Entries}} · {{t $.Lang "review.submitted" (timeAgo $.Lang .CreatedAt)}}{{if .UpdatedAfter}}, {{t $.Lang "review.updated" (timeAgo $.Lang .FileUpdatedAt)}}{{end}}</span>
+            <div class="rq-file"><a class="review-link" href="{{$p.Path}}/reviews/{{.ID}}" title="{{t $.Lang "review.open"}}"><strong>{{.RepoPath}}</strong></a>
+                <span class="muted small">{{t $.Lang "review.strings" .Entries}}</span></div>
+            <span class="rq-user small" title="{{.RequesterName}}">@{{.RequesterUsername}}</span>
+            <span class="rq-time small muted"><span>{{t $.Lang "review.submitted" (timeAgo $.Lang .CreatedAt)}}</span>{{if .UpdatedAfter}}<span>{{t $.Lang "review.updated" (timeAgo $.Lang .FileUpdatedAt)}}</span>{{end}}</span>
             <span class="review-end">
                 {{if .Error}}<span class="rv-chip rv-rejected small" title="{{errText $.Lang .Error}}">{{t $.Lang "review.failed"}}</span>{{end}}
                 {{if .OpenComments}}<span class="rv-chip rv-rejected small"><span class="mark-review"></span> {{t $.Lang "review.state_changes" .OpenComments}}</span>

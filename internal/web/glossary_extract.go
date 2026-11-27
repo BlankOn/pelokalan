@@ -19,14 +19,21 @@ func (h *Handler) GlossaryExtractEstimate(w http.ResponseWriter, r *http.Request
 		return
 	}
 	groupID, _ := strconv.ParseInt(r.URL.Query().Get("group"), 10, 64)
-	est, err := h.ai.EstimateExtract(r.Context(), p, groupID)
+	lang := middleware.GetLang(r.Context())
+	est, err := h.ai.EstimateExtract(r.Context(), p, groupID, r.URL.Query().Get("module"))
 	if err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": h.errorMessage(r, err)})
 		return
 	}
-	lang := middleware.GetLang(r.Context())
 	resp := map[string]any{"configured": est.Configured, "running": est.Running, "to_send": est.ToSend,
-		"over_budget": est.OverBudget}
+		"over_budget": est.OverBudget, "need_module": est.NeedModule}
+	if est.Modules != nil { // the module picker: one module per run keeps the spending small
+		mods := make([]map[string]string, len(est.Modules))
+		for i, m := range est.Modules {
+			mods[i] = map[string]string{"name": m.Name, "label": i18n.T(lang, "extract.module_option", m.Name, m.Strings, m.ToSend)}
+		}
+		resp["modules"] = mods
+	}
 	if est.Configured {
 		resp["summary"] = i18n.T(lang, "extract.summary", est.Strings, est.Done, est.ToSend)
 		if est.ToSend > 0 {
@@ -46,7 +53,7 @@ func (h *Handler) GlossaryExtractStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	groupID, _ := strconv.ParseInt(r.FormValue("group"), 10, 64)
-	if _, err := h.ai.StartExtract(r.Context(), middleware.GetUser(r.Context()), p, groupID); err != nil {
+	if _, err := h.ai.StartExtract(r.Context(), middleware.GetUser(r.Context()), p, groupID, r.FormValue("module")); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": h.errorMessage(r, err)})
 		return
 	}

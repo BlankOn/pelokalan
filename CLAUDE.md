@@ -754,7 +754,7 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   nothing fuzzy or AI, no open request, and not unchanged since its last commit to the repository; `#review-dialog` with an optional note; `POST /catalogs/{cid}/review`, sent in the background by app.js with
   `X-Requested-With: fetch` → JSON, so the page stays where it is: the popup closes, a toast shows and the file lists
   refresh with their current filters); owners and
-  managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan (each request is a clickable row, highlighted on hover, saying "diajukan <time>" and, when the file changed more than a minute after the request, ", diperbarui <time>" (`ModuleReview.UpdatedAfter`, `FileUpdatedAt` = the file's `updated_at`); search by file
+  managers are emailed and see "Menunggu tinjauan" on top of Penerjemahan (each request is a clickable row, highlighted on hover, in four columns: file with its string count, translator, "Diajukan <time>" with "Diperbarui <time>" below when the file changed more than a minute after the request, and the labels; stacked on phones (`ModuleReview.UpdatedAfter`, `FileUpdatedAt` = the file's `updated_at`); search by file
   or translator and an order select, `[data-review-queue]` in app.js, filtered in the page; a request whose review
   comments are all resolved shows a green "✓ Sudah diperbaiki" (`ModuleReview.ResolvedComments`), also on file rows); `/projects/{id}/reviews/{rid}` shows the
   changes (`review.Service.Changes`: `catalog.Service.ChangedTargets` = the git patch rule, against the last synced file)
@@ -900,8 +900,9 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
 ## Glossary extraction from long strings (AI)
 
 - Short strings become glossary terms as they are; documentation keeps its vocabulary in long strings. Owners and
-  coordinators press "✨ Ekstrak istilah dengan AI" on the glossary page (`#extract-dialog`, app.js): pick a module group,
-  see the estimate (`GET /projects/{id}/glossary-extract?group=`: long strings, already extracted, to send, tokens, cost,
+  coordinators press "✨ Ekstrak istilah dengan AI" on the glossary page (`#extract-dialog`, app.js): pick a module group
+  and, when it has more than one module, one module (`module` param, `ExtractEstimate.Modules/NeedModule`;
+  `StartExtract` refuses a group-wide run then, `err.extract_module_required`, to keep token use small), see the estimate (`GET /projects/{id}/glossary-extract?group=`: long strings, already extracted, to send, tokens, cost,
   budget), start (`POST`). While a run is going the button is hidden (`Data.ExtractRunning`, app.js) and its progress
   shows instead (`GET …/glossary-extract/status`, polled) with "Hentikan" beside it (`POST …/cancel`; a run the
   process no longer has, only marked running in the database, is closed as cancelled).

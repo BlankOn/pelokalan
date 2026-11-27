@@ -105,12 +105,12 @@ func TestGitHubReviews(t *testing.T) {
 	// the owner sees the queue and the change; kiki cannot decide on her own request
 	owner.get(base+"/files").status(http.StatusOK).contains("Menunggu tinjauan", page)
 	// the queue says when it was asked for, and when the file changed after that (more than a minute later)
-	owner.get(base + "/files").status(http.StatusOK).contains("diajukan ").lacks(", diperbarui ")
+	owner.get(base + "/files").status(http.StatusOK).contains("Diajukan ").lacks("<span>Diperbarui ")
 	if _, err := env.DB.Exec(`UPDATE catalogs SET updated_at = (SELECT created_at FROM module_reviews WHERE id = $2) + interval '5 minutes'
 		WHERE id = $1`, kc, rid); err != nil {
 		t.Fatal(err)
 	}
-	owner.get(base + "/files").status(http.StatusOK).contains(", diperbarui ")
+	owner.get(base + "/files").status(http.StatusOK).contains("<span>Diperbarui ")
 	// in Berkas anggota lain the owner gets "Tinjau" for a file waiting for review
 	owner.get(base + "/member-files").status(http.StatusOK).contains(`href="` + page + `">Tinjau`)
 	// the review editor: the review's strings only, the diff, the note, the approval button; no edit pane tools

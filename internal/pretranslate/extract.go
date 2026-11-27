@@ -48,8 +48,8 @@ func stringHash(source, translation string) string {
 }
 
 // importStrings reads an import's project files and returns its long translated strings (each text once); only
-// limits the files read (nil = all)
-func (s *Service) importStrings(ctx context.Context, imp *models.ModuleGroupImport, only map[string]bool) ([]extractString, error) {
+// limits the files read (nil = all), and so does module ("" = every module)
+func (s *Service) importStrings(ctx context.Context, imp *models.ModuleGroupImport, only map[string]bool, module string) ([]extractString, error) {
 	files, err := s.glossary.ImportFiles(ctx, imp.ID)
 	if err != nil {
 		return nil, err
@@ -57,7 +57,7 @@ func (s *Service) importStrings(ctx context.Context, imp *models.ModuleGroupImpo
 	var out []extractString
 	seen := map[string]int{}
 	for _, f := range files {
-		if only != nil && !only[f.Filename] {
+		if only != nil && !only[f.Filename] || module != "" && glossary.ModuleName(f.Filename, imp.Language) != module {
 			continue
 		}
 		data, err := gz.Decompress(f.Data)
@@ -100,7 +100,7 @@ func hashesOf(list []extractString) []string {
 
 // rebuildAITerms turns the stored results of an import's strings into its AI glossary rows
 func (s *Service) rebuildAITerms(ctx context.Context, imp *models.ModuleGroupImport) (int, error) {
-	list, err := s.importStrings(ctx, imp, nil)
+	list, err := s.importStrings(ctx, imp, nil, "")
 	if err != nil {
 		return 0, err
 	}
@@ -162,6 +162,24 @@ type extractPlan struct {
 	batches map[string][][]ai.ExtractItem
 	hashes  map[string]map[int64]string // language -> item id -> string hash
 	system  map[string]string
+	modules map[string]*ExtractModule // per module (when the plan covers every module)
+}
+
+// ExtractModule is one module of a group in the extraction dialog
+type ExtractModule struct {
+	Name    string
+	Strings int // long strings
+	ToSend  int // not extracted yet
+}
+
+// Modules lists the plan's modules by name
+func (pl *extractPlan) moduleList() []ExtractModule {
+	out := make([]ExtractModule, 0, len(pl.modules))
+	for _, m := range pl.modules {
+		out = append(out, *m)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i].Name < out[j].Name })
+	return out
 }
 
 func (s *Service) groupImports(ctx context.Context, projectID, groupID int64) ([]*models.ModuleGroupImport, error) {
@@ -179,14 +197,15 @@ func (s *Service) groupImports(ctx context.Context, projectID, groupID int64) ([
 }
 
 // planExtract lists the strings of a module group not extracted before. only (nil = every file of every import)
-// limits the work to the imports it names, each to the files in its set (a nil set = all of that import's files)
-func (s *Service) planExtract(ctx context.Context, projectID, groupID int64, only map[int64]map[string]bool) (*extractPlan, error) {
+// limits the work to the imports it names, each to the files in its set (a nil set = all of that import's files);
+// module ("" = all) to one module
+func (s *Service) planExtract(ctx context.Context, projectID, groupID int64, only map[int64]map[string]bool, module string) (*extractPlan, error) {
 	imps, err := s.groupImports(ctx, projectID, groupID)
 	if err != nil {
 		return nil, err
 	}
 	pl := &extractPlan{imports: imps, pending: map[string][]ai.ExtractItem{}, batches: map[string][][]ai.ExtractItem{},
-		hashes: map[string]map[int64]string{}, system: map[string]string{}}
+		hashes: map[string]map[int64]string{}, system: map[string]string{}, modules: map[string]*ExtractModule{}}
 	seen := map[string]bool{}
 	for _, imp := range imps {
 		var files map[string]bool
@@ -197,7 +216,7 @@ func (s *Service) planExtract(ctx context.Context, projectID, groupID int64, onl
 			}
 			files = f
 		}
-		list, err := s.importStrings(ctx, imp, files)
+		list, err := s.importStrings(ctx, imp, files, module)
 		if err != nil {
 			return nil, err
 		}
@@ -211,9 +230,17 @@ func (s *Service) planExtract(ctx context.Context, projectID, groupID int64, onl
 			pl.system[imp.Language] = ai.ExtractSystemPrompt("English", languageLabel(imp.Language))
 		}
 		for _, x := range list {
+			name, _, _ := strings.Cut(x.module, "\x1f")
+			m := pl.modules[name]
+			if m == nil {
+				m = &ExtractModule{Name: name}
+				pl.modules[name] = m
+			}
+			m.Strings++
 			if _, ok := done[x.hash]; ok || seen[imp.Language+x.hash] {
 				continue
 			}
+			m.ToSend++
 			seen[imp.Language+x.hash] = true
 			id := int64(len(pl.hashes[imp.Language]) + 1)
 			pl.hashes[imp.Language][id] = x.hash
@@ -245,6 +272,9 @@ type ExtractEstimate struct {
 	BudgetLeft       float64
 	OverBudget       bool
 	Running          bool
+	Module           string          // the chosen module ("" = the whole group)
+	Modules          []ExtractModule // the group's modules (with a choice of "" only)
+	NeedModule       bool            // the group has several modules: one must be chosen
 }
 
 func (pl *extractPlan) estimate(st *models.AISettings) (n int, prompt, completion int64, cost float64) {
@@ -258,8 +288,9 @@ func (pl *extractPlan) estimate(st *models.AISettings) (n int, prompt, completio
 	return n, prompt, completion, st.Cost(prompt, completion)
 }
 
-// EstimateExtract predicts the work and cost of extracting glossary terms from a module group's long strings
-func (s *Service) EstimateExtract(ctx context.Context, p *models.Project, groupID int64) (*ExtractEstimate, error) {
+// EstimateExtract predicts the work and cost of extracting glossary terms from a module group's long strings, of one
+// module when given ("" = the group: then the modules are listed, and a group with several needs one chosen)
+func (s *Service) EstimateExtract(ctx context.Context, p *models.Project, groupID int64, module string) (*ExtractEstimate, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -267,14 +298,18 @@ func (s *Service) EstimateExtract(ctx context.Context, p *models.Project, groupI
 	if err != nil {
 		return nil, err
 	}
-	est := &ExtractEstimate{GroupID: groupID, Running: s.extracting(p.ID)}
+	est := &ExtractEstimate{GroupID: groupID, Running: s.extracting(p.ID), Module: module}
 	if st == nil {
 		return est, nil
 	}
 	est.Configured, est.Model = true, st.Model
-	pl, err := s.planExtract(ctx, p.ID, groupID, nil)
+	pl, err := s.planExtract(ctx, p.ID, groupID, nil, module)
 	if err != nil {
 		return nil, err
+	}
+	if module == "" {
+		est.Modules = pl.moduleList()
+		est.NeedModule = len(est.Modules) > 1
 	}
 	est.Strings, est.ToSend = pl.strings, pl.toSend
 	est.Done = max(pl.strings-pl.toSend, 0)
@@ -305,9 +340,10 @@ func (s *Service) extracting(projectID int64) bool {
 	return true
 }
 
-// StartExtract starts extracting glossary terms from a module group's long strings in the background; strings that
-// are new after later syncs of the group are extracted too
-func (s *Service) StartExtract(ctx context.Context, user *models.User, p *models.Project, groupID int64) (*models.TermExtractionJob, error) {
+// StartExtract starts extracting glossary terms from the long strings of one module of a module group ("" = the
+// group, allowed only when it has a single module, to keep the spending small) in the background; strings that change
+// in later syncs of the group are extracted too
+func (s *Service) StartExtract(ctx context.Context, user *models.User, p *models.Project, groupID int64, module string) (*models.TermExtractionJob, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -330,10 +366,18 @@ func (s *Service) StartExtract(ctx context.Context, user *models.User, p *models
 	if !lock.TryLock() {
 		return nil, apperr.New("err.extract_running")
 	}
-	pl, err := s.planExtract(ctx, p.ID, groupID, nil)
+	pl, err := s.planExtract(ctx, p.ID, groupID, nil, module)
 	if err != nil {
 		lock.Unlock()
 		return nil, err
+	}
+	if module == "" && len(pl.modules) > 1 {
+		lock.Unlock()
+		return nil, apperr.New("err.extract_module_required")
+	}
+	if module != "" && pl.strings == 0 {
+		lock.Unlock()
+		return nil, apperr.New("err.extract_module_unknown")
 	}
 	if st.MonthlyBudget > 0 {
 		_, _, _, cost := pl.estimate(st)
@@ -404,7 +448,7 @@ func (s *Service) AfterImport(projectID, groupID int64, imports []*models.Module
 			only[imp.ID][n] = true
 		}
 	}
-	pl, err := s.planExtract(ctx, projectID, groupID, only)
+	pl, err := s.planExtract(ctx, projectID, groupID, only, "")
 	if err != nil || pl.toSend == 0 {
 		return
 	}

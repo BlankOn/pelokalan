@@ -89,6 +89,13 @@
             <select id="ex-group" name="group" data-extract-group>
                 {{range $r.Groups}}{{if .ImportCount}}<option value="{{.ID}}" {{if eq (printf "%d" .ID) $r.Group}}selected{{end}}>{{.Label}}{{if .AITerms}} · ✨{{end}}</option>{{end}}{{end}}
             </select>
+        <div data-extract-module-field hidden>
+            <label for="ex-module">{{t .Lang "extract.module"}}</label>
+            <select id="ex-module" name="module" data-extract-module>
+                <option value="">{{t .Lang "extract.module_choose"}}</option>
+            </select>
+            <p class="muted small field-help">{{t .Lang "extract.module_help"}}</p>
+        </div>
         <div class="extract-estimate small" data-extract-estimate></div>
         <p class="small muted">{{t .Lang "extract.after_sync"}}</p>
         <div class="dialog-actions">
