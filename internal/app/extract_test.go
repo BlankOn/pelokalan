@@ -161,4 +161,18 @@ func TestGlossaryExtraction(t *testing.T) {
 	if strings.Contains(scalar[string](t, `SELECT error FROM term_extraction_jobs WHERE project_id = $1 ORDER BY id DESC LIMIT 1`, pid), "err") {
 		t.Fatal("sync run failed")
 	}
+	// while a run is going the button gives way to its progress and "Hentikan"; a run the server lost (only in the
+	// database) is closed by Hentikan too
+	owner.get(base + "/glossary").status(http.StatusOK).contains("data-extract-open>").lacks("data-extract-open hidden")
+	if _, err := env.DB.Exec(`INSERT INTO term_extraction_jobs (project_id, group_id, status, model, total)
+		VALUES ($1, $2, 'running', 'gpt-4o-mini', 10)`, pid, gid); err != nil {
+		t.Fatal(err)
+	}
+	owner.get(base+"/glossary").status(http.StatusOK).contains("data-extract-open hidden", "data-extract-stop")
+	visitor(t).post(base+"/glossary-extract/cancel", nil).redirectsTo("/login")
+	owner.post(base+"/glossary-extract/cancel", nil).status(http.StatusOK)
+	if st := scalar[string](t, `SELECT status FROM term_extraction_jobs WHERE project_id = $1 ORDER BY id DESC LIMIT 1`, pid); st != "cancelled" {
+		t.Fatalf("status after Hentikan = %q", st)
+	}
+	owner.get(base + "/glossary").status(http.StatusOK).lacks("data-extract-open hidden")
 }

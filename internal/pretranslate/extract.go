@@ -401,9 +401,17 @@ func (s *Service) CancelExtract(ctx context.Context, p *models.Project) error {
 		return apperr.ErrForbidden
 	}
 	if c, ok := s.extractCancels.Load(p.ID); ok {
-		c.(context.CancelFunc)()
+		c.(context.CancelFunc)() // the run stops and records itself as cancelled
+		return nil
 	}
-	return nil
+	// no run in this process (it was lost, e.g. killed): close what the database still calls running
+	j, err := s.repo.LatestExtractJob(ctx, p.ID)
+	if err != nil || !j.IsRunning() {
+		return nil
+	}
+	now := time.Now()
+	j.Status, j.FinishedAt = models.AIJobCancelled, &now
+	return s.repo.UpdateExtractJob(ctx, j)
 }
 
 // LatestExtract returns the project's newest extraction run, or nil

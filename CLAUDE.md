@@ -902,7 +902,9 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
 - Short strings become glossary terms as they are; documentation keeps its vocabulary in long strings. Owners and
   coordinators press "✨ Ekstrak istilah dengan AI" on the glossary page (`#extract-dialog`, app.js): pick a module group,
   see the estimate (`GET /projects/{id}/glossary-extract?group=`: long strings, already extracted, to send, tokens, cost,
-  budget), start (`POST`), progress beside the button (`GET …/glossary-extract/status`, polled), "Hentikan" (`POST …/cancel`).
+  budget), start (`POST`). While a run is going the button is hidden (`Data.ExtractRunning`, app.js) and its progress
+  shows instead (`GET …/glossary-extract/status`, polled) with "Hentikan" beside it (`POST …/cancel`; a run the
+  process no longer has, only marked running in the database, is closed as cancelled).
 - `pkg/ai/extract.go`: `ExtractSystemPrompt` (precise rules: copy both sides verbatim, keep the inflected form, skip
   function words, names, code, markup, untranslated terms; JSON `{"items":[{"id","terms":[{"s","t"}]}]}`),
   `ExtractCandidate` (>= `ExtractMinWords` (4) words outside markup, <= 3000 chars), `CheckPairs` (each side must occur as

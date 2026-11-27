@@ -3699,6 +3699,7 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
     var box = dlg.querySelector("[data-extract-estimate]");
     var start = dlg.querySelector("[data-extract-start]");
     var stop = dlg.querySelector("[data-extract-cancel]");
+    var stopBar = document.querySelector("[data-extract-stop]"); // beside the progress line
     var running = false, timer = null, lastID = null;
 
     function post(url, body) {
@@ -3730,6 +3731,9 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
     function showRunning(on) {
         running = on;
         stop.hidden = !on;
+        stop.disabled = false;
+        opener.hidden = on; // one run at a time: no new one while this runs
+        if (stopBar) { stopBar.hidden = !on; stopBar.disabled = false; }
         if (on) start.disabled = true;
     }
     function poll() {
@@ -3780,6 +3784,11 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
                 .then(function (s) { lastID = s.id; showRunning(true); poll(); });
         });
     });
-    stop.addEventListener("click", function () { post(base + "/cancel", new FormData()).then(poll); });
+    function cancelRun(btn) {
+        btn.disabled = true;
+        post(base + "/cancel", new FormData()).then(function () { setTimeout(poll, 500); });
+    }
+    stop.addEventListener("click", function () { cancelRun(stop); });
+    if (stopBar) stopBar.addEventListener("click", function () { cancelRun(stopBar); });
     watch();
 })();

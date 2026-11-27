@@ -170,6 +170,11 @@ func (h *Handler) renderGlossary(w http.ResponseWriter, r *http.Request, p *mode
 	data.Data["Languages"] = languages
 	data.Data["Results"] = results
 	data.Data["Sync"] = glossarySyncStatus(results.Groups, imports)
+	if p.Role.CanManage() { // a running extraction shows its progress and "Hentikan" instead of the button
+		if j, err := h.ai.LatestExtract(r.Context(), p); err == nil && j != nil && j.IsRunning() {
+			data.Data["ExtractRunning"] = true
+		}
+	}
 	h.render(w, "glossary", data)
 }
 
