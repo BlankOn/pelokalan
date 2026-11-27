@@ -29,6 +29,7 @@ import (
 	"pelokalan/internal/platform/config"
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/project"
+	"pelokalan/internal/reservation"
 	"pelokalan/internal/service"
 	"pelokalan/internal/web/middleware"
 	"pelokalan/pkg/badgecard"
@@ -56,8 +57,8 @@ type Handler struct {
 	thesaurus      *langtools.ThesaurusService
 	spelling       *langtools.SpellingService
 	activity       *activity.Service
-	reservations   *service.ReservationService // module reservations (nil-safe: off)
-	reviews        *service.ReviewService      // reviews and commits to repositories (nil-safe: off)
+	reservations   *reservation.Service   // module reservations (nil-safe: off)
+	reviews        *service.ReviewService // reviews and commits to repositories (nil-safe: off)
 	assetVersion   string
 	byLogo         string
 }

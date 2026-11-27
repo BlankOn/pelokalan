@@ -1,4 +1,4 @@
-package postgres
+package reservation
 
 import (
 	"context"
@@ -9,13 +9,12 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 type reservationRepository struct{ db *sql.DB }
 
 // NewReservationRepository stores module reservations
-func NewReservationRepository(db *sql.DB) repository.ReservationRepository {
+func NewRepository(db *sql.DB) Repository {
 	return &reservationRepository{db: db}
 }
 

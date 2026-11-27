@@ -25,6 +25,7 @@ import (
 	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
 	"pelokalan/internal/repository/postgres"
+	"pelokalan/internal/reservation"
 	"pelokalan/internal/service"
 	"pelokalan/internal/web"
 	"pelokalan/internal/web/middleware"
@@ -55,7 +56,7 @@ type Repositories struct {
 	Commit   repository.CommitRepository
 	Discuss  repository.DiscussionRepository
 	Activity activity.Repository
-	Reserve  repository.ReservationRepository
+	Reserve  reservation.Repository
 	Review   repository.ReviewRepository
 }
 
@@ -73,7 +74,7 @@ type App struct {
 	Glossary     *service.GlossaryService
 	Discussions  *service.DiscussionService
 	Activity     *activity.Service
-	Reservations *service.ReservationService
+	Reservations *reservation.Service
 	Reviews      *service.ReviewService
 	Wiki         *service.WikiService
 	Contexts     *modulecontext.Service
@@ -119,7 +120,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		Commit:   postgres.NewCommitRepository(db),
 		Discuss:  postgres.NewDiscussionRepository(db),
 		Activity: activity.NewRepository(db),
-		Reserve:  postgres.NewReservationRepository(db),
+		Reserve:  reservation.NewRepository(db),
 		Review:   postgres.NewReviewRepository(db),
 	}
 	repos := a.Repos
@@ -145,7 +146,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 	a.Activity = activity.New(repos.Activity)
 	a.Activity.SetBadgeMail(repos.User, mailer, cfg.Site, a.Auth.IsAllowed) // emails about new badges
 	// module reservations (Settings → Umum): claimed on edits, released by people, merges and expiry
-	a.Reservations = service.NewReservationService(repos.Reserve, repos.Project, repos.User, mailer, cfg.Site)
+	a.Reservations = reservation.New(repos.Reserve, repos.Project, repos.User, mailer, cfg.Site)
 	a.Catalogs.SetReservations(a.Reservations)
 	a.Auth.SetActivity(a.Activity)
 	a.Auth.SetBlobs(a.Blobs)

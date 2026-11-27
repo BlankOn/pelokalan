@@ -9,6 +9,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/gz"
+	"pelokalan/internal/reservation"
 	"pelokalan/pkg/glossary"
 	"pelokalan/pkg/po"
 )
@@ -149,7 +150,7 @@ func (s *CatalogService) landingsIn(ctx context.Context, c *models.Catalog, grou
 }
 
 // SetReservations lets syncs release a module whose holder's changes are all upstream
-func (s *CatalogService) SetReservations(r *ReservationService) { s.reservations = r }
+func (s *CatalogService) SetReservations(r *reservation.Service) { s.reservations = r }
 
 // BackfillLandingsJob names the one-time catch-up in one_time_jobs
 const BackfillLandingsJob = "backfill-upstream-landings-2026-11"

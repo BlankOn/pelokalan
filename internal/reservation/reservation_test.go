@@ -1,4 +1,4 @@
-package service
+package reservation
 
 import (
 	"context"
@@ -107,7 +107,7 @@ func TestReservations(t *testing.T) {
 	p := &models.Project{ID: 9, Name: "GNOME", Slug: "gnome-id", Reservations: true, ReservationDays: 30}
 	mem := newMemReservations()
 	mail := &sentMail{}
-	s := NewReservationService(mem, oneProject{p: p}, someUsers{}, mail, config.SiteConfig{BaseURL: "https://x", Name: "Pelokalan"})
+	s := New(mem, oneProject{p: p}, someUsers{}, mail, config.SiteConfig{BaseURL: "https://x", Name: "Pelokalan"})
 
 	// off: nothing is held or refused
 	p.Reservations = false

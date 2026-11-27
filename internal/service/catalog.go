@@ -18,6 +18,7 @@ import (
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/project"
 	"pelokalan/internal/repository"
+	"pelokalan/internal/reservation"
 	"pelokalan/pkg/po"
 )
 
@@ -28,7 +29,7 @@ type CatalogService struct {
 	projects *project.Service
 	activity *activity.Service
 	// reservations: released when a sync shows all the holder's changes upstream (nil = off)
-	reservations *ReservationService
+	reservations *reservation.Service
 	// project files, for git patches against the repository's own files (SetProjectFiles)
 	projectFiles repository.GlossaryRepository
 }

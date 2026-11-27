@@ -1,4 +1,4 @@
-package service
+package reservation
 
 import (
 	"context"
@@ -17,7 +17,6 @@ import (
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/project"
-	"pelokalan/internal/repository"
 )
 
 // Module reservations. When a project turns them on (Settings → Umum), a member holds a module (file name
@@ -34,8 +33,8 @@ var ErrModuleReserved = apperr.New("err.module_reserved")
 const ReminderDays = 3
 
 // ReservationService manages module reservations
-type ReservationService struct {
-	repo     repository.ReservationRepository
+type Service struct {
+	repo     Repository
 	projects project.Repository
 	users    account.UserRepository
 	mailer   mailer.Mailer
@@ -43,13 +42,13 @@ type ReservationService struct {
 }
 
 // NewReservationService creates the reservation service
-func NewReservationService(repo repository.ReservationRepository, projects project.Repository,
-	users account.UserRepository, mailer mailer.Mailer, site config.SiteConfig) *ReservationService {
-	return &ReservationService{repo: repo, projects: projects, users: users, mailer: mailer, site: site}
+func New(repo Repository, projects project.Repository,
+	users account.UserRepository, mailer mailer.Mailer, site config.SiteConfig) *Service {
+	return &Service{repo: repo, projects: projects, users: users, mailer: mailer, site: site}
 }
 
 // Map returns a project's held modules by module (nil when reservations are off)
-func (s *ReservationService) Map(ctx context.Context, p *models.Project) map[string]*models.ModuleReservation {
+func (s *Service) Map(ctx context.Context, p *models.Project) map[string]*models.ModuleReservation {
 	if s == nil || p == nil || !p.Reservations {
 		return nil
 	}
@@ -66,7 +65,7 @@ func (s *ReservationService) Map(ctx context.Context, p *models.Project) map[str
 }
 
 // Holder returns who holds a module (nil when it is free or reservations are off)
-func (s *ReservationService) Holder(ctx context.Context, p *models.Project, module string) *models.ModuleReservation {
+func (s *Service) Holder(ctx context.Context, p *models.Project, module string) *models.ModuleReservation {
 	if s == nil || p == nil || !p.Reservations || module == "" {
 		return nil
 	}
@@ -78,7 +77,7 @@ func (s *ReservationService) Holder(ctx context.Context, p *models.Project, modu
 }
 
 // Check refuses when another member holds the module
-func (s *ReservationService) Check(ctx context.Context, user *models.User, p *models.Project, module string) error {
+func (s *Service) Check(ctx context.Context, user *models.User, p *models.Project, module string) error {
 	if h := s.Holder(ctx, p, module); h != nil && (user == nil || h.UserID != user.ID) {
 		return ErrModuleReserved
 	}
@@ -87,7 +86,7 @@ func (s *ReservationService) Check(ctx context.Context, user *models.User, p *mo
 
 // Claim reserves the module for user when it is free (and reservations are on); it refuses when another
 // member holds it. Holding it already is fine.
-func (s *ReservationService) Claim(ctx context.Context, user *models.User, p *models.Project, module string) error {
+func (s *Service) Claim(ctx context.Context, user *models.User, p *models.Project, module string) error {
 	if s == nil || p == nil || !p.Reservations || module == "" || user == nil {
 		return nil
 	}
@@ -106,7 +105,7 @@ func (s *ReservationService) Claim(ctx context.Context, user *models.User, p *mo
 
 // Release ends a reservation: the holder, or an owner/manager (p.Role); the holder gets an email when someone
 // else released it
-func (s *ReservationService) Release(ctx context.Context, user *models.User, p *models.Project, module string) error {
+func (s *Service) Release(ctx context.Context, user *models.User, p *models.Project, module string) error {
 	h := s.Holder(ctx, p, module)
 	if h == nil {
 		return nil
@@ -128,7 +127,7 @@ func (s *ReservationService) Release(ctx context.Context, user *models.User, p *
 }
 
 // ReleaseMerged releases a module held by holderID because all their changes to it are upstream now
-func (s *ReservationService) ReleaseMerged(ctx context.Context, projectID int64, module string, holderID int64) {
+func (s *Service) ReleaseMerged(ctx context.Context, projectID int64, module string, holderID int64) {
 	if s == nil {
 		return
 	}
@@ -149,7 +148,7 @@ func (s *ReservationService) ReleaseMerged(ctx context.Context, projectID int64,
 
 // ReleasePushed releases a module held by holderID after Pelokalan committed their file to the repository
 // (the review email already tells them)
-func (s *ReservationService) ReleasePushed(ctx context.Context, projectID int64, module string, holderID int64) {
+func (s *Service) ReleasePushed(ctx context.Context, projectID int64, module string, holderID int64) {
 	if s == nil {
 		return
 	}
@@ -166,7 +165,7 @@ func (s *ReservationService) ReleasePushed(ctx context.Context, projectID int64,
 
 // Expire reminds holders whose reservation ends within ReminderDays and releases those past the project's
 // ReservationDays without saves. It returns how many it released.
-func (s *ReservationService) Expire(ctx context.Context, now time.Time) (int, error) {
+func (s *Service) Expire(ctx context.Context, now time.Time) (int, error) {
 	if s == nil {
 		return 0, nil
 	}
@@ -207,7 +206,7 @@ func (s *ReservationService) Expire(ctx context.Context, now time.Time) (int, er
 
 // notify emails the holder about their reservation: kind manager (released by who), merged, expired,
 // reminder
-func (s *ReservationService) notify(ctx context.Context, p *models.Project, r *models.ModuleReservation, kind, who string) {
+func (s *Service) notify(ctx context.Context, p *models.Project, r *models.ModuleReservation, kind, who string) {
 	if s.mailer == nil || s.users == nil {
 		return
 	}

@@ -7,7 +7,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
+	"pelokalan/internal/reservation"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -17,7 +17,7 @@ import (
 // who holds what (attachReservations) and can be filtered by it (rv=mine|other|free).
 
 // SetReservations turns on module reservations
-func (h *Handler) SetReservations(s *service.ReservationService) { h.reservations = s }
+func (h *Handler) SetReservations(s *reservation.Service) { h.reservations = s }
 
 // loadEditableCatalog is loadOwnCatalog for changes to the translations: the module must not be held by
 // another member, and a free one becomes the user's
