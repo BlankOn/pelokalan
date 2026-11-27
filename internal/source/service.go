@@ -62,9 +62,11 @@ type LandingDetector interface {
 // SetLandings turns on detecting members' work accepted upstream
 func (s *Service) SetLandings(d LandingDetector) { s.landings = d }
 
-// TermExtractor adds AI glossary terms found in long strings to new imports (pretranslate.Service)
+// TermExtractor adds AI glossary terms found in long strings to new imports (pretranslate.Service). changed lists,
+// per import id, the files whose content differs from the group's previous copy (an import missing from it is the
+// group's first of that language: every file counts as changed)
 type TermExtractor interface {
-	AfterImport(projectID, groupID int64, imports []*models.ModuleGroupImport)
+	AfterImport(projectID, groupID int64, imports []*models.ModuleGroupImport, changed map[int64][]string)
 }
 
 // SetTermExtractor makes every import get its AI glossary terms, and new strings of groups where extraction was
@@ -217,7 +219,12 @@ func (s *Service) importInto(ctx context.Context, v *models.ModuleGroup, filenam
 	}
 
 	res := &ModuleGroupImportResult{Skipped: built.Skipped, Group: v}
+	changed := map[int64][]string{} // import id -> files that differ from the previous copy (for term extraction)
 	for _, lang := range built.Languages {
+		prev, err := s.repo.GroupFileHashes(ctx, v.ID, lang) // before the import below replaces them
+		if err != nil {
+			log.Printf("glossary: file hashes of group %d (%s): %v", v.ID, lang, err)
+		}
 		terms := byLang[lang]
 		imp := &models.ModuleGroupImport{
 			ProjectID:  v.ProjectID,
@@ -238,13 +245,24 @@ func (s *Service) importInto(ctx context.Context, v *models.ModuleGroup, filenam
 				log.Printf("glossary: record stats of version %d: %v", v.ID, err)
 			}
 		}()
-		if err := s.repo.AddProjectFiles(ctx, projectFiles(files, imp, language, v.IsGit())); err != nil {
+		pfs := projectFiles(files, imp, language, v.IsGit())
+		if err := s.repo.AddProjectFiles(ctx, pfs); err != nil {
 			log.Printf("glossary: store project files of import %d: %v", imp.ID, err)
+		}
+		if prev != nil {
+			list := []string{}
+			for _, f := range pfs {
+				sum := sha256.Sum256(f.Data)
+				if prev[f.Filename] != hex.EncodeToString(sum[:]) {
+					list = append(list, f.Filename)
+				}
+			}
+			changed[imp.ID] = list
 		}
 		res.Imports = append(res.Imports, imp)
 	}
 	if s.terms != nil && len(res.Imports) > 0 {
-		go s.terms.AfterImport(v.ProjectID, v.ID, res.Imports)
+		go s.terms.AfterImport(v.ProjectID, v.ID, res.Imports, changed)
 	}
 	if s.landings != nil { // whose work is upstream now: in the background, imports do not wait
 		up := make([]UpstreamFile, 0, len(files))

@@ -1,0 +1,29 @@
+{{/* the body of the review editor's consistency panel (consistencyView); polls itself while the check runs */}}
+{{define "consistency_panel"}}{{$v := .}}
+<div id="cons-body" class="cons-body"{{with .State}}{{if .Running}} hx-get="{{$v.URL}}" hx-trigger="every 2s" hx-swap="outerHTML" data-no-busy{{end}}{{end}}>
+    {{with .Error}}<p class="cons-error">{{.}}</p>{{end}}
+    {{with .State}}
+    {{if .Running}}<p class="muted cons-progress"><span class="cons-spin" aria-hidden="true"></span>{{t $v.Lang "consistency.running" .Done .Total}}</p>
+    {{else}}
+    <p class="small muted cons-summary">{{t $v.Lang "consistency.summary" .Total .Terms (len .Findings)}}{{if .Cost}} · {{usd .Cost}}{{end}} · {{timeAgo $v.Lang .Finished}}</p>
+    {{with .Error}}<p class="cons-error small">{{t $v.Lang "consistency.partial" (errText $v.Lang .)}}</p>{{end}}
+    {{if .Findings}}
+    <ul class="cons-list">
+        {{range .Findings}}{{$f := .}}
+        <li class="cons-item">
+            <div class="cons-term"><strong>{{.Term}}</strong>
+                {{if .Glossary}}<span class="small muted">{{t $v.Lang "consistency.glossary"}} <span class="cons-gl">{{.Glossary}}</span> ({{.GlossaryShare}}%)</span>{{end}}
+                {{if .InFile}}<span class="cons-tag">{{t $v.Lang "consistency.in_file"}}</span>{{end}}
+            </div>
+            <div class="cons-uses">
+                {{range .Uses}}<button type="button" class="cons-use{{if .Glossary}} cons-ok{{else if $f.Glossary}} cons-diff{{end}}" data-goto-entries="{{range $i, $id := .Entries}}{{if $i}},{{end}}{{$id}}{{end}}"
+                    title="{{range .Sources}}{{.}}&#10;{{end}}">{{.Translation}} <small>{{len .Entries}}×</small></button>{{end}}
+            </div>
+        </li>
+        {{end}}
+    </ul>
+    {{else}}<p class="cons-clear">✓ {{t $v.Lang "consistency.clear"}}</p>{{end}}
+    {{end}}
+    {{else}}{{if not .Error}}<p class="muted small">{{t $v.Lang "consistency.intro"}}</p>{{end}}{{end}}
+</div>
+{{end}}

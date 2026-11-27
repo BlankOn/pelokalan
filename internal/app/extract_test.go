@@ -1,6 +1,8 @@
 package app_test
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -108,9 +110,13 @@ func TestGlossaryExtraction(t *testing.T) {
 	owner.post(base+"/ai", url.Values{"base_url": {fake.URL}, "model": {"gpt-4o-mini"}, "api_key": {"sk-test-0123456789"}}).
 		redirectsTo(base + "/settings")
 
+	// a second file that no sync changes: its strings are left to the button
+	backlog := "Use the keyword arguments to change the behaviour of this function."
+	backlogTr := "Gunakan argumen kata kunci untuk mengubah perilaku fungsi ini."
+	sys := poFile("sys", backlog, backlogTr)
 	upload := func(pairs ...string) {
 		owner.upload(base+"/module-groups/import", url.Values{"name": {"docs"}, "version_name": {"1"}, "language": {"id"}},
-			"docs.tar.gz", targz(t, map[string][]byte{"os.po": poFile("os", pairs...)})).redirectsTo(base + "/settings?")
+			"docs.tar.gz", targz(t, map[string][]byte{"os.po": poFile("os", pairs...), "sys.po": sys})).redirectsTo(base + "/settings?")
 	}
 	upload("Library", "Pustaka", long, longTr)
 	gid := scalar[int64](t, `SELECT id FROM module_groups WHERE project_id = $1`, pid)
@@ -121,10 +127,10 @@ func TestGlossaryExtraction(t *testing.T) {
 	visitor(t).get(base + "/glossary").status(http.StatusOK).lacks("Ekstrak istilah dengan AI")
 	visitor(t).get(base + "/glossary-extract?group=" + g).redirectsTo("/login")
 
-	owner.get(base+"/glossary-extract?group="+g).status(http.StatusOK).contains(`"to_send":1`, "1 string panjang")
+	owner.get(base+"/glossary-extract?group="+g).status(http.StatusOK).contains(`"to_send":2`, "2 string panjang")
 	owner.post(base+"/glossary-extract", url.Values{"group": {g}}).status(http.StatusOK).contains("dimulai")
 	waitExtract(t, pid, 1)
-	if reqs := fake.requests(); len(reqs) != 1 || len(reqs[0]) != 1 || reqs[0][0] != long {
+	if reqs := fake.requests(); len(reqs) != 1 || len(reqs[0]) != 2 {
 		t.Fatalf("requests = %q", reqs)
 	}
 
@@ -142,7 +148,13 @@ func TestGlossaryExtraction(t *testing.T) {
 	}
 	owner.get(base+"/glossary-extract/status").status(http.StatusOK).contains(`"running":false`, "Ekstraksi selesai")
 
-	// a sync with a new long string: only that string is sent, the earlier pairs come back from the stored results
+	// sys.po's string was never extracted (as if the first run had been stopped)
+	sum := sha256.Sum256([]byte(backlog + "\x00" + backlogTr))
+	if _, err := env.DB.Exec(`DELETE FROM term_extractions WHERE string_hash = $1`, hex.EncodeToString(sum[:])); err != nil {
+		t.Fatal(err)
+	}
+	// a sync that changes os.po only: just its new string is sent (not sys.po's backlog), the earlier pairs come back
+	// from the stored results
 	upload("Library", "Pustaka", long, longTr, added, addedTr)
 	waitExtract(t, pid, 2)
 	reqs := fake.requests()
@@ -157,7 +169,7 @@ func TestGlossaryExtraction(t *testing.T) {
 		time.Sleep(30 * time.Millisecond)
 	}
 	owner.get(base + "/glossary/search?f=1&terms=1&group=all&q=pengurai").status(http.StatusOK).contains("parser")
-	owner.get(base + "/glossary-extract?group=" + g).status(http.StatusOK).contains(`"to_send":0`)
+	owner.get(base + "/glossary-extract?group=" + g).status(http.StatusOK).contains(`"to_send":1`) // the backlog, for the button
 	if strings.Contains(scalar[string](t, `SELECT error FROM term_extraction_jobs WHERE project_id = $1 ORDER BY id DESC LIMIT 1`, pid), "err") {
 		t.Fatal("sync run failed")
 	}

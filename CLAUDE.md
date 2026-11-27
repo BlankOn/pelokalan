@@ -917,10 +917,20 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   `glossary_terms.origin = 'ai'` per import (`ReplaceAITerms`, `module_group_imports.ai_term_count` feeds `Stamp`).
 - After every import `source.Service` calls `TermExtractor.AfterImport` (app wires `pretranslate.Service`) in the background:
   for groups where extraction was started (`module_groups.ai_terms`) the new import gets its AI rows from stored results,
-  then strings that are new or changed are extracted (within the budget), then rebuilt.
+  then only the files whose content changed since the group's previous copy (`GroupFileHashes`: SHA-256 of the stored
+  gzip, compared in `importInto`; a first copy counts as all changed) have their unextracted strings sent (within the
+  budget), then rows are rebuilt. A backlog in unchanged files (a stopped first run) is left to the button.
 - A translation is "AI" when every row behind it is (`bool_and(origin = 'ai')`): a small purple "AI" mark
   (`ai_term_mark`) in the glossary list and term page. AI-only terms are never applied to a whole string
   (`ai.Term.AI`, `Glossary.Exact`) and are only optional hints for pre-translation.
+
+- **Consistency check in the review editor** ("Konsistensi" after Validasi, `Data.CanCheck`: people who review, not the
+  requester): `#cons-panel` below the table, `GET|POST /projects/{id}/reviews/{rid}/consistency` (HTML partial
+  `consistency_panel`, polls itself every 2 s while running). `pretranslate.Service.CheckConsistency` takes the review's
+  strings (translated, not fuzzy), reuses stored extraction results, sends the rest like an extraction run (cost in
+  `term_extraction_jobs`, budget checked; one-word strings are their own pair), then lists terms whose translation
+  differs from the glossary's agreed one (people's, share >= 50%, not AI-only) or varies among the strings. Chips are
+  green (= glossary) or orange; clicking one selects its strings in turn. Kept in memory per file (not stored).
 
 ## Editor glossary section
 

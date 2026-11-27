@@ -3792,3 +3792,55 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
     if (stopBar) stopBar.addEventListener("click", function () { cancelRun(stopBar); });
     watch();
 })();
+
+// Review editor: "Konsistensi" opens the panel below the table with the file's last consistency check; "Periksa"
+// starts one (the panel polls itself while it runs); a translation chip selects its strings one after another.
+(function () {
+    var btn = document.getElementById("btn-consistency");
+    var panel = document.getElementById("cons-panel");
+    if (!btn || !panel) return;
+    var url = panel.dataset.url;
+    function swap(html) {
+        var body = document.getElementById("cons-body");
+        if (!body) return;
+        body.outerHTML = html;
+        var fresh = document.getElementById("cons-body");
+        if (fresh && window.htmx) htmx.process(fresh);
+    }
+    function load() {
+        fetch(url, {credentials: "same-origin", cache: "no-store"}).then(function (r) { return r.text(); }).then(swap);
+    }
+    function show(on) {
+        panel.hidden = !on;
+        btn.classList.toggle("active", on);
+    }
+    btn.addEventListener("click", function () {
+        show(panel.hidden);
+        if (!panel.hidden) load();
+    });
+    panel.addEventListener("click", function (ev) {
+        if (ev.target.closest("[data-cons-close]")) { show(false); return; }
+        var run = ev.target.closest("[data-cons-run]");
+        if (run) {
+            run.disabled = true;
+            fetch(url, {method: "POST", credentials: "same-origin", headers: {"X-Requested-With": "fetch"}})
+                .then(function (r) { return r.text(); })
+                .then(function (html) { swap(html); run.disabled = false; })
+                .catch(function () { run.disabled = false; });
+            return;
+        }
+        var use = ev.target.closest("[data-goto-entries]");
+        if (use) {
+            var ids = use.dataset.gotoEntries.split(",");
+            var i = parseInt(use.dataset.i || "0", 10) % ids.length;
+            use.dataset.i = String(i + 1);
+            var row = document.getElementById("row-" + ids[i]);
+            if (row) {
+                row.click();
+                row.scrollIntoView({block: "center"});
+            } else if (window.toast) {
+                window.toast(panel.dataset.missing || "", true);
+            }
+        }
+    });
+})();

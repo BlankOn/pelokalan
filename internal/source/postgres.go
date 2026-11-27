@@ -200,6 +200,29 @@ func (r *glossaryRepository) SetGroupAITerms(ctx context.Context, groupID int64,
 	return err
 }
 
+func (r *glossaryRepository) GroupFileHashes(ctx context.Context, groupID int64, language string) (map[string]string, error) {
+	var n int
+	if err := r.db.QueryRowContext(ctx, `SELECT COUNT(*) FROM module_group_imports WHERE group_id = $1 AND language = $2`,
+		groupID, language).Scan(&n); err != nil || n == 0 {
+		return nil, err
+	}
+	rows, err := r.db.QueryContext(ctx, `SELECT f.filename, encode(sha256(f.data), 'hex') FROM project_files f
+		JOIN module_group_imports i ON i.id = f.import_id WHERE i.group_id = $1 AND i.language = $2`, groupID, language)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]string{}
+	for rows.Next() {
+		var name, hash string
+		if err := rows.Scan(&name, &hash); err != nil {
+			return nil, err
+		}
+		out[name] = hash
+	}
+	return out, rows.Err()
+}
+
 func (r *glossaryRepository) ImportFiles(ctx context.Context, importID int64) ([]*models.ProjectFile, error) {
 	rows, err := r.db.QueryContext(ctx, `SELECT `+projectFileColumns+`, f.data
 		FROM project_files f JOIN module_groups v ON v.id = f.group_id WHERE f.import_id = $1 ORDER BY f.filename`, importID)

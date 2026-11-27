@@ -1792,6 +1792,34 @@ mark.rv-anchor.rv-done { background: none; border-bottom: 0; padding: 0; }
 .review-mode:not(.view-mode) mark.rv-anchor.rv-done { background: #d3f9d8; border-bottom: 2px solid #37b24d; padding: 0 1px; }
 .review-mode:not(.view-mode) .entry-row.rv-resolved:not(.selected) { background: #effaf1; }
 .review-mode:not(.view-mode) .entry-row.rv-resolved:not(.selected):hover { background: #e3f6e7; }
+/* review editor: term consistency panel below the table */
+.cons-panel { flex: 0 0 auto; max-height: 45%; display: flex; flex-direction: column; border-top: 2px solid var(--border);
+    background: var(--surface); min-height: 0; }
+.cons-panel[hidden] { display: none; }
+.cons-head { display: flex; align-items: center; gap: 10px; padding: 8px 14px; border-bottom: 1px solid var(--border-soft); }
+.cons-head-help { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.cons-close { font-size: 16px; }
+.cons-body { overflow: auto; padding: 8px 14px 12px; min-height: 0; }
+.cons-body p { margin: 4px 0; }
+.cons-error { color: var(--danger, #c92a2a); }
+.cons-clear { color: #2b8a3e; }
+.cons-spin { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: cons-spin .8s linear infinite; margin-right: 8px; vertical-align: -2px; }
+@keyframes cons-spin { to { transform: rotate(360deg); } }
+.cons-list { list-style: none; margin: 6px 0 0; padding: 0; }
+.cons-item { padding: 6px 0; border-top: 1px solid var(--border-soft); display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+.cons-item:first-child { border-top: 0; }
+.cons-term { min-width: 220px; display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.cons-gl { color: #2b8a3e; font-weight: 600; }
+.cons-tag { font-size: 11px; padding: 1px 6px; border-radius: 10px; background: #fff4e6; color: #a35200; border: 1px solid #ffd8a8; }
+.cons-uses { display: flex; gap: 6px; flex-wrap: wrap; }
+.cons-use { border: 1px solid var(--border-soft); background: var(--surface-2); border-radius: 4px; padding: 1px 8px; cursor: pointer;
+    font: inherit; font-size: 13px; color: inherit; }
+.cons-use small { color: var(--muted); }
+.cons-use:hover { border-color: var(--accent); }
+.cons-use.cons-ok { background: var(--ok-soft); border-color: #bfe3cc; }
+.cons-use.cons-diff { background: #fff4e6; border-color: #ffd8a8; }
+.tb-btn.active { background: var(--accent-soft); }
 .mark-resolved { display: inline-block; width: 10px; height: 10px; border-radius: 2px; background: #d3f9d8;
     border: 1px solid #37b24d; vertical-align: -1px; }
 .comment-quote { margin: 4px 0 6px; padding: 2px 8px; border-left: 3px solid #e03131; background: #fff0f3; color: #5c1a26;

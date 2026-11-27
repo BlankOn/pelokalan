@@ -88,6 +88,8 @@ type Service struct {
 	newClient func(s *models.AISettings, key string) chatClient
 	// glossary extraction: one run per project (project id -> *sync.Mutex) and how to stop it (-> context.CancelFunc)
 	extractLocks, extractCancels sync.Map
+	// consistency checks of files under review (catalog id -> *consistencyRun), in memory
+	consistency sync.Map
 }
 
 type historyRecorder interface {

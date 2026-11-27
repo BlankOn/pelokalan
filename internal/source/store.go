@@ -66,6 +66,9 @@ type Repository interface {
 	// ProjectFileTotals adds up the project files' strings, counting each module (per language) once, from its
 	// newest copy
 	ProjectFileTotals(ctx context.Context, projectID int64) (total, translated, fuzzy int, err error)
+	// GroupFileHashes returns, for a module group's current import of a language, each project file's name and the
+	// SHA-256 (hex) of its stored data (nil when the group has no import of that language yet)
+	GroupFileHashes(ctx context.Context, groupID int64, language string) (map[string]string, error)
 	// ImportFiles returns an import's project files with their (gzip) data
 	ImportFiles(ctx context.Context, importID int64) ([]*models.ProjectFile, error)
 	// ReplaceAITerms replaces the AI-extracted glossary rows of an import

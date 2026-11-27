@@ -151,6 +151,8 @@ func (h *Handler) reviewData(r *http.Request, p *models.Project, c *models.Catal
 	// "Komentari bagian ini" in the selection popup: people who review (not the requester) on a waiting request
 	data.Data["CanAnchor"] = rv.Status == models.ReviewRequested && user != nil && p.Role.CanReview() && rv.RequestedBy != user.ID
 	data.Data["CanWithdraw"] = rv.Status == models.ReviewRequested && user != nil && rv.RequestedBy == user.ID
+	// "Konsistensi": people who review check the review's terms against the glossary and each other
+	data.Data["CanCheck"] = rv.Status == models.ReviewRequested && user != nil && p.Role.CanReview() && rv.RequestedBy != user.ID
 	// owners and coordinators may cancel someone else's request (the translator is emailed)
 	data.Data["CanCancel"] = rv.Status == models.ReviewRequested && user != nil && rv.RequestedBy != user.ID && p.Role.CanManage()
 	if rv.Status != models.ReviewRequested {

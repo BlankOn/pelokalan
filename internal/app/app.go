@@ -311,6 +311,8 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Post("/projects/{id}/reviews/{rid}/approve", h.ApproveReview)
 		r.Post("/projects/{id}/reviews/{rid}/reject", h.RejectReview)
 		r.Post("/projects/{id}/reviews/{rid}/withdraw", h.WithdrawReview)
+		r.Get("/projects/{id}/reviews/{rid}/consistency", h.ReviewConsistency)
+		r.Post("/projects/{id}/reviews/{rid}/consistency", h.StartReviewConsistency)
 		r.Post("/projects/{id}/module-groups/{gid}/github/check", h.CheckModuleGroupGitHub)
 		r.Post("/projects/{id}/module-groups/{gid}/github/direct", h.SetModuleGroupDirect)
 		r.Post("/catalogs/{cid}/review", h.RequestReview)

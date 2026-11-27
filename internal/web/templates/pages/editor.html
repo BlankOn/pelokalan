@@ -128,6 +128,16 @@
             <div id="editor" class="editor-pane">
                 <div class="editor-empty muted">{{t .Lang "editor.select_entry"}}</div>
             </div>
+            {{if .Data.CanCheck}}<section id="cons-panel" class="cons-panel" hidden data-url="{{.Data.Project.Path}}/reviews/{{.Data.Review.ID}}/consistency">
+                <header class="cons-head">
+                    <strong>{{t .Lang "consistency.title"}}</strong>
+                    <span class="muted small cons-head-help">{{t .Lang "consistency.help"}}</span>
+                    <div class="spacer"></div>
+                    <button type="button" class="btn btn-small" data-cons-run>{{t .Lang "consistency.run"}}</button>
+                    <button type="button" class="linklike cons-close" data-cons-close aria-label="{{t .Lang "action.close"}}" title="{{t .Lang "action.close"}}">✕</button>
+                </header>
+                <div id="cons-body" class="cons-body"></div>
+            </section>{{end}}
         </div>
         <div class="side-splitter" id="side-splitter" role="separator" aria-orientation="vertical" tabindex="0" title="{{t .Lang "sidebar.resize"}}">
             <button type="button" class="side-toggle" id="side-toggle" data-hide="{{t .Lang "sidebar.hide"}}" data-show="{{t .Lang "sidebar.show"}}" title="{{t .Lang "sidebar.hide"}}" aria-label="{{t .Lang "sidebar.hide"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg><svg class="side-close-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>{{if not .Data.Review}}<span class="side-badge" id="side-review-badge" data-n="{{.Data.List.Listing.ReviewComments}}" title="{{t .Lang "review.sidebar_badge"}}">{{.Data.List.Listing.ReviewComments}}</span>{{end}}</button>
@@ -341,6 +351,10 @@
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12l4 4 10-10"/></svg>
         <span>{{t .Lang "editor.validate"}}</span>
     </button>
+    {{if .Data.CanCheck}}<button type="button" class="tb-btn" id="btn-consistency" title="{{t .Lang "consistency.help"}}">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M4 12h7M4 18h10"/><path d="M15 15l2.5 2.5L22 13"/></svg>
+        <span>{{t .Lang "consistency.button"}}</span>
+    </button>{{end}}
     <a class="tb-btn" href="{{$c.URL}}/raw" title="{{t .Lang "raw.open"}}">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg>
         <span>{{t .Lang "raw.button"}}</span>

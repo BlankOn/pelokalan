@@ -47,8 +47,9 @@ func stringHash(source, translation string) string {
 	return hex.EncodeToString(sum[:])
 }
 
-// importStrings reads an import's project files and returns its long translated strings (each text once)
-func (s *Service) importStrings(ctx context.Context, imp *models.ModuleGroupImport) ([]extractString, error) {
+// importStrings reads an import's project files and returns its long translated strings (each text once); only
+// limits the files read (nil = all)
+func (s *Service) importStrings(ctx context.Context, imp *models.ModuleGroupImport, only map[string]bool) ([]extractString, error) {
 	files, err := s.glossary.ImportFiles(ctx, imp.ID)
 	if err != nil {
 		return nil, err
@@ -56,6 +57,9 @@ func (s *Service) importStrings(ctx context.Context, imp *models.ModuleGroupImpo
 	var out []extractString
 	seen := map[string]int{}
 	for _, f := range files {
+		if only != nil && !only[f.Filename] {
+			continue
+		}
 		data, err := gz.Decompress(f.Data)
 		if err != nil {
 			continue
@@ -96,7 +100,7 @@ func hashesOf(list []extractString) []string {
 
 // rebuildAITerms turns the stored results of an import's strings into its AI glossary rows
 func (s *Service) rebuildAITerms(ctx context.Context, imp *models.ModuleGroupImport) (int, error) {
-	list, err := s.importStrings(ctx, imp)
+	list, err := s.importStrings(ctx, imp, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -174,7 +178,9 @@ func (s *Service) groupImports(ctx context.Context, projectID, groupID int64) ([
 	return out, nil
 }
 
-func (s *Service) planExtract(ctx context.Context, projectID, groupID int64) (*extractPlan, error) {
+// planExtract lists the strings of a module group not extracted before. only (nil = every file of every import)
+// limits the work to the imports it names, each to the files in its set (a nil set = all of that import's files)
+func (s *Service) planExtract(ctx context.Context, projectID, groupID int64, only map[int64]map[string]bool) (*extractPlan, error) {
 	imps, err := s.groupImports(ctx, projectID, groupID)
 	if err != nil {
 		return nil, err
@@ -183,7 +189,15 @@ func (s *Service) planExtract(ctx context.Context, projectID, groupID int64) (*e
 		hashes: map[string]map[int64]string{}, system: map[string]string{}}
 	seen := map[string]bool{}
 	for _, imp := range imps {
-		list, err := s.importStrings(ctx, imp)
+		var files map[string]bool
+		if only != nil {
+			f, ok := only[imp.ID]
+			if !ok {
+				continue // not part of this sync
+			}
+			files = f
+		}
+		list, err := s.importStrings(ctx, imp, files)
 		if err != nil {
 			return nil, err
 		}
@@ -258,7 +272,7 @@ func (s *Service) EstimateExtract(ctx context.Context, p *models.Project, groupI
 		return est, nil
 	}
 	est.Configured, est.Model = true, st.Model
-	pl, err := s.planExtract(ctx, p.ID, groupID)
+	pl, err := s.planExtract(ctx, p.ID, groupID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -316,7 +330,7 @@ func (s *Service) StartExtract(ctx context.Context, user *models.User, p *models
 	if !lock.TryLock() {
 		return nil, apperr.New("err.extract_running")
 	}
-	pl, err := s.planExtract(ctx, p.ID, groupID)
+	pl, err := s.planExtract(ctx, p.ID, groupID, nil)
 	if err != nil {
 		lock.Unlock()
 		return nil, err
@@ -351,9 +365,10 @@ func (s *Service) StartExtract(ctx context.Context, user *models.User, p *models
 }
 
 // AfterImport is called (in the background) after a module group was imported or synced: the new imports get their
-// AI glossary rows from the stored results, and when extraction was started for the group, strings that are new or
-// changed are extracted (within the monthly budget) first.
-func (s *Service) AfterImport(projectID, groupID int64, imports []*models.ModuleGroupImport) {
+// AI glossary rows from the stored results, and when extraction was started for the group, the strings not extracted
+// yet in the files that changed (changed: import id -> file names; an import missing = all its files) are extracted
+// (within the monthly budget). The rest of a group's backlog is left to the button.
+func (s *Service) AfterImport(projectID, groupID int64, imports []*models.ModuleGroupImport, changed map[int64][]string) {
 	ctx, cancel := context.WithTimeout(context.Background(), 6*time.Hour)
 	defer cancel()
 	g, err := s.glossary.GetGroup(ctx, groupID)
@@ -377,7 +392,19 @@ func (s *Service) AfterImport(projectID, groupID int64, imports []*models.Module
 	lock := s.extractLock(projectID)
 	lock.Lock() // after a run that is still going
 	defer lock.Unlock()
-	pl, err := s.planExtract(ctx, projectID, groupID)
+	only := map[int64]map[string]bool{}
+	for _, imp := range imports {
+		names, ok := changed[imp.ID]
+		if !ok {
+			only[imp.ID] = nil // the group's first copy of this language: every file
+			continue
+		}
+		only[imp.ID] = map[string]bool{} // only the files that changed (none: nothing to send)
+		for _, n := range names {
+			only[imp.ID][n] = true
+		}
+	}
+	pl, err := s.planExtract(ctx, projectID, groupID, only)
 	if err != nil || pl.toSend == 0 {
 		return
 	}
