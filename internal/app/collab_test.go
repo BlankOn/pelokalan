@@ -128,7 +128,7 @@ func TestDiscussions(t *testing.T) {
 	mails.waitFor(t, owner.Email, "Setuju.")
 	cid := scalar[int64](t, `SELECT c.id FROM comments c JOIN discussions d ON d.id = c.discussion_id WHERE d.subject_key = $1 AND c.body = 'Setuju.'`, key)
 	// the Diskusi list previews each discussion's newest comment
-	visitor(t).get(base + "/discussions").status(http.StatusOK).contains(`discussion-snippet small">“Setuju.”`)
+	visitor(t).get(base + "/discussions").status(http.StatusOK).contains(`discussion-snippet">“Setuju.”`)
 
 	// only the author edits; the owner may delete (soft)
 	owner.post(base+"/comments/"+strconv.FormatInt(cid, 10)+"/edit", url.Values{"body": {"Diubah pemilik"}})
