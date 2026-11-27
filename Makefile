@@ -1,4 +1,4 @@
-.PHONY: prep build run test test-integration cover clean migrate-up migrate-down run-postgres stop-postgres setup dev fmt lint dbshell deploy deploy-logs deploy-dbshell
+.PHONY: prep build run test test-integration check cover clean migrate-up migrate-down run-postgres stop-postgres setup dev fmt lint dbshell deploy deploy-logs deploy-dbshell
 
 # Configuration
 POSTGRES_CONTAINER_NAME ?= pelokalan-postgres
@@ -25,6 +25,12 @@ test:
 # PostgreSQL (make prep). Each run creates pelokalan_test_<random> and drops it; your data is untouched.
 TEST_DATABASE_URL ?= postgres://$(POSTGRES_USER):$(POSTGRES_PASS)@localhost:$(POSTGRES_PORT)/postgres?sslmode=disable
 test-integration:
+	TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test -count=1 ./...
+
+# Everything a change must pass: formatting, go vet and every test (integration included)
+check:
+	@./scripts/check-fmt.sh
+	go vet ./...
 	TEST_DATABASE_URL='$(TEST_DATABASE_URL)' go test -count=1 ./...
 
 # Coverage of all packages by all tests (integration included): total on the last line, HTML in bin/coverage.html
