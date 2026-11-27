@@ -32,6 +32,7 @@ import (
 	"pelokalan/internal/platform/i18n"
 	"pelokalan/internal/project"
 	"pelokalan/internal/reservation"
+	"pelokalan/internal/review"
 	"pelokalan/internal/service"
 	"pelokalan/internal/source"
 	"pelokalan/internal/web/middleware"
@@ -61,8 +62,8 @@ type Handler struct {
 	thesaurus      *langtools.ThesaurusService
 	spelling       *langtools.SpellingService
 	activity       *activity.Service
-	reservations   *reservation.Service   // module reservations (nil-safe: off)
-	reviews        *service.ReviewService // reviews and commits to repositories (nil-safe: off)
+	reservations   *reservation.Service // module reservations (nil-safe: off)
+	reviews        *review.Service      // reviews and commits to repositories (nil-safe: off)
 	assetVersion   string
 	byLogo         string
 }

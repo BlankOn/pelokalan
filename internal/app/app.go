@@ -28,6 +28,7 @@ import (
 	"pelokalan/internal/repository"
 	"pelokalan/internal/repository/postgres"
 	"pelokalan/internal/reservation"
+	"pelokalan/internal/review"
 	"pelokalan/internal/service"
 	"pelokalan/internal/source"
 	"pelokalan/internal/web"
@@ -61,7 +62,7 @@ type Repositories struct {
 	Discuss  discussion.Repository
 	Activity activity.Repository
 	Reserve  reservation.Repository
-	Review   repository.ReviewRepository
+	Review   review.Repository
 }
 
 // App is the wired application
@@ -79,7 +80,7 @@ type App struct {
 	Discussions  *discussion.Service
 	Activity     *activity.Service
 	Reservations *reservation.Service
-	Reviews      *service.ReviewService
+	Reviews      *review.Service
 	Wiki         *wiki.Service
 	Contexts     *modulecontext.Service
 	AI           *service.AIService
@@ -125,7 +126,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		Discuss:  discussion.NewRepository(db),
 		Activity: activity.NewRepository(db),
 		Reserve:  reservation.NewRepository(db),
-		Review:   postgres.NewReviewRepository(db),
+		Review:   review.NewRepository(db),
 	}
 	repos := a.Repos
 
@@ -168,7 +169,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		}
 		a.Glossary.SetGitHub(gh)
 	}
-	a.Reviews = service.NewReviewService(repos.Review, a.Catalogs, a.Glossary, a.Reservations, repos.Project, repos.User, mailer, cfg.Site)
+	a.Reviews = review.New(repos.Review, a.Catalogs, a.Glossary, a.Reservations, repos.Project, repos.User, mailer, cfg.Site)
 	a.Reviews.SetDiscussions(a.Discussions) // reviewers' comments on files waiting for review stay open until resolved
 	a.Catalogs.SetActivity(a.Activity)
 	a.Discussions.SetActivity(a.Activity)

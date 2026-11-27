@@ -8,7 +8,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/i18n"
-	"pelokalan/internal/service"
+	"pelokalan/internal/review"
 	"pelokalan/internal/web/middleware"
 )
 
@@ -17,7 +17,7 @@ import (
 // (Pelokalan commits the file to the branch) or send it back with a note, or send a file right away.
 
 // SetReviews turns on reviews of modules for repositories Pelokalan writes to
-func (h *Handler) SetReviews(s *service.ReviewService) { h.reviews = s }
+func (h *Handler) SetReviews(s *review.Service) { h.reviews = s }
 
 // CheckModuleGroupGitHub asks GitHub about the app's access: POST /projects/{id}/module-groups/{gid}/github/check
 func (h *Handler) CheckModuleGroupGitHub(w http.ResponseWriter, r *http.Request) {

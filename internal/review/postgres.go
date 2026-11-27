@@ -1,4 +1,4 @@
-package postgres
+package review
 
 import (
 	"context"
@@ -9,7 +9,6 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/store"
-	"pelokalan/internal/repository"
 )
 
 // Review requests of modules for repositories Pelokalan writes to (module_reviews, migration 048)
@@ -17,7 +16,7 @@ import (
 type reviewRepository struct{ db *sql.DB }
 
 // NewReviewRepository stores module review requests
-func NewReviewRepository(db *sql.DB) repository.ReviewRepository { return &reviewRepository{db: db} }
+func NewRepository(db *sql.DB) Repository { return &reviewRepository{db: db} }
 
 const reviewColumns = `r.id, r.project_id, r.catalog_id, r.group_id, r.module, r.repo_path, r.status, r.requested_by, r.note,
 	r.entries, r.created_at, r.reviewed_by, r.reviewed_at, r.review_note, r.commit_sha, r.commit_url, r.error,

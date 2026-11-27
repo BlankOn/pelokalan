@@ -1,4 +1,4 @@
-package service
+package review
 
 import (
 	"context"
@@ -21,7 +21,6 @@ import (
 	"pelokalan/internal/platform/mailer"
 	"pelokalan/internal/platform/store"
 	"pelokalan/internal/project"
-	"pelokalan/internal/repository"
 	"pelokalan/internal/reservation"
 	"pelokalan/internal/source"
 	"pelokalan/pkg/githubapp"
@@ -40,8 +39,8 @@ import (
 const MaxReviewNote = 2000
 
 // ReviewService handles review requests and commits to repositories
-type ReviewService struct {
-	repo         repository.ReviewRepository
+type Service struct {
+	repo         Repository
 	catalogs     *catalog.Service
 	glossary     *source.Service
 	reservations *reservation.Service
@@ -54,14 +53,14 @@ type ReviewService struct {
 
 // SetDiscussions connects review comments: comments by reviewers on a file waiting for review stay open
 // until resolved, and approval waits for them
-func (s *ReviewService) SetDiscussions(d *discussion.Service) {
+func (s *Service) SetDiscussions(d *discussion.Service) {
 	s.discuss = d
 	d.SetReviews(s.OpenFor)
 }
 
 // OpenFor is the open review a comment by user on the file belongs to: the file waits for review and the
 // user is an owner, coordinator or reviewer who did not ask for it (nil = a plain comment)
-func (s *ReviewService) OpenFor(ctx context.Context, p *models.Project, catalogID int64, user *models.User) *int64 {
+func (s *Service) OpenFor(ctx context.Context, p *models.Project, catalogID int64, user *models.User) *int64 {
 	if s == nil || !p.Role.CanReview() {
 		return nil
 	}
@@ -76,7 +75,7 @@ func (s *ReviewService) OpenFor(ctx context.Context, p *models.Project, catalogI
 }
 
 // openComments counts a file's open review comments
-func (s *ReviewService) openComments(ctx context.Context, p *models.Project, catalogID int64) int {
+func (s *Service) openComments(ctx context.Context, p *models.Project, catalogID int64) int {
 	if s.discuss == nil {
 		return 0
 	}
@@ -88,15 +87,15 @@ func (s *ReviewService) openComments(ctx context.Context, p *models.Project, cat
 }
 
 // NewReviewService creates the review service
-func NewReviewService(repo repository.ReviewRepository, catalogs *catalog.Service, glossary *source.Service,
+func New(repo Repository, catalogs *catalog.Service, glossary *source.Service,
 	reservations *reservation.Service, projects project.Repository, users account.UserRepository,
-	mailer mailer.Mailer, site config.SiteConfig) *ReviewService {
-	return &ReviewService{repo: repo, catalogs: catalogs, glossary: glossary, reservations: reservations,
+	mailer mailer.Mailer, site config.SiteConfig) *Service {
+	return &Service{repo: repo, catalogs: catalogs, glossary: glossary, reservations: reservations,
 		projects: projects, users: users, mailer: mailer, site: site}
 }
 
 // DirectGroup is the module group a member's file is committed to (nil = its repository is not written by Pelokalan)
-func (s *ReviewService) DirectGroup(ctx context.Context, p *models.Project, c *models.Catalog) *models.ModuleGroup {
+func (s *Service) DirectGroup(ctx context.Context, p *models.Project, c *models.Catalog) *models.ModuleGroup {
 	if s == nil || c == nil || c.RepoPath == "" || c.IsTemplate || s.glossary.GitHubApp() == nil {
 		return nil
 	}
@@ -107,7 +106,7 @@ func (s *ReviewService) DirectGroup(ctx context.Context, p *models.Project, c *m
 }
 
 // Attach fills Review and CanPush of the files
-func (s *ReviewService) Attach(ctx context.Context, p *models.Project, catalogs []*models.Catalog) {
+func (s *Service) Attach(ctx context.Context, p *models.Project, catalogs []*models.Catalog) {
 	if s == nil || s.glossary.GitHubApp() == nil {
 		return
 	}
@@ -132,7 +131,7 @@ func (s *ReviewService) Attach(ctx context.Context, p *models.Project, catalogs 
 }
 
 // Open lists the project's requests waiting for review (owners, coordinators and reviewers)
-func (s *ReviewService) Open(ctx context.Context, p *models.Project) ([]*models.ModuleReview, error) {
+func (s *Service) Open(ctx context.Context, p *models.Project) ([]*models.ModuleReview, error) {
 	if s == nil || !p.Role.CanReview() {
 		return nil, nil
 	}
@@ -144,7 +143,7 @@ func (s *ReviewService) Open(ctx context.Context, p *models.Project) ([]*models.
 }
 
 // Get returns a review of the project
-func (s *ReviewService) Get(ctx context.Context, p *models.Project, id int64) (*models.ModuleReview, error) {
+func (s *Service) Get(ctx context.Context, p *models.Project, id int64) (*models.ModuleReview, error) {
 	r, err := s.repo.Get(ctx, id)
 	if errors.Is(err, store.ErrNotFound) || err == nil && r.ProjectID != p.ID {
 		return nil, apperr.ErrNotFound
@@ -153,7 +152,7 @@ func (s *ReviewService) Get(ctx context.Context, p *models.Project, id int64) (*
 }
 
 // lastSent is the repository file as Pelokalan last committed it for the catalog (nil = never)
-func (s *ReviewService) lastSent(ctx context.Context, catalogID int64) []byte {
+func (s *Service) lastSent(ctx context.Context, catalogID int64) []byte {
 	data, err := s.repo.LastPushed(ctx, catalogID)
 	if err != nil || data == nil {
 		return nil
@@ -166,7 +165,7 @@ func (s *ReviewService) lastSent(ctx context.Context, catalogID int64) []byte {
 }
 
 // Changes is what a review would send, against the repository file as last synced (for the review page)
-func (s *ReviewService) Changes(ctx context.Context, p *models.Project, c *models.Catalog) (*gitpatch.FileDiff, error) {
+func (s *Service) Changes(ctx context.Context, p *models.Project, c *models.Catalog) (*gitpatch.FileDiff, error) {
 	pf, _, err := s.glossary.ProjectFileByRepoPath(ctx, p.ID, c.RepoPath)
 	if err != nil {
 		return nil, err
@@ -187,7 +186,7 @@ func (s *ReviewService) Changes(ctx context.Context, p *models.Project, c *model
 }
 
 // ChangedHashes are the key hashes of the entries a review of the file would send (the review editor lists them)
-func (s *ReviewService) ChangedHashes(ctx context.Context, c *models.Catalog) map[string]bool {
+func (s *Service) ChangedHashes(ctx context.Context, c *models.Catalog) map[string]bool {
 	out := map[string]bool{}
 	want, err := s.catalogs.ChangedTargets(ctx, c, s.lastSent(ctx, c.ID))
 	if err != nil {
@@ -208,7 +207,7 @@ func cleanNote(note string) string {
 }
 
 // Request asks for a review of the user's file
-func (s *ReviewService) Request(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, note string) (*models.ModuleReview, error) {
+func (s *Service) Request(ctx context.Context, user *models.User, p *models.Project, c *models.Catalog, note string) (*models.ModuleReview, error) {
 	if !c.WritableBy(user.ID) {
 		return nil, apperr.ErrForbidden
 	}
@@ -236,7 +235,7 @@ func (s *ReviewService) Request(ctx context.Context, user *models.User, p *model
 }
 
 // Withdraw takes the user's own open request back
-func (s *ReviewService) Withdraw(ctx context.Context, user *models.User, p *models.Project, id int64) error {
+func (s *Service) Withdraw(ctx context.Context, user *models.User, p *models.Project, id int64) error {
 	r, err := s.Get(ctx, p, id)
 	if err != nil {
 		return err
@@ -252,7 +251,7 @@ func (s *ReviewService) Withdraw(ctx context.Context, user *models.User, p *mode
 }
 
 // Reject sends a request back to the translator with a note (owners and managers, not the translator)
-func (s *ReviewService) Reject(ctx context.Context, reviewer *models.User, p *models.Project, id int64, note string) error {
+func (s *Service) Reject(ctx context.Context, reviewer *models.User, p *models.Project, id int64, note string) error {
 	r, err := s.reviewable(ctx, reviewer, p, id)
 	if err != nil {
 		return err
@@ -269,7 +268,7 @@ func (s *ReviewService) Reject(ctx context.Context, reviewer *models.User, p *mo
 	return nil
 }
 
-func (s *ReviewService) reviewable(ctx context.Context, reviewer *models.User, p *models.Project, id int64) (*models.ModuleReview, error) {
+func (s *Service) reviewable(ctx context.Context, reviewer *models.User, p *models.Project, id int64) (*models.ModuleReview, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -287,7 +286,7 @@ func (s *ReviewService) reviewable(ctx context.Context, reviewer *models.User, p
 }
 
 // Approve commits a requested file to the repository (owners and managers, not the translator)
-func (s *ReviewService) Approve(ctx context.Context, reviewer *models.User, p *models.Project, id int64) (*models.ModuleReview, error) {
+func (s *Service) Approve(ctx context.Context, reviewer *models.User, p *models.Project, id int64) (*models.ModuleReview, error) {
 	r, err := s.reviewable(ctx, reviewer, p, id)
 	if err != nil {
 		return nil, err
@@ -300,7 +299,7 @@ func (s *ReviewService) Approve(ctx context.Context, reviewer *models.User, p *m
 }
 
 // PushNow commits a file to the repository right away (owners and managers, any member's file)
-func (s *ReviewService) PushNow(ctx context.Context, manager *models.User, p *models.Project, c *models.Catalog) (*models.ModuleReview, error) {
+func (s *Service) PushNow(ctx context.Context, manager *models.User, p *models.Project, c *models.Catalog) (*models.ModuleReview, error) {
 	if !p.Role.CanManage() {
 		return nil, apperr.ErrForbidden
 	}
@@ -343,7 +342,7 @@ func (s *ReviewService) PushNow(ctx context.Context, manager *models.User, p *mo
 }
 
 // push commits the file's changes to the branch's current file; a failure stays on the open request
-func (s *ReviewService) push(ctx context.Context, reviewer *models.User, p *models.Project, c *models.Catalog, r *models.ModuleReview) error {
+func (s *Service) push(ctx context.Context, reviewer *models.User, p *models.Project, c *models.Catalog, r *models.ModuleReview) error {
 	err := s.commit(ctx, reviewer, p, c, r)
 	if err == nil {
 		return nil
@@ -358,7 +357,7 @@ func (s *ReviewService) push(ctx context.Context, reviewer *models.User, p *mode
 	return err
 }
 
-func (s *ReviewService) commit(ctx context.Context, reviewer *models.User, p *models.Project, c *models.Catalog, r *models.ModuleReview) error {
+func (s *Service) commit(ctx context.Context, reviewer *models.User, p *models.Project, c *models.Catalog, r *models.ModuleReview) error {
 	g := s.DirectGroup(ctx, p, c)
 	gh := s.glossary.GitHubApp()
 	if g == nil || gh == nil {
@@ -466,7 +465,7 @@ func gitHubErr(err error, path string) error {
 }
 
 // commitMessage: what changed, who translated, who reviewed, where it was done
-func (s *ReviewService) commitMessage(p *models.Project, c *models.Catalog, owner, reviewer *models.User, r *models.ModuleReview, n int) string {
+func (s *Service) commitMessage(p *models.Project, c *models.Catalog, owner, reviewer *models.User, r *models.ModuleReview, n int) string {
 	var b strings.Builder
 	fmt.Fprintf(&b, "Update translation of %s\n\n", c.RepoPath)
 	strs := "strings"
@@ -486,7 +485,7 @@ func (s *ReviewService) commitMessage(p *models.Project, c *models.Catalog, owne
 }
 
 // notifyReviewers emails the project's owners and managers (not the translator) about a new request
-func (s *ReviewService) notifyReviewers(ctx context.Context, p *models.Project, from *models.User, c *models.Catalog, r *models.ModuleReview) {
+func (s *Service) notifyReviewers(ctx context.Context, p *models.Project, from *models.User, c *models.Catalog, r *models.ModuleReview) {
 	if s.mailer == nil || s.projects == nil {
 		return
 	}
@@ -509,7 +508,7 @@ func (s *ReviewService) notifyReviewers(ctx context.Context, p *models.Project, 
 }
 
 // notifyTranslator emails the translator that their file was committed ("pushed") or sent back ("rejected")
-func (s *ReviewService) notifyTranslator(ctx context.Context, p *models.Project, r *models.ModuleReview, reviewer *models.User, kind string) {
+func (s *Service) notifyTranslator(ctx context.Context, p *models.Project, r *models.ModuleReview, reviewer *models.User, kind string) {
 	if s.mailer == nil || s.users == nil {
 		return
 	}
@@ -536,7 +535,7 @@ func (s *ReviewService) notifyTranslator(ctx context.Context, p *models.Project,
 	s.send(ctx, u, lang, subject, body, note, link, button, p)
 }
 
-func (s *ReviewService) send(ctx context.Context, u *models.User, lang, subject, body, note, link, button string, p *models.Project) {
+func (s *Service) send(ctx context.Context, u *models.User, lang, subject, body, note, link, button string, p *models.Project) {
 	hello := i18n.T(lang, "mail.badge_hello", u.DisplayName())
 	text := hello + "\n\n" + body + "\n\n"
 	noteHTML := ""
