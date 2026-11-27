@@ -10,6 +10,10 @@
             <strong>{{$f.Filename}}</strong>
             <span class="muted small">{{t .Lang "files.project"}} · {{$f.GroupLabel}} · {{langName $f.Language}}</span>
         </div>
+        <div class="rv-view" role="group" aria-label="{{t .Lang "review.view_label"}}">
+            <button type="button" class="rv-view-btn active" data-review-view="table">{{t .Lang "review.view_table"}}</button>
+            <button type="button" class="rv-view-btn" data-review-view="raw" data-raw-src="{{$p.Path}}/project-files/{{$f.ID}}/download">{{t .Lang "view.raw"}}</button>
+        </div>
         <form method="get" class="pfv-search">
             <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "editor.search"}}" aria-label="{{t .Lang "editor.search"}}">
         </form>
@@ -36,6 +40,7 @@
                 </div>
                 {{else}}<div class="list-empty muted">{{t .Lang "editor.no_entries"}}</div>{{end}}
             </div>
+            <div id="raw-view" class="raw-view-wrap" hidden><pre class="raw-view"></pre></div>
         </div>
     </div>
     <footer class="statusbar">

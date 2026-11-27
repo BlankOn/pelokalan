@@ -153,6 +153,7 @@
                 <p class="muted small review-diff-help">{{t $.Lang "review.diff_help"}}</p>
                 {{else}}<p class="muted review-diff-help">{{t $.Lang "review.no_changes"}}</p>{{end}}
             </div>{{end}}
+            {{if .Data.ViewOnly}}<div id="raw-view" class="raw-view-wrap" hidden><pre class="raw-view"></pre></div>{{end}}
             <div class="splitter" id="splitter" role="separator" aria-orientation="horizontal" tabindex="0"></div>
             <div id="editor" class="editor-pane">
                 <div class="editor-empty muted">{{t .Lang "editor.select_entry"}}</div>
@@ -404,10 +405,11 @@
         <strong>{{$c.Filename}}</strong>
         <span class="muted small">@{{$c.OwnerUsername}} · {{$c.LanguageName}}{{with .Data.Changed}} · {{t $.Lang "view.changed" .}}{{end}}</span>
     </div>
-    {{if .Data.Diff}}<div class="rv-view" role="group" aria-label="{{t .Lang "review.view_label"}}">
+    <div class="rv-view" role="group" aria-label="{{t .Lang "review.view_label"}}">
         <button type="button" class="rv-view-btn active" data-review-view="table">{{t .Lang "review.view_table"}}</button>
-        <button type="button" class="rv-view-btn" data-review-view="diff">{{t .Lang "review.view_diff"}}</button>
-    </div>{{end}}
+        {{if .Data.Diff}}<button type="button" class="rv-view-btn" data-review-view="diff">{{t .Lang "review.view_diff"}}</button>{{end}}
+        <button type="button" class="rv-view-btn" data-review-view="raw" data-raw-src="/catalogs/{{$c.ID}}/download">{{t .Lang "view.raw"}}</button>
+    </div>
     <div class="spacer"></div>
     {{template "view_action" .}}
     <input type="hidden" id="filter-selected" value="">

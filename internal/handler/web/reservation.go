@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"pelokalan/internal/handler/middleware"
+	"pelokalan/internal/i18n"
 	"pelokalan/internal/models"
 	"pelokalan/internal/service"
 )
@@ -82,6 +83,27 @@ func reservationFilter(q url.Values, userID int64) func(*models.ModuleReservatio
 }
 
 // reservationBack is where the reserve/release buttons return to
+// inPage reports whether the page sent the form in the background (app.js `data-ajax`): it wants JSON, not a new page
+func inPage(r *http.Request) bool { return r.Header.Get("X-Requested-With") == "fetch" }
+
+// finish ends a form action: JSON with a message for the page, else a redirect to back (with the message as a flash)
+func (h *Handler) finish(w http.ResponseWriter, r *http.Request, back, flash string) {
+	if inPage(r) {
+		writeJSON(w, http.StatusOK, map[string]string{"message": i18n.T(middleware.GetLang(r.Context()), "flash."+flash)})
+		return
+	}
+	http.Redirect(w, r, back+flashSep(back)+"flash="+flash, http.StatusSeeOther)
+}
+
+// failAction reports a refused form action: JSON for the page, else the usual error page
+func (h *Handler) failAction(w http.ResponseWriter, r *http.Request, err error) {
+	if inPage(r) {
+		writeJSON(w, http.StatusBadRequest, map[string]string{"error": h.errorMessage(r, err)})
+		return
+	}
+	h.fail(w, r, err)
+}
+
 func reservationBack(r *http.Request, p *models.Project) string {
 	return safeNext(r.FormValue("next"), p.Path()+"/files")
 }
@@ -94,10 +116,10 @@ func (h *Handler) ReserveModule(w http.ResponseWriter, r *http.Request) {
 	}
 	module := strings.TrimSpace(r.FormValue("module"))
 	if err := h.reservations.Claim(r.Context(), middleware.GetUser(r.Context()), p, module); err != nil {
-		h.fail(w, r, err)
+		h.failAction(w, r, err)
 		return
 	}
-	http.Redirect(w, r, reservationBack(r, p), http.StatusSeeOther)
+	h.finish(w, r, reservationBack(r, p), "module_reserved")
 }
 
 // ReleaseModule ends a reservation (the holder, or an owner/manager): POST /projects/{id}/reservations/release
@@ -107,8 +129,8 @@ func (h *Handler) ReleaseModule(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.reservations.Release(r.Context(), middleware.GetUser(r.Context()), p, strings.TrimSpace(r.FormValue("module"))); err != nil {
-		h.fail(w, r, err)
+		h.failAction(w, r, err)
 		return
 	}
-	http.Redirect(w, r, reservationBack(r, p), http.StatusSeeOther)
+	h.finish(w, r, reservationBack(r, p), "module_released")
 }

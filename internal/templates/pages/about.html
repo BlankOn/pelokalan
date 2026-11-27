@@ -1,7 +1,11 @@
 {{define "content"}}
-<div class="page-head"><div><h1>{{t .Lang "title.about"}}</h1><p class="muted">{{t .Lang "about.lead"}}</p></div></div>
+<div class="page-head"><h1>{{t .Lang "title.about"}}</h1></div>
 <section class="card about">
+    <h2>{{t .Lang "about.what_title"}}</h2>
+    <p>{{t .Lang "about.lead"}}</p>
     <p>{{t .Lang "about.what"}}</p>
+</section>
+<section class="card about">
     <h2>{{t .Lang "about.goal_title"}}</h2>
     <h3>{{t .Lang "about.newcomers_title"}}</h3>
     <p>{{t .Lang "about.newcomers"}}</p>

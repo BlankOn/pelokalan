@@ -750,6 +750,9 @@ handler/web/licenses.go). Keep it in sync with go.mod and static/ when adding de
   reviewers a file waiting for review shows "Tinjau" (to the review editor) instead of "Lihat". In review and view layouts long
   strings wrap in the table, and the selected row is only lightly marked (pale blue, dark text) since there is no edit
   pane below.
+- **Raw view**: the view-only layouts (another member's file with `?view=1`, the project file viewer) have a "Tabel | Raw"
+  switch (Diff in between for repository files); Raw loads the file's PO text once (its download address) into
+  `#raw-view`, highlighted by `window.poHighlight` (shared with the raw editor; plain text over 3 MB).
 - **Project file viewer** (`/projects/{id}/project-files/{fid}/view`, public; "Lihat" in Berkas proyek; `ProjectFileView`,
   pages/project_file.html): the stored file read-only in the view layout (table, `?q=` search, status bar, PO
   download). Glossary module chips (list and term page) link to `/projects/{id}/project-files/module/{name}?q=<term>`
@@ -982,6 +985,16 @@ deploys never run stale JS/CSS.
   requests time out after 20 s, navigation during a save waits for it, and a failed save asks
   before moving on. htmx's per-element request queue could otherwise freeze the editor after
   one stalled request. The entry list filter still uses htmx.
+
+## Toasts and background forms
+
+- Flash messages (`?flash=<key>`, `flash.*` strings) are floating toasts on every page (`#toast` in base.html, removed
+  after 4.5 s; app.js drops `flash` from the address so a reload does not repeat it). From JS: `window.toast(msg, isError)`
+  (defined for every page: the `#toast` element would otherwise be `window.toast`).
+- Forms with `data-ajax` (⋯ menu: reserve, release, withdraw a review; the coordinators' "Lepas") and the review popup
+  are sent in the background with `X-Requested-With: fetch`; handlers answer JSON through `Handler.finish` /
+  `failAction` (redirect + flash otherwise). The page shows the message as a toast and `window.refreshFileLists()`
+  reloads the three file lists with their filters. `data-confirm` still asks first (it resubmits on OK).
 
 ## Slow requests
 

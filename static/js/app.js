@@ -132,16 +132,71 @@
         if (d.showModal) d.showModal();
     });
 
-    // Remove toasts after a few seconds
+    // Remove toasts after a few seconds (also the one a page brings for its ?flash= message)
     var toastArea = document.getElementById("toast");
     if (toastArea) {
-        new MutationObserver(function () {
+        var arm = function () {
             toastArea.querySelectorAll(".toast:not([data-timer])").forEach(function (t) {
                 t.setAttribute("data-timer", "1");
                 setTimeout(function () { t.remove(); }, 4500);
             });
-        }).observe(toastArea, { childList: true });
+        };
+        new MutationObserver(arm).observe(toastArea, { childList: true });
+        arm();
     }
+    // PO syntax highlighting (raw editor, raw view): keywords, strings with escapes, placeholders and markup, and each
+    // kind of comment; returns HTML
+    window.poHighlight = (function () {
+        function esc(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+        function hlString(s) { // s is a quoted PO string, quotes included
+            var out = "", re = /\\.|%(?:\d+\$)?[-+ 0#']*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|h|ll|l|L|q|j|z|t)?[diouxXeEfFgGaAcspn%]|%\([A-Za-z0-9_]+\)[-+ 0#]*\d*(?:\.\d+)?[diouxXeEfFgGcrsa]|\{[A-Za-z0-9_.]*\}|<\/?[A-Za-z][\w:.-]*(?:\s[^<>"]*)?\/?>/g, last = 0, m;
+            while ((m = re.exec(s))) {
+                out += esc(s.slice(last, m.index));
+                var cls = m[0][0] === "\\" ? "po-esc" : m[0][0] === "<" ? "po-tag" : "po-fmt";
+                out += '<span class="' + cls + '">' + esc(m[0]) + "</span>";
+                last = re.lastIndex;
+            }
+            return '<span class="po-str">' + out + esc(s.slice(last)) + "</span>";
+        }
+        function hlRest(rest) { // keyword line or continuation: highlight the quoted part
+            var q = rest.indexOf('"');
+            return q < 0 ? esc(rest) : esc(rest.slice(0, q)) + hlString(rest.slice(q));
+        }
+        var inId = false;
+        function hlLine(line) {
+            if (line[0] === "#") {
+                var k = line.slice(0, 2), cls = "po-cm";
+                if (k === "#:") cls = "po-ref";
+                else if (k === "#.") cls = "po-dev";
+                else if (k === "#|") cls = "po-prev";
+                else if (k === "#~") cls = "po-obs";
+                else if (k === "#,") {
+                    return '<span class="po-flag">' + esc(line).replace(/\bfuzzy\b/, '<span class="po-fuzzy">fuzzy</span>') + "</span>";
+                }
+                return '<span class="' + cls + '">' + esc(line) + "</span>";
+            }
+            var m = /^(\s*)(msgctxt|msgid_plural|msgid|msgstr(?:\[\d+\])?)\b(.*)$/.exec(line);
+            if (m) {
+                inId = m[2] !== "msgstr" && m[2].indexOf("msgstr") !== 0;
+                return esc(m[1]) + '<span class="po-kw">' + m[2] + "</span>" + (inId ? '<span class="po-id">' + hlRest(m[3]) + "</span>" : hlRest(m[3]));
+            }
+            if (/^\s*"/.test(line)) return inId ? '<span class="po-id">' + hlRest(line) + "</span>" : hlRest(line);
+            inId = false;
+            return esc(line);
+        }
+        return function (text) {
+            inId = false;
+            return text.split("\n").map(hlLine).join("\n");
+        };
+    })();
+    // the flash message was shown as a toast: drop it from the address so a reload does not show it again
+    try {
+        var u = new URL(location.href);
+        if (u.searchParams.has("flash")) {
+            u.searchParams.delete("flash");
+            history.replaceState(history.state, "", u.pathname + (u.search || "") + u.hash);
+        }
+    } catch (e) { /* old browser: keep the address */ }
     // a short message in the corner, on every page (the element <div id="toast"> would otherwise be window.toast)
     window.toast = function (message, isError) {
         var area = document.getElementById("toast");
@@ -1651,48 +1706,11 @@ document.addEventListener("submit", function (ev) {
     // Syntax highlighting: keywords, strings with escapes and placeholders, and each kind of comment
     var hl = document.getElementById("raw-hl");
     function esc(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
-    function hlString(s) { // s is a quoted PO string, quotes included
-        var out = "", re = /\\.|%(?:\d+\$)?[-+ 0#']*(?:\d+|\*)?(?:\.(?:\d+|\*))?(?:hh|h|ll|l|L|q|j|z|t)?[diouxXeEfFgGaAcspn%]|%\([A-Za-z0-9_]+\)[-+ 0#]*\d*(?:\.\d+)?[diouxXeEfFgGcrsa]|\{[A-Za-z0-9_.]*\}|<\/?[A-Za-z][\w:.-]*(?:\s[^<>"]*)?\/?>/g, last = 0, m;
-        while ((m = re.exec(s))) {
-            out += esc(s.slice(last, m.index));
-            var cls = m[0][0] === "\\" ? "po-esc" : m[0][0] === "<" ? "po-tag" : "po-fmt";
-            out += '<span class="' + cls + '">' + esc(m[0]) + "</span>";
-            last = re.lastIndex;
-        }
-        return '<span class="po-str">' + out + esc(s.slice(last)) + "</span>";
-    }
-    function hlRest(rest) { // keyword line or continuation: highlight the quoted part
-        var q = rest.indexOf('"');
-        return q < 0 ? esc(rest) : esc(rest.slice(0, q)) + hlString(rest.slice(q));
-    }
-    var inId = false;
-    function hlLine(line) {
-        if (line[0] === "#") {
-            var k = line.slice(0, 2), cls = "po-cm";
-            if (k === "#:") cls = "po-ref";
-            else if (k === "#.") cls = "po-dev";
-            else if (k === "#|") cls = "po-prev";
-            else if (k === "#~") cls = "po-obs";
-            else if (k === "#,") {
-                return '<span class="po-flag">' + esc(line).replace(/\bfuzzy\b/, '<span class="po-fuzzy">fuzzy</span>') + "</span>";
-            }
-            return '<span class="' + cls + '">' + esc(line) + "</span>";
-        }
-        var m = /^(\s*)(msgctxt|msgid_plural|msgid|msgstr(?:\[\d+\])?)\b(.*)$/.exec(line);
-        if (m) {
-            inId = m[2] !== "msgstr" && m[2].indexOf("msgstr") !== 0;
-            return esc(m[1]) + '<span class="po-kw">' + m[2] + "</span>" + (inId ? '<span class="po-id">' + hlRest(m[3]) + "</span>" : hlRest(m[3]));
-        }
-        if (/^\s*"/.test(line)) return inId ? '<span class="po-id">' + hlRest(line) + "</span>" : hlRest(line);
-        inId = false;
-        return esc(line);
-    }
     var hlFrame = 0;
     function highlight() {
         hlFrame = 0;
-        inId = false;
         // the trailing newline keeps the last line's height when the text ends with a line break
-        hl.innerHTML = ta.value.split("\n").map(hlLine).join("\n") + "\n";
+        hl.innerHTML = window.poHighlight(ta.value) + "\n";
         syncScroll();
     }
     function syncScroll() { hl.style.transform = "translate(" + -ta.scrollLeft + "px," + -ta.scrollTop + "px)"; }
@@ -2870,13 +2888,31 @@ document.addEventListener("click", function (ev) {
 // Review editor: table (the review's strings) or diff (the lines that will be committed)
 document.addEventListener("click", function (ev) {
     var btn = ev.target.closest && ev.target.closest("[data-review-view]");
-    var app = document.getElementById("editor-app");
+    var app = btn && btn.closest(".editor-app");
     if (!btn || !app) return;
-    var diff = btn.dataset.reviewView === "diff";
-    app.classList.toggle("show-diff", diff);
+    var view = btn.dataset.reviewView; // table, diff or raw
+    app.classList.toggle("show-diff", view === "diff");
+    app.classList.toggle("show-raw", view === "raw");
     var pane = document.getElementById("review-diff");
-    if (pane) pane.hidden = !diff;
-    document.querySelectorAll("[data-review-view]").forEach(function (b) { b.classList.toggle("active", b === btn); });
+    if (pane) pane.hidden = view !== "diff";
+    var raw = document.getElementById("raw-view");
+    if (raw) {
+        raw.hidden = view !== "raw";
+        // the file's PO text, read once and highlighted like the raw editor (plain text for huge files)
+        if (view === "raw" && !raw.dataset.loaded) {
+            raw.dataset.loaded = "1";
+            var pre = raw.querySelector("pre");
+            pre.textContent = document.body.dataset.loading || "…";
+            fetch(btn.dataset.rawSrc, { credentials: "same-origin" })
+                .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+                .then(function (text) {
+                    if (text.length < 3000000) pre.innerHTML = window.poHighlight(text);
+                    else pre.textContent = text;
+                })
+                .catch(function () { raw.dataset.loaded = ""; pre.textContent = "—"; });
+        }
+    }
+    app.querySelectorAll("[data-review-view]").forEach(function (b) { b.classList.toggle("active", b === btn); });
 });
 
 // A thread's open review comments (data-review-open) mark the selected entry's row with a red dot, so
@@ -3020,6 +3056,35 @@ document.addEventListener("click", function (ev) {
     dlg.showModal();
     dlg.querySelector("textarea").focus();
 });
+// Penerjemahan: reload the file lists in place, keeping their search, filters and order
+window.refreshFileLists = function () {
+    ["pf-filter", "my-filter", "member-filter"].forEach(function (id) {
+        var f = document.getElementById(id);
+        if (f && window.htmx) htmx.trigger(f, "submit");
+    });
+};
+
+// Forms marked data-ajax (reserve, release, withdraw a review…) are sent in the background: the page stays where it
+// is, a toast says what happened and the file lists refresh. data-confirm still asks first (it resubmits on OK).
+document.addEventListener("submit", function (ev) {
+    var form = ev.target;
+    if (!form.hasAttribute || !form.hasAttribute("data-ajax") || ev.defaultPrevented) return;
+    ev.preventDefault();
+    var menu = form.closest("details.dropdown");
+    if (menu) menu.open = false;
+    var btn = ev.submitter || form.querySelector("button");
+    if (btn) btn.disabled = true;
+    fetch(form.action, { method: "POST", body: new FormData(form), credentials: "same-origin", headers: { "X-Requested-With": "fetch" } })
+        .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }, function () { return { ok: false, j: {} }; }); })
+        .then(function (res) {
+            if (!res.ok) throw new Error(res.j.error || "");
+            window.toast(res.j.message);
+            window.refreshFileLists();
+        })
+        .catch(function (err) { window.showMessage(err.message || document.body.dataset.error || "Error"); })
+        .finally(function () { if (btn) btn.disabled = false; });
+});
+
 // sending it stays on the page: the popup closes, a message shows and the file rows refresh with the new status
 (function () {
     var dlg = document.getElementById("review-dialog");
@@ -3034,11 +3099,8 @@ document.addEventListener("click", function (ev) {
             .then(function (res) {
                 if (!res.ok) throw new Error(res.j.error || "");
                 dlg.close();
-                if (window.toast) window.toast(res.j.message);
-                ["my-filter", "member-filter"].forEach(function (id) { // same search, filters and order
-                    var f = document.getElementById(id);
-                    if (f && window.htmx) htmx.trigger(f, "submit");
-                });
+                window.toast(res.j.message);
+                window.refreshFileLists();
             })
             .catch(function (err) { window.showMessage(err.message || "Error"); })
             .finally(function () { btn.disabled = false; });
@@ -3279,7 +3341,7 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
                     if (!res.ok) throw new Error(res.j.error || "");
                     showAvatar(res.j.url);
                     close();
-                    if (window.toast) window.toast(box.dataset.saved);
+                    window.toast(box.dataset.saved);
                 })
                 .catch(function (err) { window.showMessage(err.message || box.dataset.notImage); })
                 .finally(function () { saveBtn.disabled = false; });
@@ -3289,7 +3351,7 @@ document.querySelectorAll(".heat-scroll").forEach(function (el) { el.scrollLeft 
         window.askConfirm(box.dataset.removeConfirm, { danger: true }).then(function (ok) {
             if (!ok) return;
             fetch(box.dataset.delete, { method: "POST", credentials: "same-origin" })
-                .then(function (r) { if (!r.ok) throw new Error(); showAvatar(""); if (window.toast) window.toast(box.dataset.removed); })
+                .then(function (r) { if (!r.ok) throw new Error(); showAvatar(""); window.toast(box.dataset.removed); })
                 .catch(function () { window.showMessage(box.dataset.notImage); });
         });
     });

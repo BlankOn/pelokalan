@@ -56,20 +56,11 @@ func (h *Handler) RequestReview(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	_, err := h.reviews.Request(r.Context(), middleware.GetUser(r.Context()), p, c, r.FormValue("note"))
-	if r.Header.Get("X-Requested-With") == "fetch" { // the popup stays on the page and refreshes the file rows
-		if err != nil {
-			writeJSON(w, http.StatusBadRequest, map[string]string{"error": h.errorMessage(r, err)})
-			return
-		}
-		writeJSON(w, http.StatusOK, map[string]string{"message": i18n.T(middleware.GetLang(r.Context()), "flash.review_requested")})
+	if _, err := h.reviews.Request(r.Context(), middleware.GetUser(r.Context()), p, c, r.FormValue("note")); err != nil {
+		h.failAction(w, r, err) // the popup stays on the page (JSON) and refreshes the file rows
 		return
 	}
-	if err != nil {
-		h.fail(w, r, err)
-		return
-	}
-	http.Redirect(w, r, safeNext(r.FormValue("next"), p.Path()+"/files")+flashSep(r.FormValue("next"))+"flash=review_requested", http.StatusSeeOther)
+	h.finish(w, r, safeNext(r.FormValue("next"), p.Path()+"/files"), "review_requested")
 }
 
 // PushCatalog sends a file to the repository right away (owners and managers): POST /catalogs/{cid}/push
@@ -225,10 +216,10 @@ func (h *Handler) WithdrawReview(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := h.reviews.Withdraw(r.Context(), middleware.GetUser(r.Context()), p, idParam(r, "rid")); err != nil {
-		h.fail(w, r, err)
+		h.failAction(w, r, err)
 		return
 	}
-	http.Redirect(w, r, p.Path()+"/files?flash=review_withdrawn", http.StatusSeeOther)
+	h.finish(w, r, p.Path()+"/files", "review_withdrawn")
 }
 
 // reviewHashes are the entries a review of the file sends

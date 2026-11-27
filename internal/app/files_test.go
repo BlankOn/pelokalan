@@ -162,6 +162,15 @@ func TestModuleGroupsAndReservations(t *testing.T) {
 
 	// the owner releases calc; their copy then offers "Reservasi & Terjemahkan", which asks first,
 	// reserves the module and opens the editor
+	// sent from the ⋯ menu in the background: JSON answers, the page stays (reserve, then release)
+	inPage := func(path string, form url.Values) *response {
+		req, _ := http.NewRequest(http.MethodPost, srv.URL+path, strings.NewReader(form.Encode()))
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("X-Requested-With", "fetch")
+		return owner.do(req)
+	}
+	inPage(base+"/reservations/release", url.Values{"module": {"calc"}}).status(http.StatusOK).contains(`"message":"Reservasi dilepas."`)
+	inPage(base+"/reservations", url.Values{"module": {"calc"}}).status(http.StatusOK).contains(`"message":"Modul direservasi`)
 	owner.post(base+"/reservations/release", url.Values{"module": {"calc"}}).redirectsTo(base)
 	mine := owner.get(base + "/my-files").status(http.StatusOK)
 	mine.contains("Reservasi &amp; Terjemahkan", "Reservasi modul calc untuk dikerjakan?").lacks("res-lock-wrap")

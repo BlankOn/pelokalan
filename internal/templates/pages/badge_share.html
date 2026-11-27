@@ -25,10 +25,10 @@
         <table class="table badge-work">
             <thead><tr><th>{{t $.Lang "user.col_project"}}</th>{{if .Modules}}<th>{{t $.Lang "badges.col_module"}}</th>{{end}}<th class="num">{{t $.Lang .CountKey}}</th><th>{{t $.Lang "badges.col_when"}}</th>{{if .AnyAI}}<th><span class="sr-only">AI</span></th>{{end}}</tr></thead>
             <tbody>{{range .Rows}}<tr>
-                <td><a href="{{.ProjectPath}}">{{.ProjectName}}</a></td>
-                {{if $.Data.Detail.Modules}}<td>{{if .Module}}<strong>{{.Module}}</strong>{{if and .Filename (ne .Filename .Module)}}<div class="muted small">{{.Filename}}</div>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>{{end}}
-                <td class="num">{{num .Count}}</td>
-                <td class="small muted">{{.When}}</td>
+                <td class="bw-project"><a href="{{.ProjectPath}}">{{.ProjectName}}</a></td>
+                {{if $.Data.Detail.Modules}}<td class="bw-module">{{if .Module}}<strong>{{.Module}}</strong>{{if and .Filename (ne .Filename .Module)}}<div class="muted small">{{.Filename}}</div>{{end}}{{else}}<span class="muted">—</span>{{end}}</td>{{end}}
+                <td class="num bw-count" data-unit="{{t $.Lang $.Data.Detail.CountKey}}">{{num .Count}}</td>
+                <td class="small muted bw-when">{{.When}}</td>
                 {{if $.Data.Detail.AnyAI}}<td class="bw-ai">{{if .AI}}<span class="ai-badge" title="{{t $.Lang "badges.ai_assisted"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="s1" d="M12 3l2 5 5 2-5 2-2 5-2-5-5-2 5-2z"/><path class="s2" d="M19 15l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/></svg>AI</span>{{end}}</td>{{end}}
             </tr>{{end}}</tbody>
         </table>

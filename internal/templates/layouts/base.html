@@ -28,12 +28,11 @@
 </head>
 <body class="{{if .Data.FullPage}}full{{end}}" data-lang="{{.Lang}}" data-loading="{{t .Lang "common.loading"}}">
     {{template "nav" .}}
-    <div id="toast" class="toast-area" aria-live="polite"></div>
+    <div id="toast" class="toast-area" aria-live="polite">{{if .Flash}}<div class="toast">{{.Flash}}</div>{{end}}</div>
     {{if .Data.FullPage}}
         {{template "content" .}}
     {{else}}
     <main class="container">
-        {{if .Flash}}<div class="alert alert-ok">{{.Flash}}</div>{{end}}
         {{if .Error}}<div class="alert alert-error">{{.Error}}</div>{{end}}
         {{template "content" .}}
     </main>
