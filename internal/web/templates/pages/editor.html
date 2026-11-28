@@ -344,8 +344,8 @@
         <span class="muted small">{{t .Lang "review.by" $r.RequesterName $r.RequesterUsername}}{{with .Data.Changed}} · {{t $.Lang "review.strings" .}}{{end}}</span>
     </div>
     <div class="rv-view" role="group" aria-label="{{t .Lang "review.view_label"}}">
-        <button type="button" class="rv-view-btn active" data-review-view="table">{{t .Lang "review.view_table"}}</button>
-        <button type="button" class="rv-view-btn" data-review-view="diff">{{t .Lang "review.view_diff"}}</button>
+        <button type="button" class="tb-btn rv-view-btn active" data-review-view="table"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M10 9.5v10"/></svg><span>{{t .Lang "review.view_table"}}</span></button>
+        <button type="button" class="tb-btn rv-view-btn" data-review-view="diff"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5v7M3.5 7h7M13.5 17h7M5 20L19 4"/></svg><span>{{t .Lang "review.view_diff"}}</span></button>
     </div>
     <div class="tb-sep"></div>
     {{$c := .Data.Catalog}}
@@ -417,9 +417,9 @@
         <span class="muted small">@{{$c.OwnerUsername}} · {{$c.LanguageName}}{{with .Data.Changed}} · {{t $.Lang "view.changed" .}}{{end}}</span>
     </div>
     <div class="rv-view" role="group" aria-label="{{t .Lang "review.view_label"}}">
-        <button type="button" class="rv-view-btn active" data-review-view="table">{{t .Lang "review.view_table"}}</button>
-        {{if .Data.Diff}}<button type="button" class="rv-view-btn" data-review-view="diff">{{t .Lang "review.view_diff"}}</button>{{end}}
-        <button type="button" class="rv-view-btn" data-review-view="raw" data-raw-src="/catalogs/{{$c.ID}}/download">{{t .Lang "view.raw"}}</button>
+        <button type="button" class="tb-btn rv-view-btn active" data-review-view="table"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M10 9.5v10"/></svg><span>{{t .Lang "review.view_table"}}</span></button>
+        {{if .Data.Diff}}<button type="button" class="tb-btn rv-view-btn" data-review-view="diff"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5v7M3.5 7h7M13.5 17h7M5 20L19 4"/></svg><span>{{t .Lang "review.view_diff"}}</span></button>{{end}}
+        <button type="button" class="tb-btn rv-view-btn" data-review-view="raw" data-raw-src="/catalogs/{{$c.ID}}/download"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg><span>{{t .Lang "view.raw"}}</span></button>
     </div>
     <div class="spacer"></div>
     {{with .Data.ModulePage}}<a class="tb-btn" href="{{.}}" target="_blank" rel="noopener" title="{{t $.Lang "editor.module_page_help"}}">

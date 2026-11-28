@@ -11,8 +11,8 @@
             <span class="muted small">{{t .Lang "files.project"}} · {{$f.GroupLabel}} · {{langName $f.Language}}</span>
         </div>
         <div class="rv-view" role="group" aria-label="{{t .Lang "review.view_label"}}">
-            <button type="button" class="rv-view-btn active" data-review-view="table">{{t .Lang "review.view_table"}}</button>
-            <button type="button" class="rv-view-btn" data-review-view="raw" data-raw-src="{{$p.Path}}/project-files/{{$f.ID}}/download">{{t .Lang "view.raw"}}</button>
+            <button type="button" class="tb-btn rv-view-btn active" data-review-view="table"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M10 9.5v10"/></svg><span>{{t .Lang "review.view_table"}}</span></button>
+            <button type="button" class="tb-btn rv-view-btn" data-review-view="raw" data-raw-src="{{$p.Path}}/project-files/{{$f.ID}}/download"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7l-5 5 5 5M16 7l5 5-5 5M14 4l-4 16"/></svg><span>{{t .Lang "view.raw"}}</span></button>
         </div>
         <form method="get" class="pfv-search">
             <input type="search" name="q" value="{{.Data.Query}}" placeholder="{{t .Lang "editor.search"}}" aria-label="{{t .Lang "editor.search"}}">

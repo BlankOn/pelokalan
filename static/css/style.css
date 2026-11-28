@@ -1902,9 +1902,8 @@ mark.rv-anchor.rv-done { background: none; border-bottom: 0; padding: 0; }
 .review-toolbar { gap: 10px; }
 .rv-tb-info { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .rv-tb-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.rv-view { display: inline-flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; margin-left: 8px; }
-.rv-view-btn { border: 0; background: var(--surface); padding: 4px 12px; font: inherit; font-size: 13px; cursor: pointer; color: var(--text); }
-.rv-view-btn + .rv-view-btn { border-left: 1px solid var(--border); }
+/* Tabel | Diff | Raw: toolbar buttons (icon over label) kept together as one switch */
+.rv-view { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; margin-left: 8px; }
 /* "Tampilkan" in the yellow open-comments banner: only the strings with unresolved review comments */
 .review-open-flash { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .rv-open-filter { display: inline; margin: 0 0 0 8px; }
@@ -1912,7 +1911,7 @@ mark.rv-anchor.rv-done { background: none; border-bottom: 0; padding: 0; }
     background: #fffaf0; cursor: pointer; font-weight: 600; }
 .rv-toggle:has(input:checked) { background: #f6d58a; border-color: #d9a93a; }
 .rv-toggle input { margin: 0; }
-.rv-view-btn.active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.rv-view-btn.active, .rv-view-btn.active:hover { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
 .review-toolbar form { margin: 0; }
 .review-note-flash { white-space: pre-wrap; }
 .editor-flash.review-open-flash { background: var(--fuzzy-soft); color: #7a4d05; border-bottom-color: #f1d29a; } /* a warning, like the other ones */
