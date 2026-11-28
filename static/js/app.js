@@ -368,6 +368,7 @@
         var ed = document.getElementById("editor");
         if (window.htmx && ed) htmx.process(ed);
         undoStack = [];
+        redoStack = [];
         lastTyping = 0;
         applyLock();
         currentId = (ed && ed.dataset.entryId) || null;
@@ -704,7 +705,9 @@
     // Undo for the translation box: snapshots of every plural form and the needs-work flag.
     // Typing is grouped into bursts; tools (copy source, AI, glossary, thesaurus, suggestions)
     // record a snapshot before they change the text. The history resets per entry.
-    var undoStack = [], lastTyping = 0;
+    // Ctrl+Z / Ctrl+Shift+Z (Ctrl+Y) in the box use this history too: the browser's own one is lost whenever a
+    // tool or an entry load sets the text, so it would undo nothing or the wrong thing.
+    var undoStack = [], redoStack = [], lastTyping = 0;
     function trSnapshot() {
         var f = form();
         if (!f) return null;
@@ -726,6 +729,7 @@
         if (!s || sameSnapshot(undoStack[undoStack.length - 1], s)) return;
         undoStack.push(s);
         if (undoStack.length > 50) undoStack.shift();
+        redoStack = []; // a new change ends what could be redone
         updateUndoButton();
     }
     window.trBeforeChange = pushUndo; // used by the thesaurus popup
@@ -796,10 +800,13 @@
             el.appendChild(node);
         });
     }
-    function undo() {
-        var f = form(), s = undoStack.pop();
-        if (!f || !s) return;
-        f.querySelectorAll(".tr-input").forEach(function (ta, i) { if (s.values[i] !== undefined) ta.value = s.values[i]; });
+    function restoreSnapshot(f, s) {
+        f.querySelectorAll(".tr-input").forEach(function (ta, i) {
+            if (s.values[i] === undefined) return;
+            ta.value = s.values[i];
+            // spell marks and other listeners follow the restored text (before the flag below, which they may clear)
+            ta.dispatchEvent(new Event("input", { bubbles: true }));
+        });
         var cb = f.querySelector("input[name=fuzzy]");
         if (cb) { cb.checked = s.fuzzy; cb.dataset.touched = "1"; }
         syncUnfuzzyButton();
@@ -808,6 +815,28 @@
         updateUndoButton();
         focusTranslation();
     }
+    function undo() {
+        var f = form();
+        if (!f || !undoStack.length) return;
+        var cur = trSnapshot(), s = undoStack.pop();
+        // the newest snapshot may be the text as it is now (taken before a change that did nothing)
+        if (sameSnapshot(s, cur) && undoStack.length) s = undoStack.pop();
+        else if (sameSnapshot(s, cur)) { updateUndoButton(); return; }
+        redoStack.push(cur);
+        restoreSnapshot(f, s);
+    }
+    function redo() {
+        var f = form(), s = redoStack.pop();
+        if (!f || !s) return;
+        undoStack.push(trSnapshot());
+        restoreSnapshot(f, s);
+    }
+    document.addEventListener("keydown", function (ev) {
+        if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || !ev.target.matches || !ev.target.matches("#entry-form .tr-input")) return;
+        var k = ev.key.toLowerCase();
+        if (k === "z" && !ev.shiftKey) { ev.preventDefault(); if (!ev.target.readOnly) undo(); }
+        else if (k === "z" && ev.shiftKey || k === "y" && !ev.shiftKey) { ev.preventDefault(); if (!ev.target.readOnly) redo(); }
+    });
     document.addEventListener("beforeinput", function (ev) {
         if (!ev.target.matches || !ev.target.matches("#entry-form .tr-input")) return;
         var now = Date.now();

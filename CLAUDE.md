@@ -1077,6 +1077,8 @@ deploys never run stale JS/CSS.
   the list and current entry reload. "Terjemahkan AI" locks the box with a shimmer (`.ai-filling`).
 - "Urungkan" (`#btn-undo`) undoes the last change to the translation: typing bursts and every tool
   (copy source, AI, glossary chip, thesaurus via `window.trBeforeChange`, suggestions) push a snapshot.
+  Ctrl+Z (⌘Z) in the box goes through the same history, and Ctrl+Shift+Z / Ctrl+Y redo (`redoStack`, cleared by any
+  new change and per entry): the browser's own undo is lost whenever code sets the text.
 - Plural placeholders are checked like `msgfmt -c` (`po.ValidateWith` + `po.PluralFor(c.PluralForms, …)`, which
   evaluates the Plural-Forms formula for n = 0…1000): every `msgstr[i]` is compared with `msgid_plural`; only a
   form used for at most one number, in a file with several forms, may drop a placeholder. With one form
