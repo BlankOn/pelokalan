@@ -66,7 +66,15 @@ func TestReviewConsistency(t *testing.T) {
 
 	// reviewers get the button and the panel; the translator (in their own editor) and visitors do not
 	rina.get(page).status(http.StatusOK).contains(`id="btn-consistency"`, `id="cons-panel"`)
-	owner.get(page).status(http.StatusOK).contains(`id="btn-consistency"`)
+	ob := owner.get(page).status(http.StatusOK).contains(`id="btn-consistency"`, `data-review-view="raw"`).Body
+	// the review toolbar: Tabel | Diff | Teks, then Konsistensi, Validasi, PO
+	order := []string{`data-review-view="table"`, `data-review-view="diff"`, `data-review-view="raw"`, `id="btn-consistency"`,
+		`id="btn-validate"`, `<span>PO</span>`}
+	for i := 1; i < len(order); i++ {
+		if a, b := strings.Index(ob, order[i-1]), strings.Index(ob, order[i]); a < 0 || b < a {
+			t.Fatalf("%s should come before %s (%d, %d)", order[i-1], order[i], a, b)
+		}
+	}
 	kiki.get(fmt.Sprintf("/catalogs/%d", kc)).lacks(`id="btn-consistency"`)
 	kiki.post(check, nil).status(http.StatusForbidden)
 	visitor(t).get(check).redirectsTo("/login")
