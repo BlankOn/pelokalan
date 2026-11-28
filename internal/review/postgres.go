@@ -20,7 +20,7 @@ func NewRepository(db *sql.DB) Repository { return &reviewRepository{db: db} }
 
 const reviewColumns = `r.id, r.project_id, r.catalog_id, r.group_id, r.module, r.repo_path, r.status, r.requested_by, r.note,
 	r.entries, r.created_at, r.reviewed_by, r.reviewed_at, r.review_note, r.commit_sha, r.commit_url, r.error,
-	ru.username, COALESCE(NULLIF(ru.name, ''), ru.username), COALESCE(rv.username, ''), c.filename, ou.username, p.slug, c.updated_at`
+	ru.username, COALESCE(NULLIF(ru.name, ''), ru.username), ru.avatar, COALESCE(rv.username, ''), c.filename, ou.username, p.slug, c.updated_at`
 
 const reviewFrom = ` FROM module_reviews r
 	JOIN users ru ON ru.id = r.requested_by
@@ -33,7 +33,7 @@ func scanReview(row interface{ Scan(...any) error }) (*models.ModuleReview, erro
 	r := &models.ModuleReview{}
 	err := row.Scan(&r.ID, &r.ProjectID, &r.CatalogID, &r.GroupID, &r.Module, &r.RepoPath, &r.Status, &r.RequestedBy, &r.Note,
 		&r.Entries, &r.CreatedAt, &r.ReviewedBy, &r.ReviewedAt, &r.ReviewNote, &r.CommitSHA, &r.CommitURL, &r.Error,
-		&r.RequesterUsername, &r.RequesterName, &r.ReviewerUsername, &r.Filename, &r.OwnerUsername, &r.ProjectSlug, &r.FileUpdatedAt)
+		&r.RequesterUsername, &r.RequesterName, &r.RequesterAvatar, &r.ReviewerUsername, &r.Filename, &r.OwnerUsername, &r.ProjectSlug, &r.FileUpdatedAt)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, store.ErrNotFound
 	}

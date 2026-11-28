@@ -778,7 +778,7 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   tinjauan" (Settings → Umum, `projects.review_required`, migration 050) is on: then the button is hidden and
   `PushNow` refuses (`err.review_required`). One open request per file.
   Owners and coordinators may also cancel someone else's open request: "Lepas tinjauan" in the review editor toolbar
-  (before "Setujui & commit") and in Berkas anggota lain (row order: Lepas reservasi, Lepas tinjauan, Tinjau) (same `POST …/reviews/{rid}/withdraw`;
+  (in the menu of the chevron attached to "Setujui & commit", `.split-btn`) and in Berkas anggota lain (row order: Lepas reservasi, Lepas tinjauan, Tinjau) (same `POST …/reviews/{rid}/withdraw`;
   `review.Service.Withdraw` records who and emails the translator, `mail.review_cancelled`). Reviewers cannot.
 - Commit (`review.Service.commit`): reads the branch's current file, `gitpatch.ApplyCredit` (the whole file with only the
   member's changed entries rewritten, and the header crediting the translator: their "Name <email>, year." line among
@@ -800,7 +800,8 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   linking the commit).
 - **Review editor** (`/projects/{id}/reviews/{rid}` = `editorPage` with the review, `reviewData`; class `review-mode`):
   read-only, lists only the review's strings (`EntryFilter.Only`, `review.Service.ChangedHashes`), no edit pane (the
-  status bar stays, without shortcuts or filter links), toolbar `review_toolbar` (back, file + requester, Tabel/Diff `[data-review-view]` toggling
+  status bar stays, without shortcuts or filter links), toolbar `review_toolbar` (back, the requester: avatar, name, @username, when asked and the string count, linking
+  to their public page, since the top bar names the file; Tabel/Diff `[data-review-view]` toggling
   `#review-diff`, Validasi, Teks, PO, Modul, then the editor's search/filter/order (`editor_filter`, shared with the full
   editor; it carries `review=<id>` so the list stays on the review's strings; the banner's "Tampilkan" ticks its
   "Komentar tinjauan" option), "Setujui & commit" disabled while review comments are open), banner

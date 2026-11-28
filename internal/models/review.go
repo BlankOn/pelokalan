@@ -37,6 +37,7 @@ type ModuleReview struct {
 	ResolvedComments  int // its resolved review comments: with none open, the translator fixed everything
 	RequesterUsername string
 	RequesterName     string
+	RequesterAvatar   string // blob key of their profile picture ('' = the initial)
 	ReviewerUsername  string
 	Filename          string
 	OwnerUsername     string

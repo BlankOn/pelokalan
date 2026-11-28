@@ -339,10 +339,14 @@
         <span>{{t .Lang "editor.project"}}</span>
     </a>
     <div class="tb-sep"></div>
-    <div class="rv-tb-info">
-        <strong>{{$r.RepoPath}}</strong>
-        <span class="muted small">{{t .Lang "review.by" $r.RequesterName $r.RequesterUsername}}{{with .Data.Changed}} · {{t $.Lang "review.strings" .}}{{end}}</span>
-    </div>
+    {{/* the top bar names the file: this block is about the translator who asked for the review */}}
+    <a class="rv-tb-info rv-tb-person" href="/users/{{$r.RequesterUsername}}" target="_blank" rel="noopener" title="{{t .Lang "review.by" $r.RequesterName $r.RequesterUsername}}">
+        {{template "avatar" (dict "Key" $r.RequesterAvatar "Name" $r.RequesterName "Class" "rv-tb-avatar")}}
+        <span class="rv-tb-text">
+            <strong>{{$r.RequesterName}} <span class="muted">@{{$r.RequesterUsername}}</span></strong>
+            <span class="muted small">{{t .Lang "review.requested_ago" (timeAgo .Lang $r.CreatedAt)}}{{with .Data.Changed}} · {{t $.Lang "review.strings" .}}{{end}}</span>
+        </span>
+    </a>
     <div class="rv-view" role="group" aria-label="{{t .Lang "review.view_label"}}">
         <button type="button" class="tb-btn rv-view-btn active" data-review-view="table"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9.5h17M3.5 14.5h17M10 9.5v10"/></svg><span>{{t .Lang "review.view_table"}}</span></button>
         <button type="button" class="tb-btn rv-view-btn" data-review-view="diff"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5v7M3.5 7h7M13.5 17h7M5 20L19 4"/></svg><span>{{t .Lang "review.view_diff"}}</span></button>
@@ -376,14 +380,26 @@
     <div class="tb-sep"></div>
     {{template "editor_filter" (dict "Lang" .Lang "C" $c "F" .Data.Filter "Review" (or (and (eq $r.Status "requested") $r.ID) 0) "Reviewer" true)}}
     {{if eq $r.Status "requested"}}
-        {{if .Data.CanCancel}}
-        <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/withdraw" data-confirm="{{t .Lang "review.cancel_confirm" $r.RequesterUsername}}" data-confirm-ok="{{t .Lang "review.cancel"}}">
-            <button type="submit" class="btn rv-cancel">{{t .Lang "review.cancel"}}</button>
-        </form>
-        {{end}}
         {{if .Data.CanDecide}}
+        {{/* one split button: approving, and the rarer actions ("Lepas tinjauan") behind its chevron */}}
+        <div class="split-btn">
         <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/approve" data-confirm="{{t .Lang "review.approve_confirm" $r.RepoPath}}" data-confirm-ok="{{t .Lang "review.approve"}}" data-busy="{{t .Lang "review.pushing"}}">
             <button type="submit" class="btn btn-primary rv-approve" data-review-block="{{t .Lang "err.review_open_comments" 987654321}}"{{if $r.OpenComments}} disabled title="{{t .Lang "err.review_open_comments" $r.OpenComments}}"{{end}}>{{t .Lang "review.approve"}}</button>
+        </form>
+        {{if .Data.CanCancel}}
+        <details class="dropdown split-more">
+            <summary class="btn btn-primary" title="{{t .Lang "review.more_actions"}}" aria-label="{{t .Lang "review.more_actions"}}"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+            <div class="menu">
+                <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/withdraw" data-confirm="{{t .Lang "review.cancel_confirm" $r.RequesterUsername}}" data-confirm-ok="{{t .Lang "review.cancel"}}">
+                    <button type="submit" class="linklike rv-cancel">{{t .Lang "review.cancel"}}</button>
+                </form>
+            </div>
+        </details>
+        {{end}}
+        </div>
+        {{else if .Data.CanCancel}}
+        <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/withdraw" data-confirm="{{t .Lang "review.cancel_confirm" $r.RequesterUsername}}" data-confirm-ok="{{t .Lang "review.cancel"}}">
+            <button type="submit" class="btn rv-cancel">{{t .Lang "review.cancel"}}</button>
         </form>
         {{else if and $p.Role.CanReview (not $p.Role.CanManage)}}<span class="muted small" title="{{t .Lang "review.reviewer_help"}}">{{t .Lang "review.reviewer_note"}}</span>
         {{else if .Data.CanWithdraw}}

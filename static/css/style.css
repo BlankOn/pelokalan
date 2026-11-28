@@ -1902,6 +1902,12 @@ mark.rv-anchor.rv-done { background: none; border-bottom: 0; padding: 0; }
 .review-toolbar { gap: 10px; }
 .rv-tb-info { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
 .rv-tb-info strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-tb-person { flex-direction: row; align-items: center; gap: 9px; color: inherit; padding: 3px 8px 3px 4px; border-radius: 6px; }
+.rv-tb-person:hover { background: rgba(0,0,0,.05); text-decoration: none; }
+.rv-tb-avatar { width: 32px; height: 32px; font-size: 14px; flex-shrink: 0; }
+.rv-tb-text { display: flex; flex-direction: column; min-width: 0; }
+.rv-tb-text strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rv-tb-text strong .muted { font-weight: 400; }
 /* Tabel | Diff | Raw: toolbar buttons (icon over label) kept together as one switch */
 .rv-view { display: inline-flex; gap: 2px; padding: 2px; border: 1px solid var(--border); border-radius: 8px; margin-left: 8px; }
 /* "Tampilkan" in the yellow open-comments banner: only the strings with unresolved review comments */
@@ -1913,6 +1919,15 @@ mark.rv-anchor.rv-done { background: none; border-bottom: 0; padding: 0; }
 .rv-toggle input { margin: 0; }
 .rv-view-btn.active, .rv-view-btn.active:hover { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
 .review-toolbar form { margin: 0; }
+/* a button with its chevron attached (one shape): the main action and a small menu of rarer ones */
+.split-btn { display: inline-flex; align-items: stretch; }
+.split-btn > form .btn { border-top-right-radius: 0; border-bottom-right-radius: 0; height: 100%; }
+.split-more { display: flex; }
+.split-more > summary.btn { border-top-left-radius: 0; border-bottom-left-radius: 0; padding: 0 7px; display: flex; align-items: center;
+    margin-left: 1px; box-shadow: inset 1px 0 0 rgba(255,255,255,.35); cursor: pointer; }
+.split-more > summary svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.split-more .menu { right: 0; left: auto; min-width: 180px; }
+.split-more .menu .rv-cancel { color: var(--danger, #c0392b); }
 .review-note-flash { white-space: pre-wrap; }
 .editor-flash.review-open-flash { background: var(--fuzzy-soft); color: #7a4d05; border-bottom-color: #f1d29a; } /* a warning, like the other ones */
 
