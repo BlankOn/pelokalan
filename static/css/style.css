@@ -149,7 +149,7 @@ img.avatar, img.user-avatar { object-fit: cover; background: var(--surface-2); d
     align-items: center; gap: 8px; width: max-content; max-width: calc(100vw - 32px); pointer-events: none; }
 .toast {
     background: var(--ok-soft); color: #1d5e39; border: 1px solid #bfe3cc; padding: 9px 16px; border-radius: var(--radius);
-    box-shadow: 0 6px 20px rgba(0,0,0,.12); max-width: 520px; font-size: 14px; pointer-events: auto; animation: toast-in .15s ease-out;
+    box-shadow: 0 6px 20px rgba(0,0,0,.12); max-width: 520px; font-size: 14px; pointer-events: auto; animation: toast-in .15s ease-out; cursor: pointer;
 }
 .toast-error { background: var(--fuzzy-soft); color: #7a4d05; border-color: #f1d29a; }
 @keyframes toast-in { from { transform: translateY(-8px); opacity: 0; } }

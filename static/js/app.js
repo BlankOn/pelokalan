@@ -143,6 +143,11 @@
         };
         new MutationObserver(arm).observe(toastArea, { childList: true });
         arm();
+        // a click dismisses a toast right away
+        toastArea.addEventListener("click", function (ev) {
+            var t = ev.target.closest && ev.target.closest(".toast");
+            if (t) t.remove();
+        });
     }
     // PO syntax highlighting (raw editor, raw view): keywords, strings with escapes, placeholders and markup, and each
     // kind of comment; returns HTML

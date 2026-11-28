@@ -1131,7 +1131,7 @@ Version messages, sync errors and review errors are stored as "key|arg|arg"; `st
 ## Toasts and background forms
 
 - Flash messages (`?flash=<key>`, `flash.*` strings) are floating toasts on every page (`#toast` in base.html: centred at
-  the top below the top bar, light green, light yellow for errors (`toast-error`); removed after 4.5 s; app.js drops `flash` from the address so a reload does not repeat it). From JS: `window.toast(msg, isError)`
+  the top below the top bar, light green, light yellow for errors (`toast-error`); removed after 4.5 s or when clicked; app.js drops `flash` from the address so a reload does not repeat it). From JS: `window.toast(msg, isError)`
   (defined for every page: the `#toast` element would otherwise be `window.toast`).
 - Forms with `data-ajax` (⋯ menu: reserve, release, withdraw a review; the coordinators' "Lepas") and the review popup
   are sent in the background with `X-Requested-With: fetch`; handlers answer JSON through `Handler.finish` /
