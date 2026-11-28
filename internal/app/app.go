@@ -244,6 +244,7 @@ func New(cfg *config.Config, db *sql.DB, opts Options) (*App, error) {
 		r.Post("/logout", h.Logout)
 
 		r.Get("/projects", h.Projects)
+		r.Get("/nav/projects", h.ProjectSwitch)
 		r.Get("/projects/{id}", h.ProjectHome)
 		r.Get("/projects/{id}/glossary", h.GlossaryPage)
 		r.Get("/projects/{id}/glossary/search", h.GlossarySearch)

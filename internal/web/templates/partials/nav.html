@@ -4,16 +4,16 @@
         <img src="/static/img/logo.svg" alt="" width="22" height="22">
         <span>{{.SiteName}}</span>
     </a>
+    <details class="projswitch" data-switch-url="/nav/projects{{with .Data.Project}}?current={{.Slug}}{{end}}">
+        <summary title="{{t .Lang "nav.switch_project"}}"><span class="psw-label">{{with .Data.Project}}{{.Name}}{{else}}{{t $.Lang "nav.projects"}}{{end}}</span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+        <div class="menu psw-menu" aria-busy="true"><div class="psw-empty">{{t .Lang "common.loading"}}</div></div>
+    </details>
     {{with .Data.Catalog}}{{$c := .}}
     <div class="top-title">
-        <strong>{{with $.Data.Project}}<a href="{{.Path}}/files">{{.Name}}</a> · {{end}}<a href="{{$c.URL}}">{{$c.Filename}}</a></strong>
+        <strong><a href="{{$c.URL}}">{{$c.Filename}}</a></strong>
         <span class="small">{{if $c.IsTemplate}}{{t $.Lang "project.template"}}{{else}}{{$c.LanguageName}}{{end}}</span>
     </div>
-    {{else}}{{with .Data.Project}}
-    <div class="top-title">
-        <a class="top-title-project" href="{{.Path}}">{{.Name}}</a>
-    </div>
-    {{end}}{{end}}
+    {{end}}
     <div class="spacer"></div>
     <div class="langswitch" role="group" aria-label="{{t .Lang "nav.language"}}">
         {{range uiLanguages}}

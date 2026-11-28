@@ -1,0 +1,14 @@
+{{define "project_switch_menu"}}
+<div class="psw-head">{{t .Lang "nav.switch_project"}}</div>
+{{range .Projects}}
+<a class="psw-item{{if eq .Slug $.Current}} active{{end}}" href="{{.Path}}/files"{{if eq .Slug $.Current}} aria-current="page"{{end}}>
+    <span class="psw-name">{{.Name}}</span>{{if .Role}}<span class="psw-role">{{t $.Lang (printf "role.%s" .Role)}}</span>{{end}}
+</a>
+{{else}}
+<div class="psw-empty">{{t .Lang "nav.no_projects"}}</div>
+{{end}}
+<div class="psw-sep"></div>
+<a href="/projects">{{if .More}}{{t .Lang "nav.all_projects_more"}}{{else}}{{t .Lang "nav.all_projects"}}{{end}}</a>
+{{if .CanSettings}}<a href="/projects/{{.Current}}/settings">{{t .Lang "nav.project_settings"}}</a>{{end}}
+{{if .User}}<a href="/projects?new=1">{{t .Lang "nav.new_project"}}</a>{{end}}
+{{end}}

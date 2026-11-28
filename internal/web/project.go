@@ -38,6 +38,44 @@ func (h *Handler) Projects(w http.ResponseWriter, r *http.Request) {
 	h.renderProjects(w, r, "", nil)
 }
 
+// projectSwitchMax caps the projects listed in the top bar's switcher (the rest are on /projects)
+const projectSwitchMax = 30
+
+// ProjectSwitch renders the top bar's project menu (loaded when it opens): the person's projects with their
+// role, or the projects for visitors, and links to every project, the current project's settings and a new one
+func (h *Handler) ProjectSwitch(w http.ResponseWriter, r *http.Request) {
+	user := middleware.GetUser(r.Context())
+	var (
+		list []*models.Project
+		err  error
+	)
+	if user != nil {
+		list, err = h.projectService.ListForUser(r.Context(), user)
+	} else {
+		list, err = h.projectService.ListAll(r.Context(), nil)
+	}
+	if err != nil {
+		h.fail(w, r, err)
+		return
+	}
+	sort.SliceStable(list, func(i, j int) bool { return strings.ToLower(list[i].Name) < strings.ToLower(list[j].Name) })
+	more := len(list) > projectSwitchMax
+	if more {
+		list = list[:projectSwitchMax]
+	}
+	current := r.URL.Query().Get("current")
+	var cur *models.Project
+	for _, p := range list {
+		if p.Slug == current {
+			cur = p
+		}
+	}
+	h.renderPartials(w, partial{"project_switch_menu", map[string]any{
+		"Lang": middleware.GetLang(r.Context()), "User": user, "Projects": list, "Current": current, "More": more,
+		"CanSettings": cur != nil && cur.Role.CanManage(),
+	}})
+}
+
 func (h *Handler) renderProjects(w http.ResponseWriter, r *http.Request, errMsg string, form *project.ProjectInput) {
 	user := middleware.GetUser(r.Context())
 	projects, err := h.projectService.ListAll(r.Context(), user)

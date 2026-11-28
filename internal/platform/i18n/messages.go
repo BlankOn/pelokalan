@@ -5,14 +5,20 @@ package i18n
 var messages = map[string]map[string]string{
 	ID: {
 		// Navigation and layout
-		"nav.projects":    "Proyek",
-		"nav.invitations": "Undangan",
-		"nav.language":    "Bahasa antarmuka",
-		"nav.account":     "Akun",
-		"nav.profile":     "Profil",
-		"nav.logout":      "Keluar",
-		"nav.login":       "Masuk",
-		"footer.tagline":  "Penyunting terjemahan untuk proyek perangkat lunak sumber terbuka, kompatibel dengan sistem penerjemahan gettext dari proyek GNU",
+		"nav.projects":          "Proyek",
+		"nav.invitations":       "Undangan",
+		"nav.language":          "Bahasa antarmuka",
+		"nav.account":           "Akun",
+		"nav.profile":           "Profil",
+		"nav.logout":            "Keluar",
+		"nav.login":             "Masuk",
+		"nav.switch_project":    "Ganti proyek",
+		"nav.no_projects":       "Anda belum bergabung dengan proyek mana pun.",
+		"nav.all_projects":      "Semua proyek",
+		"nav.all_projects_more": "Semua proyek (lainnya di sini)",
+		"nav.project_settings":  "Pengaturan proyek",
+		"nav.new_project":       "Proyek baru",
+		"footer.tagline":        "Penyunting terjemahan untuk proyek perangkat lunak sumber terbuka, kompatibel dengan sistem penerjemahan gettext dari proyek GNU",
 
 		// Page titles
 		"title.login":       "Masuk",
@@ -1672,14 +1678,20 @@ var messages = map[string]map[string]string{
 
 	EN: {
 		// Navigation and layout
-		"nav.projects":    "Projects",
-		"nav.invitations": "Invitations",
-		"nav.language":    "Interface language",
-		"nav.account":     "Account",
-		"nav.profile":     "Profile",
-		"nav.logout":      "Sign out",
-		"nav.login":       "Sign in",
-		"footer.tagline":  "Translation editor for open source software projects, compatible with GNU project’s translation system gettext",
+		"nav.projects":          "Projects",
+		"nav.invitations":       "Invitations",
+		"nav.language":          "Interface language",
+		"nav.account":           "Account",
+		"nav.profile":           "Profile",
+		"nav.logout":            "Sign out",
+		"nav.login":             "Sign in",
+		"nav.switch_project":    "Switch project",
+		"nav.no_projects":       "You have not joined any project yet.",
+		"nav.all_projects":      "All projects",
+		"nav.all_projects_more": "All projects (more there)",
+		"nav.project_settings":  "Project settings",
+		"nav.new_project":       "New project",
+		"footer.tagline":        "Translation editor for open source software projects, compatible with GNU project’s translation system gettext",
 
 		// Page titles
 		"title.login":       "Sign in",

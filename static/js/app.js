@@ -20,7 +20,7 @@
             if (d) d.close();
         }
         // close open dropdown menus when clicking elsewhere
-        document.querySelectorAll("details.dropdown[open], details.usermenu[open]").forEach(function (el) {
+        document.querySelectorAll("details.dropdown[open], details.usermenu[open], details.projswitch[open]").forEach(function (el) {
             if (!el.contains(ev.target)) el.removeAttribute("open");
         });
     });
@@ -131,6 +131,24 @@
     document.querySelectorAll("dialog[data-open-on-load]").forEach(function (d) {
         if (d.showModal) d.showModal();
     });
+
+    // The top bar's project switcher: its list is loaded when it first opens (so pages need no extra query)
+    var psw = document.querySelector("details.projswitch");
+    if (psw) {
+        var pswLoaded = false;
+        psw.addEventListener("toggle", function () {
+            if (!psw.open || pswLoaded) return;
+            pswLoaded = true;
+            var menu = psw.querySelector(".psw-menu");
+            fetch(psw.dataset.switchUrl, { credentials: "same-origin" })
+                .then(function (r) { if (!r.ok) throw new Error(r.status); return r.text(); })
+                .then(function (html) { menu.innerHTML = html; menu.removeAttribute("aria-busy"); })
+                .catch(function () { pswLoaded = false; });
+        });
+        document.addEventListener("keydown", function (ev) {
+            if (ev.key === "Escape" && psw.open) { psw.removeAttribute("open"); psw.querySelector("summary").focus(); }
+        });
+    }
 
     // Remove toasts after a few seconds (also the one a page brings for its ?flash= message)
     var toastArea = document.getElementById("toast");

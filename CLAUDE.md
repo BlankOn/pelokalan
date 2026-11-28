@@ -1023,9 +1023,13 @@ needs project AI settings). Implemented by `pretranslate.Service.Start` / jobs i
 
 ## Top bar
 
-`partials/nav.html` centers a title: "Project · file" over the language when the page sets
-`Data.Catalog` (editor, raw, history), else the project name when it sets `Data.Project`.
-The brand links to /projects; Undangan lives in the user menu. In the editor toolbar the
+`partials/nav.html`: the brand (links to /projects; on phones the logo alone), then the **project switcher**
+(`details.projswitch`, partials/project_switch.html): a button naming the current project (`Data.Project`, else
+"Proyek") whose menu is loaded when it first opens (`GET /nav/projects?current=<slug>`, `Handler.ProjectSwitch`, public:
+the person's projects with their role, or every project for visitors, sorted by name, at most 30; then "Semua proyek",
+"Pengaturan proyek" for owners/coordinators of the current one, and "Proyek baru" → `/projects?new=1`). Pages that set
+`Data.Catalog` (editor, raw, history) show the file name over its language in the room after the switcher (`.top-title`).
+Undangan lives in the user menu. In the editor toolbar the
 search box fills the space after the buttons, followed by the filter (funnel) and order selects.
 
 ## Phones
