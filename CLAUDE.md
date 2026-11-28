@@ -372,7 +372,9 @@ wired in `app.New`. Rules:
 - Editor: selecting text in the translation box shows a popup (app.js); clicking replaces the
   selection, keeping a leading capital. In the review and view-only layouts and the project file viewer the table's text can be
   selected (`.review-mode .entry-row { user-select: text }`; a click that ends a selection does not pick the row), and
-  a word selected in a translation shows the same popup for members, read-only: clicking a synonym copies it. The
+  a word selected in a translation shows the same popup for members, read-only: clicking a synonym copies it. On touch
+  screens (long press + selection handles, no mouseup) the popup opens once the selection has stopped changing for
+  450 ms (`selectionchange` in app.js; mouse selections stay with mouseup), also with "💬 Komentari bagian ini". The
   pages carry `thesaurus_attrs` (partial) only for the owner or for members. The /licenses page credits the source.
 
 ## Spelling check (Indonesian)

@@ -2949,11 +2949,11 @@ document.addEventListener("change", function (ev) {
         }
         clearTimeout(timer);
         timer = setTimeout(function () {
-            if (!usable(q)) { show(q, rect, null, null, commentButton()); current = { table: true }; return; }
+            if (!usable(q)) { show(q, rect, null, null, commentButton()); current = { table: true, q: q }; return; }
             lookup(q, function (res) {
                 if (String(window.getSelection()).trim() !== q) return;
                 show(q, rect, res, null, commentButton());
-                current = { table: true };
+                current = { table: true, q: q };
             });
         }, 180);
         return true;
@@ -2966,6 +2966,28 @@ document.addEventListener("change", function (ev) {
     });
     document.addEventListener("keyup", function (ev) {
         if (ev.target.matches && ev.target.matches("#entry-form .tr-input") && (ev.shiftKey || ev.key === "Shift")) check(ev.target);
+    });
+    // Touch screens (iPad, phones): text is selected by a long press and dragging the handles, which sends no mouseup,
+    // so the popup also opens once the selection has stopped changing for a moment. A mouse selection is left to
+    // mouseup (no popup while the button is still down), and a selection that goes away never closes the popup here:
+    // tapping its buttons may clear the selection first.
+    var mouseDown = false, selTimer = null;
+    document.addEventListener("pointerdown", function (ev) { if (ev.pointerType === "mouse") mouseDown = true; }, true);
+    document.addEventListener("pointerup", function (ev) { if (ev.pointerType === "mouse") mouseDown = false; }, true);
+    document.addEventListener("selectionchange", function () {
+        clearTimeout(selTimer);
+        selTimer = setTimeout(function () {
+            if (mouseDown) return;
+            var a = document.activeElement;
+            if (a && a.matches && a.matches("#entry-form .tr-input")) {
+                if (a.selectionStart !== a.selectionEnd) check(a);
+                return;
+            }
+            var sel = window.getSelection();
+            if (!sel || sel.isCollapsed) return;
+            if (pop && current && current.table && current.q === String(sel).trim()) return; // already shown
+            checkTable();
+        }, 450);
     });
     document.addEventListener("keydown", function (ev) {
         if (ev.key === "Escape" && pop) { ev.stopPropagation(); close(); }
