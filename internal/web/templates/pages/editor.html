@@ -383,7 +383,7 @@
         {{end}}
         {{if .Data.CanDecide}}
         <form method="post" action="{{$p.Path}}/reviews/{{$r.ID}}/approve" data-confirm="{{t .Lang "review.approve_confirm" $r.RepoPath}}" data-confirm-ok="{{t .Lang "review.approve"}}" data-busy="{{t .Lang "review.pushing"}}">
-            <button type="submit" class="btn btn-primary rv-approve"{{if $r.OpenComments}} disabled title="{{t .Lang "err.review_open_comments" $r.OpenComments}}"{{end}}>{{t .Lang "review.approve"}}</button>
+            <button type="submit" class="btn btn-primary rv-approve" data-review-block="{{t .Lang "err.review_open_comments" 987654321}}"{{if $r.OpenComments}} disabled title="{{t .Lang "err.review_open_comments" $r.OpenComments}}"{{end}}>{{t .Lang "review.approve"}}</button>
         </form>
         {{else if and $p.Role.CanReview (not $p.Role.CanManage)}}<span class="muted small" title="{{t .Lang "review.reviewer_help"}}">{{t .Lang "review.reviewer_note"}}</span>
         {{else if .Data.CanWithdraw}}
@@ -398,7 +398,7 @@
 {{/* under the review toolbar: the translator's note, open review comments, a failed commit */}}
 {{define "review_banner"}}{{$r := .R}}
 {{if $r.Note}}<div class="editor-flash review-note-flash"><strong>{{t .Lang "review.note_from" $r.RequesterUsername}}:</strong> {{$r.Note}}</div>{{end}}
-{{if and (eq $r.Status "requested") $r.OpenComments}}<div class="editor-flash review-open-flash"><span class="mark-review"></span> {{t .Lang "review.open_comments" $r.OpenComments}}
+{{if eq $r.Status "requested"}}<div class="editor-flash review-open-flash" data-review-count data-n="{{$r.OpenComments}}"{{if not $r.OpenComments}} hidden{{end}}><span class="mark-review"></span> <span data-review-text="{{t .Lang "review.open_comments" 987654321}}">{{t .Lang "review.open_comments" $r.OpenComments}}</span>
     <span class="rv-open-filter"><label class="rv-toggle" title="{{t .Lang "review.open_only_help"}}"><input type="checkbox" data-filter-review> {{t .Lang "review.open_only"}}</label></span></div>{{end}}
 {{if and (eq $r.Status "requested") $r.Error}}<div class="editor-flash editor-hold">{{t .Lang "review.failed"}}: {{errText .Lang $r.Error}}</div>{{end}}
 {{if $r.ReviewNote}}<div class="editor-flash review-note-flash"><strong>{{t .Lang "review.note_back" $r.ReviewerUsername}}:</strong> {{$r.ReviewNote}}</div>{{end}}

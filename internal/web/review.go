@@ -158,7 +158,12 @@ func (h *Handler) reviewData(r *http.Request, p *models.Project, c *models.Catal
 	if rv.Status != models.ReviewRequested {
 		return
 	}
-	d, err := h.reviews.Changes(r.Context(), p, c)
+	// the diff's header shows who the commit will credit: the person who would approve it is among them
+	var approver *models.User
+	if data.Data["CanDecide"] == true {
+		approver = user
+	}
+	d, err := h.reviews.ChangesFor(r.Context(), p, c, rv, approver)
 	if err != nil || d == nil {
 		return
 	}

@@ -716,6 +716,16 @@ func (s *Service) ResolvedReviewComments(ctx context.Context, reviewID int64) in
 	return n
 }
 
+// ResolvedReviewAuthors are the people whose review comments on a file were resolved since its last commit to the
+// repository (by their first comment; nil on errors)
+func (s *Service) ResolvedReviewAuthors(ctx context.Context, catalogID int64) []int64 {
+	ids, err := s.repo.ResolvedReviewAuthors(ctx, catalogID)
+	if err != nil {
+		return nil
+	}
+	return ids
+}
+
 // List returns the discussions of a project, newest activity first
 func (s *Service) List(ctx context.Context, p *models.Project, f DiscussionFilter) ([]*models.Discussion, int, error) {
 	return s.repo.List(ctx, p.ID, f)

@@ -11,6 +11,9 @@ import (
 type Credit struct {
 	Name, Email string
 	Year        int
+	// Reviewers get their own "Name <email>, year." lines among the header comments, after the translator's;
+	// Last-Translator stays the translator
+	Reviewers []Credit
 }
 
 // identity is the Last-Translator value
@@ -60,6 +63,11 @@ func creditHeader(block []string, c *Credit) []string {
 		comments[i] = strings.TrimPrefix(strings.TrimPrefix(l, "#"), " ")
 	}
 	comments = po.AddContributor(comments, c.Name, c.Email, c.Year)
+	for _, r := range c.Reviewers {
+		if r.Email != "" && !strings.EqualFold(r.Email, c.Email) {
+			comments = po.AddContributor(comments, r.Name, r.Email, r.Year)
+		}
+	}
 	out := make([]string, 0, len(block)+1)
 	for _, t := range comments {
 		if t == "" {

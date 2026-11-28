@@ -782,7 +782,10 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
 - Commit (`review.Service.commit`): reads the branch's current file, `gitpatch.ApplyCredit` (the whole file with only the
   member's changed entries rewritten, and the header crediting the translator: their "Name <email>, year." line among
   the header comments via `po.AddContributor`, and an existing Last-Translator field set to them; `TranslatorCredit`,
-  only when some string changes). The review diff and "Lihat" (`review.Service.Changes`, `gitpatch.DiffCredit`) and the
+  only when some string changes). Reviewers get their own lines after the translator's (`gitpatch.Credit.Reviewers`,
+  `review.Service.credit`): the approver and everyone whose review comments on the file were resolved since its last
+  commit, requests sent back and asked for again included (`discussion.ResolvedReviewAuthors`); Last-Translator stays the
+  translator. The review editor's diff (`ChangesFor` with the viewer as approver) shows the same lines. The review diff and "Lihat" (`review.Service.Changes`, `gitpatch.DiffCredit`) and the
   git patch export show the same header lines. The member's other header edits in Pelokalan are not sent. `PutFile` (one retry on conflict), author = translator's credit identity,
   message "Update translation of <path>" + count + note + `Reviewed-by:` + project link. Only the strings a commit
   rewrote are kept (`pushed_data`, `sentEntries`) and never sent again. Before committing, `UpstreamConflicts` refuses
@@ -850,7 +853,9 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   file owner, the author or a manager): red dot on the entry row (`Entry.ReviewOpen`, `mark-review`, kept in sync by
   app.js from the thread's `data-review-open`), a "Komentar tinjauan" status filter (`EntryFilter.Review`) and status bar
   count in the translator's editor. Approving or sending (`push`/`PushNow`) waits until none is open
-  (`err.review_open_comments`). The reject route stays but the UI works through comments. While a string already has
+  (`err.review_open_comments`). Resolving (or adding) one updates the page without a reload: app.js
+  `reviewOpenChange` moves every count (`[data-review-count]`: the review banner and the status bar, hidden at 0; the
+  sidebar badge) and enables "Setujui & commit" (`[data-review-block]`) when none is left. The reject route stays but the UI works through comments. While a string already has
   an open review comment, a reviewer's reply there is a plain comment (`HasOpenReviewComment`); once all are resolved,
   the next one is a review comment again. A comment on a passage (anchor) is always a review comment.
 

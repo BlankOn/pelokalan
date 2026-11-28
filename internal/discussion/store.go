@@ -42,6 +42,9 @@ type Repository interface {
 	ReviewAnchors(ctx context.Context, projectID, catalogID int64) (map[string][]models.CommentAnchor, error)
 	// ResolvedReviewComments counts the resolved (not deleted) comments tied to a review request
 	ResolvedReviewComments(ctx context.Context, reviewID int64) (int, error)
+	// ResolvedReviewAuthors lists the authors of resolved review comments on a file's requests since its last commit to
+	// the repository (a request sent back and asked for again is the same review), by their first comment
+	ResolvedReviewAuthors(ctx context.Context, catalogID int64) ([]int64, error)
 	UpdateComment(ctx context.Context, id int64, body string, mentions []int64) error
 	DeleteComment(ctx context.Context, id, byUserID int64) error
 	// DeleteDiscussion removes a discussion with its comments, mentions and attachment links

@@ -223,7 +223,9 @@ func TestGitHubReviews(t *testing.T) {
 
 	// the diff shows the header credit the commit adds for the translator
 	year := strconv.Itoa(time.Now().Year())
-	owner.get(page).status(http.StatusOK).contains(kiki.Email + "&gt;, " + year + ".")
+	owner.get(page).status(http.StatusOK).contains(kiki.Email+"&gt;, "+year+".",
+		// ...and the reviewers: the approver (the one looking) and rina, whose review comment was resolved
+		owner.Email+"&gt;, "+year+".", rina.Email+"&gt;, "+year+".")
 
 	owner.post(page+"/approve", nil).redirectsTo(page)
 	commits := ghFake.LastCommits()
@@ -238,7 +240,7 @@ func TestGitHubReviews(t *testing.T) {
 	}
 	body := string(cm.Data)
 	for _, want := range []string{`msgstr "Tutup jendelanya"`, `msgstr "Hapus direktori"`, `msgstr "Buka berkas tersebut"`,
-		"<" + kiki.Email + ">, " + year + ".\nmsgid \"\""} { // credited in the header comments
+		"<" + kiki.Email + ">, " + year + ".\n", "<" + owner.Email + ">, " + year + ".\n", "<" + rina.Email + ">, " + year + ".\nmsgid \"\""} { // the translator, then the approver and rina (resolved comment) in the header comments
 		if !strings.Contains(body, want) {
 			t.Errorf("committed file lacks %s:\n%s", want, body)
 		}

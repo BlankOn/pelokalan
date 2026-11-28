@@ -65,3 +65,26 @@ func TestCreditHeader(t *testing.T) {
 		t.Error("Apply without credit changed the header")
 	}
 }
+
+// reviewers get their own lines after the translator's; Last-Translator stays the translator
+func TestCreditReviewers(t *testing.T) {
+	want := map[string]Target{"Hello": {Translation: []string{"Halo"}}}
+	credit := &Credit{Name: "Budi Santoso", Email: "budi@example.org", Year: 2026, Reviewers: []Credit{
+		{Name: "Citra Dewi", Email: "citra@example.org", Year: 2026},
+		{Name: "Ana Lama", Email: "ana@example.org", Year: 2026},    // already credited: her line gains the year
+		{Name: "Budi again", Email: "BUDI@example.org", Year: 2026}, // the translator: not twice
+	}}
+	out, _ := ApplyCredit([]byte(creditBase), want, credit)
+	s := string(out)
+	for _, line := range []string{
+		"# Ana Lama <ana@example.org>, 2024, 2026.\n# Budi Santoso <budi@example.org>, 2026.\n# Citra Dewi <citra@example.org>, 2026.\n#\n",
+		`"Last-Translator: Budi Santoso <budi@example.org>\n"`,
+	} {
+		if !strings.Contains(s, line) {
+			t.Fatalf("missing %q in:\n%s", line, s)
+		}
+	}
+	if strings.Contains(s, "Budi again") {
+		t.Fatalf("the translator is credited twice:\n%s", s)
+	}
+}

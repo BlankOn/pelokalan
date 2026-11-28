@@ -176,6 +176,12 @@ func (s *Service) lastSent(ctx context.Context, catalogID int64) []byte {
 
 // Changes is what a review would send, against the repository file as last synced (for the review page)
 func (s *Service) Changes(ctx context.Context, p *models.Project, c *models.Catalog) (*gitpatch.FileDiff, error) {
+	return s.ChangesFor(ctx, p, c, nil, nil)
+}
+
+// ChangesFor is Changes with the header crediting the review's reviewers too (credit): those whose review comments
+// were resolved and approver (nil = nobody yet), as the commit will
+func (s *Service) ChangesFor(ctx context.Context, p *models.Project, c *models.Catalog, r *models.ModuleReview, approver *models.User) (*gitpatch.FileDiff, error) {
 	pf, _, err := s.glossary.ProjectFileByRepoPath(ctx, p.ID, c.RepoPath)
 	if err != nil {
 		return nil, err
@@ -188,11 +194,40 @@ func (s *Service) Changes(ctx context.Context, p *models.Project, c *models.Cata
 	if err != nil {
 		return nil, err
 	}
-	var credit *gitpatch.Credit
+	var cr *gitpatch.Credit
 	if owner, err := s.users.GetByID(ctx, c.OwnerID); err == nil {
-		credit = catalog.TranslatorCredit(owner)
+		cr = s.credit(ctx, owner, r, approver)
 	}
-	return gitpatch.DiffCredit(c.RepoPath, base, want, credit), nil
+	return gitpatch.DiffCredit(c.RepoPath, base, want, cr), nil
+}
+
+// credit is how a commit credits people in the file's header: the translator (also Last-Translator), then the
+// approver and everyone whose review comments on the file were resolved since its last commit (requests sent back
+// and asked for again included), each on their own line
+func (s *Service) credit(ctx context.Context, owner *models.User, r *models.ModuleReview, approver *models.User) *gitpatch.Credit {
+	cr := catalog.TranslatorCredit(owner)
+	if cr == nil {
+		return nil
+	}
+	seen := map[int64]bool{owner.ID: true}
+	add := func(u *models.User) {
+		if u == nil || seen[u.ID] {
+			return
+		}
+		seen[u.ID] = true
+		if rc := catalog.TranslatorCredit(u); rc != nil {
+			cr.Reviewers = append(cr.Reviewers, *rc)
+		}
+	}
+	add(approver)
+	if r != nil && s.discuss != nil {
+		for _, id := range s.discuss.ResolvedReviewAuthors(ctx, r.CatalogID) {
+			if u, err := s.users.GetByID(ctx, id); err == nil {
+				add(u)
+			}
+		}
+	}
+	return cr
 }
 
 // ChangedHashes are the key hashes of the entries a review of the file would send (the review editor lists them)
@@ -405,7 +440,8 @@ func (s *Service) commit(ctx context.Context, reviewer *models.User, p *models.P
 		if conflicts := s.catalogs.UpstreamConflicts(ctx, c, f.Data, want, sent); len(conflicts) > 0 {
 			return apperr.New("err.review_upstream_conflict", len(conflicts), conflictList(conflicts))
 		}
-		data, n := gitpatch.ApplyCredit(f.Data, want, catalog.TranslatorCredit(owner)) // the header credits the translator
+		// the header credits the translator (also Last-Translator), the approver and reviewers whose comments were resolved
+		data, n := gitpatch.ApplyCredit(f.Data, want, s.credit(ctx, owner, r, reviewer))
 		if n == 0 {
 			return apperr.New("err.review_nothing")
 		}

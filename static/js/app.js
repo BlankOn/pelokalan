@@ -3070,6 +3070,33 @@ document.addEventListener("click", function (ev) {
     app.querySelectorAll("[data-review-view]").forEach(function (b) { b.classList.toggle("active", b === btn); });
 });
 
+// reviewOpenChange moves every count of the file's open review comments by delta without a reload: the badge beside
+// the sidebar handle, the review banner and the status bar (shown only while some are open), and "Setujui & commit",
+// which works again once none is open. Their texts carry 987654321 where the number goes (data-review-text).
+function reviewOpenChange(delta) {
+    var badge = document.getElementById("side-review-badge");
+    if (badge) {
+        var b = Math.max(0, parseInt(badge.dataset.n || "0", 10) + delta);
+        badge.dataset.n = String(b);
+        badge.textContent = String(b);
+    }
+    var total = null;
+    document.querySelectorAll("[data-review-count]").forEach(function (el) {
+        var n = Math.max(0, parseInt(el.dataset.n || "0", 10) + delta);
+        if (total === null) total = n;
+        el.dataset.n = String(n);
+        el.hidden = n === 0;
+        var txt = el.querySelector("[data-review-text]");
+        if (txt) txt.textContent = txt.dataset.reviewText.replace("987654321", String(n));
+    });
+    if (total === null) return;
+    document.querySelectorAll("[data-review-block]").forEach(function (btn) {
+        btn.disabled = total > 0;
+        if (total > 0) btn.title = btn.dataset.reviewBlock.replace("987654321", String(total));
+        else btn.removeAttribute("title");
+    });
+}
+
 // A thread's open review comments (data-review-open) mark the selected entry's row with a red dot, so
 // resolving the last one (or a reviewer's new comment) shows in the list at once
 document.addEventListener("htmx:load", function (ev) {
@@ -3077,15 +3104,10 @@ document.addEventListener("htmx:load", function (ev) {
     var row = document.querySelector(".entry-row.selected");
     if (!th || !row || !th.closest("#sidebar, #editor")) return;
     var n = parseInt(th.dataset.reviewOpen || "0", 10);
-    // the count beside the sidebar handle follows this entry's change
+    // the file's open review comment counts follow this entry's change
     var before = parseInt(row.dataset.reviewOpen || "0", 10);
     row.dataset.reviewOpen = String(n);
-    var badge = document.getElementById("side-review-badge");
-    if (badge && n !== before) {
-        var total = Math.max(0, parseInt(badge.dataset.n || "0", 10) + n - before);
-        badge.dataset.n = String(total);
-        badge.textContent = String(total);
-    }
+    if (n !== before) reviewOpenChange(n - before);
     var icon = row.querySelector(".cell-icon"), dot = icon && icon.querySelector(".mark-review");
     if (n > 0 && icon && !dot) {
         dot = document.createElement("span");

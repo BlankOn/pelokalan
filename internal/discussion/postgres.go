@@ -358,6 +358,27 @@ func (r *discussionRepository) ResolvedReviewComments(ctx context.Context, revie
 	return n, err
 }
 
+func (r *discussionRepository) ResolvedReviewAuthors(ctx context.Context, catalogID int64) ([]int64, error) {
+	rows, err := r.db.QueryContext(ctx, `SELECT c.author_id FROM comments c
+		JOIN module_reviews v ON v.id = c.review_id AND v.catalog_id = $1
+		WHERE c.resolved_at IS NOT NULL AND c.deleted_at IS NULL AND c.author_id IS NOT NULL
+		  AND v.id > COALESCE((SELECT MAX(id) FROM module_reviews WHERE catalog_id = $1 AND status = 'pushed'), 0)
+		GROUP BY c.author_id ORDER BY MIN(c.created_at)`, catalogID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out = append(out, id)
+	}
+	return out, rows.Err()
+}
+
 func (r *discussionRepository) OpenReviewComments(ctx context.Context, projectID, catalogID int64) (map[string]int, error) {
 	return r.reviewCommentCounts(ctx, projectID, catalogID, false)
 }
