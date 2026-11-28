@@ -151,7 +151,8 @@ wired in `app.New`. Rules:
   (= `ModuleGroup` with project files, e.g. gnome-51; `group_filter` partial, checkbox dropdown
   `[data-multi-filter]` with "Tampilkan semua" like the editor filter, shown when there is a group; `g` params).
   Search and filter live in `#pf-filter`; "Muat lagi" includes it (`hx-include`).
-- The black top bar (`.topbar`) sticks at the top of every page except full pages (`body.full`: editor, raw, history,
+- The black top bar (`.topbar`; on content pages its ends line up with the content column, `.container`; full pages keep the
+  whole width) sticks at the top of every page except full pages (`body.full`: editor, raw, history,
   file viewer, which use `100dvh` and scroll inside) (48px, `html { scroll-padding-top }` keeps anchors below
   it); the project tabs (`.tabs-nav`, `top: 48px`) stick right under it on every project page. Each of the three sections
   (`.files-section[data-sticky-section]`) keeps its title, card head, filter bar and column row on top while it scrolls

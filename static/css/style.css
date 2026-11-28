@@ -57,6 +57,9 @@ code, kbd, pre { font-family: var(--mono); font-size: 12px; }
     flex-shrink: 0;
 }
 .topbar { position: sticky; top: 0; z-index: 30; }
+/* on content pages the bar's ends line up with the content column (.container: 1080px with 20px padding);
+   full pages (editor …) keep the whole width */
+body:not(.full) .topbar { padding-inline: max(20px, calc((100% - 1040px) / 2)); }
 /* anchors land below the sticky top bar */
 html { scroll-padding-top: 60px; }
 .brand { display: flex; align-items: center; gap: 8px; color: #fff; font-weight: 600; font-size: 15px; }
