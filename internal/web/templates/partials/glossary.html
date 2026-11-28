@@ -10,7 +10,7 @@
 {{end}}
 
 {{/* a translation found only by AI extraction from long strings */}}
-{{define "ai_term_mark"}}<span class="gl-ai" title="{{t . "extract.mark_title"}}">AI</span>{{end}}
+{{define "ai_term_mark"}}<span class="gl-ai" role="img" title="{{t . "extract.mark_title"}}" aria-label="{{t . "extract.mark_title"}}"></span>{{end}}
 
 {{define "glossary_page"}}
 {{range .Page.Groups}}{{$g := .}}

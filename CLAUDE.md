@@ -940,8 +940,8 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
   then only the files whose content changed since the group's previous copy (`GroupFileHashes`: SHA-256 of the stored
   gzip, compared in `importInto`; a first copy counts as all changed) have their unextracted strings sent (within the
   budget), then rows are rebuilt. A backlog in unchanged files (a stopped first run) is left to the button.
-- A translation is "AI" when every row behind it is (`bool_and(origin = 'ai')`): a small purple "AI" mark
-  (`ai_term_mark`) in the glossary list and term page. AI-only terms are never applied to a whole string
+- A translation is "AI" when every row behind it is (`bool_and(origin = 'ai')`): a small purple dot
+  (`ai_term_mark`, tooltip) in the glossary list and term page. AI-only terms are never applied to a whole string
   (`ai.Term.AI`, `Glossary.Exact`) and are only optional hints for pre-translation.
 
 - **Consistency check in the review editor** ("Konsistensi" after Validasi, `Data.CanCheck`: people who review, not the

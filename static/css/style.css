@@ -655,8 +655,9 @@ h1 .ai-badge { font-size: 12px; }
 .gl-chip.gl-main { background: var(--ok-soft); border-color: #bfe3cc; }
 .gl-inconsistent .gl-chip:not(.gl-main) { background: var(--fuzzy-soft); border-color: #f2d9a6; }
 .gl-chip small { color: var(--muted); }
-.gl-ai { display: inline-block; font-size: 10px; font-weight: 700; line-height: 1; padding: 2px 4px; border-radius: 3px;
-    color: #7048e8; background: #f3f0ff; border: 1px solid #d0bfff; vertical-align: 1px; cursor: help; }
+/* a translation found only by AI extraction: a small purple dot (tooltip says what it means) */
+.gl-ai { display: inline-block; width: 7px; height: 7px; border-radius: 50%; background: #7048e8; vertical-align: 2px;
+    margin: 0 1px; cursor: help; }
 .extract-bar { display: inline-flex; align-items: center; gap: 10px; margin-left: auto; }
 .extract-estimate { min-height: 3em; margin: 10px 0; }
 #extract-dialog { width: min(560px, calc(100vw - 32px)); }
