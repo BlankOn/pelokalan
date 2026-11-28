@@ -136,17 +136,76 @@ func (r *glossaryRepository) CreateGroupImport(ctx context.Context, imp *models.
 	return tx.Commit()
 }
 
-// insertTerms adds glossary rows of an import (origin "" or "ai")
+// insertTerms adds glossary rows of an import (origin "" or "ai") and where each was found
+// (glossary_term_modules). Ids are taken from the sequence first, so module rows can point at their term.
 func insertTerms(ctx context.Context, tx *sql.Tx, imp *models.ModuleGroupImport, terms []GlossaryTerm, origin string) error {
-	const cols = 14
-	const batch = 500
-	for start := 0; start < len(terms); start += batch {
-		end := min(start+batch, len(terms))
+	if len(terms) == 0 {
+		return nil
+	}
+	ids := make([]int64, 0, len(terms))
+	rows, err := tx.QueryContext(ctx,
+		`SELECT nextval(pg_get_serial_sequence('glossary_terms', 'id')) FROM generate_series(1, $1)`, len(terms))
+	if err != nil {
+		return err
+	}
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return err
+	}
+	if len(ids) != len(terms) {
+		return fmt.Errorf("glossary terms: got %d ids for %d terms", len(ids), len(terms))
+	}
+
+	termRows := make([][]any, len(terms))
+	var moduleRows [][]any
+	for i, t := range terms {
+		termRows[i] = []any{ids[i], imp.ID, imp.ProjectID, imp.GroupID, imp.Language, t.Source, t.SourceNorm, t.Translation,
+			t.TranslationNorm, t.WordCount, t.Occurrences,
+			strings.Join(t.Modules, listSep), strings.Join(t.Contexts, listSep), glossary.TermHash(t.SourceNorm), origin}
+		counts := t.ModuleCounts
+		if len(counts) == 0 { // callers that only know the names: one occurrence each
+			counts = map[string]int{}
+			for _, m := range t.Modules {
+				counts[m] = 1
+			}
+		}
+		for m, n := range counts {
+			if m == "" {
+				continue
+			}
+			moduleRows = append(moduleRows, []any{ids[i], imp.ProjectID, imp.Language, m, models.ModuleKey(m), n})
+		}
+	}
+	if err := insertRows(ctx, tx, `INSERT INTO glossary_terms (id, import_id, project_id, group_id, language, source,
+		source_norm, translation, translation_norm, word_count, occurrences, modules, contexts, source_hash, origin) VALUES `,
+		termRows); err != nil {
+		return err
+	}
+	return insertRows(ctx, tx, `INSERT INTO glossary_term_modules (term_id, project_id, language, module, module_key,
+		occurrences) VALUES `, moduleRows)
+}
+
+// insertRows inserts rows (all of the same width) in batches of a few thousand parameters
+func insertRows(ctx context.Context, tx *sql.Tx, head string, rows [][]any) error {
+	if len(rows) == 0 {
+		return nil
+	}
+	cols := len(rows[0])
+	batch := max(1, 8000/cols)
+	for start := 0; start < len(rows); start += batch {
+		end := min(start+batch, len(rows))
 		var sb strings.Builder
-		sb.WriteString(`INSERT INTO glossary_terms (import_id, project_id, group_id, language, source, source_norm, translation,
-			translation_norm, word_count, occurrences, modules, contexts, source_hash, origin) VALUES `)
+		sb.WriteString(head)
 		args := make([]any, 0, (end-start)*cols)
-		for i, t := range terms[start:end] {
+		for i, row := range rows[start:end] {
 			if i > 0 {
 				sb.WriteByte(',')
 			}
@@ -158,9 +217,7 @@ func insertTerms(ctx context.Context, tx *sql.Tx, imp *models.ModuleGroupImport,
 				fmt.Fprintf(&sb, "$%d", len(args)+c)
 			}
 			sb.WriteByte(')')
-			args = append(args, imp.ID, imp.ProjectID, imp.GroupID, imp.Language, t.Source, t.SourceNorm, t.Translation,
-				t.TranslationNorm, t.WordCount, t.Occurrences,
-				strings.Join(t.Modules, listSep), strings.Join(t.Contexts, listSep), glossary.TermHash(t.SourceNorm), origin)
+			args = append(args, row...)
 		}
 		if _, err := tx.ExecContext(ctx, sb.String(), args...); err != nil {
 			return err
@@ -345,6 +402,41 @@ func (r *glossaryRepository) Term(ctx context.Context, projectID int64, hash str
 	return term, nil
 }
 
+func (r *glossaryRepository) ModuleTerms(ctx context.Context, projectID int64, language string, groupID int64, moduleKey string) ([]ModuleTerm, error) {
+	args := []any{projectID, language, moduleKey}
+	filter := ""
+	if groupID > 0 {
+		args = append(args, groupID)
+		filter = " AND g.group_id = $4"
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		WITH t AS (
+			SELECT g.source_norm, g.translation_norm, MIN(g.source) AS src, MIN(g.translation) AS tr,
+			       SUM(m.occurrences) AS n, MIN(g.word_count) AS wc, bool_and(g.origin = 'ai') AS ai
+			FROM glossary_term_modules m JOIN glossary_terms g ON g.id = m.term_id
+			WHERE m.project_id = $1 AND m.language = $2 AND m.module_key = $3`+filter+`
+			GROUP BY g.source_norm, g.translation_norm
+		), ranked AS (
+			SELECT *, SUM(n) OVER w AS total, COUNT(*) OVER w AS variants,
+			       ROW_NUMBER() OVER (PARTITION BY source_norm ORDER BY ai, n DESC, translation_norm) AS rk
+			FROM t WINDOW w AS (PARTITION BY source_norm)
+		)
+		SELECT src, tr, n, total, variants, wc, ai FROM ranked WHERE rk = 1`, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []ModuleTerm
+	for rows.Next() {
+		var t ModuleTerm
+		if err := rows.Scan(&t.Source, &t.Translation, &t.Count, &t.Total, &t.Variants, &t.Words, &t.AI); err != nil {
+			return nil, err
+		}
+		out = append(out, t)
+	}
+	return out, rows.Err()
+}
+
 func (r *glossaryRepository) PreferredTerms(ctx context.Context, projectID int64, language string, groupID int64) ([]PreferredTerm, error) {
 	args := []any{projectID, language}
 	filter := ""
@@ -404,9 +496,9 @@ func (r *glossaryRepository) Search(ctx context.Context, q GlossaryQuery) ([]*mo
 		where = append(where, fmt.Sprintf("t.word_count <= $%d", len(args)))
 	}
 	if q.Module != "" {
-		// modules are stored joined by listSep; match a whole name
-		args = append(args, listSep+q.Module+listSep)
-		where = append(where, fmt.Sprintf("strpos('%s' || t.modules || '%s', $%d) > 0", listSep, listSep, len(args)))
+		// every module of a pair is in glossary_term_modules (the modules column keeps only the first ones)
+		args = append(args, q.Module)
+		where = append(where, fmt.Sprintf("EXISTS (SELECT 1 FROM glossary_term_modules m WHERE m.term_id = t.id AND m.module = $%d)", len(args)))
 	}
 	having := "HAVING bool_or(" + strings.Join(where, " AND ") + ")"
 	if q.Inconsistent {
@@ -530,16 +622,16 @@ func (r *glossaryRepository) Stamp(ctx context.Context, projectID int64, languag
 }
 
 func (r *glossaryRepository) Modules(ctx context.Context, projectID int64, language string, groupID int64) ([]ModuleCount, error) {
-	args := []any{projectID, language, listSep}
+	args := []any{projectID, language}
 	filter := ""
 	if groupID > 0 {
 		args = append(args, groupID)
-		filter = " AND t.group_id = $4"
+		filter = " AND t.group_id = $3"
 	}
 	rows, err := r.db.QueryContext(ctx, `
-		SELECT m, COUNT(*) FROM glossary_terms t, unnest(string_to_array(t.modules, $3)) m
-		WHERE t.project_id = $1 AND t.language = $2`+filter+` AND m <> ''
-		GROUP BY m ORDER BY m`, args...)
+		SELECT m.module, COUNT(*) FROM glossary_term_modules m JOIN glossary_terms t ON t.id = m.term_id
+		WHERE m.project_id = $1 AND m.language = $2`+filter+`
+		GROUP BY m.module ORDER BY m.module`, args...)
 	if err != nil {
 		return nil, err
 	}

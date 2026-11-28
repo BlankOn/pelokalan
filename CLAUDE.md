@@ -231,6 +231,15 @@ wired in `app.New`. Rules:
 - Stored per import in `glossary_terms` (one row per distinct source/translation pair);
   deleting an import removes its terms. Search groups by `source_norm` across imports.
 - Language comes from the form, else the PO `Language:` header, else the `.xx.po` filename suffix.
+- **Per module** (`glossary_term_modules`, migration 059): every pair (people's and AI-extracted) has one row per
+  module it came from, with its occurrences there and no cap (`glossary.Term.ModuleCounts`, written by `insertTerms`
+  with ids taken from the sequence first); `module` = the glossary module name ("calc.main"), `module_key` =
+  `models.ModuleKey` ("calc"). `glossary_terms.modules` keeps only the first 30 for display; the glossary's module
+  filter and list read the table. `source.ModuleOverlay` puts a module's own translations ahead of the project-wide
+  ones (`ai.Glossary.WithOverlay`) when the module uses them at least `ModuleMinUses` (2) times or exclusively,
+  they differ from the project's, and an AI-only pair never replaces one people agreed on. Used by the editor
+  (`ForEntry` with the file's module; overlays cached per module with the project stamp), pre-translation and
+  single-entry AI (`pretranslate.glossaryFor`) and the consistency check.
 
 ## Glossary strings and discussions
 
@@ -958,7 +967,8 @@ The sidebar's list takes at most 30% of the sidebar's height and scrolls inside 
 At the top of the right sidebar (`entry_glossary` partial in editor.html, rendered by sidebar.html; while the
 sidebar is closed, and on phones, the copy in the editor pane above the source text shows instead) the editor lists glossary terms found in the entry (`source.Service.ForEntry`,
 all versions, preferred translation + share). Chips insert the translation at the cursor; ↗ opens
-the term page. Orange text when nothing matches or the language has no glossary. Chips the project AI
+the term page. Orange text when nothing matches or the language has no glossary. A module's own translation (above) shows a blue
+"modul ini" tag and the project-wide translation as a second, dashed chip (`.gl-mod`, `.gl-alt`). Chips the project AI
 context or the file's Konteks talks about (`ai.Mentioned`, same rule as pre-translation) are orange
 (`EntryTerm.Overridden`). Term matchers are
 cached per project+language and rebuilt only when `source.Repository.Stamp` (imports) changes.

@@ -31,7 +31,8 @@ type Term struct {
 	TranslationNorm string
 	WordCount       int
 	Occurrences     int
-	Modules         []string
+	Modules         []string       // where it was found (at most maxModules, for display)
+	ModuleCounts    map[string]int // module -> occurrences there (every module, no cap)
 	Contexts        []string
 }
 
@@ -104,6 +105,10 @@ func Build(files []File, language string) *Result {
 			}
 			t.Occurrences++
 			t.Modules = addUnique(t.Modules, module, maxModules)
+			if t.ModuleCounts == nil {
+				t.ModuleCounts = map[string]int{}
+			}
+			t.ModuleCounts[module]++
 			if e.HasContext && e.Context != "" {
 				t.Contexts = addUnique(t.Contexts, e.Context, 10)
 			}

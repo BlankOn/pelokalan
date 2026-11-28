@@ -94,6 +94,8 @@
             <li class="gl-term{{if .Overridden}} gl-overridden{{end}}"{{if .Overridden}} title="{{t $.Lang "editor.glossary_overridden"}}"{{end}}>
                 <button type="button" class="gl-insert" data-insert="{{.Translation}}" {{if $.ReadOnly}}disabled{{end}} title="{{t $.Lang "editor.glossary_insert"}}"><span class="gl-src">{{.Term}}</span> <span class="arrow">→</span> <strong class="gl-tr">{{.Translation}}</strong></button>
                 <span class="muted small" title="{{t $.Lang "editor.glossary_share"}}">{{.Share}}%</span>
+                {{if .Module}}<span class="gl-mod" title="{{t $.Lang "editor.glossary_module_title"}}">{{t $.Lang "editor.glossary_module"}}</span>
+                {{if .Project}}<button type="button" class="gl-insert gl-alt" data-insert="{{.Project}}" {{if $.ReadOnly}}disabled{{end}} title="{{t $.Lang "editor.glossary_project_title"}}">{{.Project}}</button>{{end}}{{end}}
                 <a class="gl-open small" href="{{$.Project.Path}}/glossary/{{.Hash}}" target="_blank" rel="noopener" title="{{t $.Lang "editor.glossary_open"}}">↗</a>
             </li>
             {{end}}

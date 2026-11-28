@@ -341,6 +341,25 @@ type AIEstimate struct {
 	OverBudget       bool
 }
 
+// glossaryFor is the project's glossary (of one module group when groupID > 0) with the file's module's own
+// translations put first (source.ModuleOverlay)
+func (s *Service) glossaryFor(ctx context.Context, p *models.Project, c *models.Catalog, groupID int64) (*ai.Glossary, error) {
+	pref, err := s.glossary.PreferredTerms(ctx, p.ID, c.Language, groupID)
+	if err != nil {
+		return nil, err
+	}
+	terms := make([]ai.Term, len(pref))
+	for i, t := range pref {
+		terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words, AI: t.AI}
+	}
+	g := ai.NewGlossary(terms)
+	mod, err := s.glossary.ModuleTerms(ctx, p.ID, c.Language, groupID, models.ModuleOf(c))
+	if err != nil {
+		return nil, err
+	}
+	return source.ModuleOverlay(g, mod), nil
+}
+
 func (s *Service) plan(ctx context.Context, p *models.Project, c *models.Catalog, opts AIOptions) (*aiPlan, error) {
 	entries, err := s.catalogs.ListEntries(ctx, c.ID, false)
 	if err != nil {
@@ -348,15 +367,9 @@ func (s *Service) plan(ctx context.Context, p *models.Project, c *models.Catalog
 	}
 	var g *ai.Glossary
 	if opts.GroupID >= 0 {
-		pref, err := s.glossary.PreferredTerms(ctx, p.ID, c.Language, opts.GroupID)
-		if err != nil {
+		if g, err = s.glossaryFor(ctx, p, c, opts.GroupID); err != nil {
 			return nil, err
 		}
-		terms := make([]ai.Term, len(pref))
-		for i, t := range pref {
-			terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words, AI: t.AI}
-		}
-		g = ai.NewGlossary(terms)
 	}
 
 	memory := map[int64]string{}
@@ -833,13 +846,9 @@ func (s *Service) TranslateEntry(ctx context.Context, user *models.User, p *mode
 	if err != nil {
 		return nil, err
 	}
-	pref, err := s.glossary.PreferredTerms(ctx, p.ID, c.Language, 0)
+	gl, err := s.glossaryFor(ctx, p, c, 0)
 	if err != nil {
 		return nil, err
-	}
-	terms := make([]ai.Term, len(pref))
-	for i, t := range pref {
-		terms[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words, AI: t.AI}
 	}
 	fileContext := ""
 	if s.contexts != nil {
@@ -848,7 +857,6 @@ func (s *Service) TranslateEntry(ctx context.Context, user *models.User, p *mode
 		}
 	}
 	contextWords := ai.ContextWords(st.ExtraContext + "\n" + fileContext)
-	gl := ai.NewGlossary(terms)
 	it := buildItem(e, c, gl, contextWords, current)
 	system := ai.SystemPrompt(languageLabel(p.SourceLanguage), languageLabel(c.Language), st.ExtraContext, fileContext)
 	batch := []ai.Item{it}

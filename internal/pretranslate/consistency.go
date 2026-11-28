@@ -10,6 +10,7 @@ import (
 
 	"pelokalan/internal/models"
 	"pelokalan/internal/platform/apperr"
+	"pelokalan/internal/source"
 	"pelokalan/pkg/ai"
 	"pelokalan/pkg/glossary"
 )
@@ -240,11 +241,23 @@ func (s *Service) CheckConsistency(ctx context.Context, user *models.User, p *mo
 		}
 
 		// compare: glossary's agreed translations (people's, not AI-only) and the strings among themselves
+		// (the file's module's own translations first, like the editor and pre-translation)
 		pref := map[string][2]any{}
 		if terms, err := s.glossary.PreferredTerms(bg, p.ID, c.Language, 0); err == nil {
 			for _, t := range terms {
 				if !t.AI && t.Share >= consistencyMinShare {
 					pref[glossary.Normalize(t.Source)] = [2]any{t.Translation, int(t.Share*100 + 0.5)}
+				}
+			}
+			if mod, err := s.glossary.ModuleTerms(bg, p.ID, c.Language, 0, models.ModuleOf(c)); err == nil {
+				base := make([]ai.Term, len(terms))
+				for i, t := range terms {
+					base[i] = ai.Term{Source: t.Source, Translation: t.Translation, Share: t.Share, Words: t.Words, AI: t.AI}
+				}
+				for _, t := range source.ModuleOverlay(ai.NewGlossary(base), mod).Overlay() {
+					if !t.AI && t.Share >= consistencyMinShare {
+						pref[glossary.Normalize(t.Source)] = [2]any{t.Translation, int(t.Share*100 + 0.5)}
+					}
 				}
 			}
 		}

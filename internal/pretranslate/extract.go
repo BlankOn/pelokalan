@@ -130,6 +130,10 @@ func (s *Service) rebuildAITerms(ctx context.Context, imp *models.ModuleGroupImp
 			}
 			t.Occurrences++
 			for _, m := range strings.Split(x.module, "\x1f") {
+				if t.ModuleCounts == nil {
+					t.ModuleCounts = map[string]int{}
+				}
+				t.ModuleCounts[m]++
 				if len(t.Modules) < 30 && !contains(t.Modules, m) {
 					t.Modules = append(t.Modules, m)
 				}

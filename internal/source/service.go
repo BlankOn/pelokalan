@@ -213,7 +213,7 @@ func (s *Service) importInto(ctx context.Context, v *models.ModuleGroup, filenam
 			Source: t.Source, SourceNorm: t.SourceNorm,
 			Translation: t.Translation, TranslationNorm: t.TranslationNorm,
 			WordCount: t.WordCount, Occurrences: t.Occurrences,
-			Modules: t.Modules, Contexts: t.Contexts,
+			Modules: t.Modules, Contexts: t.Contexts, ModuleCounts: t.ModuleCounts,
 		})
 		entries[t.Language] += t.Occurrences
 	}

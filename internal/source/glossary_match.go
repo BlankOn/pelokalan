@@ -17,6 +17,9 @@ type EntryTerm struct {
 	Translation string
 	Share       int    // percent of uses with this translation
 	Hash        string // glossary string page id
+	// Module: the file's module uses this translation, which differs from the project-wide Project one
+	Module  bool
+	Project string
 	// Overridden: the project's AI context or the file's Konteks talks about a word of this
 	// term, so AI pre-translation treats the glossary translation as a suggestion only
 	Overridden bool
@@ -39,7 +42,70 @@ type matcherEntry struct {
 type matcherCache struct {
 	mu      sync.Mutex
 	entries map[string]*matcherEntry
+	modules map[string]*matcherEntry // project matcher + a module's own translations, by module
 	build   sync.Mutex
+}
+
+// maxModuleMatchers bounds the cached module overlays (they are small; the base matcher is shared)
+const maxModuleMatchers = 2000
+
+// ModuleMinUses is how often a module must use its own translation of a term for it to win over the
+// project-wide one, unless it is the module's only translation of the term
+const ModuleMinUses = 2
+
+// ModuleOverlay puts a module's own translations ahead of the project-wide ones in base: those the module uses
+// at least ModuleMinUses times or exclusively, that differ from the project's, and (when found only by AI) do not
+// replace a translation people agreed on
+func ModuleOverlay(base *ai.Glossary, mod []ModuleTerm) *ai.Glossary {
+	var over []ai.Term
+	for _, m := range mod {
+		if m.Count < ModuleMinUses && m.Variants != 1 || m.Total == 0 {
+			continue
+		}
+		t := ai.Term{Source: m.Source, Translation: m.Translation, Share: float64(m.Count) / float64(m.Total),
+			Words: m.Words, AI: m.AI, Module: true}
+		if b, ok := base.Lookup(m.Source); ok {
+			if glossary.Normalize(b.Translation) == glossary.Normalize(m.Translation) || m.AI && !b.AI {
+				continue
+			}
+			t.Source, t.Project = b.Source, b.Translation
+		}
+		over = append(over, t)
+	}
+	return base.WithOverlay(over)
+}
+
+// moduleMatcher is the project matcher with the module's own translations on top (cached with the same stamp)
+func (s *Service) moduleMatcher(ctx context.Context, projectID int64, language, module string) (*ai.Glossary, error) {
+	base, err := s.matcher(ctx, projectID, language)
+	if err != nil || module == "" {
+		return base, err
+	}
+	c := &s.matchers
+	key := language + "/" + strconv.FormatInt(projectID, 10)
+	c.mu.Lock()
+	stamp := ""
+	if e := c.entries[key]; e != nil {
+		stamp = e.stamp
+	}
+	mkey := key + "/" + module
+	if e := c.modules[mkey]; e != nil && e.stamp == stamp {
+		c.mu.Unlock()
+		return e.g, nil
+	}
+	c.mu.Unlock()
+	mod, err := s.repo.ModuleTerms(ctx, projectID, language, 0, module)
+	if err != nil {
+		return nil, err
+	}
+	g := ModuleOverlay(base, mod)
+	c.mu.Lock()
+	if c.modules == nil || len(c.modules) >= maxModuleMatchers {
+		c.modules = map[string]*matcherEntry{}
+	}
+	c.modules[mkey] = &matcherEntry{stamp: stamp, g: g}
+	c.mu.Unlock()
+	return g, nil
 }
 
 // stampCheckInterval limits how often the cheap "did the glossary change" query runs
@@ -91,9 +157,10 @@ func (s *Service) matcher(ctx context.Context, projectID int64, language string)
 	return g, nil
 }
 
-// ForEntry finds glossary terms (all versions) that occur in an entry's source text
-func (s *Service) ForEntry(ctx context.Context, projectID int64, language, source, plural string) (*EntryGlossary, error) {
-	g, err := s.matcher(ctx, projectID, language)
+// ForEntry finds glossary terms (all versions) that occur in an entry's source text; module (models.ModuleKey of
+// the file, "" = none) puts that module's own translations first
+func (s *Service) ForEntry(ctx context.Context, projectID int64, language, module, source, plural string) (*EntryGlossary, error) {
+	g, err := s.moduleMatcher(ctx, projectID, language, module)
 	if err != nil {
 		return nil, err
 	}
@@ -114,6 +181,8 @@ func (s *Service) ForEntry(ctx context.Context, projectID int64, language, sourc
 				Translation: t.Translation,
 				Share:       int(math.Round(t.Share * 100)),
 				Hash:        glossary.TermHash(norm),
+				Module:      t.Module,
+				Project:     t.Project,
 			})
 		}
 	}

@@ -139,12 +139,64 @@ type Term struct {
 	// AI: found only by glossary extraction from long strings (no person's short string has it): a hint the
 	// model may follow, never applied to a whole string nor enforced
 	AI bool
+	// Module: the open file's module agrees on this translation, which differs from the project-wide one
+	// (Project; Share is then the share within the module)
+	Module  bool
+	Project string
 }
 
 // Glossary looks up preferred translations by normalized source text
 type Glossary struct {
 	terms    map[string]Term
+	over     map[string]Term // a module's own translations, ahead of terms (WithOverlay)
 	maxWords int
+}
+
+// WithOverlay returns the glossary with terms put ahead of the ones of the same source (a module's own
+// translations); the receiver is shared, not changed
+func (g *Glossary) WithOverlay(terms []Term) *Glossary {
+	if len(terms) == 0 {
+		return g
+	}
+	out := &Glossary{over: make(map[string]Term, len(terms))}
+	if g != nil {
+		out.terms, out.maxWords = g.terms, g.maxWords
+	}
+	for _, t := range terms {
+		out.over[glossary.Normalize(t.Source)] = t
+		if t.Words > out.maxWords && t.Words <= glossary.TermMaxWords {
+			out.maxWords = t.Words
+		}
+	}
+	return out
+}
+
+// Overlay lists the terms WithOverlay put ahead (in no particular order)
+func (g *Glossary) Overlay() []Term {
+	if g == nil {
+		return nil
+	}
+	out := make([]Term, 0, len(g.over))
+	for _, t := range g.over {
+		out = append(out, t)
+	}
+	return out
+}
+
+func (g *Glossary) term(key string) (Term, bool) {
+	if t, ok := g.over[key]; ok {
+		return t, true
+	}
+	t, ok := g.terms[key]
+	return t, ok
+}
+
+// Lookup returns the term of a source text (normalized here)
+func (g *Glossary) Lookup(source string) (Term, bool) {
+	if g == nil {
+		return Term{}, false
+	}
+	return g.term(glossary.Normalize(source))
 }
 
 // NewGlossary indexes terms by their normalized source
@@ -164,7 +216,13 @@ func (g *Glossary) Len() int {
 	if g == nil {
 		return 0
 	}
-	return len(g.terms)
+	n := len(g.terms)
+	for k := range g.over {
+		if _, ok := g.terms[k]; !ok {
+			n++
+		}
+	}
+	return n
 }
 
 // MinExactShare is how dominant a glossary translation must be to be applied
@@ -177,7 +235,7 @@ func (g *Glossary) Exact(source string) (string, bool) {
 	if g == nil || source != glossary.Clean(source) {
 		return "", false
 	}
-	t, ok := g.terms[glossary.Normalize(source)]
+	t, ok := g.term(glossary.Normalize(source))
 	if !ok || t.Share < MinExactShare || t.AI {
 		return "", false
 	}
@@ -216,7 +274,7 @@ func (g *Glossary) MatchTerms(source string) []Term {
 			if n == 1 && utf8.RuneCountInString(key) < 3 {
 				continue
 			}
-			t, ok := g.terms[key]
+			t, ok := g.term(key)
 			if !ok || seen[key] {
 				continue
 			}

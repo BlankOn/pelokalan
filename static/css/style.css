@@ -1139,6 +1139,8 @@ h1 .ai-badge { font-size: 12px; }
     overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
 .sb-glossary .gl-term { display: flex; flex-shrink: 0; }
 .sb-glossary .gl-insert { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.gl-mod { flex-shrink: 0; font-size: 11px; line-height: 1.4; padding: 0 5px; border-radius: 8px; background: #e3edff; color: #1c4fb8; cursor: help; white-space: nowrap; }
+.gl-insert.gl-alt, .sb-glossary .gl-insert.gl-alt { flex: 0 1 auto; font-size: 12px; color: var(--muted); padding: 1px 5px; border: 1px dashed #bfe3cf; }
 .sb-glossary .ed-label { margin-bottom: 8px; flex-wrap: wrap; }
 .sb-glossary .ed-gl-none { display: block; margin-top: 4px; }
 

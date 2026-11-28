@@ -34,6 +34,7 @@ type GlossaryTerm struct {
 	Source, SourceNorm, Translation, TranslationNorm string
 	WordCount, Occurrences                           int
 	Modules, Contexts                                []string
+	ModuleCounts                                     map[string]int // module name -> occurrences there (no cap)
 }
 
 // GlossaryRepository defines methods for glossary data access
@@ -115,6 +116,9 @@ type Repository interface {
 	// PreferredTerms returns the most used translation of every source term
 	// (groupID 0 = all module groups)
 	PreferredTerms(ctx context.Context, projectID int64, language string, groupID int64) ([]PreferredTerm, error)
+	// ModuleTerms is PreferredTerms within one module (models.ModuleKey; groupID 0 = every group): each source's
+	// top translation there (people's before AI-only), with its count, the source's total and how many translations
+	ModuleTerms(ctx context.Context, projectID int64, language string, groupID int64, moduleKey string) ([]ModuleTerm, error)
 	// Modules lists the modules (PO files) glossary terms come from, with their term counts
 	Modules(ctx context.Context, projectID int64, language string, groupID int64) ([]ModuleCount, error)
 	// Search returns one page of groups and the total number of matching groups
@@ -128,6 +132,15 @@ type PreferredTerm struct {
 	Share       float64
 	Words       int
 	AI          bool // found only by AI extraction
+}
+
+// ModuleTerm is a module's own preferred translation of a source
+type ModuleTerm struct {
+	Source, Translation string
+	Count, Total        int // uses of this translation in the module, of the source in the module
+	Variants            int // distinct translations of the source in the module
+	Words               int
+	AI                  bool // found only by AI extraction
 }
 
 // ModuleCount is a module (PO file) and how many glossary rows come from it

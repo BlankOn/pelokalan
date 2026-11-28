@@ -382,7 +382,7 @@ func (h *Handler) editorData(r *http.Request, c *models.Catalog, p *models.Proje
 		Thread:   p.Path() + "/discussions/" + models.SubjectPOEntry + "/" + discussion.EntrySubjectKey(c, e),
 	}
 	if !c.IsTemplate && c.Language != "" {
-		if g, err := h.glossary.ForEntry(r.Context(), p.ID, c.Language, e.MsgID, e.MsgIDPlural); err == nil {
+		if g, err := h.glossary.ForEntry(r.Context(), p.ID, c.Language, models.ModuleOf(c), e.MsgID, e.MsgIDPlural); err == nil {
 			if len(g.Terms) > 0 {
 				words := h.contextWords(r, p, c)
 				for i := range g.Terms {
