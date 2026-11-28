@@ -77,6 +77,7 @@ func (h *Handler) SaveAISettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	err := h.ai.SaveSettings(r.Context(), middleware.GetUser(r.Context()), p, pretranslate.AISettingsInput{
+		Provider:      r.FormValue("provider"),
 		BaseURL:       r.FormValue("base_url"),
 		Model:         r.FormValue("model"),
 		APIKey:        r.FormValue("api_key"),

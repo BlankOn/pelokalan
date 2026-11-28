@@ -27,6 +27,9 @@ var licenseCredits = []credit{
 	{"htmx 1.9.10", "https://htmx.org", "0BSD", "licenses.use_htmx"},
 	{"Feather Icons", "https://feathericons.com", "MIT", "licenses.use_feather"},
 	{"Simple Icons", "https://simpleicons.org", "CC0-1.0", "licenses.use_simpleicons"},
+	{"Anthropic Go SDK", "https://github.com/anthropics/anthropic-sdk-go", "MIT", "licenses.use_anthropic"},
+	{"gjson, sjson, match, pretty (tidwall), jsonparser, jsonschema, generic-list-go, ordered-map, standard-webhooks, OpenTelemetry Go, logr, yaml",
+		"https://github.com/anthropics/anthropic-sdk-go/blob/main/go.mod", "MIT, Apache-2.0, BSD-3-Clause", "licenses.use_anthropic_deps"},
 	{"PostgreSQL", "https://www.postgresql.org", "PostgreSQL License", "licenses.use_postgres"},
 }
 

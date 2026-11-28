@@ -5,6 +5,7 @@ import "time"
 // AISettings configures the LLM used for pre-translation in a project
 type AISettings struct {
 	ProjectID     int64
+	Provider      string // "openai" (or a compatible API) or "anthropic" (Claude)
 	BaseURL       string
 	Model         string
 	APIKeyEnc     string

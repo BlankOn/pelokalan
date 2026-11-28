@@ -294,3 +294,10 @@ func TestMatchCase(t *testing.T) {
 		t.Fatal("lowerFirst")
 	}
 }
+
+func TestParseResponseAroundJSON(t *testing.T) {
+	got, err := ParseResponse("Here are the translations:\n{\"translations\":[{\"id\":1,\"forms\":[\"Buka\"]}]}\nDone.")
+	if err != nil || len(got[1]) != 1 || got[1][0] != "Buka" {
+		t.Fatalf("got %v, %v", got, err)
+	}
+}

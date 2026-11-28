@@ -1305,6 +1305,28 @@
     window.addEventListener("pageshow", function () { pending.clear(); hide(); });
 })();
 
+// AI settings: the provider (OpenAI-compatible or Claude) narrows the model list to its own models, swaps the
+// API address when it still holds the other provider's default, and says that the other provider needs its own key
+document.addEventListener("change", function (ev) {
+    var prov = ev.target.closest && ev.target.closest("[data-ai-provider]");
+    if (!prov) return;
+    var form = prov.closest("form");
+    var pick = form.querySelector("[data-model-pick]");
+    var chosen = prov.selectedOptions[0];
+    pick.querySelectorAll("option[data-provider]").forEach(function (o) { o.hidden = o.dataset.provider !== prov.value; });
+    var first = pick.querySelector('option[data-provider="' + prov.value + '"][value="' + (chosen.dataset.model || "") + '"]') ||
+        pick.querySelector('option[data-provider="' + prov.value + '"]');
+    if (first) { pick.value = first.value; pick.dispatchEvent(new Event("change", {bubbles: true})); }
+    var base = form.querySelector("input[name=base_url]");
+    var defaults = [].map.call(prov.options, function (o) { return o.dataset.base; });
+    if (base && (!base.value || defaults.indexOf(base.value.replace(/\/+$/, "")) >= 0)) base.value = chosen.dataset.base;
+    var note = form.querySelector("[data-provider-key-note]");
+    var key = form.querySelector("input[name=api_key]");
+    var changed = prov.value !== prov.dataset.current;
+    if (note) note.hidden = !changed;
+    if (key) { key.required = changed || key.dataset.required === "1"; key.placeholder = !changed && key.dataset.placeholder ? key.dataset.placeholder : (prov.value === "anthropic" ? "sk-ant-…" : "sk-…"); }
+});
+
 // AI settings: the model dropdown fills the hidden model field; "Lainnya…" shows it for any other name
 document.addEventListener("change", function (ev) {
     var pick = ev.target.closest && ev.target.closest("[data-model-pick]");

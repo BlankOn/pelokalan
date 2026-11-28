@@ -36,9 +36,26 @@ type AIPrice struct{ Input, Output float64 }
 // AIPrices holds their prices, used for estimates, cost tracking and the monthly budget instead of
 // prices typed by managers. Taken from https://developers.openai.com/api/docs/pricing on 2026-11-14;
 // update both by hand when OpenAI changes them.
+// Claude models follow (provider "anthropic"; prices from Anthropic's price list on 2026-11-28, Haiku's for prompts
+// up to 100K tokens).
 var AIModels = []string{
 	"gpt-4o-mini", "gpt-5-nano", "gpt-6-luna", "gpt-5.6-luna", "gpt-5.4-nano", "gpt-5-mini", "gpt-4.1-mini",
 	"gpt-5.4-mini", "gpt-6.1-terra", "gpt-5", "gpt-5.1", "gpt-4.1", "o3", "gpt-6.1-sol", "gpt-4o",
+	"claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5",
+}
+
+// DefaultClaudeModel is the model chosen when a project switches to Claude
+const DefaultClaudeModel = "claude-opus-5-5"
+
+// ModelProvider is the provider a listed model belongs to ("" for a model typed by hand)
+func ModelProvider(model string) string {
+	if _, ok := AIPrices[model]; !ok {
+		return ""
+	}
+	if strings.HasPrefix(model, "claude-") {
+		return ProviderAnthropic
+	}
+	return ProviderOpenAI
 }
 
 var AIPrices = map[string]AIPrice{
@@ -57,6 +74,10 @@ var AIPrices = map[string]AIPrice{
 	"o3":            {2.00, 8.00},
 	"gpt-6.1-sol":   {2.00, 10.00},
 	"gpt-4o":        {2.50, 10.00},
+
+	"claude-opus-5-5":   {4.00, 20.00},
+	"claude-sonnet-5-5": {2.00, 10.00},
+	"claude-haiku-5-5":  {0.10, 0.50},
 }
 
 // applyModelPrice replaces the stored prices with the built-in ones for a known model (stored prices
@@ -116,6 +137,9 @@ func New(repo Repository, catalogs catalog.Repository, glossaryRepo source.Repos
 	box *ai.Box, allowPrivate bool) *Service {
 	s := &Service{repo: repo, catalogs: catalogs, glossary: glossaryRepo, box: box, allowPrivate: allowPrivate}
 	s.newClient = func(st *models.AISettings, key string) chatClient {
+		if st.Provider == ProviderAnthropic {
+			return newClaudeClient(st.BaseURL, key, st.Model, s.allowPrivate)
+		}
 		return ai.NewClient(st.BaseURL, key, st.Model, s.allowPrivate)
 	}
 	return s
@@ -138,6 +162,7 @@ func (s *Service) Settings(ctx context.Context, p *models.Project) (*models.AISe
 
 // AISettingsInput is the settings form
 type AISettingsInput struct {
+	Provider      string // ProviderOpenAI (default) or ProviderAnthropic
 	BaseURL       string
 	Model         string
 	APIKey        string // empty keeps the stored key
@@ -165,9 +190,16 @@ func (s *Service) SaveSettings(ctx context.Context, user *models.User, p *models
 	if err != nil {
 		return err
 	}
-	st := &models.AISettings{ProjectID: p.ID, UpdatedBy: &user.ID}
+	st := &models.AISettings{ProjectID: p.ID, UpdatedBy: &user.ID, Provider: ProviderOpenAI}
+	if in.Provider == ProviderAnthropic {
+		st.Provider = ProviderAnthropic
+	}
 	st.BaseURL = strings.TrimRight(strings.TrimSpace(in.BaseURL), "/")
-	if st.BaseURL == "" {
+	// each provider has its own address; the other provider's default left in the field is replaced
+	switch {
+	case st.Provider == ProviderAnthropic && (st.BaseURL == "" || st.BaseURL == ai.DefaultBaseURL):
+		st.BaseURL = DefaultAnthropicBaseURL
+	case st.Provider == ProviderOpenAI && (st.BaseURL == "" || st.BaseURL == DefaultAnthropicBaseURL):
 		st.BaseURL = ai.DefaultBaseURL
 	}
 	if _, err := glossary.ValidateURL(st.BaseURL); err != nil {
@@ -176,6 +208,9 @@ func (s *Service) SaveSettings(ctx context.Context, user *models.User, p *models
 	st.Model = strings.TrimSpace(in.Model)
 	if st.Model == "" || len(st.Model) > 100 || strings.ContainsAny(st.Model, " /?#") {
 		return apperr.New("err.ai_model")
+	}
+	if mp := ModelProvider(st.Model); mp != "" && mp != st.Provider { // e.g. a Claude model with the OpenAI API
+		return apperr.New("err.ai_model_provider")
 	}
 	ok1, ok2, ok3 := true, true, true
 	if _, known := AIPrices[st.Model]; known {
@@ -202,7 +237,7 @@ func (s *Service) SaveSettings(ctx context.Context, user *models.User, p *models
 			return err
 		}
 		st.APIKeyHint = ai.KeyHint(key)
-	case current != nil:
+	case current != nil && current.Provider == st.Provider: // a key is for one provider only
 		st.APIKeyEnc, st.APIKeyHint = current.APIKeyEnc, current.APIKeyHint
 	default:
 		return apperr.New("err.ai_key_required")

@@ -326,6 +326,13 @@ func ParseResponse(content string) (map[int64][]string, error) {
 	content = strings.TrimPrefix(content, "```json")
 	content = strings.TrimPrefix(content, "```")
 	content = strings.TrimSuffix(content, "```")
+	// models without a JSON mode (Claude) may put a word before or after the object
+	if i := strings.Index(content, "{"); i > 0 {
+		content = content[i:]
+	}
+	if i := strings.LastIndex(content, "}"); i >= 0 && i < len(content)-1 {
+		content = content[:i+1]
+	}
 	var resp struct {
 		Translations []struct {
 			ID    int64    `json:"id"`

@@ -198,6 +198,7 @@ func funcMap() template.FuncMap {
 		"editorStatuses": func() []string { return account.EditorStatuses },
 		"aiModels":       func() []string { return pretranslate.AIModels },
 		"aiPrice":        func(model string) pretranslate.AIPrice { return pretranslate.AIPrices[model] },
+		"aiProvider":     pretranslate.ModelProvider,
 		"validateStatuses": func(u *models.User) string {
 			var out []string
 			for _, c := range po.Checks {

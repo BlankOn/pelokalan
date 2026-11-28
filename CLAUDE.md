@@ -10,7 +10,7 @@ invite collaborators and translate in a desktop-style editor.
 
 ## Tech Stack
 
-- **Language:** Go 1.24
+- **Language:** Go 1.25 (the Anthropic SDK needs it; Dockerfile builds with golang:1.25-alpine)
 - **Web Framework:** Chi v5
 - **Database:** PostgreSQL 16 (pgx stdlib driver)
 - **Auth:** Email OTP + JWT session cookie (golang-jwt/jwt v5)
@@ -857,6 +857,16 @@ web/licenses.go). Keep it in sync with go.mod and static/ when adding dependenci
 
 ## AI pre-translation
 
+- **Providers** (`project_ai_settings.provider`, migration 058): `openai` (OpenAI or any API compatible with its chat
+  completions, `pkg/ai.Client`) or `anthropic` (Claude, `pretranslate/claude.go` on Anthropic's official Go SDK,
+  `github.com/anthropics/anthropic-sdk-go/v2`; same `chatClient` Chat/Ping, so every AI feature works with both). Settings
+  has a "Penyedia" select (`[data-ai-provider]`, app.js shows only that provider's models from `AIModels`, swaps the API
+  address, asks for a new key: a stored key belongs to one provider). Claude models (`claude-opus-5-5` default,
+  `claude-sonnet-5-5`, `claude-haiku-5-5`) carry their prices in `AIPrices`; `ModelProvider` refuses a model of the other
+  provider (`err.ai_model_provider`). Claude requests go through the Messages API (beta endpoint) with effort `low`,
+  the server-side refusal fallback (`fallbacks: "default"`, for the models in `claudeFallbackModels`), no temperature,
+  `max_tokens` 16000, through `netsafe`; the key is sent as `Authorization: Bearer` (the SDK's way). Claude has no JSON
+  mode, so `ai.ParseResponse` and `ParseExtractResponse` cut the JSON object out of any text around it.
 - Settings per project in `project_ai_settings` (owner/manager): base URL, model (a dropdown of
   `pretranslate.AIModels`, OpenAI chat models, plus "Lainnya…" for any other name; `[data-model-pick]` in app.js). Prices of
   those models are built in (`pretranslate.AIPrices`, USD per 1M tokens from OpenAI's pricing page, updated by hand; shown
